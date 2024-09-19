@@ -1,0 +1,8 @@
+Website = "https://yaojiqunaer.github.io"
+
+[Details]
+  Icon = "Icon.png"
+  Name = "GalaxyTerm"
+  ID = "io.github.yaojiqunaer.galaxyterm"
+  Version = "0.0.1"
+  Build = 5
