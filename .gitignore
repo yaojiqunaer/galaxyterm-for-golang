@@ -24,3 +24,8 @@ go.work.sum
 # env file
 .env
 .idea
+
+# wails init
+build/bin
+node_modules
+frontend/dist
