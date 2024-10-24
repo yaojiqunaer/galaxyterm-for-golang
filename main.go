@@ -5,6 +5,7 @@ import (
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"os"
 )
 
 //go:embed all:frontend/dist
@@ -12,20 +13,23 @@ var assets embed.FS
 
 func main() {
 	// Create an instance of the app structure
-	app := NewApp()
+	app := NewApp(TerminalOptions{
+		args: []string{os.Getenv("SHELL"), "-li"},
+	})
 
 	// Create application with options
-	err := wails.Run(&options.App{
-		Title:  "GalaxyTerm",
-		Width:  1024,
-		Height: 768,
+	var err = wails.Run(&options.App{
+		Title:  "Wails Terminal",
+		Width:  750,
+		Height: 475,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		BackgroundColour: &options.RGBA{R: 27, G: 38, B: 54, A: 1},
+		BackgroundColour: &options.RGBA{R: 0, G: 0, B: 0, A: 1},
 		OnStartup:        app.startup,
 		Bind: []interface{}{
 			app,
+			&Theme{},
 		},
 	})
 

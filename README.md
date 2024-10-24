@@ -29,3 +29,26 @@
 ----
 
 ## 安装
+
+### 前端
+
+#### 格式化插件
+
+```shell
+npm install normalize.css
+```
+
+#### xterm.js
+
+```shell
+npm install @xterm/xterm
+npm install @xterm/addon-attach
+npm install @xterm/addon-clipboard
+npm install @xterm/addon-fit
+npm install @xterm/addon-image
+npm install @xterm/addon-search
+npm install @xterm/addon-serialize
+npm install @xterm/addon-unicode11
+npm install @xterm/addon-web-links
+npm install @xterm/addon-webgl
+```
