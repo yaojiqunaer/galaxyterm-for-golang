@@ -17,14 +17,15 @@ function GalaxyTerminal() {
     useEffect(() => {
         // 初始化xterm终端
         term.current = new Terminal({
-            rows: 24,
-            cols: 80,
+            // rows: 24,
+            // cols: 80,
             cursorBlink: true,
             allowProposedApi: true,
             allowTransparency: true,
             macOptionIsMeta: true,
             macOptionClickForcesSelection: true,
-            scrollback: 0,
+            // 上下滚动缓冲区
+            scrollback: 5000,
             fontSize: 13,
             fontFamily: "Consolas,Liberation Mono,Menlo,Courier,monospace",
             theme: window.matchMedia("(prefers-color-scheme: dark)").matches ? themeLight : themeDark,
