@@ -12,9 +12,10 @@ import (
 var assets embed.FS
 
 func main() {
+	shell := os.Getenv("SHELL")
 	// Create an instance of the app structure
 	app := NewApp(TerminalOptions{
-		args: []string{os.Getenv("SHELL"), "-li"},
+		args: []string{shell, "-c", "cd $HOME && alias ls='ls --color=auto' && alias grep='grep --color=auto' && exec " + shell + " -li"},
 	})
 
 	// Create application with options
