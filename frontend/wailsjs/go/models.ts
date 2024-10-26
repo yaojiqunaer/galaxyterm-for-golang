@@ -1,4 +1,4 @@
-export namespace main {
+export namespace internal {
 	
 	export class Theme {
 	    cursor: string;

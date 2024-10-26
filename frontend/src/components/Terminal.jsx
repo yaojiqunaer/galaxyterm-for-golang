@@ -1,10 +1,10 @@
-import React, {useEffect, useRef} from 'react';
+import React, { useEffect, useRef } from 'react';
 import "@xterm/xterm/css/xterm.css"
-import {Terminal} from '@xterm/xterm';
-import {FitAddon} from "@xterm/addon-fit";
+import { Terminal } from '@xterm/xterm';
+import { FitAddon } from "@xterm/addon-fit";
 import * as runtime from "../../wailsjs/runtime/runtime.js";
-import * as WailsApp from "../../wailsjs/go/main/App.js";
-import * as Theme from "../../wailsjs/go/main/Theme.js";
+import * as PtyTerminal from "../../wailsjs/go/terminal/PtyTerminal.js";
+import * as Theme from "../../wailsjs/go/internal/Theme.js";
 
 function GalaxyTerminal() {
     const terminalRef = useRef(null);
@@ -17,8 +17,8 @@ function GalaxyTerminal() {
     useEffect(() => {
         // 初始化xterm终端
         term.current = new Terminal({
-            // rows: 24,
-            // cols: 80,
+            rows: 24,
+            cols: 80,
             cursorBlink: true,
             allowProposedApi: true,
             allowTransparency: true,
@@ -34,42 +34,40 @@ function GalaxyTerminal() {
         term.current.loadAddon(fitAddon.current);
         // 将终端挂载到指定的DOM节点
         term.current.open(terminalRef.current);
-        fitAddon.current.fit()
-        term.current.focus();
+        
+        setTimeout(() => {
+            // 确保DOM完全渲染后再调用fit方法
+            fitAddon.current.fit();
+            term.current.focus();
+        }, 0);
 
         // 监听终端大小变化，并通过Wails事件发送给后端
         term.current.onResize(size => {
             console.log("Resized to rows: " + size.rows + "cols: " + size.cols);
-            WailsApp.SetTTYSize(size.rows, size.cols).then(() => {
-                runtime.LogDebug("Resized to rows: " + size.rows + "cols: " + size.cols);
-            }).catch(error => console.error("Error setting TTY size:", error));
+            PtyTerminal.Resize(size.cols, size.rows)
         });
 
         // 监听浏览器窗口变化并手动调整终端尺寸
         const handleResize = () => {
             fitAddon.current.fit();
         };
-
         window.addEventListener('resize', handleResize);
 
         // 监听用户输入，并通过Wails事件发送给后端
         term.current.onData((data) => {
-            WailsApp.SendText(data).then(r => {
-                runtime.LogDebug("Sent data: " + data);
-            });
+            PtyTerminal.Send(data)
         });
 
         // 监听来自Go后端的终端输出
-        runtime.EventsOn('local-tty', (data) => {
-            runtime.LogDebug("Received data: " + data);
+        runtime.EventsOn('local-pty', (data) => {
             term.current.write(data);
         });
 
-
         // 启动后端
-        WailsApp.Start().then(r => {
+        PtyTerminal.Connect().then(() => {
             runtime.LogDebug("Started backend");
         });
+
         // 清理监听器
         return () => {
             runtime.EventsOff('local-tty');
@@ -79,7 +77,7 @@ function GalaxyTerminal() {
     }, [themeDark, themeLight]);
 
     return (
-        <div ref={terminalRef} style={{width: '100%', height: '100%'}}/>
+        <div ref={terminalRef} style={{ width: '100%', height: '100%' }} />
     );
 }
 
