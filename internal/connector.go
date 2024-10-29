@@ -24,3 +24,24 @@ type TerminalOptions struct {
 	DarkTheme   *Theme
 	CustomTheme *Theme
 }
+
+type Auth struct {
+	UserName string
+	// TODO: encryption
+	Password string
+	AuthType AuthType
+}
+
+type AuthType string
+
+type PtyType string
+
+const (
+	PWD AuthType = "PASSWORD"
+
+	XTERM_256_COLOR PtyType = "xterm-256color"
+	XTERM           PtyType = "xterm"
+	XTERM_COLOR     PtyType = "xterm-color"
+	VT100           PtyType = "vt100"
+	VT200           PtyType = "vt200"
+)

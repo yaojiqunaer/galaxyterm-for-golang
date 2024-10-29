@@ -17,3 +17,7 @@ export function Resize(arg1, arg2) {
 export function Send(arg1) {
   return window['go']['terminal']['PtyTerminal']['Send'](arg1);
 }
+
+export function Startup(arg1) {
+  return window['go']['terminal']['PtyTerminal']['Startup'](arg1);
+}

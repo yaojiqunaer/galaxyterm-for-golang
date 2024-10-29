@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"galaxyterm/internal"
 	"galaxyterm/internal/terminal"
@@ -16,9 +17,13 @@ var assets embed.FS
 func main() {
 	shell := os.Getenv("SHELL")
 	// Create an instance of the app structure
-	ptyTerm := terminal.NewTerminal(internal.TerminalOptions{
+	ptyTerm := terminal.NewPtyTerminal(internal.TerminalOptions{
 		Args: []string{shell, "-c", "cd $HOME && alias ls='ls --color=auto' && alias grep='grep --color=auto' && exec " + shell + " -li"},
 	})
+
+	sshTerminal := terminal.NewSshTerminal(internal.TerminalOptions{
+		Args: []string{},
+	}, "127.0.0.1:22", internal.Auth{UserName: "test", Password: "123456"})
 
 	// Create application with options
 	var err = wails.Run(&options.App{
@@ -29,9 +34,13 @@ func main() {
 			Assets: assets,
 		},
 		BackgroundColour: &options.RGBA{R: 0, G: 0, B: 0, A: 1},
-		OnStartup:        ptyTerm.Startup,
+		OnStartup: func(ctx context.Context) {
+			ptyTerm.Startup(ctx)
+			sshTerminal.Startup(ctx)
+		},
 		Bind: []interface{}{
 			ptyTerm,
+			sshTerminal,
 			&internal.Theme{},
 		},
 	})

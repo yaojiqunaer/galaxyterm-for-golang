@@ -20,8 +20,8 @@ type PtyTerminal struct {
 	cols    uint16
 }
 
-// NewTerminal NewTerm creates a new instance of the Terminal struct.
-func NewTerminal(options internal.TerminalOptions) *PtyTerminal {
+// NewPtyTerminal NewTerm creates a new instance of the Terminal struct.
+func NewPtyTerminal(options internal.TerminalOptions) *PtyTerminal {
 	return &PtyTerminal{options: options}
 }
 
@@ -81,7 +81,7 @@ func (term *PtyTerminal) startTTY() error {
 		cmd = exec.Command(term.options.Args[0], term.options.Args[1:]...)
 	}
 	cmd.Env = os.Environ()
-	cmd.Env = append(cmd.Env, "TERM=xterm-256color")
+	cmd.Env = append(cmd.Env, "TERM="+string(internal.XTERM_256_COLOR))
 
 	tty, err := pty.Start(cmd)
 	if err != nil {
