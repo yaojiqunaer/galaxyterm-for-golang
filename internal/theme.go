@@ -1,4 +1,4 @@
-package main
+package internal
 
 import (
 	"embed"
@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-//go:embed config/themes
+//go:embed themes
 var themes embed.FS
 
 type Theme struct {
@@ -35,7 +35,7 @@ type Theme struct {
 }
 
 func (theme *Theme) GetAllThemes() ([]string, error) {
-	dir, err := themes.ReadDir("config/themes")
+	dir, err := themes.ReadDir("./themes")
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func (theme *Theme) GetCustomTheme(name string) *Theme {
 }
 
 func LoadTheme(name string) (*Theme, error) {
-	f, err := themes.Open(path.Join("config/themes", fmt.Sprintf("%s.json", name)))
+	f, err := themes.Open(path.Join("./themes", fmt.Sprintf("%s.json", name)))
 	if err != nil {
 		return nil, err
 	}

@@ -3,10 +3,10 @@ import "@xterm/xterm/css/xterm.css"
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from "@xterm/addon-fit";
 import * as runtime from "../../wailsjs/runtime/runtime.js";
-import * as PtyTerminal from "../../wailsjs/go/terminal/PtyTerminal.js";
+import * as SshTerminal from "../../wailsjs/go/terminal/SshTerminal.js";
 import * as Theme from "../../wailsjs/go/internal/Theme.js";
 
-function GalaxyTerminal() {
+function SshTerm() {
     const terminalRef = useRef(null);
     const term = useRef(null);
     const fitAddon = useRef(null);
@@ -44,7 +44,7 @@ function GalaxyTerminal() {
         // 监听终端大小变化，并通过Wails事件发送给后端
         term.current.onResize(size => {
             console.log("Resized to rows: " + size.rows + "cols: " + size.cols);
-            PtyTerminal.Resize(size.cols, size.rows)
+            SshTerminal.Resize(size.cols, size.rows)
         });
 
         // 监听浏览器窗口变化并手动调整终端尺寸
@@ -55,22 +55,22 @@ function GalaxyTerminal() {
 
         // 监听用户输入，并通过Wails事件发送给后端
         term.current.onData((data) => {
-            PtyTerminal.Send(data)
+            SshTerminal.Send(data)
         });
 
         // 监听来自Go后端的终端输出
-        runtime.EventsOn('local-pty', (data) => {
+        runtime.EventsOn('ssh-pty', (data) => {
             term.current.write(data);
         });
 
         // 启动后端
-        PtyTerminal.Connect().then(() => {
+        SshTerminal.Connect().then(() => {
             runtime.LogDebug("Started backend");
         });
 
         // 清理监听器
         return () => {
-            runtime.EventsOff('local-pty');
+            runtime.EventsOff('ssh-pty');
             term.current.dispose();
             window.removeEventListener('resize', handleResize);
         };
@@ -81,4 +81,4 @@ function GalaxyTerminal() {
     );
 }
 
-export default GalaxyTerminal;
+export default SshTerm;
