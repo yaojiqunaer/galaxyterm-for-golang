@@ -34,12 +34,6 @@ function SshTerm() {
         term.current.loadAddon(fitAddon.current);
         // 将终端挂载到指定的DOM节点
         term.current.open(terminalRef.current);
-        
-        setTimeout(() => {
-            // 确保DOM完全渲染后再调用fit方法
-            fitAddon.current.fit();
-            term.current.focus();
-        }, 0);
 
         // 监听终端大小变化，并通过Wails事件发送给后端
         term.current.onResize(size => {
@@ -65,6 +59,11 @@ function SshTerm() {
 
         // 启动后端
         SshTerminal.Connect().then(() => {
+            setTimeout(() => {
+                // 确保DOM完全渲染后再调用fit方法
+                fitAddon.current.fit();
+                term.current.focus();
+            }, 0);
             runtime.LogDebug("Started backend");
         });
 
