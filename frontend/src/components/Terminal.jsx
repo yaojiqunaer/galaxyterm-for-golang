@@ -65,6 +65,11 @@ function GalaxyTerminal() {
 
         // 启动后端
         PtyTerminal.Connect().then(() => {
+            setTimeout(() => {
+                // 确保DOM完全渲染后再调用fit方法
+                fitAddon.current.fit();
+                term.current.focus();
+            }, 0);
             runtime.LogDebug("Started backend");
         });
 
