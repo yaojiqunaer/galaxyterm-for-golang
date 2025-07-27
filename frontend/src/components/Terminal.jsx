@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import "@xterm/xterm/css/xterm.css"
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from "@xterm/addon-fit";
@@ -6,84 +6,86 @@ import * as runtime from "../../wailsjs/runtime/runtime.js";
 import * as PtyTerminal from "../../wailsjs/go/terminal/PtyTerminal.js";
 import * as Theme from "../../wailsjs/go/internal/Theme.js";
 
-function GalaxyTerminal() {
+function GalaxyTerminal(props, ref) {
     const terminalRef = useRef(null);
     const term = useRef(null);
     const fitAddon = useRef(null);
-
-    const themeDark = Theme.GetDarkTheme();
-    const themeLight = Theme.GetLightTheme();
+    useImperativeHandle(ref, () => ({
+        fit: () => {
+            if (fitAddon.current) fitAddon.current.fit();
+        }
+    }), []);
 
     useEffect(() => {
-        // 初始化xterm终端
-        term.current = new Terminal({
-            rows: 24,
-            cols: 80,
-            cursorBlink: true,
-            allowProposedApi: true,
-            allowTransparency: true,
-            macOptionIsMeta: true,
-            macOptionClickForcesSelection: true,
-            // 上下滚动缓冲区
-            scrollback: 5000,
-            fontSize: 13,
-            fontFamily: "Consolas,Liberation Mono,Menlo,Courier,monospace",
-            theme: window.matchMedia("(prefers-color-scheme: dark)").matches ? themeLight : themeDark,
-        });
-        fitAddon.current = new FitAddon();
-        term.current.loadAddon(fitAddon.current);
-        // 将终端挂载到指定的DOM节点
-        term.current.open(terminalRef.current);
-        
-        setTimeout(() => {
-            // 确保DOM完全渲染后再调用fit方法
-            fitAddon.current.fit();
-            term.current.focus();
-        }, 0);
-
-        // 监听终端大小变化，并通过Wails事件发送给后端
-        term.current.onResize(size => {
-            console.log("Resized to rows: " + size.rows + "cols: " + size.cols);
-            PtyTerminal.Resize(size.cols, size.rows)
-        });
-
-        // 监听浏览器窗口变化并手动调整终端尺寸
-        const handleResize = () => {
-            fitAddon.current.fit();
-        };
-        window.addEventListener('resize', handleResize);
-
-        // 监听用户输入，并通过Wails事件发送给后端
-        term.current.onData((data) => {
-            PtyTerminal.Send(data)
-        });
-
-        // 监听来自Go后端的终端输出
-        runtime.EventsOn('local-pty', (data) => {
-            term.current.write(data);
-        });
-
-        // 启动后端
-        PtyTerminal.Connect().then(() => {
+        let disposed = false;
+        let observer = null;
+        async function initTerminal() {
+            const themeDark = await Theme.GetDarkTheme();
+            const themeLight = await Theme.GetLightTheme();
+            if (disposed) return;
+            term.current = new Terminal({
+                rows: 24,
+                cols: 80,
+                cursorBlink: true,
+                allowProposedApi: true,
+                allowTransparency: true,
+                macOptionIsMeta: true,
+                macOptionClickForcesSelection: true,
+                scrollback: 5000,
+                fontSize: 13,
+                fontFamily: "Consolas,Liberation Mono,Menlo,Courier,monospace",
+                theme: window.matchMedia("(prefers-color-scheme: dark)").matches ? themeDark : themeLight,
+            });
+            fitAddon.current = new FitAddon();
+            term.current.loadAddon(fitAddon.current);
+            term.current.open(terminalRef.current);
             setTimeout(() => {
-                // 确保DOM完全渲染后再调用fit方法
                 fitAddon.current.fit();
                 term.current.focus();
             }, 0);
-            runtime.LogDebug("Started backend");
-        });
-
-        // 清理监听器
-        return () => {
-            runtime.EventsOff('local-pty');
-            term.current.dispose();
-            window.removeEventListener('resize', handleResize);
-        };
-    }, [themeDark, themeLight]);
+            term.current.onResize(size => {
+                PtyTerminal.Resize(size.cols, size.rows)
+            });
+            const handleResize = () => {
+                fitAddon.current.fit();
+            };
+            window.addEventListener('resize', handleResize);
+            term.current.onData((data) => {
+                PtyTerminal.Send(data)
+            });
+            runtime.EventsOn('local-pty', (data) => {
+                term.current.write(data);
+            });
+            PtyTerminal.Connect().then(() => {
+                setTimeout(() => {
+                    fitAddon.current.fit();
+                    term.current.focus();
+                }, 0);
+                runtime.LogDebug("Started backend");
+            });
+            // 监听终端父容器尺寸变化，自动fit
+            if (terminalRef.current) {
+                observer = new window.ResizeObserver(() => {
+                    fitAddon.current && fitAddon.current.fit();
+                });
+                observer.observe(terminalRef.current.parentElement);
+            }
+            // 清理
+            return () => {
+                runtime.EventsOff('local-pty');
+                term.current.dispose();
+                window.removeEventListener('resize', handleResize);
+                if (observer) observer.disconnect();
+            };
+        }
+        let cleanup;
+        initTerminal().then(fn => { cleanup = fn });
+        return () => { disposed = true; if (cleanup) cleanup(); };
+    }, []);
 
     return (
         <div ref={terminalRef} style={{ width: '100%', height: '100%' }} />
     );
 }
 
-export default GalaxyTerminal;
+export default forwardRef(GalaxyTerminal);
