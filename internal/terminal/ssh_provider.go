@@ -13,9 +13,12 @@ import (
 )
 
 type sshDriver struct {
-	addr     string
-	username string
-	password string
+	addr       string
+	username   string
+	authType   string
+	password   string
+	privateKey string
+	passphrase string
 
 	client  *ssh.Client
 	session *ssh.Session
@@ -56,20 +59,29 @@ func newSSHDriver(req session.CreateSessionRequest) (*sshDriver, error) {
 	if password == "" {
 		password = stringValue(req.Config, "password")
 	}
+	authType := stringValue(req.Auth, "authType")
+	if authType == "" {
+		authType = "password"
+	}
 
 	return &sshDriver{
-		addr:     fmt.Sprintf("%s:%d", host, port),
-		username: username,
-		password: password,
+		addr:       fmt.Sprintf("%s:%d", host, port),
+		username:   username,
+		authType:   authType,
+		password:   password,
+		privateKey: stringValue(req.Auth, "privateKey"),
+		passphrase: stringValue(req.Auth, "passphrase"),
 	}, nil
 }
 
 func (d *sshDriver) Start(ctx context.Context, emit session.Emitter) error {
+	authMethods, err := d.authMethods()
+	if err != nil {
+		return err
+	}
 	config := &ssh.ClientConfig{
-		User: d.username,
-		Auth: []ssh.AuthMethod{
-			ssh.Password(d.password),
-		},
+		User:            d.username,
+		Auth:            authMethods,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
@@ -141,6 +153,26 @@ func (d *sshDriver) Start(ctx context.Context, emit session.Emitter) error {
 		emit(session.Event{Type: session.EventExit})
 	}()
 	return nil
+}
+
+func (d *sshDriver) authMethods() ([]ssh.AuthMethod, error) {
+	if d.authType == "privateKey" {
+		if d.privateKey == "" {
+			return nil, configError("privateKey")
+		}
+		var signer ssh.Signer
+		var err error
+		if d.passphrase != "" {
+			signer, err = ssh.ParsePrivateKeyWithPassphrase([]byte(d.privateKey), []byte(d.passphrase))
+		} else {
+			signer, err = ssh.ParsePrivateKey([]byte(d.privateKey))
+		}
+		if err != nil {
+			return nil, err
+		}
+		return []ssh.AuthMethod{ssh.PublicKeys(signer)}, nil
+	}
+	return []ssh.AuthMethod{ssh.Password(d.password)}, nil
 }
 
 func (d *sshDriver) Send(data string) error {

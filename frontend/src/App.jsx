@@ -86,6 +86,7 @@ function App() {
   const [fileLoading, setFileLoading] = useState(false);
   const [mkdirOpen, setMkdirOpen] = useState(false);
   const [mkdirName, setMkdirName] = useState('');
+  const [sshAuthType, setSshAuthType] = useState('password');
   const [form] = Form.useForm();
   const [fileForm] = Form.useForm();
   const terminalRefs = useRef({});
@@ -136,9 +137,13 @@ function App() {
       port: profile?.config?.port || 22,
       username: profile?.auth?.username || '',
       password: '',
+      authType: profile?.auth?.authType || 'password',
+      privateKey: '',
+      passphrase: '',
       shell: profile?.config?.shell || '',
       saveProfile: false,
     });
+    setSshAuthType(profile?.auth?.authType || 'password');
     setDrawerOpen(true);
   };
 
@@ -679,9 +684,30 @@ function App() {
               <Form.Item name="username" label={t('field.username')} rules={[{ required: true, message: t('validation.required') }]}>
                 <Input />
               </Form.Item>
-              <Form.Item name="password" label={t('field.password')}>
-                <Input.Password />
+              <Form.Item name="authType" label={t('field.authType')} initialValue="password">
+                <Select
+                  onChange={setSshAuthType}
+                  options={[
+                    { value: 'password', label: t('auth.password') },
+                    { value: 'privateKey', label: t('auth.privateKey') },
+                  ]}
+                />
               </Form.Item>
+              {sshAuthType === 'password' && (
+                <Form.Item name="password" label={t('field.password')}>
+                  <Input.Password />
+                </Form.Item>
+              )}
+              {sshAuthType === 'privateKey' && (
+                <>
+                  <Form.Item name="privateKey" label={t('field.privateKey')} rules={[{ required: true, message: t('validation.required') }]}>
+                    <Input.TextArea rows={7} placeholder={t('placeholder.privateKey')} />
+                  </Form.Item>
+                  <Form.Item name="passphrase" label={t('field.passphrase')}>
+                    <Input.Password />
+                  </Form.Item>
+                </>
+              )}
             </>
           )}
           <Form.Item name="saveProfile" valuePropName="checked">
@@ -759,6 +785,7 @@ function saveProfile(profiles, request) {
     config: request.config,
     auth: {
       username: request.auth?.username || '',
+      authType: request.auth?.authType || 'password',
     },
   };
   const nextProfiles = [...profiles, profile];
@@ -798,7 +825,10 @@ function buildRequest(type, displayName, values) {
       },
       auth: {
         username: values.username,
+        authType: values.authType || 'password',
         password: values.password || '',
+        privateKey: values.privateKey || '',
+        passphrase: values.passphrase || '',
       },
     };
   }
