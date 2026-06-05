@@ -9,6 +9,7 @@ import (
 	"galaxyterm/internal/files"
 	"galaxyterm/internal/session"
 	"galaxyterm/internal/terminal"
+	"galaxyterm/internal/tunnel"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
@@ -68,6 +69,7 @@ func main() {
 			session.NewAPI(sessionManager),
 			files.NewAPI(),
 			extensions.NewAPI(),
+			tunnel.NewAPI(),
 			&internal.Theme{},
 		},
 		Windows: nil,

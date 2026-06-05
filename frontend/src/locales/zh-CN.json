@@ -30,6 +30,7 @@
   "nav.sessions": "会话",
   "nav.extensions": "扩展",
   "nav.files": "文件",
+  "nav.tunnels": "隧道",
   "nav.settings": "设置",
   "section.quickConnect": "快速连接",
   "section.activeSessions": "活动会话",
@@ -40,6 +41,7 @@
   "section.remoteFiles": "远程文件",
   "section.quickCommands": "快捷命令",
   "section.sessionGrid": "分屏会话",
+  "section.tunnels": "端口转发",
   "empty.noSessions": "暂无会话",
   "empty.noConnections": "暂无保存的连接",
   "empty.noFiles": "暂无文件",
@@ -59,6 +61,10 @@
   "field.jumpPort": "跳板端口",
   "field.jumpUsername": "跳板用户",
   "field.jumpPassword": "跳板密码",
+  "field.localHost": "本地地址",
+  "field.localPort": "本地端口",
+  "field.remoteHost": "远端地址",
+  "field.remotePort": "远端端口",
   "field.shell": "Shell",
   "field.locale": "界面语言",
   "field.saveProfile": "保存为连接",
@@ -99,4 +105,6 @@
   "message.deleteSuccess": "已删除",
   "message.downloadStarted": "已开始下载",
   "message.noActiveSession": "没有活动终端会话"
+  ,"message.tunnelStarted": "隧道已启动",
+  "message.tunnelStopped": "隧道已停止"
 }

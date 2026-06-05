@@ -30,6 +30,7 @@
   "nav.sessions": "Sessions",
   "nav.extensions": "Extensions",
   "nav.files": "Files",
+  "nav.tunnels": "Tunnels",
   "nav.settings": "Settings",
   "section.quickConnect": "Quick Connect",
   "section.activeSessions": "Active Sessions",
@@ -40,6 +41,7 @@
   "section.remoteFiles": "Remote Files",
   "section.quickCommands": "Quick Commands",
   "section.sessionGrid": "Split Sessions",
+  "section.tunnels": "Port Forwarding",
   "empty.noSessions": "No sessions",
   "empty.noConnections": "No saved connections",
   "empty.noFiles": "No files",
@@ -59,6 +61,10 @@
   "field.jumpPort": "Jump Port",
   "field.jumpUsername": "Jump User",
   "field.jumpPassword": "Jump Password",
+  "field.localHost": "Local Host",
+  "field.localPort": "Local Port",
+  "field.remoteHost": "Remote Host",
+  "field.remotePort": "Remote Port",
   "field.shell": "Shell",
   "field.locale": "Interface Language",
   "field.saveProfile": "Save as connection",
@@ -98,5 +104,7 @@
   "message.mkdirSuccess": "Folder created",
   "message.deleteSuccess": "Deleted",
   "message.downloadStarted": "Download started",
-  "message.noActiveSession": "No active terminal session"
+  "message.noActiveSession": "No active terminal session",
+  "message.tunnelStarted": "Tunnel started",
+  "message.tunnelStopped": "Tunnel stopped"
 }

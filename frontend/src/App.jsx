@@ -39,6 +39,7 @@ import TerminalPane from './components/TerminalPane.jsx';
 import * as ExtensionsAPI from '../wailsjs/go/extensions/API.js';
 import * as FilesAPI from '../wailsjs/go/files/API.js';
 import * as SessionAPI from '../wailsjs/go/session/API.js';
+import * as TunnelAPI from '../wailsjs/go/tunnel/API.js';
 import { availableLocales, currentLocale, setLocale, t } from './i18n.js';
 
 const { Sider, Content } = Layout;
@@ -77,6 +78,7 @@ function App() {
   const [sessions, setSessions] = useState([]);
   const [profiles, setProfiles] = useState(() => loadProfiles());
   const [installedExtensions, setInstalledExtensions] = useState([]);
+  const [tunnels, setTunnels] = useState([]);
   const [activeKey, setActiveKey] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -93,6 +95,7 @@ function App() {
   const [sshAuthType, setSshAuthType] = useState('password');
   const [form] = Form.useForm();
   const [fileForm] = Form.useForm();
+  const [tunnelForm] = Form.useForm();
   const terminalRefs = useRef({});
   const quickCommands = useMemo(() => defaultQuickCommands(), []);
 
@@ -631,9 +634,87 @@ function App() {
     </div>
   );
 
+  const startTunnel = async () => {
+    const values = await tunnelForm.validateFields();
+    const info = await TunnelAPI.Start({
+      name: values.name || 'Tunnel',
+      sshHost: values.sshHost,
+      sshPort: values.sshPort || 22,
+      sshUser: values.sshUser,
+      sshPassword: values.sshPassword || '',
+      localHost: values.localHost || '127.0.0.1',
+      localPort: values.localPort,
+      remoteHost: values.remoteHost,
+      remotePort: values.remotePort,
+    });
+    setTunnels((current) => [...current, info]);
+    message.success(t('message.tunnelStarted'));
+  };
+
+  const stopTunnel = async (id) => {
+    await TunnelAPI.Stop(id);
+    setTunnels((current) => current.filter((item) => item.id !== id));
+    message.success(t('message.tunnelStopped'));
+  };
+
+  const renderTunnels = () => (
+    <div className="workspace-page">
+      <div className="page-header">
+        <div>
+          <Text type="secondary">{t('nav.tunnels')}</Text>
+          <Title level={3}>{t('section.tunnels')}</Title>
+        </div>
+      </div>
+      <Card>
+        <Form form={tunnelForm} layout="inline" className="file-browser-form" initialValues={{ sshPort: 22, localHost: '127.0.0.1' }}>
+          <Form.Item name="name" label={t('field.name')}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="sshHost" label={t('field.host')} rules={[{ required: true, message: t('validation.required') }]}>
+            <Input placeholder={t('placeholder.host')} />
+          </Form.Item>
+          <Form.Item name="sshPort" label={t('field.port')}>
+            <InputNumber min={1} max={65535} />
+          </Form.Item>
+          <Form.Item name="sshUser" label={t('field.username')} rules={[{ required: true, message: t('validation.required') }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="sshPassword" label={t('field.password')}>
+            <Input.Password />
+          </Form.Item>
+          <Form.Item name="localHost" label={t('field.localHost')}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="localPort" label={t('field.localPort')} rules={[{ required: true, message: t('validation.required') }]}>
+            <InputNumber min={1} max={65535} />
+          </Form.Item>
+          <Form.Item name="remoteHost" label={t('field.remoteHost')} rules={[{ required: true, message: t('validation.required') }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="remotePort" label={t('field.remotePort')} rules={[{ required: true, message: t('validation.required') }]}>
+            <InputNumber min={1} max={65535} />
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" onClick={startTunnel}>{t('action.create')}</Button>
+          </Form.Item>
+        </Form>
+        <List
+          className="profile-list"
+          dataSource={tunnels}
+          renderItem={(item) => (
+            <List.Item actions={[<Button key="stop" danger size="small" onClick={() => stopTunnel(item.id)}>{t('action.delete')}</Button>]}>
+              <List.Item.Meta title={item.name} description={`${item.localAddr} -> ${item.remoteAddr} via ${item.sshAddr}`} />
+            </List.Item>
+          )}
+        />
+      </Card>
+    </div>
+  );
+
   const renderContent = () => {
     if (selectedNav === 'connections') return renderConnections();
     if (selectedNav === 'files') return renderFiles();
+    if (selectedNav === 'tunnels') return renderTunnels();
     if (selectedNav === 'extensions') return renderExtensions();
     if (selectedNav === 'settings') return renderSettings();
     return renderSessions();
@@ -659,6 +740,7 @@ function App() {
             { key: 'connections', icon: <CloudServerOutlined />, label: t('nav.connections') },
             { key: 'sessions', icon: <CodeOutlined />, label: t('nav.sessions') },
             { key: 'files', icon: <FolderOpenOutlined />, label: t('nav.files') },
+            { key: 'tunnels', icon: <ApiOutlined />, label: t('nav.tunnels') },
             { key: 'extensions', icon: <AppstoreAddOutlined />, label: t('nav.extensions') },
             { key: 'settings', icon: <SettingOutlined />, label: t('nav.settings') },
           ]}
