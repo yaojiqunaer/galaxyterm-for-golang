@@ -36,6 +36,7 @@ import {
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import TerminalPane from './components/TerminalPane.jsx';
+import * as ExtensionsAPI from '../wailsjs/go/extensions/API.js';
 import * as FilesAPI from '../wailsjs/go/files/API.js';
 import * as SessionAPI from '../wailsjs/go/session/API.js';
 import { availableLocales, currentLocale, setLocale, t } from './i18n.js';
@@ -75,6 +76,7 @@ function App() {
   const [providers, setProviders] = useState(fallbackProviders);
   const [sessions, setSessions] = useState([]);
   const [profiles, setProfiles] = useState(() => loadProfiles());
+  const [installedExtensions, setInstalledExtensions] = useState([]);
   const [activeKey, setActiveKey] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -97,6 +99,12 @@ function App() {
       .catch(() => {
         setProviders(fallbackProviders);
       });
+  }, []);
+
+  useEffect(() => {
+    ExtensionsAPI.ListInstalled()
+      .then((items) => setInstalledExtensions(Array.isArray(items) ? items : []))
+      .catch(() => setInstalledExtensions([]));
   }, []);
 
   useEffect(() => {
@@ -283,6 +291,20 @@ function App() {
         </Space>
       </div>
       <Alert type="info" showIcon message={t('settings.coreOnly')} />
+      {installedExtensions.length > 0 && (
+        <>
+          <Divider />
+          <Title level={4}>{t('section.installedProviders')}</Title>
+          <List
+            dataSource={installedExtensions}
+            renderItem={(extension) => (
+              <List.Item>
+                <List.Item.Meta title={extension.name} description={`${extension.id} · ${extension.version}`} />
+              </List.Item>
+            )}
+          />
+        </>
+      )}
       <div className="extension-grid">
         {providers.map((provider) => (
           <Card key={provider.type} size="small">
