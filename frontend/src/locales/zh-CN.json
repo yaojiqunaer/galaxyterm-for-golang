@@ -1,0 +1,23 @@
+{
+  "app.title": "GalaxyTerm",
+  "action.newTerminal": "新建终端",
+  "action.create": "创建",
+  "action.cancel": "取消",
+  "field.type": "类型",
+  "field.name": "名称",
+  "field.host": "主机",
+  "field.port": "端口",
+  "field.username": "用户名",
+  "field.password": "密码",
+  "field.shell": "Shell",
+  "placeholder.sessionName": "可自定义标签名",
+  "placeholder.host": "例如 127.0.0.1",
+  "placeholder.shell": "留空使用默认 Shell",
+  "provider.local.name": "本地终端",
+  "provider.ssh.name": "SSH 终端",
+  "terminal.status.connecting": "正在连接...",
+  "terminal.status.connected": "已连接",
+  "terminal.status.closed": "会话已关闭",
+  "terminal.error.createFailed": "创建终端失败",
+  "terminal.error.disconnected": "终端连接异常"
+}

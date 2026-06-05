@@ -1,73 +1,99 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Layout, Tabs, Button, Modal, Select, Input, message } from 'antd';
+import React, { useEffect, useRef, useState } from 'react';
+import { Button, Form, Input, InputNumber, Layout, Modal, Select, Tabs, message } from 'antd';
 import { PlusOutlined } from '@ant-design/icons';
-import SshTerminal from './components/SshTerm.jsx';
-import Terminal from './components/Terminal.jsx';
+import TerminalPane from './components/TerminalPane.jsx';
+import * as SessionAPI from '../wailsjs/go/session/API.js';
+import { t } from './i18n.js';
 
-const TERMINAL_TYPES = [
-  { label: '本地终端', value: 'local', component: Terminal },
-  { label: 'SSH终端', value: 'ssh', component: SshTerminal },
+const fallbackProviders = [
+  { type: 'local', nameKey: 'provider.local.name', name: 'Local Terminal' },
+  { type: 'ssh', nameKey: 'provider.ssh.name', name: 'SSH' },
 ];
 
+function providerLabel(provider) {
+  return t(provider.nameKey, provider.name || provider.type);
+}
+
 function App() {
-  const [sessions, setSessions] = useState([
-    { id: '1', type: 'ssh', label: 'SSH终端1', component: <SshTerminal /> },
-    { id: '2', type: 'local', label: '本地终端1', component: <Terminal /> },
-  ]);
-  const [activeKey, setActiveKey] = useState(sessions[0].id);
+  const [providers, setProviders] = useState(fallbackProviders);
+  const [sessions, setSessions] = useState([]);
+  const [activeKey, setActiveKey] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [newType, setNewType] = useState('local');
-  const [newLabel, setNewLabel] = useState('');
+  const [form] = Form.useForm();
   const terminalRefs = useRef({});
 
   useEffect(() => {
-    // 初始化时fit当前终端
-    if (terminalRefs.current[activeKey] && terminalRefs.current[activeKey].fit) {
-      setTimeout(() => terminalRefs.current[activeKey].fit(), 0);
-    }
+    SessionAPI.ListProviders()
+      .then((loadedProviders) => {
+        if (Array.isArray(loadedProviders) && loadedProviders.length > 0) {
+          setProviders(loadedProviders);
+          setNewType(loadedProviders[0].type);
+        }
+      })
+      .catch(() => {
+        setProviders(fallbackProviders);
+      });
   }, []);
 
-  const handleTabChange = (key) => {
-    setActiveKey(key);
-    setTimeout(() => {
-      if (terminalRefs.current[key] && terminalRefs.current[key].fit) {
-        terminalRefs.current[key].fit();
-      }
-    }, 0);
-  };
+  useEffect(() => {
+    if (activeKey && terminalRefs.current[activeKey]?.fit) {
+      setTimeout(() => terminalRefs.current[activeKey]?.fit(), 0);
+    }
+  }, [activeKey]);
 
-  const addSession = () => {
+  const openModal = () => {
+    const firstType = providers[0]?.type || 'local';
+    setNewType(firstType);
+    form.setFieldsValue({
+      displayName: '',
+      host: '',
+      port: 22,
+      username: '',
+      password: '',
+      shell: '',
+    });
     setModalOpen(true);
-    setNewType('local');
-    setNewLabel('');
   };
 
-  const handleOk = () => {
-    const typeObj = TERMINAL_TYPES.find(t => t.value === newType);
-    if (!typeObj) return;
-    const id = Date.now().toString();
-    const label = newLabel || `${typeObj.label}${sessions.filter(s => s.type === newType).length + 1}`;
-    setSessions([...sessions, { id, type: newType, label, component: React.createElement(typeObj.component) }]);
+  const createSession = async () => {
+    const values = await form.validateFields();
+    const provider = providers.find((item) => item.type === newType) || fallbackProviders[0];
+    const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`;
+    const label = values.displayName || providerLabel(provider);
+    const request = buildRequest(newType, label, values);
+
+    setSessions((current) => [...current, { id, label, request }]);
     setActiveKey(id);
     setModalOpen(false);
-    message.success('新终端已创建');
+    message.success(t('terminal.status.connecting'));
   };
-
-  const handleCancel = () => setModalOpen(false);
 
   const removeSession = (targetKey) => {
-    let newActiveKey = activeKey;
-    let lastIndex = -1;
-    sessions.forEach((s, i) => {
-      if (s.id === targetKey) lastIndex = i - 1;
+    setSessions((current) => {
+      const next = current.filter((item) => item.id !== targetKey);
+      if (activeKey === targetKey) {
+        setActiveKey(next[0]?.id || '');
+      }
+      return next;
     });
-    const newSessions = sessions.filter(s => s.id !== targetKey);
-    if (newSessions.length && newActiveKey === targetKey) {
-      newActiveKey = newSessions[lastIndex >= 0 ? lastIndex : 0].id;
-    }
-    setSessions(newSessions);
-    setActiveKey(newActiveKey);
   };
+
+  const items = sessions.map((session) => ({
+    key: session.id,
+    label: session.label,
+    children: (
+      <div style={{ width: '100%', height: '100%', minHeight: 0, flex: 1, display: 'flex', flexDirection: 'column' }}>
+        <TerminalPane
+          ref={(el) => {
+            terminalRefs.current[session.id] = el;
+          }}
+          request={session.request}
+        />
+      </div>
+    ),
+    closable: true,
+  }));
 
   return (
     <Layout style={{ minHeight: '100vh', background: 'transparent' }}>
@@ -79,50 +105,88 @@ function App() {
           type="editable-card"
           hideAdd
           activeKey={activeKey}
-          onChange={handleTabChange}
+          onChange={setActiveKey}
           onEdit={(targetKey, action) => {
-            if (action === 'add') addSession();
-            else if (action === 'remove') removeSession(targetKey);
+            if (action === 'add') openModal();
+            if (action === 'remove') removeSession(targetKey);
           }}
-          items={sessions.map(s => ({
-            key: s.id,
-            label: s.label,
-            children: <div style={{width: '100%', height: '100%', minHeight: 0, flex: 1, background: 'transparent', padding: 0, margin: 0, display: 'flex', flexDirection: 'column'}}>
-              {React.cloneElement(s.component, {
-                ref: el => { terminalRefs.current[s.id] = el; }
-              })}
-            </div>,
-            closable: sessions.length > 1,
-          }))}
-          tabBarExtraContent={<Button icon={<PlusOutlined />} onClick={addSession}>新建终端</Button>}
+          items={items}
+          tabBarExtraContent={<Button icon={<PlusOutlined />} onClick={openModal}>{t('action.newTerminal')}</Button>}
         />
       </Layout.Content>
       <Modal
-        title="新建终端"
+        title={t('action.newTerminal')}
         open={modalOpen}
-        onOk={handleOk}
-        onCancel={handleCancel}
+        onOk={createSession}
+        onCancel={() => setModalOpen(false)}
+        okText={t('action.create')}
+        cancelText={t('action.cancel')}
       >
-        <div style={{ marginBottom: 16 }}>
-          <span>类型：</span>
-          <Select
-            value={newType}
-            onChange={setNewType}
-            options={TERMINAL_TYPES}
-            style={{ width: 120 }}
-          />
-        </div>
-        <div>
-          <span>名称：</span>
-          <Input
-            value={newLabel}
-            onChange={e => setNewLabel(e.target.value)}
-            placeholder="可自定义标签名"
-          />
-        </div>
+        <Form form={form} layout="vertical">
+          <Form.Item label={t('field.type')}>
+            <Select
+              value={newType}
+              onChange={setNewType}
+              options={providers.map((provider) => ({
+                value: provider.type,
+                label: providerLabel(provider),
+              }))}
+            />
+          </Form.Item>
+          <Form.Item name="displayName" label={t('field.name')}>
+            <Input placeholder={t('placeholder.sessionName')} />
+          </Form.Item>
+          {newType === 'local' && (
+            <Form.Item name="shell" label={t('field.shell')}>
+              <Input placeholder={t('placeholder.shell')} />
+            </Form.Item>
+          )}
+          {newType === 'ssh' && (
+            <>
+              <Form.Item name="host" label={t('field.host')} rules={[{ required: true, message: t('field.host') }]}>
+                <Input placeholder={t('placeholder.host')} />
+              </Form.Item>
+              <Form.Item name="port" label={t('field.port')} initialValue={22}>
+                <InputNumber min={1} max={65535} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item name="username" label={t('field.username')} rules={[{ required: true, message: t('field.username') }]}>
+                <Input />
+              </Form.Item>
+              <Form.Item name="password" label={t('field.password')}>
+                <Input.Password />
+              </Form.Item>
+            </>
+          )}
+        </Form>
       </Modal>
     </Layout>
   );
+}
+
+function buildRequest(type, displayName, values) {
+  if (type === 'ssh') {
+    return {
+      providerType: type,
+      displayName,
+      config: {
+        host: values.host,
+        port: values.port || 22,
+      },
+      auth: {
+        username: values.username,
+        password: values.password || '',
+      },
+    };
+  }
+
+  return {
+    providerType: type,
+    displayName,
+    config: {
+      shell: values.shell || '',
+    },
+    auth: {},
+  };
 }
 
 export default App;

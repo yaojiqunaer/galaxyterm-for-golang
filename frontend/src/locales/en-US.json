@@ -1,0 +1,23 @@
+{
+  "app.title": "GalaxyTerm",
+  "action.newTerminal": "New Terminal",
+  "action.create": "Create",
+  "action.cancel": "Cancel",
+  "field.type": "Type",
+  "field.name": "Name",
+  "field.host": "Host",
+  "field.port": "Port",
+  "field.username": "Username",
+  "field.password": "Password",
+  "field.shell": "Shell",
+  "placeholder.sessionName": "Optional tab name",
+  "placeholder.host": "For example 127.0.0.1",
+  "placeholder.shell": "Leave empty to use default shell",
+  "provider.local.name": "Local Terminal",
+  "provider.ssh.name": "SSH Terminal",
+  "terminal.status.connecting": "Connecting...",
+  "terminal.status.connected": "Connected",
+  "terminal.status.closed": "Session closed",
+  "terminal.error.createFailed": "Failed to create terminal",
+  "terminal.error.disconnected": "Terminal connection error"
+}

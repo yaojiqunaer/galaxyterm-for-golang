@@ -3,14 +3,15 @@ package main
 import (
 	"context"
 	"embed"
+	"fmt"
 	"galaxyterm/internal"
+	"galaxyterm/internal/session"
 	"galaxyterm/internal/terminal"
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
 	"github.com/wailsapp/wails/v2/pkg/options/mac"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
-	"os"
 )
 
 //go:embed all:frontend/dist
@@ -20,15 +21,14 @@ var assets embed.FS
 var icon []byte
 
 func main() {
-	shell := os.Getenv("SHELL")
-	// Create an instance of the app structure
-	ptyTerm := terminal.NewPtyTerminal(internal.TerminalOptions{
-		Args: []string{shell, "-c", "cd $HOME && alias ls='ls --color=auto' && alias grep='grep --color=auto' && exec " + shell + " -li"},
+	var appCtx context.Context
+	sessionManager := session.NewManager(func(event session.Event) {
+		if appCtx == nil {
+			return
+		}
+		runtime.EventsEmit(appCtx, fmt.Sprintf("terminal:%s:%s", event.Type, event.SessionID), event)
 	})
-
-	sshTerminal := terminal.NewSshTerminal(internal.TerminalOptions{
-		Args: []string{},
-	}, "127.0.0.1:22", internal.Auth{UserName: "test", Password: "123456"})
+	terminal.RegisterBuiltInProviders(sessionManager)
 
 	// Create application with options
 	var err = wails.Run(&options.App{
@@ -50,21 +50,20 @@ func main() {
 		},
 		//Menu:   newMenu,
 		OnStartup: func(ctx context.Context) {
-			ptyTerm.Startup(ctx)
-			sshTerminal.Startup(ctx)
+			appCtx = ctx
 		},
 		OnDomReady: func(ctx context.Context) {
 
 		},
 		OnShutdown: func(ctx context.Context) {
-			//ptyTerm.Disconnect()
-			//sshTerminal.Disconnect()
+			for _, info := range sessionManager.ListSessions() {
+				_ = sessionManager.Close(info.ID)
+			}
 		},
 		//OnBeforeClose:   beforeClose,
 		//CSSDragProperty: "--wails-draggable",
 		Bind: []interface{}{
-			ptyTerm,
-			sshTerminal,
+			session.NewAPI(sessionManager),
 			&internal.Theme{},
 		},
 		Windows: nil,

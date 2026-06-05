@@ -1,0 +1,236 @@
+package terminal
+
+import (
+	"context"
+	"fmt"
+	"galaxyterm/internal"
+	"galaxyterm/internal/session"
+	"io"
+	"strconv"
+	"sync"
+
+	"golang.org/x/crypto/ssh"
+)
+
+type sshDriver struct {
+	addr     string
+	username string
+	password string
+
+	client  *ssh.Client
+	session *ssh.Session
+	stdin   io.WriteCloser
+	mu      sync.Mutex
+}
+
+func NewSSHProvider() session.Provider {
+	return session.Provider{
+		Type:         "ssh",
+		NameKey:      "provider.ssh.name",
+		Name:         "SSH",
+		Description:  "SSH terminal",
+		Category:     "builtin",
+		Capabilities: []string{"stream", "resize"},
+		NewDriver: func(req session.CreateSessionRequest) (session.Driver, error) {
+			return newSSHDriver(req)
+		},
+	}
+}
+
+func newSSHDriver(req session.CreateSessionRequest) (*sshDriver, error) {
+	host := stringValue(req.Config, "host")
+	if host == "" {
+		return nil, configError("host")
+	}
+
+	port := intValue(req.Config, "port", 22)
+	username := stringValue(req.Auth, "username")
+	if username == "" {
+		username = stringValue(req.Config, "username")
+	}
+	if username == "" {
+		return nil, configError("username")
+	}
+
+	password := stringValue(req.Auth, "password")
+	if password == "" {
+		password = stringValue(req.Config, "password")
+	}
+
+	return &sshDriver{
+		addr:     fmt.Sprintf("%s:%d", host, port),
+		username: username,
+		password: password,
+	}, nil
+}
+
+func (d *sshDriver) Start(ctx context.Context, emit session.Emitter) error {
+	config := &ssh.ClientConfig{
+		User: d.username,
+		Auth: []ssh.AuthMethod{
+			ssh.Password(d.password),
+		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+
+	client, err := ssh.Dial("tcp", d.addr, config)
+	if err != nil {
+		return err
+	}
+
+	sshSession, err := client.NewSession()
+	if err != nil {
+		_ = client.Close()
+		return err
+	}
+
+	modes := ssh.TerminalModes{
+		ssh.ECHO:          1,
+		ssh.TTY_OP_ISPEED: 14400,
+		ssh.TTY_OP_OSPEED: 14400,
+	}
+	if err := sshSession.RequestPty(string(internal.XTERM_256_COLOR), 24, 80, modes); err != nil {
+		_ = sshSession.Close()
+		_ = client.Close()
+		return err
+	}
+
+	stdout, err := sshSession.StdoutPipe()
+	if err != nil {
+		_ = sshSession.Close()
+		_ = client.Close()
+		return err
+	}
+	stderr, err := sshSession.StderrPipe()
+	if err != nil {
+		_ = sshSession.Close()
+		_ = client.Close()
+		return err
+	}
+	stdin, err := sshSession.StdinPipe()
+	if err != nil {
+		_ = sshSession.Close()
+		_ = client.Close()
+		return err
+	}
+
+	d.mu.Lock()
+	d.client = client
+	d.session = sshSession
+	d.stdin = stdin
+	d.mu.Unlock()
+
+	if err := sshSession.Shell(); err != nil {
+		_ = d.Close()
+		return err
+	}
+
+	go readStream(ctx, stdout, emit, false)
+	go readStream(ctx, stderr, emit, false)
+	go func() {
+		if err := sshSession.Wait(); err != nil {
+			emit(session.Event{
+				Type: session.EventError,
+				Error: &session.AppError{
+					Code:           "SSH_SESSION_WAIT_ERROR",
+					MessageKey:     "error.ssh.sessionWait",
+					DefaultMessage: err.Error(),
+				},
+			})
+		}
+		emit(session.Event{Type: session.EventExit})
+	}()
+	return nil
+}
+
+func (d *sshDriver) Send(data string) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.stdin == nil {
+		return nil
+	}
+	_, err := d.stdin.Write([]byte(data))
+	return err
+}
+
+func (d *sshDriver) Resize(cols uint16, rows uint16) error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.session == nil {
+		return nil
+	}
+	return d.session.WindowChange(int(rows), int(cols))
+}
+
+func (d *sshDriver) Close() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+
+	var firstErr error
+	if d.stdin != nil {
+		firstErr = d.stdin.Close()
+		d.stdin = nil
+	}
+	if d.session != nil {
+		if err := d.session.Close(); firstErr == nil && err != nil {
+			firstErr = err
+		}
+		d.session = nil
+	}
+	if d.client != nil {
+		if err := d.client.Close(); firstErr == nil && err != nil {
+			firstErr = err
+		}
+		d.client = nil
+	}
+	return firstErr
+}
+
+func stringValue(values map[string]interface{}, key string) string {
+	if values == nil {
+		return ""
+	}
+	value, ok := values[key]
+	if !ok || value == nil {
+		return ""
+	}
+	switch typed := value.(type) {
+	case string:
+		return typed
+	default:
+		return fmt.Sprint(typed)
+	}
+}
+
+func intValue(values map[string]interface{}, key string, fallback int) int {
+	if values == nil {
+		return fallback
+	}
+	value, ok := values[key]
+	if !ok || value == nil {
+		return fallback
+	}
+	switch typed := value.(type) {
+	case int:
+		return typed
+	case int64:
+		return int(typed)
+	case float64:
+		return int(typed)
+	case string:
+		parsed, err := strconv.Atoi(typed)
+		if err == nil {
+			return parsed
+		}
+	}
+	return fallback
+}
+
+func configError(field string) error {
+	return &session.AppError{
+		Code:           "INVALID_CONFIG",
+		MessageKey:     "error.config.required",
+		DefaultMessage: fmt.Sprintf("missing required config field: %s", field),
+		Details:        map[string]interface{}{"field": field},
+	}
+}
