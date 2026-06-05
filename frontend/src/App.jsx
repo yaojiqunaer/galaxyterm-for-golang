@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Checkbox,
+  ConfigProvider,
   Divider,
   Drawer,
   Empty,
@@ -14,13 +15,16 @@ import {
   Layout,
   List,
   Menu,
+  Segmented,
   Select,
   Space,
+  Switch,
   Tabs,
   Tag,
   Tooltip,
   Typography,
   message,
+  theme as antdTheme,
 } from 'antd';
 import {
   ApiOutlined,
@@ -28,16 +32,20 @@ import {
   CloudServerOutlined,
   CodeOutlined,
   DatabaseOutlined,
+  DeleteOutlined,
   FolderOpenOutlined,
   GlobalOutlined,
   LaptopOutlined,
   PlusOutlined,
+  ReloadOutlined,
+  SaveOutlined,
   SettingOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import TerminalPane from './components/TerminalPane.jsx';
 import * as ExtensionsAPI from '../wailsjs/go/extensions/API.js';
 import * as FilesAPI from '../wailsjs/go/files/API.js';
+import * as ThemeAPI from '../wailsjs/go/internal/Theme.js';
 import * as SessionAPI from '../wailsjs/go/session/API.js';
 import * as TunnelAPI from '../wailsjs/go/tunnel/API.js';
 import { availableLocales, currentLocale, setLocale, t } from './i18n.js';
@@ -46,6 +54,18 @@ const { Sider, Content } = Layout;
 const { Text, Title } = Typography;
 
 const profileStorageKey = 'galaxyterm.connectionProfiles';
+const settingsStorageKey = 'galaxyterm.settings';
+const workspaceStorageKey = 'galaxyterm.workspaceSnapshot';
+
+const defaultSettings = {
+  appTheme: 'system',
+  terminalTheme: 'auto',
+  fontFamily: 'Consolas,Liberation Mono,Menlo,Courier,monospace',
+  fontSize: 13,
+  scrollback: 5000,
+  autoSaveWorkspace: true,
+  autoRestoreWorkspace: false,
+};
 
 const fallbackProviders = [
   { type: 'local', nameKey: 'provider.local.name', name: 'Local Terminal', category: 'builtin' },
@@ -77,6 +97,8 @@ function App() {
   const [providers, setProviders] = useState(fallbackProviders);
   const [sessions, setSessions] = useState([]);
   const [profiles, setProfiles] = useState(() => loadProfiles());
+  const [settings, setSettings] = useState(() => loadSettings());
+  const [terminalThemes, setTerminalThemes] = useState(['auto']);
   const [installedExtensions, setInstalledExtensions] = useState([]);
   const [tunnels, setTunnels] = useState([]);
   const [activeKey, setActiveKey] = useState('');
@@ -86,6 +108,8 @@ function App() {
   const [selectedNav, setSelectedNav] = useState('connections');
   const [sessionView, setSessionView] = useState('tabs');
   const [profileQuery, setProfileQuery] = useState('');
+  const [groupQuery, setGroupQuery] = useState('all');
+  const [workspaceSummary, setWorkspaceSummary] = useState(() => loadWorkspaceSummary());
   const [editingProfileId, setEditingProfileId] = useState('');
   const [newType, setNewType] = useState('local');
   const [fileEntries, setFileEntries] = useState([]);
@@ -100,7 +124,8 @@ function App() {
   const quickCommands = useMemo(() => defaultQuickCommands(), []);
 
   useEffect(() => {
-    SessionAPI.ListProviders()
+    Promise.resolve()
+      .then(() => SessionAPI.ListProviders())
       .then((loadedProviders) => {
         if (Array.isArray(loadedProviders) && loadedProviders.length > 0) {
           setProviders(loadedProviders);
@@ -113,10 +138,38 @@ function App() {
   }, []);
 
   useEffect(() => {
-    ExtensionsAPI.ListInstalled()
+    Promise.resolve()
+      .then(() => ExtensionsAPI.ListInstalled())
       .then((items) => setInstalledExtensions(Array.isArray(items) ? items : []))
       .catch(() => setInstalledExtensions([]));
   }, []);
+
+  useEffect(() => {
+    Promise.resolve()
+      .then(() => ThemeAPI.GetAllThemes())
+      .then((themes) => {
+        const names = Array.isArray(themes) ? themes : [];
+        setTerminalThemes(['auto', ...names]);
+      })
+      .catch(() => setTerminalThemes(['auto']));
+  }, []);
+
+  useEffect(() => {
+    persistSettings(settings);
+    document.documentElement.dataset.appTheme = resolveAppTheme(settings.appTheme);
+  }, [settings]);
+
+  useEffect(() => {
+    if (settings.autoRestoreWorkspace) {
+      restoreWorkspace({ silent: true });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!settings.autoSaveWorkspace || sessions.length === 0) return;
+    persistWorkspaceSnapshot(buildWorkspaceSnapshot(sessions, activeKey, sessionView));
+    setWorkspaceSummary(loadWorkspaceSummary());
+  }, [activeKey, sessionView, sessions, settings.autoSaveWorkspace]);
 
   useEffect(() => {
     if (activeKey && terminalRefs.current[activeKey]?.fit) {
@@ -135,12 +188,18 @@ function App() {
   })), [providers]);
 
   const selectedProvider = providers.find((item) => item.type === newType) || providers[0] || fallbackProviders[0];
+  const profileGroups = useMemo(() => uniqueProfileGroups(profiles), [profiles]);
+  const visibleProfiles = useMemo(
+    () => filteredProfiles(profiles, profileQuery, groupQuery),
+    [profiles, profileQuery, groupQuery],
+  );
 
   const openDrawer = (type = providers[0]?.type || 'local', profile = null) => {
     const providerType = profile?.providerType || type;
     setNewType(providerType);
     form.setFieldsValue({
       displayName: profile?.displayName || '',
+      group: profile?.group || '',
       host: profile?.config?.host || '',
       port: profile?.config?.port || 22,
       username: profile?.auth?.username || '',
@@ -215,10 +274,61 @@ function App() {
     });
   };
 
+  const closeAllSessions = () => {
+    setSessions([]);
+    setActiveKey('');
+    terminalRefs.current = {};
+  };
+
   const updateSessionStatus = (sessionId, status) => {
     setSessions((current) => current.map((item) => (
       item.backendSessionId === sessionId || item.id === sessionId ? { ...item, status } : item
     )));
+  };
+
+  const saveWorkspace = () => {
+    const snapshot = buildWorkspaceSnapshot(sessions, activeKey, sessionView);
+    persistWorkspaceSnapshot(snapshot);
+    setWorkspaceSummary(loadWorkspaceSummary());
+    message.success(t('message.workspaceSaved'));
+  };
+
+  const restoreWorkspace = ({ silent = false } = {}) => {
+    const snapshot = loadWorkspaceSnapshot();
+    if (!snapshot || snapshot.sessions.length === 0) {
+      if (!silent) message.info(t('message.noWorkspaceSnapshot'));
+      return;
+    }
+    const restorableSessions = snapshot.sessions.filter((session) => canRestoreSession(session.request));
+    const skipped = snapshot.sessions.length - restorableSessions.length;
+    if (restorableSessions.length === 0) {
+      if (!silent) message.warning(t('message.workspaceRestoreSkipped'));
+      return;
+    }
+    let restoredActiveKey = '';
+    const restoredSessions = restorableSessions.map((session) => {
+      const nextId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
+      if (session.id === snapshot.activeKey) restoredActiveKey = nextId;
+      return {
+        ...session,
+        id: nextId,
+        backendSessionId: '',
+        status: 'connecting',
+      };
+    });
+    setSessions((current) => [...current, ...restoredSessions]);
+    setActiveKey(restoredActiveKey || restoredSessions[0].id);
+    setSessionView(snapshot.sessionView || 'tabs');
+    setSelectedNav('sessions');
+    if (!silent) {
+      message.success(skipped > 0 ? t('message.workspaceRestoredPartial') : t('message.workspaceRestored'));
+    }
+  };
+
+  const clearWorkspaceSnapshot = () => {
+    localStorage.removeItem(workspaceStorageKey);
+    setWorkspaceSummary(loadWorkspaceSummary());
+    message.success(t('message.workspaceCleared'));
   };
 
   const deleteProfile = (profileId) => {
@@ -253,6 +363,7 @@ function App() {
             terminalRefs.current[session.id] = el;
           }}
           request={session.request}
+          settings={settings}
           onSessionCreated={(backendSessionId) => {
             setSessions((current) => current.map((item) => (
               item.id === session.id ? { ...item, backendSessionId, status: 'connected' } : item
@@ -291,6 +402,7 @@ function App() {
                     terminalRefs.current[session.id] = el;
                   }}
                   request={session.request}
+                  settings={settings}
                   onSessionCreated={(backendSessionId) => {
                     setSessions((current) => current.map((item) => (
                       item.id === session.id ? { ...item, backendSessionId, status: 'connected' } : item
@@ -343,19 +455,30 @@ function App() {
       <div className="page-header compact">
         <Title level={4}>{t('section.savedConnections')}</Title>
       </div>
-      <Input.Search
-        className="profile-search"
-        allowClear
-        value={profileQuery}
-        onChange={(event) => setProfileQuery(event.target.value)}
-        placeholder={t('nav.connections')}
-      />
-      {filteredProfiles(profiles, profileQuery).length === 0 ? (
+      <Space className="profile-filters" wrap>
+        <Select
+          value={groupQuery}
+          className="profile-group-filter"
+          onChange={setGroupQuery}
+          options={[
+            { value: 'all', label: t('group.all') },
+            ...profileGroups.map((group) => ({ value: group, label: group })),
+          ]}
+        />
+        <Input.Search
+          className="profile-search"
+          allowClear
+          value={profileQuery}
+          onChange={(event) => setProfileQuery(event.target.value)}
+          placeholder={t('nav.connections')}
+        />
+      </Space>
+      {visibleProfiles.length === 0 ? (
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noConnections')} />
       ) : (
         <List
           className="profile-list"
-          dataSource={filteredProfiles(profiles, profileQuery)}
+          dataSource={visibleProfiles}
           renderItem={(profile) => (
             <List.Item
               actions={[
@@ -367,7 +490,12 @@ function App() {
             >
               <List.Item.Meta
                 avatar={<span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>}
-                title={profile.displayName}
+                title={(
+                  <Space size={8}>
+                    <span>{profile.displayName}</span>
+                    {profile.group && <Tag>{profile.group}</Tag>}
+                  </Space>
+                )}
                 description={profileDescription(profile)}
               />
             </List.Item>
@@ -616,21 +744,112 @@ function App() {
           <Title level={3}>{t('section.preferences')}</Title>
         </div>
       </div>
-      <Card>
-        <Form layout="vertical">
-          <Form.Item label={t('field.locale')}>
-            <Select
-              defaultValue={currentLocale}
-              options={availableLocales().map((locale) => ({ value: locale, label: locale }))}
-              onChange={(locale) => {
-                setLocale(locale);
-                window.location.reload();
-              }}
+      <Space direction="vertical" size={14} className="settings-stack">
+        <Card title={t('settings.interface')}>
+          <Form layout="vertical">
+            <Form.Item label={t('field.locale')}>
+              <Select
+                value={currentLocale}
+                options={availableLocales().map((locale) => ({ value: locale, label: locale }))}
+                onChange={(locale) => {
+                  setLocale(locale);
+                  window.location.reload();
+                }}
+              />
+            </Form.Item>
+            <Form.Item label={t('field.appTheme')}>
+              <Segmented
+                block
+                value={settings.appTheme}
+                options={[
+                  { value: 'system', label: t('theme.system') },
+                  { value: 'light', label: t('theme.light') },
+                  { value: 'dark', label: t('theme.dark') },
+                ]}
+                onChange={(value) => setSettings((current) => ({ ...current, appTheme: value }))}
+              />
+            </Form.Item>
+            <Text type="secondary">{t('settings.languageHint')}</Text>
+          </Form>
+        </Card>
+
+        <Card title={t('settings.terminal')}>
+          <Form layout="vertical">
+            <Form.Item label={t('field.terminalTheme')}>
+              <Select
+                value={settings.terminalTheme}
+                options={terminalThemes.map((name) => ({
+                  value: name,
+                  label: name === 'auto' ? t('theme.auto') : name,
+                }))}
+                onChange={(value) => setSettings((current) => ({ ...current, terminalTheme: value }))}
+              />
+            </Form.Item>
+            <Form.Item label={t('field.fontFamily')}>
+              <Input
+                value={settings.fontFamily}
+                onChange={(event) => setSettings((current) => ({ ...current, fontFamily: event.target.value }))}
+              />
+            </Form.Item>
+            <Space size={12} wrap>
+              <Form.Item label={t('field.fontSize')}>
+                <InputNumber
+                  min={10}
+                  max={24}
+                  value={settings.fontSize}
+                  onChange={(value) => setSettings((current) => ({ ...current, fontSize: value || defaultSettings.fontSize }))}
+                />
+              </Form.Item>
+              <Form.Item label={t('field.scrollback')}>
+                <InputNumber
+                  min={500}
+                  max={100000}
+                  step={500}
+                  value={settings.scrollback}
+                  onChange={(value) => setSettings((current) => ({ ...current, scrollback: value || defaultSettings.scrollback }))}
+                />
+              </Form.Item>
+            </Space>
+          </Form>
+        </Card>
+
+        <Card title={t('settings.workspace')}>
+          <Space direction="vertical" className="settings-stack">
+            <Space align="center" className="settings-row">
+              <div>
+                <Text strong>{t('field.autoSaveWorkspace')}</Text>
+                <Text type="secondary">{t('settings.autoSaveHint')}</Text>
+              </div>
+              <Switch
+                checked={settings.autoSaveWorkspace}
+                onChange={(checked) => setSettings((current) => ({ ...current, autoSaveWorkspace: checked }))}
+              />
+            </Space>
+            <Space align="center" className="settings-row">
+              <div>
+                <Text strong>{t('field.autoRestoreWorkspace')}</Text>
+                <Text type="secondary">{t('settings.autoRestoreHint')}</Text>
+              </div>
+              <Switch
+                checked={settings.autoRestoreWorkspace}
+                onChange={(checked) => setSettings((current) => ({ ...current, autoRestoreWorkspace: checked }))}
+              />
+            </Space>
+            <Alert
+              type="info"
+              showIcon
+              message={workspaceSummary
+                ? `${t('settings.workspaceSnapshot')}: ${workspaceSummary.count} · ${workspaceSummary.updatedAt}`
+                : t('message.noWorkspaceSnapshot')}
             />
-          </Form.Item>
-          <Text type="secondary">{t('settings.languageHint')}</Text>
-        </Form>
-      </Card>
+            <Space wrap>
+              <Button icon={<SaveOutlined />} onClick={saveWorkspace}>{t('action.saveWorkspace')}</Button>
+              <Button icon={<ReloadOutlined />} onClick={() => restoreWorkspace()}>{t('action.restoreWorkspace')}</Button>
+              <Button danger icon={<DeleteOutlined />} onClick={clearWorkspaceSnapshot}>{t('action.clearWorkspace')}</Button>
+            </Space>
+          </Space>
+        </Card>
+      </Space>
     </div>
   );
 
@@ -720,8 +939,11 @@ function App() {
     return renderSessions();
   };
 
+  const isDarkTheme = resolveAppTheme(settings.appTheme) === 'dark';
+
   return (
-    <Layout className="app-shell">
+    <ConfigProvider theme={{ algorithm: isDarkTheme ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm }}>
+    <Layout className={`app-shell theme-${isDarkTheme ? 'dark' : 'light'}`}>
       <Sider width={272} className="workspace-sidebar">
         <div className="brand-block">
           <div className="brand-mark"><ThunderboltOutlined /></div>
@@ -810,6 +1032,15 @@ function App() {
             <Button onClick={() => setSessionView(sessionView === 'tabs' ? 'grid' : 'tabs')}>
               {sessionView === 'tabs' ? t('action.grid') : t('action.tabs')}
             </Button>
+            <Tooltip title={t('action.saveWorkspace')}>
+              <Button icon={<SaveOutlined />} onClick={saveWorkspace} />
+            </Tooltip>
+            <Tooltip title={t('action.restoreWorkspace')}>
+              <Button icon={<ReloadOutlined />} onClick={() => restoreWorkspace()} />
+            </Tooltip>
+            <Tooltip title={t('action.closeAll')}>
+              <Button danger icon={<DeleteOutlined />} onClick={closeAllSessions} disabled={sessions.length === 0} />
+            </Tooltip>
           </Space>
           <Space className="topbar-actions">
             <Tooltip title={t('action.language')}>
@@ -860,6 +1091,9 @@ function App() {
           </Form.Item>
           <Form.Item name="displayName" label={t('field.name')}>
             <Input placeholder={t('placeholder.sessionName')} />
+          </Form.Item>
+          <Form.Item name="group" label={t('field.group')}>
+            <Input placeholder={t('placeholder.group')} />
           </Form.Item>
           {newType === 'local' && (
             <Form.Item name="shell" label={t('field.shell')}>
@@ -951,6 +1185,7 @@ function App() {
         />
       </Drawer>
     </Layout>
+    </ConfigProvider>
   );
 }
 
@@ -1018,6 +1253,7 @@ function saveProfile(profiles, request, editingProfileId = '') {
     id: editingProfileId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`),
     providerType: request.providerType,
     displayName: request.displayName,
+    group: request.group || '',
     config: request.config,
     auth: {
       username: request.auth?.username || '',
@@ -1042,15 +1278,113 @@ function profileDescription(profile) {
   return profile.config?.shell || 'default shell';
 }
 
-function filteredProfiles(profiles, query) {
+function uniqueProfileGroups(profiles) {
+  return [...new Set(profiles.map((profile) => profile.group).filter(Boolean))].sort((left, right) => left.localeCompare(right));
+}
+
+function filteredProfiles(profiles, query, group = 'all') {
   const keyword = query.trim().toLowerCase();
-  if (!keyword) return profiles;
-  return profiles.filter((profile) => (
-    profile.displayName?.toLowerCase().includes(keyword)
-    || profile.providerType?.toLowerCase().includes(keyword)
-    || profile.config?.host?.toLowerCase().includes(keyword)
-    || profile.auth?.username?.toLowerCase().includes(keyword)
-  ));
+  return profiles.filter((profile) => {
+    const groupMatched = group === 'all' || (profile.group || '') === group;
+    if (!groupMatched) return false;
+    if (!keyword) return true;
+    return (
+      profile.displayName?.toLowerCase().includes(keyword)
+      || profile.group?.toLowerCase().includes(keyword)
+      || profile.providerType?.toLowerCase().includes(keyword)
+      || profile.config?.host?.toLowerCase().includes(keyword)
+      || profile.auth?.username?.toLowerCase().includes(keyword)
+    );
+  });
+}
+
+function loadSettings() {
+  try {
+    const raw = localStorage.getItem(settingsStorageKey);
+    const parsed = JSON.parse(raw || '{}');
+    return normalizeSettings(parsed);
+  } catch {
+    return { ...defaultSettings };
+  }
+}
+
+function normalizeSettings(settings) {
+  return {
+    ...defaultSettings,
+    ...settings,
+    fontSize: clampNumber(settings.fontSize, 10, 24, defaultSettings.fontSize),
+    scrollback: clampNumber(settings.scrollback, 500, 100000, defaultSettings.scrollback),
+  };
+}
+
+function persistSettings(settings) {
+  localStorage.setItem(settingsStorageKey, JSON.stringify(normalizeSettings(settings)));
+}
+
+function clampNumber(value, min, max, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+}
+
+function resolveAppTheme(theme) {
+  if (theme === 'dark' || theme === 'light') return theme;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+}
+
+function buildWorkspaceSnapshot(sessions, activeKey, sessionView) {
+  return {
+    version: 1,
+    updatedAt: new Date().toISOString(),
+    activeKey,
+    sessionView,
+    sessions: sessions.map((session) => ({
+      id: session.id,
+      label: session.label,
+      providerType: session.providerType,
+      request: sanitizeRequest(session.request),
+    })),
+  };
+}
+
+function sanitizeRequest(request) {
+  return {
+    ...request,
+    config: { ...(request?.config || {}) },
+    auth: {
+      username: request?.auth?.username || '',
+      authType: request?.auth?.authType || 'password',
+      jumpUsername: request?.auth?.jumpUsername || '',
+    },
+  };
+}
+
+function canRestoreSession(request) {
+  return request?.providerType === 'local';
+}
+
+function persistWorkspaceSnapshot(snapshot) {
+  localStorage.setItem(workspaceStorageKey, JSON.stringify(snapshot));
+}
+
+function loadWorkspaceSnapshot() {
+  try {
+    const raw = localStorage.getItem(workspaceStorageKey);
+    const parsed = JSON.parse(raw || 'null');
+    if (!parsed || !Array.isArray(parsed.sessions)) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function loadWorkspaceSummary() {
+  const snapshot = loadWorkspaceSnapshot();
+  if (!snapshot) return null;
+  return {
+    count: snapshot.sessions.length,
+    updatedAt: new Date(snapshot.updatedAt).toLocaleString(),
+  };
 }
 
 function parentPath(current) {
@@ -1072,6 +1406,7 @@ function buildRequest(type, displayName, values) {
     return {
       providerType: type,
       displayName,
+      group: values.group || '',
       config: {
         host: values.host,
         port: values.port || 22,
@@ -1093,6 +1428,7 @@ function buildRequest(type, displayName, values) {
   return {
     providerType: type,
     displayName,
+    group: values.group || '',
     config: {
       shell: values.shell || '',
     },

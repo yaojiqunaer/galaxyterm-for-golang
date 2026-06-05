@@ -25,6 +25,56 @@ select {
   background: #eef1f4;
 }
 
+.theme-dark.app-shell {
+  background: #12171d;
+}
+
+.theme-dark .workspace-sidebar {
+  border-right-color: #26313b;
+  background: #151b22 !important;
+}
+
+.theme-dark .brand-block,
+.theme-dark .sidebar-section,
+.theme-dark .topbar,
+.theme-dark .statusbar {
+  border-color: #26313b;
+  background: #151b22;
+}
+
+.theme-dark .main-layout,
+.theme-dark .content-area,
+.theme-dark .workspace-page,
+.theme-dark .welcome-panel,
+.theme-dark .terminal-tabs .ant-tabs-nav,
+.theme-dark .session-grid-toolbar,
+.theme-dark .split-terminal-header {
+  background: #10151b;
+}
+
+.theme-dark .provider-row:hover,
+.theme-dark .session-row:hover,
+.theme-dark .session-row.active {
+  background: #1d2a35;
+}
+
+.theme-dark .provider-card,
+.theme-dark .profile-list,
+.theme-dark .file-browser-card,
+.theme-dark .drawer-provider-head {
+  border-color: #2a3744;
+  background: #151b22;
+}
+
+.theme-dark .welcome-copy h1 {
+  color: #e9eef3;
+}
+
+.theme-dark code {
+  background: #202b36;
+  color: #d8e4ef;
+}
+
 .workspace-sidebar {
   display: flex;
   flex-direction: column;
@@ -350,8 +400,15 @@ select {
 }
 
 .profile-search {
-  max-width: 360px;
+  width: 360px;
+}
+
+.profile-filters {
   margin-bottom: 12px;
+}
+
+.profile-group-filter {
+  width: 180px;
 }
 
 code {
@@ -392,6 +449,21 @@ code {
 
 .file-toolbar {
   margin: 4px 0 12px;
+}
+
+.settings-stack {
+  width: 100%;
+}
+
+.settings-row {
+  justify-content: space-between;
+  width: 100%;
+}
+
+.settings-row .ant-typography-secondary {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
 }
 
 .remote-file-row {

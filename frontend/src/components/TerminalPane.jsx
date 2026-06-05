@@ -7,7 +7,7 @@ import * as SessionAPI from '../../wailsjs/go/session/API.js';
 import * as Theme from '../../wailsjs/go/internal/Theme.js';
 import { t } from '../i18n.js';
 
-function TerminalPane({ request, onSessionCreated, onSessionClosed }, ref) {
+function TerminalPane({ request, settings, onSessionCreated, onSessionClosed }, ref) {
   const containerRef = useRef(null);
   const term = useRef(null);
   const fitAddon = useRef(null);
@@ -33,8 +33,7 @@ function TerminalPane({ request, onSessionCreated, onSessionClosed }, ref) {
     let cleanupExit = null;
 
     async function initTerminal() {
-      const themeDark = await Theme.GetDarkTheme();
-      const themeLight = await Theme.GetLightTheme();
+      const terminalTheme = await resolveTerminalTheme(settings);
       if (disposed) return;
 
       term.current = new Terminal({
@@ -45,10 +44,10 @@ function TerminalPane({ request, onSessionCreated, onSessionClosed }, ref) {
         allowTransparency: true,
         macOptionIsMeta: true,
         macOptionClickForcesSelection: true,
-        scrollback: 5000,
-        fontSize: 13,
-        fontFamily: 'Consolas,Liberation Mono,Menlo,Courier,monospace',
-        theme: window.matchMedia('(prefers-color-scheme: dark)').matches ? themeDark : themeLight,
+        scrollback: settings?.scrollback || 5000,
+        fontSize: settings?.fontSize || 13,
+        fontFamily: settings?.fontFamily || 'Consolas,Liberation Mono,Menlo,Courier,monospace',
+        theme: terminalTheme,
       });
 
       fitAddon.current = new FitAddon();
@@ -129,6 +128,20 @@ function TerminalPane({ request, onSessionCreated, onSessionClosed }, ref) {
   }, []);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
+}
+
+async function resolveTerminalTheme(settings = {}) {
+  const selectedTheme = settings.terminalTheme || 'auto';
+  if (selectedTheme && selectedTheme !== 'auto') {
+    try {
+      return await Theme.GetCustomTheme(selectedTheme);
+    } catch {
+      // Fall back to automatic theme when a saved custom theme is no longer available.
+    }
+  }
+  const themeDark = await Theme.GetDarkTheme();
+  const themeLight = await Theme.GetLightTheme();
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? themeDark : themeLight;
 }
 
 function isRiskyPaste(data) {
