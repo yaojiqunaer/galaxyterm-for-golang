@@ -7,6 +7,9 @@
   "action.open": "Open",
   "action.save": "Save",
   "action.delete": "Delete",
+  "action.up": "Up",
+  "action.mkdir": "New Folder",
+  "action.download": "Download",
   "action.saveAndOpen": "Save and Open",
   "action.installOffline": "Offline Install",
   "action.addSource": "Add Source",
@@ -70,5 +73,8 @@
   "message.profileSaved": "Connection saved",
   "message.profileDeleted": "Connection deleted",
   "message.extensionComing": "Extension installation will be added in the next phase",
-  "message.fileListFailed": "Failed to read remote directory"
+  "message.fileListFailed": "Failed to read remote directory",
+  "message.mkdirSuccess": "Folder created",
+  "message.deleteSuccess": "Deleted",
+  "message.downloadStarted": "Download started"
 }

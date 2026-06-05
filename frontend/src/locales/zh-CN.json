@@ -7,6 +7,9 @@
   "action.open": "打开",
   "action.save": "保存",
   "action.delete": "删除",
+  "action.up": "上级",
+  "action.mkdir": "新建目录",
+  "action.download": "下载",
   "action.saveAndOpen": "保存并打开",
   "action.installOffline": "离线安装",
   "action.addSource": "添加源",
@@ -69,6 +72,9 @@
   "settings.coreOnly": "当前仅启用轻量核心，K8s、Docker 和数据库终端将通过扩展安装。",
   "message.profileSaved": "连接已保存",
   "message.profileDeleted": "连接已删除",
-  "message.extensionComing": "扩展安装器将在下一阶段接入"
-  ,"message.fileListFailed": "读取远程目录失败"
+  "message.extensionComing": "扩展安装器将在下一阶段接入",
+  "message.fileListFailed": "读取远程目录失败",
+  "message.mkdirSuccess": "目录已创建",
+  "message.deleteSuccess": "已删除",
+  "message.downloadStarted": "已开始下载"
 }

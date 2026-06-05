@@ -2,6 +2,7 @@ package files
 
 import (
 	"fmt"
+	"io"
 	"path"
 	"strings"
 
@@ -22,6 +23,20 @@ type SFTPListRequest struct {
 	Password string `json:"password"`
 	Path     string `json:"path"`
 }
+
+type SFTPPathRequest struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Path     string `json:"path"`
+}
+
+type SFTPReadRequest = SFTPPathRequest
+
+type SFTPMkdirRequest = SFTPPathRequest
+
+type SFTPDeleteRequest = SFTPPathRequest
 
 type FileEntry struct {
 	Name    string `json:"name"`
@@ -63,6 +78,64 @@ func (api *API) List(req SFTPListRequest) ([]FileEntry, error) {
 	return entries, nil
 }
 
+func (api *API) Mkdir(req SFTPMkdirRequest) error {
+	normalized, err := validateSFTPPathRequest(SFTPPathRequest(req))
+	if err != nil {
+		return err
+	}
+	client, err := dialSFTP(SFTPListRequest(normalized))
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+	return client.MkdirAll(normalized.Path)
+}
+
+func (api *API) Delete(req SFTPDeleteRequest) error {
+	normalized, err := validateSFTPPathRequest(SFTPPathRequest(req))
+	if err != nil {
+		return err
+	}
+	client, err := dialSFTP(SFTPListRequest(normalized))
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	info, err := client.Stat(normalized.Path)
+	if err != nil {
+		return err
+	}
+	if info.IsDir() {
+		return client.RemoveDirectory(normalized.Path)
+	}
+	return client.Remove(normalized.Path)
+}
+
+func (api *API) ReadFile(req SFTPReadRequest) (string, error) {
+	normalized, err := validateSFTPPathRequest(SFTPPathRequest(req))
+	if err != nil {
+		return "", err
+	}
+	client, err := dialSFTP(SFTPListRequest(normalized))
+	if err != nil {
+		return "", err
+	}
+	defer client.Close()
+
+	file, err := client.Open(normalized.Path)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	content, err := io.ReadAll(file)
+	if err != nil {
+		return "", err
+	}
+	return string(content), nil
+}
+
 func validateSFTPListRequest(req SFTPListRequest) (SFTPListRequest, error) {
 	req.Host = strings.TrimSpace(req.Host)
 	req.Username = strings.TrimSpace(req.Username)
@@ -81,6 +154,33 @@ func validateSFTPListRequest(req SFTPListRequest) (SFTPListRequest, error) {
 		req.Path = "."
 	}
 	return req, nil
+}
+
+func validateSFTPPathRequest(req SFTPPathRequest) (SFTPPathRequest, error) {
+	listReq, err := validateSFTPListRequest(SFTPListRequest(req))
+	if err != nil {
+		return req, err
+	}
+	if strings.TrimSpace(listReq.Path) == "" || listReq.Path == "." {
+		return req, fmt.Errorf("missing required field: path")
+	}
+	return SFTPPathRequest(listReq), nil
+}
+
+func ParentPath(current string) string {
+	current = strings.TrimSpace(current)
+	if current == "" || current == "." {
+		return "."
+	}
+	cleaned := path.Clean(current)
+	if cleaned == "/" {
+		return "/"
+	}
+	parent := path.Dir(cleaned)
+	if parent == "." && strings.HasPrefix(cleaned, "/") {
+		return "/"
+	}
+	return parent
 }
 
 func dialSFTP(req SFTPListRequest) (*sftp.Client, error) {

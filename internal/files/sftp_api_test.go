@@ -33,3 +33,18 @@ func TestValidateSFTPListRequestRequiresHostAndUsername(t *testing.T) {
 		t.Fatal("expected missing username error")
 	}
 }
+
+func TestParentPath(t *testing.T) {
+	cases := map[string]string{
+		"/var/log": "/var",
+		"/var":     "/",
+		"/":        "/",
+		".":        ".",
+	}
+
+	for input, want := range cases {
+		if got := ParentPath(input); got != want {
+			t.Fatalf("ParentPath(%q) = %q, want %q", input, got, want)
+		}
+	}
+}

@@ -84,6 +84,8 @@ function App() {
   const [newType, setNewType] = useState('local');
   const [fileEntries, setFileEntries] = useState([]);
   const [fileLoading, setFileLoading] = useState(false);
+  const [mkdirOpen, setMkdirOpen] = useState(false);
+  const [mkdirName, setMkdirName] = useState('');
   const [form] = Form.useForm();
   const [fileForm] = Form.useForm();
   const terminalRefs = useRef({});
@@ -349,6 +351,80 @@ function App() {
     }
   };
 
+  const currentFileRequest = () => {
+    const values = fileForm.getFieldsValue();
+    return {
+      host: values.host,
+      port: values.port || 22,
+      username: values.username,
+      password: values.password || '',
+      path: values.path || '.',
+    };
+  };
+
+  const goParent = async () => {
+    const current = fileForm.getFieldValue('path') || '.';
+    const parent = parentPath(current);
+    await loadFiles(parent);
+  };
+
+  const createRemoteDirectory = async () => {
+    const name = mkdirName.trim();
+    if (!name) return;
+    const req = currentFileRequest();
+    const base = req.path || '.';
+    req.path = joinRemotePath(base, name);
+    setFileLoading(true);
+    try {
+      await FilesAPI.Mkdir(req);
+      message.success(t('message.mkdirSuccess'));
+      setMkdirOpen(false);
+      setMkdirName('');
+      await loadFiles(base);
+    } catch (error) {
+      message.error(`${t('message.fileListFailed')}: ${error}`);
+    } finally {
+      setFileLoading(false);
+    }
+  };
+
+  const deleteRemoteEntry = async (entry) => {
+    const req = currentFileRequest();
+    req.path = entry.path;
+    setFileLoading(true);
+    try {
+      await FilesAPI.Delete(req);
+      message.success(t('message.deleteSuccess'));
+      await loadFiles(fileForm.getFieldValue('path') || '.');
+    } catch (error) {
+      message.error(`${t('message.fileListFailed')}: ${error}`);
+    } finally {
+      setFileLoading(false);
+    }
+  };
+
+  const downloadRemoteFile = async (entry) => {
+    if (entry.isDir) return;
+    const req = currentFileRequest();
+    req.path = entry.path;
+    setFileLoading(true);
+    try {
+      const content = await FilesAPI.ReadFile(req);
+      const blob = new Blob([content], { type: 'application/octet-stream' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = entry.name;
+      anchor.click();
+      URL.revokeObjectURL(url);
+      message.success(t('message.downloadStarted'));
+    } catch (error) {
+      message.error(`${t('message.fileListFailed')}: ${error}`);
+    } finally {
+      setFileLoading(false);
+    }
+  };
+
   const renderFiles = () => (
     <div className="workspace-page">
       <div className="page-header">
@@ -378,6 +454,10 @@ function App() {
             <Button type="primary" onClick={() => loadFiles()} loading={fileLoading}>{t('action.open')}</Button>
           </Form.Item>
         </Form>
+        <Space className="file-toolbar">
+          <Button onClick={goParent}>{t('action.up')}</Button>
+          <Button onClick={() => setMkdirOpen(true)}>{t('action.mkdir')}</Button>
+        </Space>
         <List
           className="remote-file-list"
           loading={fileLoading}
@@ -386,6 +466,10 @@ function App() {
           renderItem={(entry) => (
             <List.Item
               className="remote-file-row"
+              actions={[
+                !entry.isDir && <Button key="download" size="small" onClick={() => downloadRemoteFile(entry)}>{t('action.download')}</Button>,
+                <Button key="delete" size="small" danger onClick={() => deleteRemoteEntry(entry)}>{t('action.delete')}</Button>,
+              ].filter(Boolean)}
               onDoubleClick={() => {
                 if (entry.isDir) loadFiles(entry.path);
               }}
@@ -399,6 +483,15 @@ function App() {
           )}
         />
       </Card>
+      <Drawer
+        title={t('action.mkdir')}
+        width={320}
+        open={mkdirOpen}
+        onClose={() => setMkdirOpen(false)}
+        extra={<Button type="primary" onClick={createRemoteDirectory}>{t('action.create')}</Button>}
+      >
+        <Input value={mkdirName} onChange={(event) => setMkdirName(event.target.value)} placeholder={t('field.name')} />
+      </Drawer>
     </div>
   );
 
@@ -678,6 +771,20 @@ function profileDescription(profile) {
     return `${profile.auth?.username || '-'}@${profile.config?.host || '-'}:${profile.config?.port || 22}`;
   }
   return profile.config?.shell || 'default shell';
+}
+
+function parentPath(current) {
+  if (!current || current === '.') return '.';
+  const normalized = current.replace(/\/+$/, '');
+  if (normalized === '' || normalized === '/') return '/';
+  const index = normalized.lastIndexOf('/');
+  if (index <= 0) return normalized.startsWith('/') ? '/' : '.';
+  return normalized.slice(0, index);
+}
+
+function joinRemotePath(base, name) {
+  if (!base || base === '.') return name;
+  return `${base.replace(/\/+$/, '')}/${name}`;
 }
 
 function buildRequest(type, displayName, values) {
