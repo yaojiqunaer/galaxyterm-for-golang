@@ -27,6 +27,9 @@
   "action.restoreWorkspace": "Restore Workspace",
   "action.clearWorkspace": "Clear Snapshot",
   "action.closeAll": "Close All Sessions",
+  "action.import": "Import",
+  "action.export": "Export",
+  "action.addCommand": "Add Command",
   "drawer.newTerminal": "New Terminal Session",
   "drawer.settings": "Settings",
   "drawer.commands": "Quick Commands",
@@ -80,6 +83,7 @@
   "field.autoSaveWorkspace": "Auto-save workspace",
   "field.autoRestoreWorkspace": "Restore workspace on startup",
   "field.saveProfile": "Save as connection",
+  "field.command": "Command",
   "field.path": "Path",
   "placeholder.sessionName": "Optional tab name",
   "placeholder.group": "For example Production / Dev / Customer",
@@ -136,5 +140,9 @@
   "message.workspaceRestoredPartial": "Workspace partially restored. Remote sessions were skipped because secrets are not saved.",
   "message.workspaceRestoreSkipped": "No sessions can be safely restored automatically",
   "message.workspaceCleared": "Workspace snapshot cleared",
-  "message.noWorkspaceSnapshot": "No workspace snapshot"
+  "message.noWorkspaceSnapshot": "No workspace snapshot",
+  "message.profileImported": "Connections imported",
+  "message.profileImportFailed": "Failed to import connections",
+  "message.commandSaved": "Quick command saved",
+  "message.commandDeleted": "Quick command deleted"
 }

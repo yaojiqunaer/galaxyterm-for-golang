@@ -56,6 +56,7 @@ const { Text, Title } = Typography;
 const profileStorageKey = 'galaxyterm.connectionProfiles';
 const settingsStorageKey = 'galaxyterm.settings';
 const workspaceStorageKey = 'galaxyterm.workspaceSnapshot';
+const commandStorageKey = 'galaxyterm.quickCommands';
 
 const defaultSettings = {
   appTheme: 'system',
@@ -110,6 +111,7 @@ function App() {
   const [profileQuery, setProfileQuery] = useState('');
   const [groupQuery, setGroupQuery] = useState('all');
   const [workspaceSummary, setWorkspaceSummary] = useState(() => loadWorkspaceSummary());
+  const [quickCommands, setQuickCommands] = useState(() => loadQuickCommands());
   const [editingProfileId, setEditingProfileId] = useState('');
   const [newType, setNewType] = useState('local');
   const [fileEntries, setFileEntries] = useState([]);
@@ -120,8 +122,9 @@ function App() {
   const [form] = Form.useForm();
   const [fileForm] = Form.useForm();
   const [tunnelForm] = Form.useForm();
+  const [commandForm] = Form.useForm();
   const terminalRefs = useRef({});
-  const quickCommands = useMemo(() => defaultQuickCommands(), []);
+  const profileImportRef = useRef(null);
 
   useEffect(() => {
     Promise.resolve()
@@ -338,6 +341,32 @@ function App() {
     message.success(t('message.profileDeleted'));
   };
 
+  const exportProfiles = () => {
+    downloadJson('galaxyterm-profiles.json', {
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      profiles: profiles.map((profile) => sanitizeProfile(profile)),
+    });
+  };
+
+  const importProfiles = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    try {
+      const payload = JSON.parse(await file.text());
+      const incoming = Array.isArray(payload) ? payload : payload.profiles;
+      if (!Array.isArray(incoming)) throw new Error('invalid profiles');
+      const normalized = incoming.map(normalizeImportedProfile).filter(Boolean);
+      const nextProfiles = mergeProfiles(profiles, normalized);
+      persistProfiles(nextProfiles);
+      setProfiles(nextProfiles);
+      message.success(t('message.profileImported'));
+    } catch (error) {
+      message.error(`${t('message.profileImportFailed')}: ${error}`);
+    }
+  };
+
   const runQuickCommand = (command) => {
     const activeTerminal = terminalRefs.current[activeKey];
     if (!activeTerminal?.send) {
@@ -346,6 +375,26 @@ function App() {
     }
     activeTerminal.send(command.endsWith('\n') ? command : `${command}\n`);
     setCommandsOpen(false);
+  };
+
+  const addQuickCommand = async () => {
+    const values = await commandForm.validateFields();
+    const nextCommands = [...quickCommands, {
+      id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`,
+      name: values.name,
+      command: values.command,
+    }];
+    persistQuickCommands(nextCommands);
+    setQuickCommands(nextCommands);
+    commandForm.resetFields();
+    message.success(t('message.commandSaved'));
+  };
+
+  const deleteQuickCommand = (id) => {
+    const nextCommands = quickCommands.filter((item) => item.id !== id);
+    persistQuickCommands(nextCommands);
+    setQuickCommands(nextCommands);
+    message.success(t('message.commandDeleted'));
   };
 
   const items = sessions.map((session) => ({
@@ -454,6 +503,17 @@ function App() {
 
       <div className="page-header compact">
         <Title level={4}>{t('section.savedConnections')}</Title>
+        <Space>
+          <Button size="small" onClick={() => profileImportRef.current?.click()}>{t('action.import')}</Button>
+          <Button size="small" onClick={exportProfiles} disabled={profiles.length === 0}>{t('action.export')}</Button>
+          <input
+            ref={profileImportRef}
+            type="file"
+            accept="application/json,.json"
+            className="hidden-file-input"
+            onChange={importProfiles}
+          />
+        </Space>
       </div>
       <Space className="profile-filters" wrap>
         <Select
@@ -1170,6 +1230,16 @@ function App() {
         open={commandsOpen}
         onClose={() => setCommandsOpen(false)}
       >
+        <Form form={commandForm} layout="vertical" className="quick-command-form">
+          <Form.Item name="name" label={t('field.name')} rules={[{ required: true, message: t('validation.required') }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="command" label={t('field.command')} rules={[{ required: true, message: t('validation.required') }]}>
+            <Input.TextArea rows={3} />
+          </Form.Item>
+          <Button type="primary" onClick={addQuickCommand}>{t('action.addCommand')}</Button>
+        </Form>
+        <Divider />
         <List
           dataSource={quickCommands}
           renderItem={(item) => (
@@ -1177,6 +1247,7 @@ function App() {
               actions={[
                 <Button key="run" size="small" type="primary" onClick={() => runQuickCommand(item.command)}>{t('action.run')}</Button>,
                 <Button key="copy" size="small" onClick={() => navigator.clipboard?.writeText(item.command)}>{t('action.copy')}</Button>,
+                <Button key="delete" size="small" danger onClick={() => deleteQuickCommand(item.id)}>{t('action.delete')}</Button>,
               ]}
             >
               <List.Item.Meta title={item.name} description={<code>{item.command}</code>} />
@@ -1191,11 +1262,11 @@ function App() {
 
 function defaultQuickCommands() {
   return [
-    { name: 'List files', command: 'ls -lah' },
-    { name: 'Disk usage', command: 'df -h' },
-    { name: 'Memory usage', command: 'free -m' },
-    { name: 'Current directory', command: 'pwd' },
-    { name: 'Network ports', command: 'netstat -tunlp' },
+    { id: 'list-files', name: 'List files', command: 'ls -lah' },
+    { id: 'disk-usage', name: 'Disk usage', command: 'df -h' },
+    { id: 'memory-usage', name: 'Memory usage', command: 'free -m' },
+    { id: 'current-directory', name: 'Current directory', command: 'pwd' },
+    { id: 'network-ports', name: 'Network ports', command: 'netstat -tunlp' },
   ];
 }
 
@@ -1246,6 +1317,73 @@ function loadProfiles() {
 
 function persistProfiles(profiles) {
   localStorage.setItem(profileStorageKey, JSON.stringify(profiles));
+}
+
+function sanitizeProfile(profile) {
+  return {
+    id: profile.id,
+    providerType: profile.providerType,
+    displayName: profile.displayName,
+    group: profile.group || '',
+    config: { ...(profile.config || {}) },
+    auth: {
+      username: profile.auth?.username || '',
+      authType: profile.auth?.authType || 'password',
+      jumpUsername: profile.auth?.jumpUsername || '',
+    },
+  };
+}
+
+function normalizeImportedProfile(profile) {
+  if (!profile || !profile.providerType || !profile.displayName) return null;
+  return sanitizeProfile({
+    ...profile,
+    id: profile.id || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`),
+    config: profile.config || {},
+    auth: profile.auth || {},
+  });
+}
+
+function mergeProfiles(currentProfiles, importedProfiles) {
+  const existingIds = new Set(currentProfiles.map((profile) => profile.id));
+  const nextProfiles = [...currentProfiles];
+  importedProfiles.forEach((profile) => {
+    const nextProfile = existingIds.has(profile.id)
+      ? { ...profile, id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}` }
+      : profile;
+    existingIds.add(nextProfile.id);
+    nextProfiles.push(nextProfile);
+  });
+  return nextProfiles;
+}
+
+function loadQuickCommands() {
+  try {
+    const raw = localStorage.getItem(commandStorageKey);
+    const parsed = JSON.parse(raw || '[]');
+    if (!Array.isArray(parsed) || parsed.length === 0) return defaultQuickCommands();
+    return parsed.filter((item) => item?.name && item?.command).map((item) => ({
+      id: item.id || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`),
+      name: item.name,
+      command: item.command,
+    }));
+  } catch {
+    return defaultQuickCommands();
+  }
+}
+
+function persistQuickCommands(commands) {
+  localStorage.setItem(commandStorageKey, JSON.stringify(commands));
+}
+
+function downloadJson(fileName, payload) {
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
 }
 
 function saveProfile(profiles, request, editingProfileId = '') {

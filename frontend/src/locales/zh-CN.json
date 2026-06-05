@@ -27,6 +27,9 @@
   "action.restoreWorkspace": "恢复工作区",
   "action.clearWorkspace": "清空快照",
   "action.closeAll": "关闭全部会话",
+  "action.import": "导入",
+  "action.export": "导出",
+  "action.addCommand": "添加命令",
   "drawer.newTerminal": "新建终端会话",
   "drawer.settings": "设置",
   "drawer.commands": "快捷命令",
@@ -80,6 +83,7 @@
   "field.autoSaveWorkspace": "自动保存工作区",
   "field.autoRestoreWorkspace": "启动时恢复工作区",
   "field.saveProfile": "保存为连接",
+  "field.command": "命令",
   "field.path": "路径",
   "placeholder.sessionName": "可自定义标签名",
   "placeholder.group": "例如 Production / Dev / 客户现场",
@@ -136,5 +140,9 @@
   "message.workspaceRestoredPartial": "工作区已部分恢复，远程会话因未保存密钥已跳过",
   "message.workspaceRestoreSkipped": "没有可安全自动恢复的会话",
   "message.workspaceCleared": "工作区快照已清空",
-  "message.noWorkspaceSnapshot": "暂无工作区快照"
+  "message.noWorkspaceSnapshot": "暂无工作区快照",
+  "message.profileImported": "连接已导入",
+  "message.profileImportFailed": "导入连接失败",
+  "message.commandSaved": "快捷命令已保存",
+  "message.commandDeleted": "快捷命令已删除"
 }
