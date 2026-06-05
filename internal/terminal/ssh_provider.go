@@ -19,6 +19,10 @@ type sshDriver struct {
 	password   string
 	privateKey string
 	passphrase string
+	jumpHost   string
+	jumpPort   int
+	jumpUser   string
+	jumpPass   string
 
 	client  *ssh.Client
 	session *ssh.Session
@@ -71,6 +75,10 @@ func newSSHDriver(req session.CreateSessionRequest) (*sshDriver, error) {
 		password:   password,
 		privateKey: stringValue(req.Auth, "privateKey"),
 		passphrase: stringValue(req.Auth, "passphrase"),
+		jumpHost:   stringValue(req.Config, "jumpHost"),
+		jumpPort:   intValue(req.Config, "jumpPort", 22),
+		jumpUser:   stringValue(req.Auth, "jumpUsername"),
+		jumpPass:   stringValue(req.Auth, "jumpPassword"),
 	}, nil
 }
 
@@ -85,7 +93,7 @@ func (d *sshDriver) Start(ctx context.Context, emit session.Emitter) error {
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
-	client, err := ssh.Dial("tcp", d.addr, config)
+	client, err := d.dial(config)
 	if err != nil {
 		return err
 	}
@@ -153,6 +161,44 @@ func (d *sshDriver) Start(ctx context.Context, emit session.Emitter) error {
 		emit(session.Event{Type: session.EventExit})
 	}()
 	return nil
+}
+
+func (d *sshDriver) dial(config *ssh.ClientConfig) (*ssh.Client, error) {
+	if d.jumpHost == "" {
+		return ssh.Dial("tcp", d.addr, config)
+	}
+
+	jumpUser := d.jumpUser
+	if jumpUser == "" {
+		jumpUser = d.username
+	}
+	jumpConfig := &ssh.ClientConfig{
+		User: jumpUser,
+		Auth: []ssh.AuthMethod{
+			ssh.Password(d.jumpPass),
+		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+
+	jumpClient, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", d.jumpHost, d.jumpPort), jumpConfig)
+	if err != nil {
+		return nil, err
+	}
+
+	conn, err := jumpClient.Dial("tcp", d.addr)
+	if err != nil {
+		_ = jumpClient.Close()
+		return nil, err
+	}
+
+	clientConn, chans, reqs, err := ssh.NewClientConn(conn, d.addr, config)
+	if err != nil {
+		_ = conn.Close()
+		_ = jumpClient.Close()
+		return nil, err
+	}
+
+	return ssh.NewClient(clientConn, chans, reqs), nil
 }
 
 func (d *sshDriver) authMethods() ([]ssh.AuthMethod, error) {

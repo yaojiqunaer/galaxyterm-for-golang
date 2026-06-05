@@ -145,6 +145,10 @@ function App() {
       authType: profile?.auth?.authType || 'password',
       privateKey: '',
       passphrase: '',
+      jumpHost: profile?.config?.jumpHost || '',
+      jumpPort: profile?.config?.jumpPort || 22,
+      jumpUsername: profile?.auth?.jumpUsername || '',
+      jumpPassword: '',
       shell: profile?.config?.shell || '',
       saveProfile: false,
     });
@@ -815,6 +819,19 @@ function App() {
                   </Form.Item>
                 </>
               )}
+              <Divider />
+              <Form.Item name="jumpHost" label={t('field.jumpHost')}>
+                <Input placeholder={t('placeholder.host')} />
+              </Form.Item>
+              <Form.Item name="jumpPort" label={t('field.jumpPort')} initialValue={22}>
+                <InputNumber min={1} max={65535} style={{ width: '100%' }} />
+              </Form.Item>
+              <Form.Item name="jumpUsername" label={t('field.jumpUsername')}>
+                <Input />
+              </Form.Item>
+              <Form.Item name="jumpPassword" label={t('field.jumpPassword')}>
+                <Input.Password />
+              </Form.Item>
             </>
           )}
           <Form.Item name="saveProfile" valuePropName="checked">
@@ -923,6 +940,7 @@ function saveProfile(profiles, request, editingProfileId = '') {
     auth: {
       username: request.auth?.username || '',
       authType: request.auth?.authType || 'password',
+      jumpUsername: request.auth?.jumpUsername || '',
     },
   };
   if (editingProfileId) {
@@ -975,6 +993,8 @@ function buildRequest(type, displayName, values) {
       config: {
         host: values.host,
         port: values.port || 22,
+        jumpHost: values.jumpHost || '',
+        jumpPort: values.jumpPort || 22,
       },
       auth: {
         username: values.username,
@@ -982,6 +1002,8 @@ function buildRequest(type, displayName, values) {
         password: values.password || '',
         privateKey: values.privateKey || '',
         passphrase: values.passphrase || '',
+        jumpUsername: values.jumpUsername || '',
+        jumpPassword: values.jumpPassword || '',
       },
     };
   }

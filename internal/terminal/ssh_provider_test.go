@@ -29,3 +29,28 @@ func TestNewSSHDriverAcceptsPrivateKeyAuth(t *testing.T) {
 		t.Fatal("privateKey was empty")
 	}
 }
+
+func TestNewSSHDriverAcceptsJumpHostConfig(t *testing.T) {
+	driver, err := newSSHDriver(session.CreateSessionRequest{
+		Config: map[string]interface{}{
+			"host":     "10.0.0.10",
+			"jumpHost": "1.2.3.4",
+			"jumpPort": 2222,
+		},
+		Auth: map[string]interface{}{
+			"username":     "app",
+			"password":     "secret",
+			"jumpUsername": "jump",
+			"jumpPassword": "jump-secret",
+		},
+	})
+	if err != nil {
+		t.Fatalf("newSSHDriver returned error: %v", err)
+	}
+	if driver.jumpHost != "1.2.3.4" {
+		t.Fatalf("jumpHost = %q, want 1.2.3.4", driver.jumpHost)
+	}
+	if driver.jumpPort != 2222 {
+		t.Fatalf("jumpPort = %d, want 2222", driver.jumpPort)
+	}
+}
