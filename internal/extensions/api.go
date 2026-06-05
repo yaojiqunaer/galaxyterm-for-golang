@@ -15,3 +15,11 @@ func (api *API) ListInstalled() []Manifest {
 func (api *API) Validate(manifest Manifest) error {
 	return ValidateManifest(manifest)
 }
+
+func (api *API) RegisterInstalled(manifest Manifest) error {
+	if err := ValidateManifest(manifest); err != nil {
+		return err
+	}
+	api.installed = append(api.installed, manifest)
+	return nil
+}

@@ -293,8 +293,8 @@ function App() {
           <Title level={3}>{t('section.officialExtensions')}</Title>
         </div>
         <Space>
-          <Button icon={<FolderOpenOutlined />} onClick={() => message.info(t('message.extensionComing'))}>{t('action.installOffline')}</Button>
-          <Button icon={<PlusOutlined />} onClick={() => message.info(t('message.extensionComing'))}>{t('action.addSource')}</Button>
+          <Button icon={<FolderOpenOutlined />} onClick={registerDemoExtension}>{t('action.installOffline')}</Button>
+          <Button icon={<PlusOutlined />} onClick={registerDemoExtension}>{t('action.addSource')}</Button>
         </Space>
       </div>
       <Alert type="info" showIcon message={t('settings.coreOnly')} />
@@ -334,6 +334,22 @@ function App() {
       </div>
     </div>
   );
+
+  const registerDemoExtension = async () => {
+    const manifest = {
+      id: 'galaxyterm-extension-demo',
+      name: 'Demo Extension',
+      version: '0.1.0',
+      apiVersion: 'v1',
+      description: 'Local extension manifest preview',
+      providers: [{ type: 'demo', nameKey: 'extension.demo', category: 'extension', capabilities: ['stream'] }],
+      locales: ['zh-CN', 'en-US'],
+    };
+    await ExtensionsAPI.RegisterInstalled(manifest);
+    const items = await ExtensionsAPI.ListInstalled();
+    setInstalledExtensions(Array.isArray(items) ? items : []);
+    message.success(t('message.extensionComing'));
+  };
 
   const loadFiles = async (overridePath = null) => {
     const values = await fileForm.validateFields();
