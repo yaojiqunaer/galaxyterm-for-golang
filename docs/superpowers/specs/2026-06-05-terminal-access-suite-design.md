@@ -17,6 +17,7 @@ The first architectural target is not to implement every provider at once. The t
 - Kubernetes, Docker, databases, message systems, and other large integrations will be official extensions.
 - Official extensions can be hosted in a personal GitHub organization or repository and distributed through GitHub Releases.
 - Offline installation will be supported by downloading extension package files from GitHub Releases and importing them locally.
+- The app and documentation must support multiple languages. Chinese and English are required first, and the design must allow additional languages later.
 
 ## Architecture
 
@@ -203,6 +204,8 @@ An extension package contains:
 ```text
 manifest.json
 bin/{darwin,linux,windows}/{arch}/extension executable
+i18n/{locale}.json
+docs/{locale}/README.md, optional
 README.md
 LICENSE
 checksums.txt
@@ -310,6 +313,96 @@ The first UI can support a practical subset of schema types:
 - boolean
 - select
 - textarea
+
+## Internationalization
+
+GalaxyTerm must treat user-facing text as localizable from the start. This applies to the core app, built-in providers, extension metadata, errors, and documentation.
+
+### Application UI
+
+The frontend should use a small i18n layer instead of hard-coded display strings. The first required locales are:
+
+```text
+zh-CN
+en-US
+```
+
+The app should select a locale in this order:
+
+1. User setting
+2. Operating system language
+3. `en-US` fallback
+
+The first implementation should keep translations in static locale files, for example:
+
+```text
+frontend/src/locales/zh-CN.json
+frontend/src/locales/en-US.json
+```
+
+UI code should reference stable translation keys, not raw Chinese or English strings. Provider metadata exposed to the frontend should also be localizable.
+
+### Backend And Provider Messages
+
+Backend code should not return only pre-rendered Chinese or English messages for user-facing errors. It should prefer structured errors:
+
+```text
+code
+messageKey
+defaultMessage
+details
+```
+
+The frontend can render `messageKey` through its locale files. `defaultMessage` is a safe fallback for logs, older clients, and extension compatibility.
+
+Built-in and extension providers should expose localized metadata when possible:
+
+```text
+name
+description
+config field labels
+config field help text
+error message keys
+```
+
+Extension manifests can include an `i18n` block:
+
+```text
+i18n/
+  zh-CN.json
+  en-US.json
+```
+
+The core app loads extension locale files and merges them under the extension provider namespace so extension translations do not collide with core translations.
+
+### Documentation
+
+Repository documentation should be multilingual. The current repository already has `README.md` and `README_EN.md`; future documentation should keep language variants explicit and easy to find.
+
+Recommended documentation defaults:
+
+- Keep the primary Chinese README as `README.md`.
+- Keep the English README as `README_EN.md` unless the project later standardizes on `README.en-US.md`.
+- Add a language selector near the top of each README variant.
+- Preserve commands, paths, package names, config keys, code blocks, and URLs exactly across translations.
+- Keep docs section order aligned across languages.
+
+Design and operator docs can use language-specific sibling files:
+
+```text
+docs/<topic>.md
+docs/<topic>.en-US.md
+```
+
+Extension repositories should follow the same rule:
+
+```text
+README.md
+README_EN.md
+docs/...
+```
+
+When extension packages include docs, their manifest should declare available documentation languages.
 
 ## Configuration And Credentials
 
