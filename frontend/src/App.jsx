@@ -82,7 +82,9 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [selectedNav, setSelectedNav] = useState('connections');
+  const [sessionView, setSessionView] = useState('tabs');
   const [profileQuery, setProfileQuery] = useState('');
+  const [editingProfileId, setEditingProfileId] = useState('');
   const [newType, setNewType] = useState('local');
   const [fileEntries, setFileEntries] = useState([]);
   const [fileLoading, setFileLoading] = useState(false);
@@ -146,6 +148,7 @@ function App() {
       shell: profile?.config?.shell || '',
       saveProfile: false,
     });
+    setEditingProfileId(profile?.id || '');
     setSshAuthType(profile?.auth?.authType || 'password');
     setDrawerOpen(true);
   };
@@ -158,7 +161,7 @@ function App() {
     const request = buildRequest(newType, label, values);
 
     if (values.saveProfile) {
-      const nextProfiles = saveProfile(profiles, request);
+      const nextProfiles = saveProfile(profiles, request, editingProfileId);
       setProfiles(nextProfiles);
       message.success(t('message.profileSaved'));
     }
@@ -168,6 +171,31 @@ function App() {
     setSelectedNav('sessions');
     setDrawerOpen(false);
     message.success(t('terminal.status.connecting'));
+  };
+
+  const duplicateProfile = (profile) => {
+    const copy = {
+      ...profile,
+      id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`,
+      displayName: `${profile.displayName} Copy`,
+    };
+    const nextProfiles = [...profiles, copy];
+    persistProfiles(nextProfiles);
+    setProfiles(nextProfiles);
+    message.success(t('message.profileSaved'));
+  };
+
+  const duplicateSession = (session) => {
+    const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`;
+    setSessions((current) => [...current, {
+      ...session,
+      id,
+      backendSessionId: '',
+      label: `${session.label} Copy`,
+      status: 'connecting',
+    }]);
+    setActiveKey(id);
+    setSelectedNav('sessions');
   };
 
   const removeSession = (targetKey) => {
@@ -234,6 +262,41 @@ function App() {
     if (sessions.length === 0) {
       return <WelcomePanel providers={providers} openDrawer={openDrawer} />;
     }
+    if (sessionView === 'grid') {
+      return (
+        <div className="session-grid-page">
+          <div className="session-grid-toolbar">
+            <Text strong>{t('section.sessionGrid')}</Text>
+            <Button size="small" onClick={() => setSessionView('tabs')}>{t('action.tabs')}</Button>
+          </div>
+          <div className="session-grid">
+            {sessions.map((session) => (
+              <div className="split-terminal" key={session.id}>
+                <div className="split-terminal-header">
+                  <span className="tab-label">{providerIcons[session.providerType] || <CodeOutlined />}{session.label}</span>
+                  <Space>
+                    <Button size="small" onClick={() => duplicateSession(session)}>{t('action.duplicate')}</Button>
+                    <Button size="small" danger onClick={() => removeSession(session.id)}>{t('action.delete')}</Button>
+                  </Space>
+                </div>
+                <TerminalPane
+                  ref={(el) => {
+                    terminalRefs.current[session.id] = el;
+                  }}
+                  request={session.request}
+                  onSessionCreated={(backendSessionId) => {
+                    setSessions((current) => current.map((item) => (
+                      item.id === session.id ? { ...item, backendSessionId, status: 'connected' } : item
+                    )));
+                  }}
+                  onSessionClosed={(backendSessionId) => updateSessionStatus(backendSessionId, 'closed')}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      );
+    }
     return (
       <Tabs
         className="terminal-tabs"
@@ -290,6 +353,8 @@ function App() {
             <List.Item
               actions={[
                 <Button key="open" size="small" onClick={() => openDrawer(profile.providerType, profile)}>{t('action.open')}</Button>,
+                <Button key="edit" size="small" onClick={() => openDrawer(profile.providerType, profile)}>{t('action.edit')}</Button>,
+                <Button key="duplicate" size="small" onClick={() => duplicateProfile(profile)}>{t('action.duplicate')}</Button>,
                 <Button key="delete" size="small" danger onClick={() => deleteProfile(profile.id)}>{t('action.delete')}</Button>,
               ]}
             >
@@ -656,6 +721,9 @@ function App() {
             <Button icon={<CodeOutlined />} onClick={() => setCommandsOpen(true)}>
               {t('action.commands')}
             </Button>
+            <Button onClick={() => setSessionView(sessionView === 'tabs' ? 'grid' : 'tabs')}>
+              {sessionView === 'tabs' ? t('action.grid') : t('action.tabs')}
+            </Button>
           </Space>
           <Space className="topbar-actions">
             <Tooltip title={t('action.language')}>
@@ -846,9 +914,9 @@ function persistProfiles(profiles) {
   localStorage.setItem(profileStorageKey, JSON.stringify(profiles));
 }
 
-function saveProfile(profiles, request) {
+function saveProfile(profiles, request, editingProfileId = '') {
   const profile = {
-    id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`,
+    id: editingProfileId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`),
     providerType: request.providerType,
     displayName: request.displayName,
     config: request.config,
@@ -857,6 +925,11 @@ function saveProfile(profiles, request) {
       authType: request.auth?.authType || 'password',
     },
   };
+  if (editingProfileId) {
+    const nextProfiles = profiles.map((item) => (item.id === editingProfileId ? profile : item));
+    persistProfiles(nextProfiles);
+    return nextProfiles;
+  }
   const nextProfiles = [...profiles, profile];
   persistProfiles(nextProfiles);
   return nextProfiles;
