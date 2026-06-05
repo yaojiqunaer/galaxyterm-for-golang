@@ -312,6 +312,31 @@ select {
   border-radius: 8px;
 }
 
+.file-browser-card {
+  border-radius: 8px;
+}
+
+.file-browser-form {
+  gap: 8px 0;
+  margin-bottom: 14px;
+}
+
+.file-browser-form .ant-form-item {
+  margin-bottom: 8px;
+}
+
+.remote-file-list {
+  border-top: 1px solid #e2e8ee;
+}
+
+.remote-file-row {
+  cursor: default;
+}
+
+.remote-file-row:hover {
+  background: #f6f9fb;
+}
+
 .statusbar {
   display: flex;
   align-items: center;

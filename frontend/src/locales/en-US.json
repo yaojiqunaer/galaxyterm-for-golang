@@ -18,6 +18,7 @@
   "nav.connections": "Connections",
   "nav.sessions": "Sessions",
   "nav.extensions": "Extensions",
+  "nav.files": "Files",
   "nav.settings": "Settings",
   "section.quickConnect": "Quick Connect",
   "section.activeSessions": "Active Sessions",
@@ -25,8 +26,10 @@
   "section.officialExtensions": "Official Extensions",
   "section.installedProviders": "Installed Providers",
   "section.preferences": "Preferences",
+  "section.remoteFiles": "Remote Files",
   "empty.noSessions": "No sessions",
   "empty.noConnections": "No saved connections",
+  "empty.noFiles": "No files",
   "welcome.eyebrow": "Terminal / SSH / Extensions",
   "welcome.title": "Open a session to start working",
   "welcome.description": "Start with local shell or SSH. Later extensions can add Kubernetes, Docker, databases, and more protocols.",
@@ -39,6 +42,7 @@
   "field.shell": "Shell",
   "field.locale": "Interface Language",
   "field.saveProfile": "Save as connection",
+  "field.path": "Path",
   "placeholder.sessionName": "Optional tab name",
   "placeholder.host": "For example 127.0.0.1",
   "placeholder.shell": "Leave empty to use default shell",
@@ -65,5 +69,6 @@
   "settings.coreOnly": "Only the lightweight core is enabled. K8s, Docker, and database terminals will be installed as extensions.",
   "message.profileSaved": "Connection saved",
   "message.profileDeleted": "Connection deleted",
-  "message.extensionComing": "Extension installation will be added in the next phase"
+  "message.extensionComing": "Extension installation will be added in the next phase",
+  "message.fileListFailed": "Failed to read remote directory"
 }

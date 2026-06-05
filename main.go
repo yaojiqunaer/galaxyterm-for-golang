@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"galaxyterm/internal"
+	"galaxyterm/internal/files"
 	"galaxyterm/internal/session"
 	"galaxyterm/internal/terminal"
 	"github.com/wailsapp/wails/v2"
@@ -64,6 +65,7 @@ func main() {
 		//CSSDragProperty: "--wails-draggable",
 		Bind: []interface{}{
 			session.NewAPI(sessionManager),
+			files.NewAPI(),
 			&internal.Theme{},
 		},
 		Windows: nil,

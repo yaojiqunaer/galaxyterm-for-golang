@@ -36,6 +36,7 @@ import {
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import TerminalPane from './components/TerminalPane.jsx';
+import * as FilesAPI from '../wailsjs/go/files/API.js';
 import * as SessionAPI from '../wailsjs/go/session/API.js';
 import { availableLocales, currentLocale, setLocale, t } from './i18n.js';
 
@@ -79,7 +80,10 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [selectedNav, setSelectedNav] = useState('connections');
   const [newType, setNewType] = useState('local');
+  const [fileEntries, setFileEntries] = useState([]);
+  const [fileLoading, setFileLoading] = useState(false);
   const [form] = Form.useForm();
+  const [fileForm] = Form.useForm();
   const terminalRefs = useRef({});
 
   useEffect(() => {
@@ -302,6 +306,80 @@ function App() {
     </div>
   );
 
+  const loadFiles = async (overridePath = null) => {
+    const values = await fileForm.validateFields();
+    const req = {
+      host: values.host,
+      port: values.port || 22,
+      username: values.username,
+      password: values.password || '',
+      path: overridePath || values.path || '.',
+    };
+    setFileLoading(true);
+    try {
+      const entries = await FilesAPI.List(req);
+      fileForm.setFieldsValue({ path: req.path });
+      setFileEntries(Array.isArray(entries) ? entries : []);
+    } catch (error) {
+      message.error(`${t('message.fileListFailed')}: ${error}`);
+    } finally {
+      setFileLoading(false);
+    }
+  };
+
+  const renderFiles = () => (
+    <div className="workspace-page">
+      <div className="page-header">
+        <div>
+          <Text type="secondary">{t('nav.files')}</Text>
+          <Title level={3}>{t('section.remoteFiles')}</Title>
+        </div>
+      </div>
+      <Card className="file-browser-card">
+        <Form form={fileForm} layout="inline" className="file-browser-form" initialValues={{ port: 22, path: '.' }}>
+          <Form.Item name="host" label={t('field.host')} rules={[{ required: true, message: t('validation.required') }]}>
+            <Input placeholder={t('placeholder.host')} />
+          </Form.Item>
+          <Form.Item name="port" label={t('field.port')}>
+            <InputNumber min={1} max={65535} />
+          </Form.Item>
+          <Form.Item name="username" label={t('field.username')} rules={[{ required: true, message: t('validation.required') }]}>
+            <Input />
+          </Form.Item>
+          <Form.Item name="password" label={t('field.password')}>
+            <Input.Password />
+          </Form.Item>
+          <Form.Item name="path" label={t('field.path')}>
+            <Input />
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" onClick={() => loadFiles()} loading={fileLoading}>{t('action.open')}</Button>
+          </Form.Item>
+        </Form>
+        <List
+          className="remote-file-list"
+          loading={fileLoading}
+          dataSource={fileEntries}
+          locale={{ emptyText: t('empty.noFiles') }}
+          renderItem={(entry) => (
+            <List.Item
+              className="remote-file-row"
+              onDoubleClick={() => {
+                if (entry.isDir) loadFiles(entry.path);
+              }}
+            >
+              <List.Item.Meta
+                avatar={<span className="provider-icon">{entry.isDir ? <FolderOpenOutlined /> : <CodeOutlined />}</span>}
+                title={entry.name}
+                description={`${entry.mode} · ${entry.size} · ${entry.modTime}`}
+              />
+            </List.Item>
+          )}
+        />
+      </Card>
+    </div>
+  );
+
   const renderSettings = () => (
     <div className="workspace-page narrow">
       <div className="page-header">
@@ -330,6 +408,7 @@ function App() {
 
   const renderContent = () => {
     if (selectedNav === 'connections') return renderConnections();
+    if (selectedNav === 'files') return renderFiles();
     if (selectedNav === 'extensions') return renderExtensions();
     if (selectedNav === 'settings') return renderSettings();
     return renderSessions();
@@ -354,6 +433,7 @@ function App() {
           items={[
             { key: 'connections', icon: <CloudServerOutlined />, label: t('nav.connections') },
             { key: 'sessions', icon: <CodeOutlined />, label: t('nav.sessions') },
+            { key: 'files', icon: <FolderOpenOutlined />, label: t('nav.files') },
             { key: 'extensions', icon: <AppstoreAddOutlined />, label: t('nav.extensions') },
             { key: 'settings', icon: <SettingOutlined />, label: t('nav.settings') },
           ]}

@@ -18,6 +18,7 @@
   "nav.connections": "连接",
   "nav.sessions": "会话",
   "nav.extensions": "扩展",
+  "nav.files": "文件",
   "nav.settings": "设置",
   "section.quickConnect": "快速连接",
   "section.activeSessions": "活动会话",
@@ -25,8 +26,10 @@
   "section.officialExtensions": "官方扩展",
   "section.installedProviders": "已安装 Provider",
   "section.preferences": "偏好设置",
+  "section.remoteFiles": "远程文件",
   "empty.noSessions": "暂无会话",
   "empty.noConnections": "暂无保存的连接",
+  "empty.noFiles": "暂无文件",
   "welcome.eyebrow": "终端 / SSH / 扩展",
   "welcome.title": "打开一个会话开始工作",
   "welcome.description": "从本地终端或 SSH 开始，后续可通过扩展接入 Kubernetes、Docker、数据库和更多协议。",
@@ -39,6 +42,7 @@
   "field.shell": "Shell",
   "field.locale": "界面语言",
   "field.saveProfile": "保存为连接",
+  "field.path": "路径",
   "placeholder.sessionName": "可自定义标签名",
   "placeholder.host": "例如 127.0.0.1",
   "placeholder.shell": "留空使用默认 Shell",
@@ -66,4 +70,5 @@
   "message.profileSaved": "连接已保存",
   "message.profileDeleted": "连接已删除",
   "message.extensionComing": "扩展安装器将在下一阶段接入"
+  ,"message.fileListFailed": "读取远程目录失败"
 }
