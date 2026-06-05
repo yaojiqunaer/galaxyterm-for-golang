@@ -10,6 +10,9 @@
   "action.up": "上级",
   "action.mkdir": "新建目录",
   "action.download": "下载",
+  "action.commands": "快捷命令",
+  "action.run": "执行",
+  "action.copy": "复制",
   "action.saveAndOpen": "保存并打开",
   "action.installOffline": "离线安装",
   "action.addSource": "添加源",
@@ -18,6 +21,7 @@
   "action.cancel": "取消",
   "drawer.newTerminal": "新建终端会话",
   "drawer.settings": "设置",
+  "drawer.commands": "快捷命令",
   "nav.connections": "连接",
   "nav.sessions": "会话",
   "nav.extensions": "扩展",
@@ -30,6 +34,7 @@
   "section.installedProviders": "已安装 Provider",
   "section.preferences": "偏好设置",
   "section.remoteFiles": "远程文件",
+  "section.quickCommands": "快捷命令",
   "empty.noSessions": "暂无会话",
   "empty.noConnections": "暂无保存的连接",
   "empty.noFiles": "暂无文件",
@@ -70,6 +75,7 @@
   "terminal.status.closed": "会话已关闭",
   "terminal.error.createFailed": "创建终端失败",
   "terminal.error.disconnected": "终端连接异常",
+  "terminal.confirmPaste": "检测到多行或大量粘贴内容，确认发送到终端？",
   "validation.required": "必填",
   "status.sessions": "会话",
   "status.providers": "Provider",
@@ -82,5 +88,6 @@
   "message.fileListFailed": "读取远程目录失败",
   "message.mkdirSuccess": "目录已创建",
   "message.deleteSuccess": "已删除",
-  "message.downloadStarted": "已开始下载"
+  "message.downloadStarted": "已开始下载",
+  "message.noActiveSession": "没有活动终端会话"
 }

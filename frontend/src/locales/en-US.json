@@ -10,6 +10,9 @@
   "action.up": "Up",
   "action.mkdir": "New Folder",
   "action.download": "Download",
+  "action.commands": "Quick Commands",
+  "action.run": "Run",
+  "action.copy": "Copy",
   "action.saveAndOpen": "Save and Open",
   "action.installOffline": "Offline Install",
   "action.addSource": "Add Source",
@@ -18,6 +21,7 @@
   "action.cancel": "Cancel",
   "drawer.newTerminal": "New Terminal Session",
   "drawer.settings": "Settings",
+  "drawer.commands": "Quick Commands",
   "nav.connections": "Connections",
   "nav.sessions": "Sessions",
   "nav.extensions": "Extensions",
@@ -30,6 +34,7 @@
   "section.installedProviders": "Installed Providers",
   "section.preferences": "Preferences",
   "section.remoteFiles": "Remote Files",
+  "section.quickCommands": "Quick Commands",
   "empty.noSessions": "No sessions",
   "empty.noConnections": "No saved connections",
   "empty.noFiles": "No files",
@@ -70,6 +75,7 @@
   "terminal.status.closed": "Session closed",
   "terminal.error.createFailed": "Failed to create terminal",
   "terminal.error.disconnected": "Terminal connection error",
+  "terminal.confirmPaste": "Large or multi-line paste detected. Send it to the terminal?",
   "validation.required": "Required",
   "status.sessions": "Sessions",
   "status.providers": "Providers",
@@ -82,5 +88,6 @@
   "message.fileListFailed": "Failed to read remote directory",
   "message.mkdirSuccess": "Folder created",
   "message.deleteSuccess": "Deleted",
-  "message.downloadStarted": "Download started"
+  "message.downloadStarted": "Download started",
+  "message.noActiveSession": "No active terminal session"
 }

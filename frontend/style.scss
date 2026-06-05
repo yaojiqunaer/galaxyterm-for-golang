@@ -300,6 +300,18 @@ select {
   background: #ffffff;
 }
 
+.profile-search {
+  max-width: 360px;
+  margin-bottom: 12px;
+}
+
+code {
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: #edf2f6;
+  color: #233747;
+}
+
 .profile-list .ant-list-item {
   padding: 12px 14px !important;
 }

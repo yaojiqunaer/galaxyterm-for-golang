@@ -17,6 +17,12 @@ function TerminalPane({ request, onSessionCreated, onSessionClosed }, ref) {
     fit: () => {
       fitAddon.current?.fit();
     },
+    send: (data) => {
+      if (sessionId.current) {
+        SessionAPI.Send(sessionId.current, data);
+        term.current?.focus();
+      }
+    },
   }), []);
 
   useEffect(() => {
@@ -75,6 +81,9 @@ function TerminalPane({ request, onSessionCreated, onSessionClosed }, ref) {
         SessionAPI.Resize(createdSessionId, size.cols, size.rows);
       });
       term.current.onData((data) => {
+        if (isRiskyPaste(data) && !window.confirm(t('terminal.confirmPaste'))) {
+          return;
+        }
         SessionAPI.Send(createdSessionId, data);
       });
 
@@ -120,6 +129,11 @@ function TerminalPane({ request, onSessionCreated, onSessionClosed }, ref) {
   }, []);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
+}
+
+function isRiskyPaste(data) {
+  const lineBreaks = (data.match(/\r|\n/g) || []).length;
+  return data.length > 120 || lineBreaks >= 2;
 }
 
 export default forwardRef(TerminalPane);

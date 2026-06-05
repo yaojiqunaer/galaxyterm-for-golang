@@ -80,7 +80,9 @@ function App() {
   const [activeKey, setActiveKey] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [commandsOpen, setCommandsOpen] = useState(false);
   const [selectedNav, setSelectedNav] = useState('connections');
+  const [profileQuery, setProfileQuery] = useState('');
   const [newType, setNewType] = useState('local');
   const [fileEntries, setFileEntries] = useState([]);
   const [fileLoading, setFileLoading] = useState(false);
@@ -90,6 +92,7 @@ function App() {
   const [form] = Form.useForm();
   const [fileForm] = Form.useForm();
   const terminalRefs = useRef({});
+  const quickCommands = useMemo(() => defaultQuickCommands(), []);
 
   useEffect(() => {
     SessionAPI.ListProviders()
@@ -190,6 +193,16 @@ function App() {
     message.success(t('message.profileDeleted'));
   };
 
+  const runQuickCommand = (command) => {
+    const activeTerminal = terminalRefs.current[activeKey];
+    if (!activeTerminal?.send) {
+      message.warning(t('message.noActiveSession'));
+      return;
+    }
+    activeTerminal.send(command.endsWith('\n') ? command : `${command}\n`);
+    setCommandsOpen(false);
+  };
+
   const items = sessions.map((session) => ({
     key: session.id,
     label: (
@@ -260,12 +273,19 @@ function App() {
       <div className="page-header compact">
         <Title level={4}>{t('section.savedConnections')}</Title>
       </div>
-      {profiles.length === 0 ? (
+      <Input.Search
+        className="profile-search"
+        allowClear
+        value={profileQuery}
+        onChange={(event) => setProfileQuery(event.target.value)}
+        placeholder={t('nav.connections')}
+      />
+      {filteredProfiles(profiles, profileQuery).length === 0 ? (
         <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noConnections')} />
       ) : (
         <List
           className="profile-list"
-          dataSource={profiles}
+          dataSource={filteredProfiles(profiles, profileQuery)}
           renderItem={(profile) => (
             <List.Item
               actions={[
@@ -633,6 +653,9 @@ function App() {
             <Button icon={<CloudServerOutlined />} onClick={() => openDrawer('ssh')}>
               {t('action.quickSsh')}
             </Button>
+            <Button icon={<CodeOutlined />} onClick={() => setCommandsOpen(true)}>
+              {t('action.commands')}
+            </Button>
           </Space>
           <Space className="topbar-actions">
             <Tooltip title={t('action.language')}>
@@ -740,8 +763,38 @@ function App() {
       >
         {renderSettings()}
       </Drawer>
+      <Drawer
+        title={t('drawer.commands')}
+        width={420}
+        open={commandsOpen}
+        onClose={() => setCommandsOpen(false)}
+      >
+        <List
+          dataSource={quickCommands}
+          renderItem={(item) => (
+            <List.Item
+              actions={[
+                <Button key="run" size="small" type="primary" onClick={() => runQuickCommand(item.command)}>{t('action.run')}</Button>,
+                <Button key="copy" size="small" onClick={() => navigator.clipboard?.writeText(item.command)}>{t('action.copy')}</Button>,
+              ]}
+            >
+              <List.Item.Meta title={item.name} description={<code>{item.command}</code>} />
+            </List.Item>
+          )}
+        />
+      </Drawer>
     </Layout>
   );
+}
+
+function defaultQuickCommands() {
+  return [
+    { name: 'List files', command: 'ls -lah' },
+    { name: 'Disk usage', command: 'df -h' },
+    { name: 'Memory usage', command: 'free -m' },
+    { name: 'Current directory', command: 'pwd' },
+    { name: 'Network ports', command: 'netstat -tunlp' },
+  ];
 }
 
 function WelcomePanel({ providers, openDrawer }) {
@@ -814,6 +867,17 @@ function profileDescription(profile) {
     return `${profile.auth?.username || '-'}@${profile.config?.host || '-'}:${profile.config?.port || 22}`;
   }
   return profile.config?.shell || 'default shell';
+}
+
+function filteredProfiles(profiles, query) {
+  const keyword = query.trim().toLowerCase();
+  if (!keyword) return profiles;
+  return profiles.filter((profile) => (
+    profile.displayName?.toLowerCase().includes(keyword)
+    || profile.providerType?.toLowerCase().includes(keyword)
+    || profile.config?.host?.toLowerCase().includes(keyword)
+    || profile.auth?.username?.toLowerCase().includes(keyword)
+  ));
 }
 
 function parentPath(current) {
