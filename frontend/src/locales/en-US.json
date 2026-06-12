@@ -7,6 +7,7 @@
   "action.open": "Open",
   "action.save": "Save",
   "action.delete": "Delete",
+  "action.clear": "Clear",
   "action.up": "Up",
   "action.mkdir": "New Folder",
   "action.download": "Download",
@@ -184,5 +185,6 @@
   "message.profileImportFailed": "Failed to import connections",
   "message.commandSaved": "Quick command saved",
   "message.commandDeleted": "Quick command deleted",
-  "message.sessionRenamed": "Session renamed"
+  "message.sessionRenamed": "Session renamed",
+  "message.recentCleared": "Recent connections cleared"
 }

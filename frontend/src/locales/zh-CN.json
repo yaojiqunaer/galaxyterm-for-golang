@@ -7,6 +7,7 @@
   "action.open": "打开",
   "action.save": "保存",
   "action.delete": "删除",
+  "action.clear": "清空",
   "action.up": "上级",
   "action.mkdir": "新建目录",
   "action.download": "下载",
@@ -184,5 +185,6 @@
   "message.profileImportFailed": "导入连接失败",
   "message.commandSaved": "快捷命令已保存",
   "message.commandDeleted": "快捷命令已删除",
-  "message.sessionRenamed": "会话已重命名"
+  "message.sessionRenamed": "会话已重命名",
+  "message.recentCleared": "最近连接已清空"
 }

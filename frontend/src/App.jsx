@@ -464,6 +464,12 @@ function App() {
     openDrawer(profile.providerType, profile);
   };
 
+  const clearRecentConnections = () => {
+    persistRecentConnections([]);
+    setRecentConnections([]);
+    message.success(t('message.recentCleared'));
+  };
+
   const exportProfiles = () => {
     downloadJson('galaxyterm-profiles.json', {
       version: profileSchemaVersion,
@@ -640,6 +646,7 @@ function App() {
         <>
           <div className="page-header compact">
             <Title level={4}>{t('section.recentConnections')}</Title>
+            <Button size="small" onClick={clearRecentConnections}>{t('action.clear')}</Button>
           </div>
           <div className="recent-connection-list">
             {recentConnections.slice(0, 6).map((connection) => (
