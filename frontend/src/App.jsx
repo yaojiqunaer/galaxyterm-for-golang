@@ -132,6 +132,7 @@ function App() {
   const [newType, setNewType] = useState('local');
   const [fileEntries, setFileEntries] = useState([]);
   const [fileLoading, setFileLoading] = useState(false);
+  const [fileAuthType, setFileAuthType] = useState('password');
   const [fileEditorOpen, setFileEditorOpen] = useState(false);
   const [fileEditorLoading, setFileEditorLoading] = useState(false);
   const [editingRemoteFile, setEditingRemoteFile] = useState(null);
@@ -845,6 +846,9 @@ function App() {
       port: values.port || 22,
       username: values.username,
       password: values.password || '',
+      authType: values.authType || 'password',
+      privateKey: values.privateKey || '',
+      passphrase: values.passphrase || '',
       path: overridePath || values.path || '.',
     };
     setFileLoading(true);
@@ -866,6 +870,9 @@ function App() {
       port: values.port || 22,
       username: values.username,
       password: values.password || '',
+      authType: values.authType || 'password',
+      privateKey: values.privateKey || '',
+      passphrase: values.passphrase || '',
       path: values.path || '.',
     };
   };
@@ -1014,9 +1021,31 @@ function App() {
           <Form.Item name="username" label={t('field.username')} rules={[{ required: true, message: t('validation.required') }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="password" label={t('field.password')}>
-            <Input.Password />
+          <Form.Item name="authType" label={t('field.authType')} initialValue="password">
+            <Select
+              className="file-auth-select"
+              onChange={setFileAuthType}
+              options={[
+                { value: 'password', label: t('auth.password') },
+                { value: 'privateKey', label: t('auth.privateKey') },
+              ]}
+            />
           </Form.Item>
+          {fileAuthType === 'password' && (
+            <Form.Item name="password" label={t('field.password')}>
+              <Input.Password />
+            </Form.Item>
+          )}
+          {fileAuthType === 'privateKey' && (
+            <>
+              <Form.Item name="privateKey" label={t('field.privateKey')} rules={[{ required: true, message: t('validation.required') }]}>
+                <Input.TextArea rows={2} className="file-private-key-input" />
+              </Form.Item>
+              <Form.Item name="passphrase" label={t('field.passphrase')}>
+                <Input.Password />
+              </Form.Item>
+            </>
+          )}
           <Form.Item name="path" label={t('field.path')}>
             <Input />
           </Form.Item>

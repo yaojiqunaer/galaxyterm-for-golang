@@ -80,3 +80,21 @@ func TestValidateSFTPWriteRequestPreservesContentAndDefaultsPort(t *testing.T) {
 		t.Fatalf("Content = %q, want hello", normalized.Content)
 	}
 }
+
+func TestSFTPAuthMethodsSupportPassword(t *testing.T) {
+	req := SFTPListRequest{Password: "secret"}
+	methods, err := sftpAuthMethods(req)
+	if err != nil {
+		t.Fatalf("sftpAuthMethods returned error: %v", err)
+	}
+	if len(methods) != 1 {
+		t.Fatalf("len(methods) = %d, want 1", len(methods))
+	}
+}
+
+func TestSFTPAuthMethodsRequirePrivateKeyContent(t *testing.T) {
+	req := SFTPListRequest{AuthType: "privateKey"}
+	if _, err := sftpAuthMethods(req); err == nil {
+		t.Fatal("expected private key validation error")
+	}
+}

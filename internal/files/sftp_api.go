@@ -17,30 +17,39 @@ func NewAPI() *API {
 }
 
 type SFTPListRequest struct {
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Path     string `json:"path"`
+	Host       string `json:"host"`
+	Port       int    `json:"port"`
+	Username   string `json:"username"`
+	Password   string `json:"password"`
+	AuthType   string `json:"authType"`
+	PrivateKey string `json:"privateKey"`
+	Passphrase string `json:"passphrase"`
+	Path       string `json:"path"`
 }
 
 type SFTPPathRequest struct {
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Path     string `json:"path"`
+	Host       string `json:"host"`
+	Port       int    `json:"port"`
+	Username   string `json:"username"`
+	Password   string `json:"password"`
+	AuthType   string `json:"authType"`
+	PrivateKey string `json:"privateKey"`
+	Passphrase string `json:"passphrase"`
+	Path       string `json:"path"`
 }
 
 type SFTPReadRequest = SFTPPathRequest
 
 type SFTPWriteRequest struct {
-	Host     string `json:"host"`
-	Port     int    `json:"port"`
-	Username string `json:"username"`
-	Password string `json:"password"`
-	Path     string `json:"path"`
-	Content  string `json:"content"`
+	Host       string `json:"host"`
+	Port       int    `json:"port"`
+	Username   string `json:"username"`
+	Password   string `json:"password"`
+	AuthType   string `json:"authType"`
+	PrivateKey string `json:"privateKey"`
+	Passphrase string `json:"passphrase"`
+	Path       string `json:"path"`
+	Content    string `json:"content"`
 }
 
 type SFTPMkdirRequest = SFTPPathRequest
@@ -151,11 +160,14 @@ func (api *API) WriteFile(req SFTPWriteRequest) error {
 		return err
 	}
 	client, err := dialSFTP(SFTPListRequest{
-		Host:     normalized.Host,
-		Port:     normalized.Port,
-		Username: normalized.Username,
-		Password: normalized.Password,
-		Path:     normalized.Path,
+		Host:       normalized.Host,
+		Port:       normalized.Port,
+		Username:   normalized.Username,
+		Password:   normalized.Password,
+		AuthType:   normalized.AuthType,
+		PrivateKey: normalized.PrivateKey,
+		Passphrase: normalized.Passphrase,
+		Path:       normalized.Path,
 	})
 	if err != nil {
 		return err
@@ -211,11 +223,14 @@ func validateSFTPPathRequest(req SFTPPathRequest) (SFTPPathRequest, error) {
 
 func validateSFTPWriteRequest(req SFTPWriteRequest) (SFTPWriteRequest, error) {
 	listReq, err := validateSFTPListRequest(SFTPListRequest{
-		Host:     req.Host,
-		Port:     req.Port,
-		Username: req.Username,
-		Password: req.Password,
-		Path:     req.Path,
+		Host:       req.Host,
+		Port:       req.Port,
+		Username:   req.Username,
+		Password:   req.Password,
+		AuthType:   req.AuthType,
+		PrivateKey: req.PrivateKey,
+		Passphrase: req.Passphrase,
+		Path:       req.Path,
 	})
 	if err != nil {
 		return req, err
@@ -227,6 +242,9 @@ func validateSFTPWriteRequest(req SFTPWriteRequest) (SFTPWriteRequest, error) {
 	req.Port = listReq.Port
 	req.Username = listReq.Username
 	req.Password = listReq.Password
+	req.AuthType = listReq.AuthType
+	req.PrivateKey = listReq.PrivateKey
+	req.Passphrase = listReq.Passphrase
 	req.Path = listReq.Path
 	return req, nil
 }
@@ -248,11 +266,13 @@ func ParentPath(current string) string {
 }
 
 func dialSFTP(req SFTPListRequest) (*sftp.Client, error) {
+	authMethods, err := sftpAuthMethods(req)
+	if err != nil {
+		return nil, err
+	}
 	config := &ssh.ClientConfig{
-		User: req.Username,
-		Auth: []ssh.AuthMethod{
-			ssh.Password(req.Password),
-		},
+		User:            req.Username,
+		Auth:            authMethods,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
@@ -267,4 +287,24 @@ func dialSFTP(req SFTPListRequest) (*sftp.Client, error) {
 		return nil, err
 	}
 	return sftpClient, nil
+}
+
+func sftpAuthMethods(req SFTPListRequest) ([]ssh.AuthMethod, error) {
+	if req.AuthType == "privateKey" {
+		if strings.TrimSpace(req.PrivateKey) == "" {
+			return nil, fmt.Errorf("missing required field: privateKey")
+		}
+		var signer ssh.Signer
+		var err error
+		if req.Passphrase != "" {
+			signer, err = ssh.ParsePrivateKeyWithPassphrase([]byte(req.PrivateKey), []byte(req.Passphrase))
+		} else {
+			signer, err = ssh.ParsePrivateKey([]byte(req.PrivateKey))
+		}
+		if err != nil {
+			return nil, err
+		}
+		return []ssh.AuthMethod{ssh.PublicKeys(signer)}, nil
+	}
+	return []ssh.AuthMethod{ssh.Password(req.Password)}, nil
 }
