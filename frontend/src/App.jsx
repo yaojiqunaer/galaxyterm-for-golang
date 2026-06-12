@@ -106,6 +106,8 @@ function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [commandsOpen, setCommandsOpen] = useState(false);
+  const [extensionInstallOpen, setExtensionInstallOpen] = useState(false);
+  const [extensionPackagePath, setExtensionPackagePath] = useState('');
   const [selectedNav, setSelectedNav] = useState('connections');
   const [sessionView, setSessionView] = useState('tabs');
   const [profileQuery, setProfileQuery] = useState('');
@@ -573,7 +575,7 @@ function App() {
           <Title level={3}>{t('section.officialExtensions')}</Title>
         </div>
         <Space>
-          <Button icon={<FolderOpenOutlined />} onClick={registerDemoExtension}>{t('action.installOffline')}</Button>
+          <Button icon={<FolderOpenOutlined />} onClick={() => setExtensionInstallOpen(true)}>{t('action.installOffline')}</Button>
           <Button icon={<PlusOutlined />} onClick={registerDemoExtension}>{t('action.addSource')}</Button>
         </Space>
       </div>
@@ -629,6 +631,24 @@ function App() {
     const items = await ExtensionsAPI.ListInstalled();
     setInstalledExtensions(Array.isArray(items) ? items : []);
     message.success(t('message.extensionComing'));
+  };
+
+  const installOfflineExtension = async () => {
+    const packagePath = extensionPackagePath.trim();
+    if (!packagePath) {
+      message.warning(t('validation.required'));
+      return;
+    }
+    try {
+      await ExtensionsAPI.InstallOffline(packagePath);
+      const items = await ExtensionsAPI.ListInstalled();
+      setInstalledExtensions(Array.isArray(items) ? items : []);
+      setExtensionInstallOpen(false);
+      setExtensionPackagePath('');
+      message.success(t('message.extensionInstalled'));
+    } catch (error) {
+      message.error(`${t('message.extensionInstallFailed')}: ${error}`);
+    }
   };
 
   const loadFiles = async (overridePath = null) => {
@@ -1254,6 +1274,24 @@ function App() {
             </List.Item>
           )}
         />
+      </Drawer>
+      <Drawer
+        title={t('drawer.installExtension')}
+        width={420}
+        open={extensionInstallOpen}
+        onClose={() => setExtensionInstallOpen(false)}
+        extra={<Button type="primary" onClick={installOfflineExtension}>{t('action.installOffline')}</Button>}
+      >
+        <Alert type="info" showIcon message={t('settings.extensionPackageHint')} />
+        <Form layout="vertical" className="terminal-form">
+          <Form.Item label={t('field.packagePath')} required>
+            <Input
+              value={extensionPackagePath}
+              onChange={(event) => setExtensionPackagePath(event.target.value)}
+              placeholder={t('placeholder.packagePath')}
+            />
+          </Form.Item>
+        </Form>
       </Drawer>
     </Layout>
     </ConfigProvider>

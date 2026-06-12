@@ -12,3 +12,7 @@ export function Validate(arg1) {
 export function RegisterInstalled(arg1) {
   return window['go']['extensions']['API']['RegisterInstalled'](arg1);
 }
+
+export function InstallOffline(arg1) {
+  return window['go']['extensions']['API']['InstallOffline'](arg1);
+}
