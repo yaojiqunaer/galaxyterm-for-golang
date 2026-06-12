@@ -132,6 +132,13 @@ function App() {
   const [newType, setNewType] = useState('local');
   const [fileEntries, setFileEntries] = useState([]);
   const [fileLoading, setFileLoading] = useState(false);
+  const [fileEditorOpen, setFileEditorOpen] = useState(false);
+  const [fileEditorLoading, setFileEditorLoading] = useState(false);
+  const [editingRemoteFile, setEditingRemoteFile] = useState(null);
+  const [editingRemoteContent, setEditingRemoteContent] = useState('');
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadRemoteName, setUploadRemoteName] = useState('');
+  const [uploadLocalContent, setUploadLocalContent] = useState('');
   const [mkdirOpen, setMkdirOpen] = useState(false);
   const [mkdirName, setMkdirName] = useState('');
   const [sshAuthType, setSshAuthType] = useState('password');
@@ -926,6 +933,68 @@ function App() {
     }
   };
 
+  const openRemoteFileEditor = async (entry) => {
+    if (entry.isDir) return;
+    if (entry.size > 1024 * 1024) {
+      message.warning(t('message.fileTooLarge'));
+      return;
+    }
+    const req = currentFileRequest();
+    req.path = entry.path;
+    setFileEditorLoading(true);
+    try {
+      const content = await FilesAPI.ReadFile(req);
+      setEditingRemoteFile(entry);
+      setEditingRemoteContent(content);
+      setFileEditorOpen(true);
+    } catch (error) {
+      message.error(`${t('message.fileListFailed')}: ${error}`);
+    } finally {
+      setFileEditorLoading(false);
+    }
+  };
+
+  const saveRemoteFile = async () => {
+    if (!editingRemoteFile) return;
+    const req = currentFileRequest();
+    req.path = editingRemoteFile.path;
+    setFileEditorLoading(true);
+    try {
+      await FilesAPI.WriteFile({ ...req, content: editingRemoteContent });
+      message.success(t('message.fileSaved'));
+      setFileEditorOpen(false);
+      await loadFiles(fileForm.getFieldValue('path') || '.');
+    } catch (error) {
+      message.error(`${t('message.fileSaveFailed')}: ${error}`);
+    } finally {
+      setFileEditorLoading(false);
+    }
+  };
+
+  const uploadTextFile = async () => {
+    const name = uploadRemoteName.trim();
+    if (!name) {
+      message.warning(t('validation.required'));
+      return;
+    }
+    const req = currentFileRequest();
+    const base = req.path || '.';
+    req.path = joinRemotePath(base, name);
+    setFileLoading(true);
+    try {
+      await FilesAPI.WriteFile({ ...req, content: uploadLocalContent });
+      message.success(t('message.uploadSuccess'));
+      setUploadOpen(false);
+      setUploadRemoteName('');
+      setUploadLocalContent('');
+      await loadFiles(base);
+    } catch (error) {
+      message.error(`${t('message.uploadFailed')}: ${error}`);
+    } finally {
+      setFileLoading(false);
+    }
+  };
+
   const renderFiles = () => (
     <div className="workspace-page">
       <div className="page-header">
@@ -957,7 +1026,9 @@ function App() {
         </Form>
         <Space className="file-toolbar">
           <Button onClick={goParent}>{t('action.up')}</Button>
+          <Button onClick={() => loadFiles()} loading={fileLoading}>{t('action.refresh')}</Button>
           <Button onClick={() => setMkdirOpen(true)}>{t('action.mkdir')}</Button>
+          <Button onClick={() => setUploadOpen(true)}>{t('action.uploadText')}</Button>
         </Space>
         <List
           className="remote-file-list"
@@ -968,11 +1039,13 @@ function App() {
             <List.Item
               className="remote-file-row"
               actions={[
+                !entry.isDir && <Button key="edit" size="small" onClick={() => openRemoteFileEditor(entry)} loading={fileEditorLoading}>{t('action.edit')}</Button>,
                 !entry.isDir && <Button key="download" size="small" onClick={() => downloadRemoteFile(entry)}>{t('action.download')}</Button>,
                 <Button key="delete" size="small" danger onClick={() => deleteRemoteEntry(entry)}>{t('action.delete')}</Button>,
               ].filter(Boolean)}
               onDoubleClick={() => {
                 if (entry.isDir) loadFiles(entry.path);
+                if (!entry.isDir) openRemoteFileEditor(entry);
               }}
             >
               <List.Item.Meta
@@ -992,6 +1065,36 @@ function App() {
         extra={<Button type="primary" onClick={createRemoteDirectory}>{t('action.create')}</Button>}
       >
         <Input value={mkdirName} onChange={(event) => setMkdirName(event.target.value)} placeholder={t('field.name')} />
+      </Drawer>
+      <Drawer
+        title={editingRemoteFile ? `${t('action.edit')} ${editingRemoteFile.name}` : t('action.edit')}
+        width={760}
+        open={fileEditorOpen}
+        onClose={() => setFileEditorOpen(false)}
+        extra={<Button type="primary" loading={fileEditorLoading} onClick={saveRemoteFile}>{t('action.save')}</Button>}
+      >
+        <Input.TextArea
+          className="remote-file-editor"
+          value={editingRemoteContent}
+          onChange={(event) => setEditingRemoteContent(event.target.value)}
+          spellCheck={false}
+        />
+      </Drawer>
+      <Drawer
+        title={t('action.uploadText')}
+        width={560}
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        extra={<Button type="primary" onClick={uploadTextFile} loading={fileLoading}>{t('action.upload')}</Button>}
+      >
+        <Form layout="vertical" className="terminal-form">
+          <Form.Item label={t('field.name')} required>
+            <Input value={uploadRemoteName} onChange={(event) => setUploadRemoteName(event.target.value)} placeholder={t('placeholder.remoteFileName')} />
+          </Form.Item>
+          <Form.Item label={t('field.content')}>
+            <Input.TextArea rows={14} value={uploadLocalContent} onChange={(event) => setUploadLocalContent(event.target.value)} />
+          </Form.Item>
+        </Form>
       </Drawer>
     </div>
   );

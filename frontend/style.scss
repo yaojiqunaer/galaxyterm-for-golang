@@ -653,6 +653,14 @@ code {
   background: var(--panel-muted);
 }
 
+.remote-file-editor {
+  min-height: 68vh !important;
+  font-family: Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
 .statusbar {
   display: flex;
   align-items: center;

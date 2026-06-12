@@ -16,3 +16,7 @@ export function Delete(arg1) {
 export function ReadFile(arg1) {
   return window['go']['files']['API']['ReadFile'](arg1);
 }
+
+export function WriteFile(arg1) {
+  return window['go']['files']['API']['WriteFile'](arg1);
+}

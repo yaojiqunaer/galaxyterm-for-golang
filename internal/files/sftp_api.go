@@ -34,6 +34,15 @@ type SFTPPathRequest struct {
 
 type SFTPReadRequest = SFTPPathRequest
 
+type SFTPWriteRequest struct {
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Path     string `json:"path"`
+	Content  string `json:"content"`
+}
+
 type SFTPMkdirRequest = SFTPPathRequest
 
 type SFTPDeleteRequest = SFTPPathRequest
@@ -136,6 +145,39 @@ func (api *API) ReadFile(req SFTPReadRequest) (string, error) {
 	return string(content), nil
 }
 
+func (api *API) WriteFile(req SFTPWriteRequest) error {
+	normalized, err := validateSFTPWriteRequest(req)
+	if err != nil {
+		return err
+	}
+	client, err := dialSFTP(SFTPListRequest{
+		Host:     normalized.Host,
+		Port:     normalized.Port,
+		Username: normalized.Username,
+		Password: normalized.Password,
+		Path:     normalized.Path,
+	})
+	if err != nil {
+		return err
+	}
+	defer client.Close()
+
+	parent := path.Dir(normalized.Path)
+	if parent != "." && parent != "/" {
+		if err := client.MkdirAll(parent); err != nil {
+			return err
+		}
+	}
+	file, err := client.Create(normalized.Path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = file.Write([]byte(normalized.Content))
+	return err
+}
+
 func validateSFTPListRequest(req SFTPListRequest) (SFTPListRequest, error) {
 	req.Host = strings.TrimSpace(req.Host)
 	req.Username = strings.TrimSpace(req.Username)
@@ -165,6 +207,28 @@ func validateSFTPPathRequest(req SFTPPathRequest) (SFTPPathRequest, error) {
 		return req, fmt.Errorf("missing required field: path")
 	}
 	return SFTPPathRequest(listReq), nil
+}
+
+func validateSFTPWriteRequest(req SFTPWriteRequest) (SFTPWriteRequest, error) {
+	listReq, err := validateSFTPListRequest(SFTPListRequest{
+		Host:     req.Host,
+		Port:     req.Port,
+		Username: req.Username,
+		Password: req.Password,
+		Path:     req.Path,
+	})
+	if err != nil {
+		return req, err
+	}
+	if strings.TrimSpace(listReq.Path) == "" || listReq.Path == "." {
+		return req, fmt.Errorf("missing required field: path")
+	}
+	req.Host = listReq.Host
+	req.Port = listReq.Port
+	req.Username = listReq.Username
+	req.Password = listReq.Password
+	req.Path = listReq.Path
+	return req, nil
 }
 
 func ParentPath(current string) string {

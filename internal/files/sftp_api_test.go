@@ -48,3 +48,35 @@ func TestParentPath(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateSFTPWriteRequestRequiresPath(t *testing.T) {
+	req := SFTPWriteRequest{
+		Host:     "127.0.0.1",
+		Username: "root",
+		Content:  "hello",
+	}
+
+	if _, err := validateSFTPWriteRequest(req); err == nil {
+		t.Fatal("expected missing path error")
+	}
+}
+
+func TestValidateSFTPWriteRequestPreservesContentAndDefaultsPort(t *testing.T) {
+	req := SFTPWriteRequest{
+		Host:     "127.0.0.1",
+		Username: "root",
+		Path:     "/tmp/hello.txt",
+		Content:  "hello",
+	}
+
+	normalized, err := validateSFTPWriteRequest(req)
+	if err != nil {
+		t.Fatalf("validateSFTPWriteRequest returned error: %v", err)
+	}
+	if normalized.Port != 22 {
+		t.Fatalf("Port = %d, want 22", normalized.Port)
+	}
+	if normalized.Content != "hello" {
+		t.Fatalf("Content = %q, want hello", normalized.Content)
+	}
+}
