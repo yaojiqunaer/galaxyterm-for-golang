@@ -2,6 +2,7 @@ import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react
 import '@xterm/xterm/css/xterm.css';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
+import { SearchAddon } from '@xterm/addon-search';
 import * as runtime from '../../wailsjs/runtime/runtime.js';
 import * as SessionAPI from '../../wailsjs/go/session/API.js';
 import * as Theme from '../../wailsjs/go/internal/Theme.js';
@@ -11,6 +12,7 @@ function TerminalPane({ request, settings, onSessionCreated, onSessionClosed }, 
   const containerRef = useRef(null);
   const term = useRef(null);
   const fitAddon = useRef(null);
+  const searchAddon = useRef(null);
   const sessionId = useRef(null);
 
   useImperativeHandle(ref, () => ({
@@ -23,6 +25,9 @@ function TerminalPane({ request, settings, onSessionCreated, onSessionClosed }, 
         term.current?.focus();
       }
     },
+    findNext: (keyword) => searchAddon.current?.findNext(keyword),
+    findPrevious: (keyword) => searchAddon.current?.findPrevious(keyword),
+    clearSearch: () => searchAddon.current?.clearDecorations(),
   }), []);
 
   useEffect(() => {
@@ -51,7 +56,9 @@ function TerminalPane({ request, settings, onSessionCreated, onSessionClosed }, 
       });
 
       fitAddon.current = new FitAddon();
+      searchAddon.current = new SearchAddon();
       term.current.loadAddon(fitAddon.current);
+      term.current.loadAddon(searchAddon.current);
       term.current.open(containerRef.current);
       term.current.writeln(t('terminal.status.connecting'));
 

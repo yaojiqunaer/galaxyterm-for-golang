@@ -61,7 +61,7 @@ const commandStorageKey = 'galaxyterm.quickCommands';
 const profileSchemaVersion = 1;
 
 const defaultSettings = {
-  appTheme: 'system',
+  appTheme: 'dark',
   terminalTheme: 'auto',
   fontFamily: 'Consolas,Liberation Mono,Menlo,Courier,monospace',
   fontSize: 13,
@@ -113,6 +113,7 @@ function App() {
   const [renameOpen, setRenameOpen] = useState(false);
   const [renamingSessionId, setRenamingSessionId] = useState('');
   const [renamingSessionName, setRenamingSessionName] = useState('');
+  const [terminalSearch, setTerminalSearch] = useState('');
   const [selectedNav, setSelectedNav] = useState('connections');
   const [sessionView, setSessionView] = useState('tabs');
   const [profileQuery, setProfileQuery] = useState('');
@@ -331,6 +332,24 @@ function App() {
     setActiveKey(sessionId);
     setSelectedNav('sessions');
     message.success(t('terminal.status.connecting'));
+  };
+
+  const findInTerminal = (direction = 'next') => {
+    const keyword = terminalSearch.trim();
+    if (!keyword) {
+      terminalRefs.current[activeKey]?.clearSearch?.();
+      return;
+    }
+    const activeTerminal = terminalRefs.current[activeKey];
+    if (!activeTerminal) {
+      message.warning(t('message.noActiveSession'));
+      return;
+    }
+    if (direction === 'previous') {
+      activeTerminal.findPrevious?.(keyword);
+      return;
+    }
+    activeTerminal.findNext?.(keyword);
   };
 
   const updateSessionStatus = (sessionId, status) => {
@@ -1107,9 +1126,17 @@ function App() {
   const isDarkTheme = resolveAppTheme(settings.appTheme) === 'dark';
 
   return (
-    <ConfigProvider theme={{ algorithm: isDarkTheme ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm }}>
+    <ConfigProvider theme={{
+      algorithm: isDarkTheme ? antdTheme.darkAlgorithm : antdTheme.defaultAlgorithm,
+      token: {
+        borderRadius: 6,
+        colorPrimary: isDarkTheme ? '#7dd3fc' : '#176b87',
+        colorInfo: isDarkTheme ? '#7dd3fc' : '#176b87',
+        fontFamily: "Inter, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif",
+      },
+    }}>
     <Layout className={`app-shell theme-${isDarkTheme ? 'dark' : 'light'}`}>
-      <Sider width={272} className="workspace-sidebar">
+      <Sider width={248} className="workspace-sidebar">
         <div className="brand-block">
           <div className="brand-mark"><ThunderboltOutlined /></div>
           <div>
@@ -1184,7 +1211,7 @@ function App() {
 
       <Layout className="main-layout">
         <div className="topbar">
-          <Space>
+          <Space className="topbar-command-group">
             <Button type="primary" icon={<PlusOutlined />} onClick={() => openDrawer()}>
               {t('action.newTerminal')}
             </Button>
@@ -1194,26 +1221,52 @@ function App() {
             <Button icon={<CodeOutlined />} onClick={() => setCommandsOpen(true)}>
               {t('action.commands')}
             </Button>
-            <Button onClick={() => setSessionView(sessionView === 'tabs' ? 'grid' : 'tabs')}>
-              {sessionView === 'tabs' ? t('action.grid') : t('action.tabs')}
-            </Button>
+            {sessions.length > 0 && (
+              <Button onClick={() => setSessionView(sessionView === 'tabs' ? 'grid' : 'tabs')}>
+                {sessionView === 'tabs' ? t('action.grid') : t('action.tabs')}
+              </Button>
+            )}
             <Tooltip title={t('action.saveWorkspace')}>
               <Button icon={<SaveOutlined />} onClick={saveWorkspace} />
             </Tooltip>
             <Tooltip title={t('action.restoreWorkspace')}>
               <Button icon={<ReloadOutlined />} onClick={() => restoreWorkspace()} />
             </Tooltip>
-            <Tooltip title={t('action.renameSession')}>
-              <Button icon={<EditOutlined />} onClick={() => openRenameSession()} disabled={!activeKey} />
-            </Tooltip>
-            <Tooltip title={t('action.reconnect')}>
-              <Button icon={<ReloadOutlined />} onClick={() => reconnectSession()} disabled={!activeKey} />
-            </Tooltip>
-            <Tooltip title={t('action.closeAll')}>
-              <Button danger icon={<DeleteOutlined />} onClick={closeAllSessions} disabled={sessions.length === 0} />
-            </Tooltip>
+            {activeKey && (
+              <>
+                <Tooltip title={t('action.renameSession')}>
+                  <Button icon={<EditOutlined />} onClick={() => openRenameSession()} />
+                </Tooltip>
+                <Tooltip title={t('action.reconnect')}>
+                  <Button icon={<ReloadOutlined />} onClick={() => reconnectSession()} />
+                </Tooltip>
+              </>
+            )}
+            {sessions.length > 0 && (
+              <Tooltip title={t('action.closeAll')}>
+                <Button danger icon={<DeleteOutlined />} onClick={closeAllSessions} />
+              </Tooltip>
+            )}
           </Space>
           <Space className="topbar-actions">
+            {activeKey && (
+              <>
+                <Input.Search
+                  className="terminal-search"
+                  allowClear
+                  size="middle"
+                  value={terminalSearch}
+                  onChange={(event) => {
+                    setTerminalSearch(event.target.value);
+                    if (!event.target.value) terminalRefs.current[activeKey]?.clearSearch?.();
+                  }}
+                  onSearch={() => findInTerminal('next')}
+                  placeholder={t('placeholder.searchTerminal')}
+                />
+                <Button onClick={() => findInTerminal('previous')} disabled={!terminalSearch.trim()}>{t('action.findPrevious')}</Button>
+                <Button onClick={() => findInTerminal('next')} disabled={!terminalSearch.trim()}>{t('action.findNext')}</Button>
+              </>
+            )}
             <Tooltip title={t('action.language')}>
               <Button icon={<GlobalOutlined />} onClick={() => setSettingsOpen(true)} />
             </Tooltip>
