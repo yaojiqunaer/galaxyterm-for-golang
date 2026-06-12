@@ -33,6 +33,7 @@ import {
   CodeOutlined,
   DatabaseOutlined,
   DeleteOutlined,
+  EditOutlined,
   FolderOpenOutlined,
   GlobalOutlined,
   LaptopOutlined,
@@ -108,6 +109,9 @@ function App() {
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [extensionInstallOpen, setExtensionInstallOpen] = useState(false);
   const [extensionPackagePath, setExtensionPackagePath] = useState('');
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [renamingSessionId, setRenamingSessionId] = useState('');
+  const [renamingSessionName, setRenamingSessionName] = useState('');
   const [selectedNav, setSelectedNav] = useState('connections');
   const [sessionView, setSessionView] = useState('tabs');
   const [profileQuery, setProfileQuery] = useState('');
@@ -237,7 +241,7 @@ function App() {
       message.success(t('message.profileSaved'));
     }
 
-    setSessions((current) => [...current, { id, label, providerType: newType, request, status: 'connecting' }]);
+    setSessions((current) => [...current, { id, label, providerType: newType, request, status: 'connecting', revision: 0 }]);
     setActiveKey(id);
     setSelectedNav('sessions');
     setDrawerOpen(false);
@@ -264,6 +268,7 @@ function App() {
       backendSessionId: '',
       label: `${session.label} Copy`,
       status: 'connecting',
+      revision: 0,
     }]);
     setActiveKey(id);
     setSelectedNav('sessions');
@@ -283,6 +288,48 @@ function App() {
     setSessions([]);
     setActiveKey('');
     terminalRefs.current = {};
+  };
+
+  const openRenameSession = (session = sessions.find((item) => item.id === activeKey)) => {
+    if (!session) {
+      message.warning(t('message.noActiveSession'));
+      return;
+    }
+    setRenamingSessionId(session.id);
+    setRenamingSessionName(session.label);
+    setRenameOpen(true);
+  };
+
+  const renameSession = () => {
+    const name = renamingSessionName.trim();
+    if (!name) {
+      message.warning(t('validation.required'));
+      return;
+    }
+    setSessions((current) => current.map((session) => (
+      session.id === renamingSessionId
+        ? { ...session, label: name, request: { ...session.request, displayName: name } }
+        : session
+    )));
+    setRenameOpen(false);
+    setRenamingSessionId('');
+    setRenamingSessionName('');
+    message.success(t('message.sessionRenamed'));
+  };
+
+  const reconnectSession = (sessionId = activeKey) => {
+    if (!sessionId) {
+      message.warning(t('message.noActiveSession'));
+      return;
+    }
+    setSessions((current) => current.map((session) => (
+      session.id === sessionId
+        ? { ...session, backendSessionId: '', status: 'connecting', revision: (session.revision || 0) + 1 }
+        : session
+    )));
+    setActiveKey(sessionId);
+    setSelectedNav('sessions');
+    message.success(t('terminal.status.connecting'));
   };
 
   const updateSessionStatus = (sessionId, status) => {
@@ -319,6 +366,7 @@ function App() {
         id: nextId,
         backendSessionId: '',
         status: 'connecting',
+        revision: 0,
       };
     });
     setSessions((current) => [...current, ...restoredSessions]);
@@ -410,6 +458,7 @@ function App() {
     children: (
       <div className="terminal-workspace">
         <TerminalPane
+          key={`${session.id}-${session.revision || 0}`}
           ref={(el) => {
             terminalRefs.current[session.id] = el;
           }}
@@ -444,11 +493,14 @@ function App() {
                 <div className="split-terminal-header">
                   <span className="tab-label">{providerIcons[session.providerType] || <CodeOutlined />}{session.label}</span>
                   <Space>
+                    <Button size="small" icon={<EditOutlined />} onClick={() => openRenameSession(session)} />
+                    <Button size="small" icon={<ReloadOutlined />} onClick={() => reconnectSession(session.id)} />
                     <Button size="small" onClick={() => duplicateSession(session)}>{t('action.duplicate')}</Button>
                     <Button size="small" danger onClick={() => removeSession(session.id)}>{t('action.delete')}</Button>
                   </Space>
                 </div>
                 <TerminalPane
+                  key={`${session.id}-${session.revision || 0}`}
                   ref={(el) => {
                     terminalRefs.current[session.id] = el;
                   }}
@@ -1118,6 +1170,12 @@ function App() {
             <Tooltip title={t('action.restoreWorkspace')}>
               <Button icon={<ReloadOutlined />} onClick={() => restoreWorkspace()} />
             </Tooltip>
+            <Tooltip title={t('action.renameSession')}>
+              <Button icon={<EditOutlined />} onClick={() => openRenameSession()} disabled={!activeKey} />
+            </Tooltip>
+            <Tooltip title={t('action.reconnect')}>
+              <Button icon={<ReloadOutlined />} onClick={() => reconnectSession()} disabled={!activeKey} />
+            </Tooltip>
             <Tooltip title={t('action.closeAll')}>
               <Button danger icon={<DeleteOutlined />} onClick={closeAllSessions} disabled={sessions.length === 0} />
             </Tooltip>
@@ -1274,6 +1332,19 @@ function App() {
             </List.Item>
           )}
         />
+      </Drawer>
+      <Drawer
+        title={t('drawer.renameSession')}
+        width={360}
+        open={renameOpen}
+        onClose={() => setRenameOpen(false)}
+        extra={<Button type="primary" onClick={renameSession}>{t('action.save')}</Button>}
+      >
+        <Form layout="vertical" className="terminal-form">
+          <Form.Item label={t('field.name')} required>
+            <Input value={renamingSessionName} onChange={(event) => setRenamingSessionName(event.target.value)} />
+          </Form.Item>
+        </Form>
       </Drawer>
       <Drawer
         title={t('drawer.installExtension')}

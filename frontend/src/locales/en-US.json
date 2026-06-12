@@ -27,6 +27,8 @@
   "action.restoreWorkspace": "Restore Workspace",
   "action.clearWorkspace": "Clear Snapshot",
   "action.closeAll": "Close All Sessions",
+  "action.renameSession": "Rename Session",
+  "action.reconnect": "Reconnect",
   "action.import": "Import",
   "action.export": "Export",
   "action.addCommand": "Add Command",
@@ -34,6 +36,7 @@
   "drawer.settings": "Settings",
   "drawer.commands": "Quick Commands",
   "drawer.installExtension": "Install Offline Extension",
+  "drawer.renameSession": "Rename Session",
   "nav.connections": "Connections",
   "nav.sessions": "Sessions",
   "nav.extensions": "Extensions",
@@ -150,5 +153,6 @@
   "message.profileImported": "Connections imported",
   "message.profileImportFailed": "Failed to import connections",
   "message.commandSaved": "Quick command saved",
-  "message.commandDeleted": "Quick command deleted"
+  "message.commandDeleted": "Quick command deleted",
+  "message.sessionRenamed": "Session renamed"
 }

@@ -27,6 +27,8 @@
   "action.restoreWorkspace": "恢复工作区",
   "action.clearWorkspace": "清空快照",
   "action.closeAll": "关闭全部会话",
+  "action.renameSession": "重命名会话",
+  "action.reconnect": "重连",
   "action.import": "导入",
   "action.export": "导出",
   "action.addCommand": "添加命令",
@@ -34,6 +36,7 @@
   "drawer.settings": "设置",
   "drawer.commands": "快捷命令",
   "drawer.installExtension": "安装离线扩展",
+  "drawer.renameSession": "重命名会话",
   "nav.connections": "连接",
   "nav.sessions": "会话",
   "nav.extensions": "扩展",
@@ -150,5 +153,6 @@
   "message.profileImported": "连接已导入",
   "message.profileImportFailed": "导入连接失败",
   "message.commandSaved": "快捷命令已保存",
-  "message.commandDeleted": "快捷命令已删除"
+  "message.commandDeleted": "快捷命令已删除",
+  "message.sessionRenamed": "会话已重命名"
 }
