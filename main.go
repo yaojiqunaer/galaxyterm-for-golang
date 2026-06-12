@@ -32,6 +32,7 @@ func main() {
 		runtime.EventsEmit(appCtx, fmt.Sprintf("terminal:%s:%s", event.Type, event.SessionID), event)
 	})
 	terminal.RegisterBuiltInProviders(sessionManager)
+	tunnelAPI := tunnel.NewAPI()
 
 	// Create application with options
 	var err = wails.Run(&options.App{
@@ -62,6 +63,7 @@ func main() {
 			for _, info := range sessionManager.ListSessions() {
 				_ = sessionManager.Close(info.ID)
 			}
+			_ = tunnelAPI.StopAll()
 		},
 		//OnBeforeClose:   beforeClose,
 		//CSSDragProperty: "--wails-draggable",
@@ -69,7 +71,7 @@ func main() {
 			session.NewAPI(sessionManager),
 			files.NewAPI(),
 			extensions.NewAPI(),
-			tunnel.NewAPI(),
+			tunnelAPI,
 			&internal.Theme{},
 		},
 		Windows: nil,

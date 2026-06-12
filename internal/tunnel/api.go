@@ -99,8 +99,25 @@ func (api *API) Stop(id string) error {
 	if !ok {
 		return nil
 	}
-	_ = t.listener.Close()
-	return t.client.Close()
+	return t.close()
+}
+
+func (api *API) StopAll() error {
+	api.mu.Lock()
+	tunnels := make([]*localTunnel, 0, len(api.tunnels))
+	for id, t := range api.tunnels {
+		tunnels = append(tunnels, t)
+		delete(api.tunnels, id)
+	}
+	api.mu.Unlock()
+
+	var firstErr error
+	for _, t := range tunnels {
+		if err := t.close(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
 }
 
 func (api *API) List() []Info {
@@ -122,6 +139,21 @@ func (t *localTunnel) accept() {
 		}
 		go t.forward(localConn)
 	}
+}
+
+func (t *localTunnel) close() error {
+	var firstErr error
+	if t.listener != nil {
+		if err := t.listener.Close(); err != nil {
+			firstErr = err
+		}
+	}
+	if t.client != nil {
+		if err := t.client.Close(); err != nil && firstErr == nil {
+			firstErr = err
+		}
+	}
+	return firstErr
 }
 
 func (t *localTunnel) forward(localConn net.Conn) {
