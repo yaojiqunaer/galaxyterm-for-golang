@@ -58,6 +58,7 @@ const profileStorageKey = 'galaxyterm.connectionProfiles';
 const settingsStorageKey = 'galaxyterm.settings';
 const workspaceStorageKey = 'galaxyterm.workspaceSnapshot';
 const commandStorageKey = 'galaxyterm.quickCommands';
+const profileSchemaVersion = 1;
 
 const defaultSettings = {
   appTheme: 'system',
@@ -393,8 +394,9 @@ function App() {
 
   const exportProfiles = () => {
     downloadJson('galaxyterm-profiles.json', {
-      version: 1,
+      version: profileSchemaVersion,
       exportedAt: new Date().toISOString(),
+      secrets: 'omitted',
       profiles: profiles.map((profile) => sanitizeProfile(profile)),
     });
   };
@@ -1449,19 +1451,24 @@ function loadProfiles() {
   try {
     const raw = localStorage.getItem(profileStorageKey);
     const parsed = JSON.parse(raw || '[]');
-    return Array.isArray(parsed) ? parsed : [];
+    const profiles = Array.isArray(parsed) ? parsed : parsed.profiles;
+    if (!Array.isArray(profiles)) return [];
+    return profiles.map(normalizeImportedProfile).filter(Boolean);
   } catch {
     return [];
   }
 }
 
 function persistProfiles(profiles) {
-  localStorage.setItem(profileStorageKey, JSON.stringify(profiles));
+  localStorage.setItem(profileStorageKey, JSON.stringify({
+    version: profileSchemaVersion,
+    profiles: profiles.map((profile) => sanitizeProfile(profile)),
+  }));
 }
 
 function sanitizeProfile(profile) {
   return {
-    id: profile.id,
+    id: profile.id || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`),
     providerType: profile.providerType,
     displayName: profile.displayName,
     group: profile.group || '',
