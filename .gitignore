@@ -24,6 +24,7 @@ go.work.sum
 # env file
 .env
 .idea
+.DS_Store
 
 # wails init
 build/bin

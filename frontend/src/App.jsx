@@ -35,6 +35,8 @@ import {
   DeleteOutlined,
   EditOutlined,
   FolderOpenOutlined,
+  FullscreenExitOutlined,
+  FullscreenOutlined,
   GlobalOutlined,
   LaptopOutlined,
   PlusOutlined,
@@ -114,6 +116,7 @@ function App() {
   const [renamingSessionId, setRenamingSessionId] = useState('');
   const [renamingSessionName, setRenamingSessionName] = useState('');
   const [terminalSearch, setTerminalSearch] = useState('');
+  const [focusMode, setFocusMode] = useState(false);
   const [selectedNav, setSelectedNav] = useState('connections');
   const [sessionView, setSessionView] = useState('tabs');
   const [profileQuery, setProfileQuery] = useState('');
@@ -183,10 +186,36 @@ function App() {
   }, [activeKey, sessionView, sessions, settings.autoSaveWorkspace]);
 
   useEffect(() => {
+    const handleKeydown = (event) => {
+      const commandKey = event.metaKey || event.ctrlKey;
+      if (!commandKey) return;
+      const key = event.key.toLowerCase();
+      if (key === 'n') {
+        event.preventDefault();
+        openDrawer();
+      }
+      if (key === 'k') {
+        event.preventDefault();
+        setCommandsOpen(true);
+      }
+      if (key === 'f' && event.shiftKey && sessions.length > 0) {
+        event.preventDefault();
+        setFocusMode((current) => !current);
+      }
+      if (key === 'r' && activeKey) {
+        event.preventDefault();
+        reconnectSession();
+      }
+    };
+    window.addEventListener('keydown', handleKeydown);
+    return () => window.removeEventListener('keydown', handleKeydown);
+  }, [activeKey, sessions.length]);
+
+  useEffect(() => {
     if (activeKey && terminalRefs.current[activeKey]?.fit) {
       setTimeout(() => terminalRefs.current[activeKey]?.fit(), 0);
     }
-  }, [activeKey]);
+  }, [activeKey, focusMode]);
 
   const providerOptions = useMemo(() => providers.map((provider) => ({
     value: provider.type,
@@ -289,6 +318,7 @@ function App() {
   const closeAllSessions = () => {
     setSessions([]);
     setActiveKey('');
+    setFocusMode(false);
     terminalRefs.current = {};
   };
 
@@ -1135,7 +1165,7 @@ function App() {
         fontFamily: "Inter, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif",
       },
     }}>
-    <Layout className={`app-shell theme-${isDarkTheme ? 'dark' : 'light'}`}>
+    <Layout className={`app-shell theme-${isDarkTheme ? 'dark' : 'light'}${focusMode ? ' focus-mode' : ''}`}>
       <Sider width={248} className="workspace-sidebar">
         <div className="brand-block">
           <div className="brand-mark"><ThunderboltOutlined /></div>
@@ -1225,6 +1255,14 @@ function App() {
               <Button onClick={() => setSessionView(sessionView === 'tabs' ? 'grid' : 'tabs')}>
                 {sessionView === 'tabs' ? t('action.grid') : t('action.tabs')}
               </Button>
+            )}
+            {sessions.length > 0 && (
+              <Tooltip title={focusMode ? t('action.exitFocus') : t('action.focusMode')}>
+                <Button
+                  icon={focusMode ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
+                  onClick={() => setFocusMode((current) => !current)}
+                />
+              </Tooltip>
             )}
             <Tooltip title={t('action.saveWorkspace')}>
               <Button icon={<SaveOutlined />} onClick={saveWorkspace} />

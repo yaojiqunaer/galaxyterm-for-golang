@@ -35,6 +35,8 @@
   "action.uninstall": "Uninstall",
   "action.findPrevious": "Previous",
   "action.findNext": "Next",
+  "action.focusMode": "Focus Mode",
+  "action.exitFocus": "Exit Focus",
   "drawer.newTerminal": "New Terminal Session",
   "drawer.settings": "Settings",
   "drawer.commands": "Quick Commands",

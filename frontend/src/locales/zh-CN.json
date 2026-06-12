@@ -35,6 +35,8 @@
   "action.uninstall": "卸载",
   "action.findPrevious": "上一个",
   "action.findNext": "下一个",
+  "action.focusMode": "专注模式",
+  "action.exitFocus": "退出专注",
   "drawer.newTerminal": "新建终端会话",
   "drawer.settings": "设置",
   "drawer.commands": "快捷命令",
