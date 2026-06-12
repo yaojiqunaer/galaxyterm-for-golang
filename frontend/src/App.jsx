@@ -15,6 +15,7 @@ import {
   Layout,
   List,
   Menu,
+  Modal,
   Segmented,
   Select,
   Space,
@@ -60,6 +61,7 @@ const profileStorageKey = 'galaxyterm.connectionProfiles';
 const settingsStorageKey = 'galaxyterm.settings';
 const workspaceStorageKey = 'galaxyterm.workspaceSnapshot';
 const commandStorageKey = 'galaxyterm.quickCommands';
+const recentConnectionStorageKey = 'galaxyterm.recentConnections';
 const profileSchemaVersion = 1;
 
 const defaultSettings = {
@@ -117,12 +119,15 @@ function App() {
   const [renamingSessionName, setRenamingSessionName] = useState('');
   const [terminalSearch, setTerminalSearch] = useState('');
   const [focusMode, setFocusMode] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [paletteQuery, setPaletteQuery] = useState('');
   const [selectedNav, setSelectedNav] = useState('connections');
   const [sessionView, setSessionView] = useState('tabs');
   const [profileQuery, setProfileQuery] = useState('');
   const [groupQuery, setGroupQuery] = useState('all');
   const [workspaceSummary, setWorkspaceSummary] = useState(() => loadWorkspaceSummary());
   const [quickCommands, setQuickCommands] = useState(() => loadQuickCommands());
+  const [recentConnections, setRecentConnections] = useState(() => loadRecentConnections());
   const [editingProfileId, setEditingProfileId] = useState('');
   const [newType, setNewType] = useState('local');
   const [fileEntries, setFileEntries] = useState([]);
@@ -198,6 +203,10 @@ function App() {
         event.preventDefault();
         setCommandsOpen(true);
       }
+      if (key === 'p') {
+        event.preventDefault();
+        setPaletteOpen(true);
+      }
       if (key === 'f' && event.shiftKey && sessions.length > 0) {
         event.preventDefault();
         setFocusMode((current) => !current);
@@ -271,6 +280,7 @@ function App() {
       setProfiles(nextProfiles);
       message.success(t('message.profileSaved'));
     }
+    rememberConnection(request, setRecentConnections);
 
     setSessions((current) => [...current, { id, label, providerType: newType, request, status: 'connecting', revision: 0 }]);
     setActiveKey(id);
@@ -441,6 +451,11 @@ function App() {
     message.success(t('message.profileDeleted'));
   };
 
+  const openProfile = (profile) => {
+    rememberConnection(profileToRequest(profile), setRecentConnections);
+    openDrawer(profile.providerType, profile);
+  };
+
   const exportProfiles = () => {
     downloadJson('galaxyterm-profiles.json', {
       version: profileSchemaVersion,
@@ -476,6 +491,13 @@ function App() {
     }
     activeTerminal.send(command.endsWith('\n') ? command : `${command}\n`);
     setCommandsOpen(false);
+    setPaletteOpen(false);
+  };
+
+  const runPaletteAction = (item) => {
+    item.run();
+    setPaletteOpen(false);
+    setPaletteQuery('');
   };
 
   const addQuickCommand = async () => {
@@ -606,6 +628,30 @@ function App() {
 
       <Divider />
 
+      {recentConnections.length > 0 && (
+        <>
+          <div className="page-header compact">
+            <Title level={4}>{t('section.recentConnections')}</Title>
+          </div>
+          <div className="recent-connection-list">
+            {recentConnections.slice(0, 6).map((connection) => (
+              <button
+                key={connection.id}
+                className="recent-connection-chip"
+                onClick={() => openDrawer(connection.providerType, recentToProfile(connection))}
+              >
+                <span className="provider-icon">{providerIcons[connection.providerType] || <CodeOutlined />}</span>
+                <span>
+                  <strong>{connection.displayName}</strong>
+                  <small>{connection.description}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+          <Divider />
+        </>
+      )}
+
       <div className="page-header compact">
         <Title level={4}>{t('section.savedConnections')}</Title>
         <Space>
@@ -647,7 +693,7 @@ function App() {
           renderItem={(profile) => (
             <List.Item
               actions={[
-                <Button key="open" size="small" onClick={() => openDrawer(profile.providerType, profile)}>{t('action.open')}</Button>,
+                <Button key="open" size="small" onClick={() => openProfile(profile)}>{t('action.open')}</Button>,
                 <Button key="edit" size="small" onClick={() => openDrawer(profile.providerType, profile)}>{t('action.edit')}</Button>,
                 <Button key="duplicate" size="small" onClick={() => duplicateProfile(profile)}>{t('action.duplicate')}</Button>,
                 <Button key="delete" size="small" danger onClick={() => deleteProfile(profile.id)}>{t('action.delete')}</Button>,
@@ -1154,6 +1200,20 @@ function App() {
   };
 
   const isDarkTheme = resolveAppTheme(settings.appTheme) === 'dark';
+  const paletteItems = buildPaletteItems({
+    profiles,
+    quickCommands,
+    providers,
+    setSelectedNav,
+    openDrawer,
+    openProfile,
+    runQuickCommand,
+    setCommandsOpen,
+    setSettingsOpen,
+    saveWorkspace,
+    restoreWorkspace,
+  });
+  const visiblePaletteItems = filterPaletteItems(paletteItems, paletteQuery);
 
   return (
     <ConfigProvider theme={{
@@ -1251,6 +1311,9 @@ function App() {
             <Button icon={<CodeOutlined />} onClick={() => setCommandsOpen(true)}>
               {t('action.commands')}
             </Button>
+            <Button icon={<ThunderboltOutlined />} onClick={() => setPaletteOpen(true)}>
+              {t('action.commandPalette')}
+            </Button>
             {sessions.length > 0 && (
               <Button onClick={() => setSessionView(sessionView === 'tabs' ? 'grid' : 'tabs')}>
                 {sessionView === 'tabs' ? t('action.grid') : t('action.tabs')}
@@ -1327,6 +1390,42 @@ function App() {
           <span>{t('status.branch')}: core</span>
         </div>
       </Layout>
+
+      <Modal
+        title={t('drawer.commandPalette')}
+        open={paletteOpen}
+        footer={null}
+        width={620}
+        className="command-palette-modal"
+        onCancel={() => {
+          setPaletteOpen(false);
+          setPaletteQuery('');
+        }}
+      >
+        <Input
+          autoFocus
+          value={paletteQuery}
+          onChange={(event) => setPaletteQuery(event.target.value)}
+          onPressEnter={() => {
+            if (visiblePaletteItems[0]) runPaletteAction(visiblePaletteItems[0]);
+          }}
+          placeholder={t('placeholder.commandPalette')}
+        />
+        <List
+          className="command-palette-list"
+          dataSource={visiblePaletteItems.slice(0, 12)}
+          locale={{ emptyText: t('empty.noCommands') }}
+          renderItem={(item) => (
+            <List.Item className="command-palette-row" onClick={() => runPaletteAction(item)}>
+              <List.Item.Meta
+                avatar={<span className="provider-icon">{item.icon}</span>}
+                title={item.title}
+                description={`${item.group} · ${item.description}`}
+              />
+            </List.Item>
+          )}
+        />
+      </Modal>
 
       <Drawer
         title={t('drawer.newTerminal')}
@@ -1612,6 +1711,176 @@ function loadQuickCommands() {
 
 function persistQuickCommands(commands) {
   localStorage.setItem(commandStorageKey, JSON.stringify(commands));
+}
+
+function loadRecentConnections() {
+  try {
+    const raw = localStorage.getItem(recentConnectionStorageKey);
+    const parsed = JSON.parse(raw || '[]');
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item) => item?.providerType && item?.displayName).slice(0, 12);
+  } catch {
+    return [];
+  }
+}
+
+function persistRecentConnections(items) {
+  localStorage.setItem(recentConnectionStorageKey, JSON.stringify(items.slice(0, 12)));
+}
+
+function rememberConnection(request, setRecentConnections) {
+  const safeRequest = sanitizeRequest(request);
+  const recent = {
+    id: recentConnectionKey(safeRequest),
+    providerType: safeRequest.providerType,
+    displayName: safeRequest.displayName || safeRequest.providerType,
+    description: profileDescription(profileFromRequest(safeRequest)),
+    request: safeRequest,
+    updatedAt: new Date().toISOString(),
+  };
+  setRecentConnections((current) => {
+    const next = [recent, ...current.filter((item) => item.id !== recent.id)].slice(0, 12);
+    persistRecentConnections(next);
+    return next;
+  });
+}
+
+function recentConnectionKey(request) {
+  if (request.providerType === 'ssh') {
+    return `ssh:${request.auth?.username || ''}@${request.config?.host || ''}:${request.config?.port || 22}`;
+  }
+  return `local:${request.config?.shell || 'default'}`;
+}
+
+function profileFromRequest(request) {
+  return {
+    id: request.id || recentConnectionKey(request),
+    providerType: request.providerType,
+    displayName: request.displayName,
+    group: request.group || '',
+    config: request.config || {},
+    auth: request.auth || {},
+  };
+}
+
+function profileToRequest(profile) {
+  return {
+    providerType: profile.providerType,
+    displayName: profile.displayName,
+    group: profile.group || '',
+    config: profile.config || {},
+    auth: profile.auth || {},
+  };
+}
+
+function recentToProfile(recent) {
+  return profileFromRequest(recent.request || {
+    providerType: recent.providerType,
+    displayName: recent.displayName,
+    config: {},
+    auth: {},
+  });
+}
+
+function buildPaletteItems(actions) {
+  const navigation = [
+    ['connections', 'nav.connections', <CloudServerOutlined />],
+    ['sessions', 'nav.sessions', <CodeOutlined />],
+    ['files', 'nav.files', <FolderOpenOutlined />],
+    ['tunnels', 'nav.tunnels', <ApiOutlined />],
+    ['extensions', 'nav.extensions', <AppstoreAddOutlined />],
+    ['settings', 'nav.settings', <SettingOutlined />],
+  ].map(([key, labelKey, icon]) => ({
+    id: `nav:${key}`,
+    group: t('palette.group.navigation'),
+    title: t(labelKey),
+    description: t('palette.description.navigation'),
+    icon,
+    keywords: `${key} ${t(labelKey)}`,
+    run: () => actions.setSelectedNav(key),
+  }));
+
+  const providerItems = actions.providers.map((provider) => ({
+    id: `provider:${provider.type}`,
+    group: t('palette.group.providers'),
+    title: providerLabel(provider),
+    description: provider.type,
+    icon: providerIcons[provider.type] || <CodeOutlined />,
+    keywords: `${provider.type} ${providerLabel(provider)}`,
+    run: () => actions.openDrawer(provider.type),
+  }));
+
+  const profileItems = actions.profiles.map((profile) => ({
+    id: `profile:${profile.id}`,
+    group: t('palette.group.connections'),
+    title: profile.displayName,
+    description: profileDescription(profile),
+    icon: providerIcons[profile.providerType] || <CodeOutlined />,
+    keywords: `${profile.displayName} ${profile.group || ''} ${profileDescription(profile)}`,
+    run: () => actions.openProfile(profile),
+  }));
+
+  const quickCommandItems = actions.quickCommands.map((command) => ({
+    id: `command:${command.id}`,
+    group: t('palette.group.commands'),
+    title: command.name,
+    description: command.command,
+    icon: <CodeOutlined />,
+    keywords: `${command.name} ${command.command}`,
+    run: () => actions.runQuickCommand(command.command),
+  }));
+
+  const workspaceItems = [
+    {
+      id: 'workspace:save',
+      group: t('palette.group.workspace'),
+      title: t('action.saveWorkspace'),
+      description: t('settings.autoSaveHint'),
+      icon: <SaveOutlined />,
+      keywords: 'save workspace snapshot',
+      run: actions.saveWorkspace,
+    },
+    {
+      id: 'workspace:restore',
+      group: t('palette.group.workspace'),
+      title: t('action.restoreWorkspace'),
+      description: t('settings.workspaceSnapshot'),
+      icon: <ReloadOutlined />,
+      keywords: 'restore workspace snapshot',
+      run: actions.restoreWorkspace,
+    },
+    {
+      id: 'settings:language',
+      group: t('palette.group.settings'),
+      title: t('action.language'),
+      description: t('settings.languageHint'),
+      icon: <GlobalOutlined />,
+      keywords: 'language locale settings',
+      run: () => actions.setSettingsOpen(true),
+    },
+    {
+      id: 'commands:manage',
+      group: t('palette.group.commands'),
+      title: t('action.commands'),
+      description: t('section.quickCommands'),
+      icon: <ThunderboltOutlined />,
+      keywords: 'quick commands manage',
+      run: () => actions.setCommandsOpen(true),
+    },
+  ];
+
+  return [...navigation, ...providerItems, ...profileItems, ...quickCommandItems, ...workspaceItems];
+}
+
+function filterPaletteItems(items, query) {
+  const keyword = query.trim().toLowerCase();
+  if (!keyword) return items;
+  return items.filter((item) => (
+    item.title?.toLowerCase().includes(keyword)
+    || item.description?.toLowerCase().includes(keyword)
+    || item.group?.toLowerCase().includes(keyword)
+    || item.keywords?.toLowerCase().includes(keyword)
+  ));
 }
 
 function downloadJson(fileName, payload) {

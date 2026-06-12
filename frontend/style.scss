@@ -514,6 +514,70 @@ select {
   width: 180px;
 }
 
+.recent-connection-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.recent-connection-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.recent-connection-chip:hover {
+  border-color: var(--accent);
+  background: var(--panel-muted);
+}
+
+.recent-connection-chip strong,
+.recent-connection-chip small {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-connection-chip small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.command-palette-modal .ant-modal-content {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.command-palette-list {
+  margin-top: 10px;
+  max-height: 440px;
+  overflow: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: 8px;
+}
+
+.command-palette-row {
+  padding: 10px 12px !important;
+  cursor: pointer;
+}
+
+.command-palette-row:hover {
+  background: var(--accent-soft);
+}
+
 code {
   padding: 2px 6px;
   border-radius: 5px;
