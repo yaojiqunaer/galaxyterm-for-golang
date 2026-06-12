@@ -639,8 +639,32 @@ function App() {
           <List
             dataSource={installedExtensions}
             renderItem={(extension) => (
-              <List.Item>
-                <List.Item.Meta title={extension.name} description={`${extension.id} · ${extension.version}`} />
+              <List.Item
+                actions={[
+                  <Button key="uninstall" size="small" danger onClick={() => uninstallExtension(extension.id)}>{t('action.uninstall')}</Button>,
+                ]}
+              >
+                <List.Item.Meta
+                  title={(
+                    <Space size={8}>
+                      <span>{extension.name}</span>
+                      <Tag color="green">{t('extension.status.installed')}</Tag>
+                    </Space>
+                  )}
+                  description={(
+                    <Space direction="vertical" size={4}>
+                      <Text type="secondary">{`${extension.id} · ${extension.version}`}</Text>
+                      <Space wrap>
+                        {(extension.providers || []).map((provider) => (
+                          <Tag key={provider.type}>{provider.type}</Tag>
+                        ))}
+                        {(extension.providers || []).flatMap((provider) => provider.capabilities || []).map((capability) => (
+                          <Tag key={capability} color="blue">{capability}</Tag>
+                        ))}
+                      </Space>
+                    </Space>
+                  )}
+                />
               </List.Item>
             )}
           />
@@ -701,6 +725,13 @@ function App() {
     } catch (error) {
       message.error(`${t('message.extensionInstallFailed')}: ${error}`);
     }
+  };
+
+  const uninstallExtension = async (extensionID) => {
+    await ExtensionsAPI.Uninstall(extensionID);
+    const items = await ExtensionsAPI.ListInstalled();
+    setInstalledExtensions(Array.isArray(items) ? items : []);
+    message.success(t('message.extensionUninstalled'));
   };
 
   const loadFiles = async (overridePath = null) => {

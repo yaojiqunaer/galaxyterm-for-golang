@@ -4,15 +4,23 @@ import (
 	"archive/zip"
 	"encoding/json"
 	"fmt"
+	"os"
 	"path/filepath"
 )
 
 type API struct {
 	installed []Manifest
+	storePath string
 }
 
 func NewAPI() *API {
-	return &API{installed: []Manifest{}}
+	return NewAPIWithStore(defaultStorePath())
+}
+
+func NewAPIWithStore(storePath string) *API {
+	api := &API{installed: []Manifest{}, storePath: storePath}
+	_ = api.load()
+	return api
 }
 
 func (api *API) ListInstalled() []Manifest {
@@ -28,7 +36,7 @@ func (api *API) RegisterInstalled(manifest Manifest) error {
 		return err
 	}
 	api.upsertInstalled(manifest)
-	return nil
+	return api.save()
 }
 
 func (api *API) InstallOffline(packagePath string) (Manifest, error) {
@@ -40,7 +48,18 @@ func (api *API) InstallOffline(packagePath string) (Manifest, error) {
 		return Manifest{}, err
 	}
 	api.upsertInstalled(manifest)
-	return manifest, nil
+	return manifest, api.save()
+}
+
+func (api *API) Uninstall(extensionID string) error {
+	next := api.installed[:0]
+	for _, item := range api.installed {
+		if item.ID != extensionID {
+			next = append(next, item)
+		}
+	}
+	api.installed = next
+	return api.save()
 }
 
 func (api *API) upsertInstalled(manifest Manifest) {
@@ -51,6 +70,51 @@ func (api *API) upsertInstalled(manifest Manifest) {
 		}
 	}
 	api.installed = append(api.installed, manifest)
+}
+
+func (api *API) load() error {
+	if api.storePath == "" {
+		return nil
+	}
+	content, err := os.ReadFile(api.storePath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	var manifests []Manifest
+	if err := json.Unmarshal(content, &manifests); err != nil {
+		return err
+	}
+	for _, manifest := range manifests {
+		if err := ValidateManifest(manifest); err == nil {
+			api.upsertInstalled(manifest)
+		}
+	}
+	return nil
+}
+
+func (api *API) save() error {
+	if api.storePath == "" {
+		return nil
+	}
+	if err := os.MkdirAll(filepath.Dir(api.storePath), 0o755); err != nil {
+		return err
+	}
+	content, err := json.MarshalIndent(api.installed, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(api.storePath, content, 0o600)
+}
+
+func defaultStorePath() string {
+	configDir, err := os.UserConfigDir()
+	if err != nil || configDir == "" {
+		return ""
+	}
+	return filepath.Join(configDir, "GalaxyTerm", "extensions", "installed.json")
 }
 
 func ReadPackageManifest(packagePath string) (Manifest, error) {

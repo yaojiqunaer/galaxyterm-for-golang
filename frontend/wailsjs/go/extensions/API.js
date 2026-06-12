@@ -16,3 +16,7 @@ export function RegisterInstalled(arg1) {
 export function InstallOffline(arg1) {
   return window['go']['extensions']['API']['InstallOffline'](arg1);
 }
+
+export function Uninstall(arg1) {
+  return window['go']['extensions']['API']['Uninstall'](arg1);
+}
