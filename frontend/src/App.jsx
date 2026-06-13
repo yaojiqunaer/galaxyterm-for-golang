@@ -1269,6 +1269,29 @@ function App() {
             </Space>
           </Space>
         </Card>
+
+        <Card title={t('settings.security')}>
+          <Alert type="success" showIcon message={t('settings.secretsHint')} />
+        </Card>
+
+        <Card title={t('settings.shortcuts')}>
+          <List
+            size="small"
+            dataSource={[
+              ['Cmd/Ctrl + N', t('action.newTerminal')],
+              ['Cmd/Ctrl + P', t('action.commandPalette')],
+              ['Cmd/Ctrl + K', t('action.commands')],
+              ['Cmd/Ctrl + R', t('action.reconnect')],
+              ['Cmd/Ctrl + Shift + F', t('action.focusMode')],
+            ]}
+            renderItem={([shortcut, action]) => (
+              <List.Item>
+                <Text code>{shortcut}</Text>
+                <Text>{action}</Text>
+              </List.Item>
+            )}
+          />
+        </Card>
       </Space>
     </div>
   );
