@@ -8,6 +8,7 @@ import {
   ConfigProvider,
   Divider,
   Drawer,
+  Dropdown,
   Empty,
   Form,
   Input,
@@ -40,6 +41,7 @@ import {
   FullscreenOutlined,
   GlobalOutlined,
   LaptopOutlined,
+  MoreOutlined,
   PlusOutlined,
   ReloadOutlined,
   SaveOutlined,
@@ -47,6 +49,7 @@ import {
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import TerminalPane from './components/TerminalPane.jsx';
+import { parseSshConfigProfiles } from './sshConfigProfiles.js';
 import * as ExtensionsAPI from '../wailsjs/go/extensions/API.js';
 import * as FilesAPI from '../wailsjs/go/files/API.js';
 import * as ThemeAPI from '../wailsjs/go/internal/Theme.js';
@@ -115,6 +118,8 @@ function App() {
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [extensionInstallOpen, setExtensionInstallOpen] = useState(false);
   const [extensionPackagePath, setExtensionPackagePath] = useState('');
+  const [sshConfigOpen, setSshConfigOpen] = useState(false);
+  const [sshConfigContent, setSshConfigContent] = useState('');
   const [renameOpen, setRenameOpen] = useState(false);
   const [renamingSessionId, setRenamingSessionId] = useState('');
   const [renamingSessionName, setRenamingSessionName] = useState('');
@@ -518,6 +523,20 @@ function App() {
     }
   };
 
+  const importSshConfigProfiles = () => {
+    const importedProfiles = parseSshConfigProfiles(sshConfigContent);
+    if (importedProfiles.length === 0) {
+      message.warning(t('message.sshConfigEmpty'));
+      return;
+    }
+    const nextProfiles = mergeProfiles(profiles, importedProfiles);
+    persistProfiles(nextProfiles);
+    setProfiles(nextProfiles);
+    setSshConfigOpen(false);
+    setSshConfigContent('');
+    message.success(t('message.sshConfigImported'));
+  };
+
   const runQuickCommand = (command) => {
     const activeTerminal = terminalRefs.current[activeKey];
     if (!activeTerminal?.send) {
@@ -691,6 +710,7 @@ function App() {
       <div className="page-header compact">
         <Title level={4}>{t('section.savedConnections')}</Title>
         <Space>
+          <Button size="small" onClick={() => setSshConfigOpen(true)}>{t('action.importSshConfig')}</Button>
           <Button size="small" onClick={() => profileImportRef.current?.click()}>{t('action.import')}</Button>
           <Button size="small" onClick={exportProfiles} disabled={profiles.length === 0}>{t('action.export')}</Button>
           <input
@@ -1397,6 +1417,54 @@ function App() {
     restoreWorkspace,
   });
   const visiblePaletteItems = filterPaletteItems(paletteItems, paletteQuery);
+  const workspaceMenuActions = {
+    saveWorkspace,
+    restoreWorkspace: () => restoreWorkspace(),
+    quickCommands: () => setCommandsOpen(true),
+    extensions: () => setSelectedNav('extensions'),
+    settings: () => setSelectedNav('settings'),
+  };
+  const workspaceMenuItems = [
+    { key: 'saveWorkspace', icon: <SaveOutlined />, label: t('action.saveWorkspace') },
+    { key: 'restoreWorkspace', icon: <ReloadOutlined />, label: t('action.restoreWorkspace') },
+    { key: 'quickCommands', icon: <CodeOutlined />, label: t('action.commands') },
+    { key: 'extensions', icon: <AppstoreAddOutlined />, label: t('nav.extensions') },
+    { key: 'settings', icon: <SettingOutlined />, label: t('nav.settings') },
+  ];
+  const sessionMenuActions = {
+    view: () => setSessionView(sessionView === 'tabs' ? 'grid' : 'tabs'),
+    focus: () => setFocusMode((current) => !current),
+    rename: () => openRenameSession(),
+    reconnect: () => reconnectSession(),
+    closeAll: closeAllSessions,
+  };
+  const sessionMenuItems = [
+    {
+      key: 'view',
+      label: sessionView === 'tabs' ? t('action.grid') : t('action.tabs'),
+    },
+    {
+      key: 'focus',
+      icon: focusMode ? <FullscreenExitOutlined /> : <FullscreenOutlined />,
+      label: focusMode ? t('action.exitFocus') : t('action.focusMode'),
+    },
+    activeKey && {
+      key: 'rename',
+      icon: <EditOutlined />,
+      label: t('action.renameSession'),
+    },
+    activeKey && {
+      key: 'reconnect',
+      icon: <ReloadOutlined />,
+      label: t('action.reconnect'),
+    },
+    {
+      key: 'closeAll',
+      icon: <DeleteOutlined />,
+      label: t('action.closeAll'),
+      danger: true,
+    },
+  ].filter(Boolean);
 
   return (
     <ConfigProvider theme={{
@@ -1491,46 +1559,18 @@ function App() {
             <Button icon={<CloudServerOutlined />} onClick={() => openDrawer('ssh')}>
               {t('action.quickSsh')}
             </Button>
-            <Button icon={<CodeOutlined />} onClick={() => setCommandsOpen(true)}>
-              {t('action.commands')}
-            </Button>
-            <Button icon={<ThunderboltOutlined />} onClick={() => setPaletteOpen(true)}>
-              {t('action.commandPalette')}
+            <Button className="command-palette-trigger" icon={<ThunderboltOutlined />} onClick={() => setPaletteOpen(true)}>
+              {t('placeholder.commandPalette')}
+              <Text code>⌘P</Text>
             </Button>
             {sessions.length > 0 && (
-              <Button onClick={() => setSessionView(sessionView === 'tabs' ? 'grid' : 'tabs')}>
-                {sessionView === 'tabs' ? t('action.grid') : t('action.tabs')}
-              </Button>
+              <Dropdown menu={{ items: sessionMenuItems, onClick: ({ key }) => sessionMenuActions[key]?.() }} trigger={['click']}>
+                <Button icon={<MoreOutlined />}>{t('action.sessionActions')}</Button>
+              </Dropdown>
             )}
-            {sessions.length > 0 && (
-              <Tooltip title={focusMode ? t('action.exitFocus') : t('action.focusMode')}>
-                <Button
-                  icon={focusMode ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
-                  onClick={() => setFocusMode((current) => !current)}
-                />
-              </Tooltip>
-            )}
-            <Tooltip title={t('action.saveWorkspace')}>
-              <Button icon={<SaveOutlined />} onClick={saveWorkspace} />
-            </Tooltip>
-            <Tooltip title={t('action.restoreWorkspace')}>
-              <Button icon={<ReloadOutlined />} onClick={() => restoreWorkspace()} />
-            </Tooltip>
-            {activeKey && (
-              <>
-                <Tooltip title={t('action.renameSession')}>
-                  <Button icon={<EditOutlined />} onClick={() => openRenameSession()} />
-                </Tooltip>
-                <Tooltip title={t('action.reconnect')}>
-                  <Button icon={<ReloadOutlined />} onClick={() => reconnectSession()} />
-                </Tooltip>
-              </>
-            )}
-            {sessions.length > 0 && (
-              <Tooltip title={t('action.closeAll')}>
-                <Button danger icon={<DeleteOutlined />} onClick={closeAllSessions} />
-              </Tooltip>
-            )}
+            <Dropdown menu={{ items: workspaceMenuItems, onClick: ({ key }) => workspaceMenuActions[key]?.() }} trigger={['click']}>
+              <Button icon={<MoreOutlined />}>{t('action.workspaceActions')}</Button>
+            </Dropdown>
           </Space>
           <Space className="topbar-actions">
             {activeKey && (
@@ -1770,6 +1810,22 @@ function App() {
             />
           </Form.Item>
         </Form>
+      </Drawer>
+      <Drawer
+        title={t('drawer.importSshConfig')}
+        width={560}
+        open={sshConfigOpen}
+        onClose={() => setSshConfigOpen(false)}
+        extra={<Button type="primary" onClick={importSshConfigProfiles}>{t('action.importSshConfig')}</Button>}
+      >
+        <Alert type="info" showIcon message={t('settings.sshConfigImportHint')} />
+        <Input.TextArea
+          className="ssh-config-import-editor"
+          value={sshConfigContent}
+          onChange={(event) => setSshConfigContent(event.target.value)}
+          placeholder={t('placeholder.sshConfig')}
+          spellCheck={false}
+        />
       </Drawer>
     </Layout>
     </ConfigProvider>

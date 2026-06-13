@@ -266,6 +266,28 @@ select {
   box-shadow: none;
 }
 
+.topbar-command-group {
+  flex: 1;
+}
+
+.topbar-command-group .ant-space-item {
+  min-width: 0;
+}
+
+.topbar .command-palette-trigger {
+  justify-content: flex-start;
+  width: min(420px, 36vw);
+  max-width: 100%;
+  color: var(--muted);
+  background: var(--terminal-chrome);
+}
+
+.topbar .command-palette-trigger .ant-typography {
+  margin-left: auto;
+  border-color: var(--border);
+  color: var(--muted);
+}
+
 .topbar-actions .ant-btn {
   width: 32px;
 }
@@ -398,7 +420,7 @@ select {
 
 .workspace-page {
   min-height: 100%;
-  padding: 20px;
+  padding: 18px 20px;
   background: var(--surface);
 }
 
@@ -412,6 +434,12 @@ select {
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 16px;
+}
+
+.page-header .ant-typography-secondary {
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: uppercase;
 }
 
 .page-header.compact {
@@ -500,6 +528,10 @@ select {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
+}
+
+.profile-list .ant-list-item-action {
+  margin-inline-start: 16px;
 }
 
 .profile-search {
@@ -663,6 +695,15 @@ code {
 
 .remote-file-editor {
   min-height: 68vh !important;
+  font-family: Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  resize: vertical;
+}
+
+.ssh-config-import-editor {
+  min-height: 56vh !important;
+  margin-top: 12px;
   font-family: Consolas, 'Liberation Mono', Menlo, Courier, monospace;
   font-size: 13px;
   line-height: 1.55;
