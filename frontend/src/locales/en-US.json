@@ -24,6 +24,8 @@
   "action.run": "Run",
   "action.copy": "Copy",
   "action.copySelection": "Copy Selection",
+  "action.copyTranscript": "Copy Terminal Output",
+  "action.exportTranscript": "Export Transcript",
   "action.pasteClipboard": "Paste Clipboard",
   "action.clearTerminal": "Clear Terminal",
   "action.resetTerminal": "Reset Terminal",
@@ -53,6 +55,9 @@
   "action.exitFocus": "Exit Focus",
   "action.sessionActions": "Session",
   "action.workspaceActions": "Workspace",
+  "action.favorite": "Favorite",
+  "action.unfavorite": "Unfavorite",
+  "label.favorite": "Favorite",
   "drawer.newTerminal": "New Terminal Session",
   "drawer.settings": "Settings",
   "drawer.commands": "Quick Commands",
@@ -213,5 +218,7 @@
   "message.clipboardEmpty": "Clipboard is empty",
   "message.clipboardFailed": "Clipboard operation failed",
   "message.copied": "Copied",
-  "message.pasted": "Pasted"
+  "message.pasted": "Pasted",
+  "message.terminalOutputEmpty": "No terminal output to export",
+  "message.transcriptExported": "Transcript exported"
 }

@@ -14,6 +14,7 @@ function TerminalPane({ request, settings, onSessionCreated, onSessionClosed }, 
   const fitAddon = useRef(null);
   const searchAddon = useRef(null);
   const sessionId = useRef(null);
+  const transcript = useRef([]);
 
   useImperativeHandle(ref, () => ({
     fit: () => {
@@ -47,6 +48,16 @@ function TerminalPane({ request, settings, onSessionCreated, onSessionClosed }, 
       term.current?.reset();
       term.current?.focus();
     },
+    copyTranscript: async () => {
+      const text = terminalBufferText(term.current);
+      if (text) await navigator.clipboard?.writeText(text);
+      term.current?.focus();
+      return text;
+    },
+    transcript: () => ({
+      raw: transcript.current.join(''),
+      screen: terminalBufferText(term.current),
+    }),
     findNext: (keyword) => searchAddon.current?.findNext(keyword),
     findPrevious: (keyword) => searchAddon.current?.findPrevious(keyword),
     clearSearch: () => searchAddon.current?.clearDecorations(),
@@ -94,13 +105,17 @@ function TerminalPane({ request, settings, onSessionCreated, onSessionClosed }, 
       onSessionCreated?.(createdSessionId);
 
       cleanupData = runtime.EventsOn(`terminal:data:${createdSessionId}`, (event) => {
-        term.current?.write(event?.Data || event?.data || '');
+        const data = event?.Data || event?.data || '';
+        if (data) transcript.current.push(data);
+        term.current?.write(data);
       });
       cleanupError = runtime.EventsOn(`terminal:error:${createdSessionId}`, (event) => {
         const message = event?.Error?.defaultMessage || event?.error?.defaultMessage || t('terminal.error.disconnected');
+        transcript.current.push(`\r\n${message}`);
         term.current?.writeln(`\r\n${message}`);
       });
       cleanupExit = runtime.EventsOn(`terminal:exit:${createdSessionId}`, () => {
+        transcript.current.push(`\r\n${t('terminal.status.closed')}`);
         term.current?.writeln(`\r\n${t('terminal.status.closed')}`);
         onSessionClosed?.(createdSessionId);
       });
@@ -199,6 +214,16 @@ async function resolveTerminalTheme(settings = {}) {
 function isRiskyPaste(data) {
   const lineBreaks = (data.match(/\r|\n/g) || []).length;
   return data.length > 120 || lineBreaks >= 2;
+}
+
+function terminalBufferText(terminal) {
+  if (!terminal?.buffer?.active) return '';
+  const buffer = terminal.buffer.active;
+  const lines = [];
+  for (let index = 0; index < buffer.length; index += 1) {
+    lines.push(buffer.getLine(index)?.translateToString(true) || '');
+  }
+  return lines.join('\n').replace(/\n+$/, '');
 }
 
 export default forwardRef(TerminalPane);

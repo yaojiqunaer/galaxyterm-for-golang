@@ -38,6 +38,8 @@ import {
   DatabaseOutlined,
   DeleteOutlined,
   EditOutlined,
+  ExportOutlined,
+  FileTextOutlined,
   FolderOpenOutlined,
   FullscreenExitOutlined,
   FullscreenOutlined,
@@ -49,6 +51,8 @@ import {
   ReloadOutlined,
   SaveOutlined,
   SettingOutlined,
+  StarFilled,
+  StarOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import TerminalPane from './components/TerminalPane.jsx';
@@ -365,6 +369,14 @@ function App() {
     message.success(t('message.profileSaved'));
   };
 
+  const toggleProfileFavorite = (profileId) => {
+    const nextProfiles = profiles.map((profile) => (
+      profile.id === profileId ? { ...profile, favorite: !profile.favorite } : profile
+    ));
+    persistProfiles(nextProfiles);
+    setProfiles(nextProfiles);
+  };
+
   const duplicateSession = (session) => {
     const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`;
     setSessions((current) => [...current, {
@@ -480,6 +492,31 @@ function App() {
     } catch (error) {
       message.error(`${t('message.clipboardFailed')}: ${error}`);
     }
+  };
+
+  const copyTerminalTranscript = async () => {
+    try {
+      const copied = await terminalRefs.current[activeKey]?.copyTranscript?.();
+      if (!copied) {
+        message.info(t('message.terminalOutputEmpty'));
+        return;
+      }
+      message.success(t('message.copied'));
+    } catch (error) {
+      message.error(`${t('message.clipboardFailed')}: ${error}`);
+    }
+  };
+
+  const exportTerminalTranscript = () => {
+    const session = sessions.find((item) => item.id === activeKey);
+    const output = terminalRefs.current[activeKey]?.transcript?.();
+    const text = output?.raw || output?.screen || '';
+    if (!session || !text.trim()) {
+      message.info(t('message.terminalOutputEmpty'));
+      return;
+    }
+    downloadText(`${safeFileName(session.label)}-${timestampFilePart()}.log`, text);
+    message.success(t('message.transcriptExported'));
   };
 
   const clearActiveTerminal = () => {
@@ -833,6 +870,13 @@ function App() {
             <List.Item
               actions={[
                 <Button key="open" size="small" onClick={() => openProfile(profile)}>{t('action.open')}</Button>,
+                <Tooltip key="favorite" title={profile.favorite ? t('action.unfavorite') : t('action.favorite')}>
+                  <Button
+                    size="small"
+                    icon={profile.favorite ? <StarFilled /> : <StarOutlined />}
+                    onClick={() => toggleProfileFavorite(profile.id)}
+                  />
+                </Tooltip>,
                 <Button key="edit" size="small" onClick={() => openDrawer(profile.providerType, profile)}>{t('action.edit')}</Button>,
                 <Button key="duplicate" size="small" onClick={() => duplicateProfile(profile)}>{t('action.duplicate')}</Button>,
                 <Button key="delete" size="small" danger onClick={() => deleteProfile(profile.id)}>{t('action.delete')}</Button>,
@@ -843,6 +887,7 @@ function App() {
                 title={(
                   <Space size={8}>
                     <span>{profile.displayName}</span>
+                    {profile.favorite && <Tag color="gold">{t('label.favorite')}</Tag>}
                     {profile.group && <Tag>{profile.group}</Tag>}
                   </Space>
                 )}
@@ -1390,6 +1435,7 @@ function App() {
               ['Cmd/Ctrl + Shift + V', t('action.pasteClipboard')],
               ['Cmd/Ctrl + L', t('action.clearTerminal')],
               ['Cmd/Ctrl + +/-/0', t('action.zoomReset')],
+              [t('action.sessionActions'), t('action.exportTranscript')],
             ]}
             renderItem={([shortcut, action]) => (
               <List.Item>
@@ -1525,6 +1571,8 @@ function App() {
     paste: pasteClipboardToTerminal,
     clear: clearActiveTerminal,
     reset: resetActiveTerminal,
+    copyTranscript: copyTerminalTranscript,
+    exportTranscript: exportTerminalTranscript,
     zoomIn: () => zoomTerminalFont(1),
     zoomOut: () => zoomTerminalFont(-1),
     zoomReset: resetTerminalFont,
@@ -1557,6 +1605,16 @@ function App() {
       key: 'clear',
       icon: <ClearOutlined />,
       label: t('action.clearTerminal'),
+    },
+    activeKey && {
+      key: 'copyTranscript',
+      icon: <FileTextOutlined />,
+      label: t('action.copyTranscript'),
+    },
+    activeKey && {
+      key: 'exportTranscript',
+      icon: <ExportOutlined />,
+      label: t('action.exportTranscript'),
     },
     activeKey && {
       key: 'reset',
@@ -2034,6 +2092,7 @@ function sanitizeProfile(profile) {
     displayName: profile.displayName,
     group: profile.group || '',
     config: { ...(profile.config || {}) },
+    favorite: !!profile.favorite,
     auth: {
       username: profile.auth?.username || '',
       authType: profile.auth?.authType || 'password',
@@ -2264,13 +2323,33 @@ function downloadJson(fileName, payload) {
   URL.revokeObjectURL(url);
 }
 
+function downloadText(fileName, text) {
+  const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = fileName;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function safeFileName(value) {
+  return (value || 'terminal').replace(/[^a-z0-9._-]+/gi, '-').replace(/^-+|-+$/g, '') || 'terminal';
+}
+
+function timestampFilePart(date = new Date()) {
+  return date.toISOString().replace(/[:.]/g, '-');
+}
+
 function saveProfile(profiles, request, editingProfileId = '') {
+  const existingProfile = profiles.find((item) => item.id === editingProfileId);
   const profile = {
     id: editingProfileId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`),
     providerType: request.providerType,
     displayName: request.displayName,
     group: request.group || '',
     config: request.config,
+    favorite: !!existingProfile?.favorite,
     auth: {
       username: request.auth?.username || '',
       authType: request.auth?.authType || 'password',
@@ -2311,7 +2390,7 @@ function filteredProfiles(profiles, query, group = 'all') {
       || profile.config?.host?.toLowerCase().includes(keyword)
       || profile.auth?.username?.toLowerCase().includes(keyword)
     );
-  });
+  }).sort((left, right) => Number(!!right.favorite) - Number(!!left.favorite));
 }
 
 function loadSettings() {

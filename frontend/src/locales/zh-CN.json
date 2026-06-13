@@ -24,6 +24,8 @@
   "action.run": "执行",
   "action.copy": "复制",
   "action.copySelection": "复制选区",
+  "action.copyTranscript": "复制终端输出",
+  "action.exportTranscript": "导出会话记录",
   "action.pasteClipboard": "粘贴剪贴板",
   "action.clearTerminal": "清屏",
   "action.resetTerminal": "重置终端",
@@ -53,6 +55,9 @@
   "action.exitFocus": "退出专注",
   "action.sessionActions": "会话",
   "action.workspaceActions": "工作区",
+  "action.favorite": "收藏",
+  "action.unfavorite": "取消收藏",
+  "label.favorite": "收藏",
   "drawer.newTerminal": "新建终端会话",
   "drawer.settings": "设置",
   "drawer.commands": "快捷命令",
@@ -213,5 +218,7 @@
   "message.clipboardEmpty": "剪贴板为空",
   "message.clipboardFailed": "剪贴板操作失败",
   "message.copied": "已复制",
-  "message.pasted": "已粘贴"
+  "message.pasted": "已粘贴",
+  "message.terminalOutputEmpty": "终端暂无可导出的输出",
+  "message.transcriptExported": "会话记录已导出"
 }
