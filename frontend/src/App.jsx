@@ -33,6 +33,8 @@ import {
   AppstoreAddOutlined,
   CloudServerOutlined,
   CodeOutlined,
+  ClearOutlined,
+  CopyOutlined,
   DatabaseOutlined,
   DeleteOutlined,
   EditOutlined,
@@ -41,6 +43,7 @@ import {
   FullscreenOutlined,
   GlobalOutlined,
   LaptopOutlined,
+  MinusOutlined,
   MoreOutlined,
   PlusOutlined,
   ReloadOutlined,
@@ -229,6 +232,33 @@ function App() {
       if (key === 'r' && activeKey) {
         event.preventDefault();
         reconnectSession();
+      }
+      if (isEditableTarget(event.target) && ['c', 'v', 'l', '=', '+', '-', '0'].includes(key)) {
+        return;
+      }
+      if (key === 'c' && event.shiftKey && activeKey) {
+        event.preventDefault();
+        copyTerminalSelection();
+      }
+      if (key === 'v' && event.shiftKey && activeKey) {
+        event.preventDefault();
+        pasteClipboardToTerminal();
+      }
+      if (key === 'l' && activeKey) {
+        event.preventDefault();
+        clearActiveTerminal();
+      }
+      if (key === '=' || key === '+') {
+        event.preventDefault();
+        zoomTerminalFont(1);
+      }
+      if (key === '-') {
+        event.preventDefault();
+        zoomTerminalFont(-1);
+      }
+      if (key === '0') {
+        event.preventDefault();
+        resetTerminalFont();
       }
     };
     window.addEventListener('keydown', handleKeydown);
@@ -424,6 +454,59 @@ function App() {
       return;
     }
     activeTerminal.findNext?.(keyword);
+  };
+
+  const copyTerminalSelection = async () => {
+    try {
+      const copied = await terminalRefs.current[activeKey]?.copySelection?.();
+      if (!copied) {
+        message.info(t('message.noTerminalSelection'));
+        return;
+      }
+      message.success(t('message.copied'));
+    } catch (error) {
+      message.error(`${t('message.clipboardFailed')}: ${error}`);
+    }
+  };
+
+  const pasteClipboardToTerminal = async () => {
+    try {
+      const pasted = await terminalRefs.current[activeKey]?.pasteClipboard?.();
+      if (!pasted) {
+        message.info(t('message.clipboardEmpty'));
+        return;
+      }
+      message.success(t('message.pasted'));
+    } catch (error) {
+      message.error(`${t('message.clipboardFailed')}: ${error}`);
+    }
+  };
+
+  const clearActiveTerminal = () => {
+    if (!terminalRefs.current[activeKey]?.clear) {
+      message.warning(t('message.noActiveSession'));
+      return;
+    }
+    terminalRefs.current[activeKey].clear();
+  };
+
+  const resetActiveTerminal = () => {
+    if (!terminalRefs.current[activeKey]?.reset) {
+      message.warning(t('message.noActiveSession'));
+      return;
+    }
+    terminalRefs.current[activeKey].reset();
+  };
+
+  const zoomTerminalFont = (delta) => {
+    setSettings((current) => ({
+      ...current,
+      fontSize: clampNumber((current.fontSize || defaultSettings.fontSize) + delta, 10, 24, defaultSettings.fontSize),
+    }));
+  };
+
+  const resetTerminalFont = () => {
+    setSettings((current) => ({ ...current, fontSize: defaultSettings.fontSize }));
   };
 
   const updateSessionStatus = (sessionId, status) => {
@@ -1303,6 +1386,10 @@ function App() {
               ['Cmd/Ctrl + K', t('action.commands')],
               ['Cmd/Ctrl + R', t('action.reconnect')],
               ['Cmd/Ctrl + Shift + F', t('action.focusMode')],
+              ['Cmd/Ctrl + Shift + C', t('action.copySelection')],
+              ['Cmd/Ctrl + Shift + V', t('action.pasteClipboard')],
+              ['Cmd/Ctrl + L', t('action.clearTerminal')],
+              ['Cmd/Ctrl + +/-/0', t('action.zoomReset')],
             ]}
             renderItem={([shortcut, action]) => (
               <List.Item>
@@ -1434,6 +1521,13 @@ function App() {
   const sessionMenuActions = {
     view: () => setSessionView(sessionView === 'tabs' ? 'grid' : 'tabs'),
     focus: () => setFocusMode((current) => !current),
+    copy: copyTerminalSelection,
+    paste: pasteClipboardToTerminal,
+    clear: clearActiveTerminal,
+    reset: resetActiveTerminal,
+    zoomIn: () => zoomTerminalFont(1),
+    zoomOut: () => zoomTerminalFont(-1),
+    zoomReset: resetTerminalFont,
     rename: () => openRenameSession(),
     reconnect: () => reconnectSession(),
     closeAll: closeAllSessions,
@@ -1448,6 +1542,43 @@ function App() {
       icon: focusMode ? <FullscreenExitOutlined /> : <FullscreenOutlined />,
       label: focusMode ? t('action.exitFocus') : t('action.focusMode'),
     },
+    activeKey && { type: 'divider' },
+    activeKey && {
+      key: 'copy',
+      icon: <CopyOutlined />,
+      label: t('action.copySelection'),
+    },
+    activeKey && {
+      key: 'paste',
+      icon: <CopyOutlined />,
+      label: t('action.pasteClipboard'),
+    },
+    activeKey && {
+      key: 'clear',
+      icon: <ClearOutlined />,
+      label: t('action.clearTerminal'),
+    },
+    activeKey && {
+      key: 'reset',
+      icon: <ReloadOutlined />,
+      label: t('action.resetTerminal'),
+    },
+    activeKey && { type: 'divider' },
+    activeKey && {
+      key: 'zoomIn',
+      icon: <PlusOutlined />,
+      label: t('action.zoomIn'),
+    },
+    activeKey && {
+      key: 'zoomOut',
+      icon: <MinusOutlined />,
+      label: t('action.zoomOut'),
+    },
+    activeKey && {
+      key: 'zoomReset',
+      label: t('action.zoomReset'),
+    },
+    activeKey && { type: 'divider' },
     activeKey && {
       key: 'rename',
       icon: <EditOutlined />,
@@ -2210,6 +2341,11 @@ function clampNumber(value, min, max, fallback) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(min, Math.min(max, parsed));
+}
+
+function isEditableTarget(target) {
+  const tagName = target?.tagName?.toLowerCase();
+  return tagName === 'input' || tagName === 'textarea' || target?.isContentEditable;
 }
 
 function resolveAppTheme(theme) {

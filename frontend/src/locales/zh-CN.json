@@ -23,6 +23,13 @@
   "action.edit": "编辑",
   "action.run": "执行",
   "action.copy": "复制",
+  "action.copySelection": "复制选区",
+  "action.pasteClipboard": "粘贴剪贴板",
+  "action.clearTerminal": "清屏",
+  "action.resetTerminal": "重置终端",
+  "action.zoomIn": "放大字号",
+  "action.zoomOut": "缩小字号",
+  "action.zoomReset": "重置字号",
   "action.saveAndOpen": "保存并打开",
   "action.installOffline": "离线安装",
   "action.addSource": "添加源",
@@ -201,5 +208,10 @@
   "message.recentCleared": "最近连接已清空",
   "message.connectionTestSuccess": "连接测试成功",
   "message.connectionTestFailed": "连接测试失败",
-  "message.localTestSkipped": "本地终端无需连接测试"
+  "message.localTestSkipped": "本地终端无需连接测试",
+  "message.noTerminalSelection": "终端没有选中文本",
+  "message.clipboardEmpty": "剪贴板为空",
+  "message.clipboardFailed": "剪贴板操作失败",
+  "message.copied": "已复制",
+  "message.pasted": "已粘贴"
 }

@@ -25,6 +25,28 @@ function TerminalPane({ request, settings, onSessionCreated, onSessionClosed }, 
         term.current?.focus();
       }
     },
+    copySelection: async () => {
+      const selection = term.current?.getSelection() || '';
+      if (selection) await navigator.clipboard?.writeText(selection);
+      term.current?.focus();
+      return selection;
+    },
+    pasteClipboard: async () => {
+      const text = await navigator.clipboard?.readText?.();
+      if (text && sessionId.current) {
+        SessionAPI.Send(sessionId.current, text);
+        term.current?.focus();
+      }
+      return text || '';
+    },
+    clear: () => {
+      term.current?.clear();
+      term.current?.focus();
+    },
+    reset: () => {
+      term.current?.reset();
+      term.current?.focus();
+    },
     findNext: (keyword) => searchAddon.current?.findNext(keyword),
     findPrevious: (keyword) => searchAddon.current?.findPrevious(keyword),
     clearSearch: () => searchAddon.current?.clearDecorations(),
@@ -134,6 +156,27 @@ function TerminalPane({ request, settings, onSessionCreated, onSessionClosed }, 
     };
   }, []);
 
+  useEffect(() => {
+    if (!term.current) return;
+    term.current.options.fontSize = settings?.fontSize || 13;
+    term.current.options.fontFamily = settings?.fontFamily || 'Consolas,Liberation Mono,Menlo,Courier,monospace';
+    term.current.options.scrollback = settings?.scrollback || 5000;
+    fitAddon.current?.fit();
+  }, [settings?.fontFamily, settings?.fontSize, settings?.scrollback]);
+
+  useEffect(() => {
+    let disposed = false;
+    if (!term.current) return () => {
+      disposed = true;
+    };
+    resolveTerminalTheme(settings).then((terminalTheme) => {
+      if (!disposed && term.current) term.current.options.theme = terminalTheme;
+    });
+    return () => {
+      disposed = true;
+    };
+  }, [settings?.terminalTheme, settings?.appTheme]);
+
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
 }
 
@@ -148,6 +191,8 @@ async function resolveTerminalTheme(settings = {}) {
   }
   const themeDark = await Theme.GetDarkTheme();
   const themeLight = await Theme.GetLightTheme();
+  if (settings.appTheme === 'dark') return themeDark;
+  if (settings.appTheme === 'light') return themeLight;
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? themeDark : themeLight;
 }
 

@@ -23,6 +23,13 @@
   "action.edit": "Edit",
   "action.run": "Run",
   "action.copy": "Copy",
+  "action.copySelection": "Copy Selection",
+  "action.pasteClipboard": "Paste Clipboard",
+  "action.clearTerminal": "Clear Terminal",
+  "action.resetTerminal": "Reset Terminal",
+  "action.zoomIn": "Zoom In",
+  "action.zoomOut": "Zoom Out",
+  "action.zoomReset": "Reset Zoom",
   "action.saveAndOpen": "Save and Open",
   "action.installOffline": "Offline Install",
   "action.addSource": "Add Source",
@@ -201,5 +208,10 @@
   "message.recentCleared": "Recent connections cleared",
   "message.connectionTestSuccess": "Connection test succeeded",
   "message.connectionTestFailed": "Connection test failed",
-  "message.localTestSkipped": "Local terminal does not need a connection test"
+  "message.localTestSkipped": "Local terminal does not need a connection test",
+  "message.noTerminalSelection": "No terminal text selected",
+  "message.clipboardEmpty": "Clipboard is empty",
+  "message.clipboardFailed": "Clipboard operation failed",
+  "message.copied": "Copied",
+  "message.pasted": "Pasted"
 }
