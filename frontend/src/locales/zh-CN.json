@@ -8,6 +8,7 @@
   "action.save": "保存",
   "action.delete": "删除",
   "action.clear": "清空",
+  "action.testConnection": "测试连接",
   "action.up": "上级",
   "action.mkdir": "新建目录",
   "action.download": "下载",
@@ -186,5 +187,8 @@
   "message.commandSaved": "快捷命令已保存",
   "message.commandDeleted": "快捷命令已删除",
   "message.sessionRenamed": "会话已重命名",
-  "message.recentCleared": "最近连接已清空"
+  "message.recentCleared": "最近连接已清空",
+  "message.connectionTestSuccess": "连接测试成功",
+  "message.connectionTestFailed": "连接测试失败",
+  "message.localTestSkipped": "本地终端无需连接测试"
 }

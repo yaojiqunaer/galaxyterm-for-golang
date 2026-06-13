@@ -54,3 +54,17 @@ func TestNewSSHDriverAcceptsJumpHostConfig(t *testing.T) {
 		t.Fatalf("jumpPort = %d, want 2222", driver.jumpPort)
 	}
 }
+
+func TestTestSSHConnectionValidatesConfig(t *testing.T) {
+	api := NewAPI()
+	err := api.TestSSHConnection(session.CreateSessionRequest{
+		ProviderType: "ssh",
+		Auth: map[string]interface{}{
+			"username": "root",
+			"password": "secret",
+		},
+	})
+	if err == nil {
+		t.Fatal("TestSSHConnection returned nil error, want missing host error")
+	}
+}

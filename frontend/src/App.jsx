@@ -51,6 +51,7 @@ import * as ExtensionsAPI from '../wailsjs/go/extensions/API.js';
 import * as FilesAPI from '../wailsjs/go/files/API.js';
 import * as ThemeAPI from '../wailsjs/go/internal/Theme.js';
 import * as SessionAPI from '../wailsjs/go/session/API.js';
+import * as TerminalAPI from '../wailsjs/go/terminal/API.js';
 import * as TunnelAPI from '../wailsjs/go/tunnel/API.js';
 import { availableLocales, currentLocale, setLocale, t } from './i18n.js';
 
@@ -132,6 +133,7 @@ function App() {
   const [newType, setNewType] = useState('local');
   const [fileEntries, setFileEntries] = useState([]);
   const [fileLoading, setFileLoading] = useState(false);
+  const [testingConnection, setTestingConnection] = useState(false);
   const [fileAuthType, setFileAuthType] = useState('password');
   const [fileEditorOpen, setFileEditorOpen] = useState(false);
   const [fileEditorLoading, setFileEditorLoading] = useState(false);
@@ -295,6 +297,25 @@ function App() {
     setSelectedNav('sessions');
     setDrawerOpen(false);
     message.success(t('terminal.status.connecting'));
+  };
+
+  const testConnection = async () => {
+    if (newType !== 'ssh') {
+      message.info(t('message.localTestSkipped'));
+      return;
+    }
+    const values = await form.validateFields();
+    const provider = providers.find((item) => item.type === newType) || fallbackProviders[0];
+    const request = buildRequest(newType, values.displayName || providerLabel(provider), values);
+    setTestingConnection(true);
+    try {
+      await TerminalAPI.TestSSHConnection(request);
+      message.success(t('message.connectionTestSuccess'));
+    } catch (error) {
+      message.error(`${t('message.connectionTestFailed')}: ${error}`);
+    } finally {
+      setTestingConnection(false);
+    }
   };
 
   const duplicateProfile = (profile) => {
@@ -1574,6 +1595,7 @@ function App() {
         extra={(
           <Space>
             <Button onClick={() => setDrawerOpen(false)}>{t('action.cancel')}</Button>
+            <Button onClick={testConnection} loading={testingConnection}>{t('action.testConnection')}</Button>
             <Button type="primary" onClick={createSession}>{t('action.create')}</Button>
           </Space>
         )}

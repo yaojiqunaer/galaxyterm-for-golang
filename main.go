@@ -71,6 +71,7 @@ func main() {
 			session.NewAPI(sessionManager),
 			files.NewAPI(),
 			extensions.NewAPI(),
+			terminal.NewAPI(),
 			tunnelAPI,
 			&internal.Theme{},
 		},
