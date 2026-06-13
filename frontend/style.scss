@@ -621,6 +621,26 @@ code {
   padding: 12px 14px !important;
 }
 
+.audit-record-list {
+  margin-top: 14px;
+}
+
+.audit-replay {
+  min-height: 320px;
+  max-height: 52vh;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--terminal-bg);
+  color: #dce7f2;
+  font-family: Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-size: 12px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
 .extension-grid {
   margin-top: 14px;
 }

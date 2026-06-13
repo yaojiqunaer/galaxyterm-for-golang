@@ -8,13 +8,15 @@ import * as SessionAPI from '../../wailsjs/go/session/API.js';
 import * as Theme from '../../wailsjs/go/internal/Theme.js';
 import { t } from '../i18n.js';
 
-function TerminalPane({ request, settings, onSessionCreated, onSessionClosed }, ref) {
+function TerminalPane({ request, settings, onAuditEvent, onSessionCreated, onSessionClosed }, ref) {
   const containerRef = useRef(null);
   const term = useRef(null);
   const fitAddon = useRef(null);
   const searchAddon = useRef(null);
   const sessionId = useRef(null);
+  const startedAt = useRef(new Date());
   const transcript = useRef([]);
+  const outputEvents = useRef([]);
 
   useImperativeHandle(ref, () => ({
     fit: () => {
@@ -58,6 +60,14 @@ function TerminalPane({ request, settings, onSessionCreated, onSessionClosed }, 
       raw: transcript.current.join(''),
       screen: terminalBufferText(term.current),
     }),
+    recording: () => ({
+      cols: term.current?.cols || 80,
+      outputEvents: outputEvents.current,
+      raw: transcript.current.join(''),
+      rows: term.current?.rows || 24,
+      screen: terminalBufferText(term.current),
+      startedAt: startedAt.current.toISOString(),
+    }),
     findNext: (keyword) => searchAddon.current?.findNext(keyword),
     findPrevious: (keyword) => searchAddon.current?.findPrevious(keyword),
     clearSearch: () => searchAddon.current?.clearDecorations(),
@@ -93,7 +103,10 @@ function TerminalPane({ request, settings, onSessionCreated, onSessionClosed }, 
       term.current.loadAddon(fitAddon.current);
       term.current.loadAddon(searchAddon.current);
       term.current.open(containerRef.current);
-      term.current.writeln(t('terminal.status.connecting'));
+      const connectingText = `${t('terminal.status.connecting')}\r\n`;
+      transcript.current.push(connectingText);
+      outputEvents.current.push({ time: 0, data: connectingText });
+      term.current.write(connectingText);
 
       const createdSessionId = await SessionAPI.CreateSession(request);
       if (disposed) {
@@ -103,29 +116,45 @@ function TerminalPane({ request, settings, onSessionCreated, onSessionClosed }, 
 
       sessionId.current = createdSessionId;
       onSessionCreated?.(createdSessionId);
+      onAuditEvent?.({
+        detail: request.displayName || request.providerType,
+        type: 'session.created',
+      });
 
       cleanupData = runtime.EventsOn(`terminal:data:${createdSessionId}`, (event) => {
         const data = event?.Data || event?.data || '';
         if (data) transcript.current.push(data);
+        if (data) outputEvents.current.push({ time: elapsedSeconds(startedAt.current), data });
         term.current?.write(data);
       });
       cleanupError = runtime.EventsOn(`terminal:error:${createdSessionId}`, (event) => {
         const message = event?.Error?.defaultMessage || event?.error?.defaultMessage || t('terminal.error.disconnected');
         transcript.current.push(`\r\n${message}`);
+        outputEvents.current.push({ time: elapsedSeconds(startedAt.current), data: `\r\n${message}` });
+        onAuditEvent?.({ detail: message, type: 'session.error' });
         term.current?.writeln(`\r\n${message}`);
       });
       cleanupExit = runtime.EventsOn(`terminal:exit:${createdSessionId}`, () => {
         transcript.current.push(`\r\n${t('terminal.status.closed')}`);
+        outputEvents.current.push({ time: elapsedSeconds(startedAt.current), data: `\r\n${t('terminal.status.closed')}` });
+        onAuditEvent?.({ type: 'session.closed' });
         term.current?.writeln(`\r\n${t('terminal.status.closed')}`);
         onSessionClosed?.(createdSessionId);
       });
 
       term.current.onResize((size) => {
+        onAuditEvent?.({ detail: `${size.cols}x${size.rows}`, type: 'terminal.resize' });
         SessionAPI.Resize(createdSessionId, size.cols, size.rows);
       });
       term.current.onData((data) => {
         if (isRiskyPaste(data) && !window.confirm(t('terminal.confirmPaste'))) {
+          onAuditEvent?.({ detail: `${data.length} chars`, type: 'paste.blocked' });
           return;
+        }
+        if (isRiskyPaste(data)) {
+          onAuditEvent?.({ detail: `${data.length} chars`, type: 'paste.sent' });
+        } else if (data.includes('\r') || data.includes('\n')) {
+          onAuditEvent?.({ type: 'input.enter' });
         }
         SessionAPI.Send(createdSessionId, data);
       });
@@ -214,6 +243,10 @@ async function resolveTerminalTheme(settings = {}) {
 function isRiskyPaste(data) {
   const lineBreaks = (data.match(/\r|\n/g) || []).length;
   return data.length > 120 || lineBreaks >= 2;
+}
+
+function elapsedSeconds(startedAt) {
+  return Math.max(0, Number(((Date.now() - startedAt.getTime()) / 1000).toFixed(6)));
 }
 
 function terminalBufferText(terminal) {

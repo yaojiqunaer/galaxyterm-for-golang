@@ -30,6 +30,7 @@ import {
 } from 'antd';
 import {
   ApiOutlined,
+  AuditOutlined,
   AppstoreAddOutlined,
   CloudServerOutlined,
   CodeOutlined,
@@ -55,6 +56,7 @@ import {
   StarOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
+import { buildAsciinemaCast, buildAuditRecord, createAuditEvent } from './auditLog.js';
 import TerminalPane from './components/TerminalPane.jsx';
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
 import * as ExtensionsAPI from '../wailsjs/go/extensions/API.js';
@@ -73,6 +75,7 @@ const settingsStorageKey = 'galaxyterm.settings';
 const workspaceStorageKey = 'galaxyterm.workspaceSnapshot';
 const commandStorageKey = 'galaxyterm.quickCommands';
 const recentConnectionStorageKey = 'galaxyterm.recentConnections';
+const auditRecordStorageKey = 'galaxyterm.auditRecords';
 const profileSchemaVersion = 1;
 
 const defaultSettings = {
@@ -141,6 +144,8 @@ function App() {
   const [workspaceSummary, setWorkspaceSummary] = useState(() => loadWorkspaceSummary());
   const [quickCommands, setQuickCommands] = useState(() => loadQuickCommands());
   const [recentConnections, setRecentConnections] = useState(() => loadRecentConnections());
+  const [auditRecords, setAuditRecords] = useState(() => loadAuditRecords());
+  const [replayRecord, setReplayRecord] = useState(null);
   const [editingProfileId, setEditingProfileId] = useState('');
   const [newType, setNewType] = useState('local');
   const [fileEntries, setFileEntries] = useState([]);
@@ -331,7 +336,21 @@ function App() {
     }
     rememberConnection(request, setRecentConnections);
 
-    setSessions((current) => [...current, { id, label, providerType: newType, request, status: 'connecting', revision: 0 }]);
+    setSessions((current) => [...current, {
+      id,
+      auditEvents: [createAuditEvent({
+        detail: profileDescription(profileFromRequest(request)),
+        sessionId: id,
+        sessionLabel: label,
+        type: 'session.open',
+      })],
+      label,
+      providerType: newType,
+      request,
+      startedAt: new Date().toISOString(),
+      status: 'connecting',
+      revision: 0,
+    }]);
     setActiveKey(id);
     setSelectedNav('sessions');
     setDrawerOpen(false);
@@ -385,6 +404,8 @@ function App() {
       backendSessionId: '',
       label: `${session.label} Copy`,
       status: 'connecting',
+      startedAt: new Date().toISOString(),
+      auditEvents: [],
       revision: 0,
     }]);
     setActiveKey(id);
@@ -392,6 +413,7 @@ function App() {
   };
 
   const removeSession = (targetKey) => {
+    saveAuditRecord(targetKey);
     setSessions((current) => {
       const next = current.filter((item) => item.id !== targetKey);
       if (activeKey === targetKey) {
@@ -402,6 +424,7 @@ function App() {
   };
 
   const closeAllSessions = () => {
+    sessions.forEach((session) => saveAuditRecord(session.id));
     setSessions([]);
     setActiveKey('');
     setFocusMode(false);
@@ -442,7 +465,20 @@ function App() {
     }
     setSessions((current) => current.map((session) => (
       session.id === sessionId
-        ? { ...session, backendSessionId: '', status: 'connecting', revision: (session.revision || 0) + 1 }
+        ? {
+          ...session,
+          auditEvents: [
+            ...(session.auditEvents || []),
+            createAuditEvent({
+              sessionId: session.id,
+              sessionLabel: session.label,
+              type: 'session.reconnect',
+            }),
+          ],
+          backendSessionId: '',
+          status: 'connecting',
+          revision: (session.revision || 0) + 1,
+        }
         : session
     )));
     setActiveKey(sessionId);
@@ -501,6 +537,7 @@ function App() {
         message.info(t('message.terminalOutputEmpty'));
         return;
       }
+      appendAuditEvent(activeKey, 'transcript.copy');
       message.success(t('message.copied'));
     } catch (error) {
       message.error(`${t('message.clipboardFailed')}: ${error}`);
@@ -516,6 +553,8 @@ function App() {
       return;
     }
     downloadText(`${safeFileName(session.label)}-${timestampFilePart()}.log`, text);
+    appendAuditEvent(activeKey, 'transcript.export');
+    saveAuditRecord(activeKey);
     message.success(t('message.transcriptExported'));
   };
 
@@ -525,6 +564,7 @@ function App() {
       return;
     }
     terminalRefs.current[activeKey].clear();
+    appendAuditEvent(activeKey, 'terminal.clear');
   };
 
   const resetActiveTerminal = () => {
@@ -533,6 +573,7 @@ function App() {
       return;
     }
     terminalRefs.current[activeKey].reset();
+    appendAuditEvent(activeKey, 'terminal.reset');
   };
 
   const zoomTerminalFont = (delta) => {
@@ -546,7 +587,82 @@ function App() {
     setSettings((current) => ({ ...current, fontSize: defaultSettings.fontSize }));
   };
 
+  const appendAuditEvent = (sessionId, type, detail = '') => {
+    setSessions((current) => current.map((session) => (
+      session.id === sessionId || session.backendSessionId === sessionId
+        ? {
+          ...session,
+          auditEvents: [
+            ...(session.auditEvents || []),
+            createAuditEvent({
+              detail,
+              sessionId: session.id,
+              sessionLabel: session.label,
+              type,
+            }),
+          ],
+        }
+        : session
+    )));
+  };
+
+  const saveAuditRecord = (sessionId = activeKey) => {
+    const session = sessions.find((item) => item.id === sessionId || item.backendSessionId === sessionId);
+    if (!session || session.auditRecordSaved) return null;
+    const recording = terminalRefs.current[session.id]?.recording?.();
+    const hasOutput = !!(recording?.raw || recording?.screen);
+    const hasEvents = (session.auditEvents || []).length > 0;
+    if (!hasOutput && !hasEvents) return null;
+    const cast = buildAsciinemaCast({
+      command: session.providerType,
+      height: recording?.rows || 24,
+      outputEvents: recording?.outputEvents || [],
+      timestamp: recording?.startedAt ? Math.floor(new Date(recording.startedAt).getTime() / 1000) : Math.floor(Date.now() / 1000),
+      title: session.label,
+      width: recording?.cols || 80,
+    });
+    const record = buildAuditRecord({
+      auditEvents: session.auditEvents || [],
+      cast,
+      endedAt: new Date().toISOString(),
+      providerType: session.providerType,
+      screen: recording?.screen || '',
+      sessionId: session.id,
+      startedAt: recording?.startedAt || session.startedAt || '',
+      title: session.label,
+    });
+    const nextRecords = persistAuditRecords([record, ...auditRecords]);
+    setAuditRecords(nextRecords);
+    setSessions((current) => current.map((item) => (
+      item.id === session.id ? { ...item, auditRecordSaved: true } : item
+    )));
+    return record;
+  };
+
+  const deleteAuditRecord = (recordId) => {
+    const nextRecords = persistAuditRecords(auditRecords.filter((record) => record.id !== recordId));
+    setAuditRecords(nextRecords);
+    if (replayRecord?.id === recordId) setReplayRecord(null);
+    message.success(t('message.auditRecordDeleted'));
+  };
+
+  const clearAuditRecords = () => {
+    persistAuditRecords([]);
+    setAuditRecords([]);
+    setReplayRecord(null);
+    message.success(t('message.auditRecordsCleared'));
+  };
+
+  const exportAuditRecord = (record, format = 'cast') => {
+    if (format === 'cast') {
+      downloadText(`${safeFileName(record.title)}-${timestampFilePart(new Date(record.endedAt))}.cast`, record.cast || '');
+      return;
+    }
+    downloadText(`${safeFileName(record.title)}-${timestampFilePart(new Date(record.endedAt))}.log`, record.screen || '');
+  };
+
   const updateSessionStatus = (sessionId, status) => {
+    if (status === 'closed') saveAuditRecord(sessionId);
     setSessions((current) => current.map((item) => (
       item.backendSessionId === sessionId || item.id === sessionId ? { ...item, status } : item
     )));
@@ -577,8 +693,14 @@ function App() {
       if (session.id === snapshot.activeKey) restoredActiveKey = nextId;
       return {
         ...session,
+        auditEvents: [createAuditEvent({
+          sessionId: nextId,
+          sessionLabel: session.label,
+          type: 'workspace.restore',
+        })],
         id: nextId,
         backendSessionId: '',
+        startedAt: new Date().toISOString(),
         status: 'connecting',
         revision: 0,
       };
@@ -664,6 +786,7 @@ function App() {
       return;
     }
     activeTerminal.send(command.endsWith('\n') ? command : `${command}\n`);
+    appendAuditEvent(activeKey, 'quick-command.run', command);
     setCommandsOpen(false);
     setPaletteOpen(false);
   };
@@ -711,6 +834,7 @@ function App() {
           }}
           request={session.request}
           settings={settings}
+          onAuditEvent={(event) => appendAuditEvent(session.id, event.type, event.detail)}
           onSessionCreated={(backendSessionId) => {
             setSessions((current) => current.map((item) => (
               item.id === session.id ? { ...item, backendSessionId, status: 'connected' } : item
@@ -753,6 +877,7 @@ function App() {
                   }}
                   request={session.request}
                   settings={settings}
+                  onAuditEvent={(event) => appendAuditEvent(session.id, event.type, event.detail)}
                   onSessionCreated={(backendSessionId) => {
                     setSessions((current) => current.map((item) => (
                       item.id === session.id ? { ...item, backendSessionId, status: 'connected' } : item
@@ -1526,11 +1651,89 @@ function App() {
     </div>
   );
 
+  const renderAuditLogs = () => (
+    <div className="workspace-page">
+      <div className="page-header">
+        <div>
+          <Text type="secondary">{t('nav.audit')}</Text>
+          <Title level={3}>{t('section.auditLogs')}</Title>
+        </div>
+        <Space>
+          <Button onClick={() => saveAuditRecord(activeKey)} disabled={!activeKey}>{t('action.saveAuditRecord')}</Button>
+          <Button danger onClick={clearAuditRecords} disabled={auditRecords.length === 0}>{t('action.clear')}</Button>
+        </Space>
+      </div>
+      <Alert type="info" showIcon message={t('settings.auditHint')} />
+      <List
+        className="profile-list audit-record-list"
+        dataSource={auditRecords}
+        locale={{ emptyText: t('empty.noAuditRecords') }}
+        renderItem={(record) => (
+          <List.Item
+            actions={[
+              <Button key="replay" size="small" onClick={() => setReplayRecord(record)}>{t('action.replay')}</Button>,
+              <Button key="cast" size="small" onClick={() => exportAuditRecord(record, 'cast')}>{t('action.exportCast')}</Button>,
+              <Button key="log" size="small" onClick={() => exportAuditRecord(record, 'log')}>{t('action.exportLog')}</Button>,
+              <Button key="delete" size="small" danger onClick={() => deleteAuditRecord(record.id)}>{t('action.delete')}</Button>,
+            ]}
+          >
+            <List.Item.Meta
+              avatar={<span className="provider-icon"><AuditOutlined /></span>}
+              title={(
+                <Space size={8}>
+                  <span>{record.title}</span>
+                  <Tag>{record.providerType || 'terminal'}</Tag>
+                </Space>
+              )}
+              description={(
+                <Space direction="vertical" size={2}>
+                  <Text type="secondary">{`${record.startedAt || '-'} -> ${record.endedAt || '-'}`}</Text>
+                  <Text type="secondary">{`${t('label.auditEvents')}: ${(record.auditEvents || []).length}`}</Text>
+                </Space>
+              )}
+            />
+          </List.Item>
+        )}
+      />
+      <Drawer
+        title={replayRecord ? `${t('action.replay')} · ${replayRecord.title}` : t('action.replay')}
+        width={760}
+        open={!!replayRecord}
+        onClose={() => setReplayRecord(null)}
+        extra={replayRecord && (
+          <Space>
+            <Button onClick={() => exportAuditRecord(replayRecord, 'cast')}>{t('action.exportCast')}</Button>
+            <Button onClick={() => exportAuditRecord(replayRecord, 'log')}>{t('action.exportLog')}</Button>
+          </Space>
+        )}
+      >
+        {replayRecord && (
+          <Space direction="vertical" className="settings-stack" size={12}>
+            <List
+              size="small"
+              header={<Text strong>{t('section.auditTimeline')}</Text>}
+              dataSource={replayRecord.auditEvents || []}
+              renderItem={(event) => (
+                <List.Item>
+                  <Text code>{event.type}</Text>
+                  <Text type="secondary">{event.at}</Text>
+                  <Text>{event.detail}</Text>
+                </List.Item>
+              )}
+            />
+            <pre className="audit-replay">{replayRecord.screen || t('message.terminalOutputEmpty')}</pre>
+          </Space>
+        )}
+      </Drawer>
+    </div>
+  );
+
   const renderContent = () => {
     if (selectedNav === 'connections') return renderConnections();
     if (selectedNav === 'files') return renderFiles();
     if (selectedNav === 'tunnels') return renderTunnels();
     if (selectedNav === 'extensions') return renderExtensions();
+    if (selectedNav === 'audit') return renderAuditLogs();
     if (selectedNav === 'settings') return renderSettings();
     return renderSessions();
   };
@@ -1573,6 +1776,11 @@ function App() {
     reset: resetActiveTerminal,
     copyTranscript: copyTerminalTranscript,
     exportTranscript: exportTerminalTranscript,
+    saveAudit: () => {
+      const record = saveAuditRecord(activeKey);
+      if (record) message.success(t('message.auditRecordSaved'));
+      if (!record) message.info(t('message.terminalOutputEmpty'));
+    },
     zoomIn: () => zoomTerminalFont(1),
     zoomOut: () => zoomTerminalFont(-1),
     zoomReset: resetTerminalFont,
@@ -1615,6 +1823,11 @@ function App() {
       key: 'exportTranscript',
       icon: <ExportOutlined />,
       label: t('action.exportTranscript'),
+    },
+    activeKey && {
+      key: 'saveAudit',
+      icon: <AuditOutlined />,
+      label: t('action.saveAuditRecord'),
     },
     activeKey && {
       key: 'reset',
@@ -1685,6 +1898,7 @@ function App() {
             { key: 'sessions', icon: <CodeOutlined />, label: t('nav.sessions') },
             { key: 'files', icon: <FolderOpenOutlined />, label: t('nav.files') },
             { key: 'tunnels', icon: <ApiOutlined />, label: t('nav.tunnels') },
+            { key: 'audit', icon: <AuditOutlined />, label: t('nav.audit') },
             { key: 'extensions', icon: <AppstoreAddOutlined />, label: t('nav.extensions') },
             { key: 'settings', icon: <SettingOutlined />, label: t('nav.settings') },
           ]}
@@ -2158,6 +2372,22 @@ function persistRecentConnections(items) {
   localStorage.setItem(recentConnectionStorageKey, JSON.stringify(items.slice(0, 12)));
 }
 
+function loadAuditRecords() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(auditRecordStorageKey) || '[]');
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((record) => record?.id && record?.title).slice(0, 100);
+  } catch {
+    return [];
+  }
+}
+
+function persistAuditRecords(records) {
+  const nextRecords = records.filter(Boolean).slice(0, 100);
+  localStorage.setItem(auditRecordStorageKey, JSON.stringify(nextRecords));
+  return nextRecords;
+}
+
 function rememberConnection(request, setRecentConnections) {
   const safeRequest = sanitizeRequest(request);
   const recent = {
@@ -2218,6 +2448,7 @@ function buildPaletteItems(actions) {
     ['sessions', 'nav.sessions', <CodeOutlined />],
     ['files', 'nav.files', <FolderOpenOutlined />],
     ['tunnels', 'nav.tunnels', <ApiOutlined />],
+    ['audit', 'nav.audit', <AuditOutlined />],
     ['extensions', 'nav.extensions', <AppstoreAddOutlined />],
     ['settings', 'nav.settings', <SettingOutlined />],
   ].map(([key, labelKey, icon]) => ({
