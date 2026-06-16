@@ -71,6 +71,11 @@ import {
   filterAuditRecords,
   summarizeWorkspace,
 } from './workspaceInsights.js';
+import {
+  buildConnectionGroups,
+  selectBatchProfiles,
+  ungroupedKey,
+} from './connectionManager.js';
 import TerminalPane from './components/TerminalPane.jsx';
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
 import * as ExtensionsAPI from '../wailsjs/go/extensions/API.js';
@@ -308,11 +313,11 @@ function App() {
   })), [providers]);
 
   const selectedProvider = providers.find((item) => item.type === newType) || providers[0] || fallbackProviders[0];
-  const profileGroups = useMemo(() => uniqueProfileGroups(profiles), [profiles]);
   const visibleProfiles = useMemo(
     () => filteredProfiles(profiles, profileQuery, groupQuery),
     [profiles, profileQuery, groupQuery],
   );
+  const connectionGroups = useMemo(() => buildConnectionGroups(profiles), [profiles]);
   const workspaceInsights = useMemo(() => summarizeWorkspace({
     auditRecords,
     installedExtensions,
@@ -367,7 +372,6 @@ function App() {
   const createSession = async () => {
     const values = await form.validateFields();
     const provider = providers.find((item) => item.type === newType) || fallbackProviders[0];
-    const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`;
     const label = values.displayName || providerLabel(provider);
     let request = buildRequest(newType, label, values);
     let profileId = editingProfileId;
@@ -411,10 +415,20 @@ function App() {
         setProfiles(nextProfiles);
         message.success(t('message.profileSaved'));
       }
+      await startProfileRequests([request], { closeDrawer: true });
+    } catch (error) {
+      message.error(`${t('message.credentialFailed')}: ${error}`);
+    }
+  };
+
+  const startProfileRequests = async (requests, { closeDrawer = false } = {}) => {
+    const createdSessions = [];
+    for (const request of requests) {
+      const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${createdSessions.length}`;
+      const label = request.displayName || request.providerType;
       rememberConnection(request, setRecentConnections);
       const sessionRequest = await resolveCredentialRequest(request);
-
-      setSessions((current) => [...current, {
+      createdSessions.push({
         id,
         auditEvents: [createAuditEvent({
           detail: profileDescription(profileFromRequest(request)),
@@ -423,19 +437,21 @@ function App() {
           type: 'session.open',
         })],
         label,
-        providerType: newType,
+        providerType: request.providerType,
         request: sessionRequest,
         startedAt: new Date().toISOString(),
         status: 'connecting',
         revision: 0,
-      }]);
-      setActiveKey(id);
-      setSelectedNav('sessions');
-      setDrawerOpen(false);
-      message.success(t('terminal.status.connecting'));
-    } catch (error) {
-      message.error(`${t('message.credentialFailed')}: ${error}`);
+      });
     }
+    if (createdSessions.length === 0) return;
+    setSessions((current) => [...current, ...createdSessions]);
+    setActiveKey(createdSessions[createdSessions.length - 1].id);
+    setSelectedNav('sessions');
+    if (closeDrawer) setDrawerOpen(false);
+    message.success(createdSessions.length > 1
+      ? `${t('message.batchSessionsStarted')}: ${createdSessions.length}`
+      : t('terminal.status.connecting'));
   };
 
   const testConnection = async () => {
@@ -817,9 +833,29 @@ function App() {
     message.success(t('message.profileDeleted'));
   };
 
-  const openProfile = (profile) => {
-    rememberConnection(profileToRequest(profile), setRecentConnections);
+  const openProfile = async (profile) => {
+    try {
+      await startProfileRequests([profileToRequest(profile)]);
+    } catch (error) {
+      message.error(`${t('message.credentialFailed')}: ${error}`);
+    }
+  };
+
+  const openProfileEditor = (profile) => {
     openDrawer(profile.providerType, profile);
+  };
+
+  const openBatchProfiles = async (options) => {
+    const selectedProfiles = selectBatchProfiles(profiles, options);
+    if (selectedProfiles.length === 0) {
+      message.info(t('message.noBatchConnections'));
+      return;
+    }
+    try {
+      await startProfileRequests(selectedProfiles.map(profileToRequest));
+    } catch (error) {
+      message.error(`${t('message.credentialFailed')}: ${error}`);
+    }
   };
 
   const clearRecentConnections = () => {
@@ -1044,9 +1080,34 @@ function App() {
         </>
       )}
 
+      {connectionGroups.length > 0 && (
+        <>
+          <div className="page-header compact">
+            <Title level={4}>{t('section.connectionGroups')}</Title>
+            <Button
+              size="small"
+              icon={<StarFilled />}
+              onClick={() => openBatchProfiles({ favoritesOnly: true })}
+              disabled={!profiles.some((profile) => profile.favorite)}
+            >
+              {t('action.openFavorites')}
+            </Button>
+          </div>
+          <ConnectionGroupBoard groups={connectionGroups} openBatchProfiles={openBatchProfiles} />
+          <Divider />
+        </>
+      )}
+
       <div className="page-header compact">
         <Title level={4}>{t('section.savedConnections')}</Title>
         <Space>
+          <Button
+            size="small"
+            onClick={() => openBatchProfiles({ group: groupQuery })}
+            disabled={visibleProfiles.length === 0}
+          >
+            {groupQuery === 'all' ? t('action.openAll') : t('action.openGroup')}
+          </Button>
           <Button size="small" onClick={() => setSshConfigOpen(true)}>{t('action.importSshConfig')}</Button>
           <Button size="small" onClick={() => profileImportRef.current?.click()}>{t('action.import')}</Button>
           <Button size="small" onClick={exportProfiles} disabled={profiles.length === 0}>{t('action.export')}</Button>
@@ -1066,7 +1127,7 @@ function App() {
           onChange={setGroupQuery}
           options={[
             { value: 'all', label: t('group.all') },
-            ...profileGroups.map((group) => ({ value: group, label: group })),
+            ...connectionGroups.map((group) => ({ value: group.key, label: groupLabel(group.key) })),
           ]}
         />
         <Input.Search
@@ -1094,7 +1155,7 @@ function App() {
                     onClick={() => toggleProfileFavorite(profile.id)}
                   />
                 </Tooltip>,
-                <Button key="edit" size="small" onClick={() => openDrawer(profile.providerType, profile)}>{t('action.edit')}</Button>,
+                <Button key="edit" size="small" onClick={() => openProfileEditor(profile)}>{t('action.edit')}</Button>,
                 <Button key="duplicate" size="small" onClick={() => duplicateProfile(profile)}>{t('action.duplicate')}</Button>,
                 <Button key="delete" size="small" danger onClick={() => deleteProfile(profile.id)}>{t('action.delete')}</Button>,
               ]}
@@ -2431,6 +2492,29 @@ function WorkspaceOverview({ insights }) {
   );
 }
 
+function ConnectionGroupBoard({ groups, openBatchProfiles }) {
+  return (
+    <div className="connection-group-grid">
+      {groups.map((group) => (
+        <button
+          className="connection-group-card"
+          key={group.key}
+          type="button"
+          onClick={() => openBatchProfiles({ group: group.key })}
+        >
+          <span className="connection-group-title">{groupLabel(group.key)}</span>
+          <strong>{group.total}</strong>
+          <span>
+            {t('label.favorite')}: {group.favoriteCount}
+            {' · '}
+            {t('label.credentialSaved')}: {group.credentialCount}
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function MetricCard({
   accent = 'default',
   label,
@@ -2829,6 +2913,10 @@ function extensionStatusColor(status) {
   return 'default';
 }
 
+function groupLabel(group) {
+  return group === ungroupedKey ? t('group.ungrouped') : group;
+}
+
 function parseCredentialRef(value) {
   if (!value) return null;
   if (typeof value === 'object') return value;
@@ -2878,14 +2966,11 @@ function profileDescription(profile) {
   return profile.config?.shell || 'default shell';
 }
 
-function uniqueProfileGroups(profiles) {
-  return [...new Set(profiles.map((profile) => profile.group).filter(Boolean))].sort((left, right) => left.localeCompare(right));
-}
-
 function filteredProfiles(profiles, query, group = 'all') {
   const keyword = query.trim().toLowerCase();
   return profiles.filter((profile) => {
-    const groupMatched = group === 'all' || (profile.group || '') === group;
+    const profileGroup = profile.group || ungroupedKey;
+    const groupMatched = group === 'all' || profileGroup === group;
     if (!groupMatched) return false;
     if (!keyword) return true;
     return (

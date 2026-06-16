@@ -27,7 +27,7 @@ Provide secure and reliable remote file access
 
 <details>
 <summary><b>🗂 Connection manager and system credentials</b></summary>
-Save non-sensitive SSH connection metadata such as name, group, host, port, username, auth type, and jump-host settings. Passwords, private keys, passphrases, and jump-host passwords can be stored in the system credential store; profile exports only keep credential references.
+Save non-sensitive SSH connection metadata such as name, group, host, port, username, auth type, and jump-host settings. Passwords, private keys, passphrases, and jump-host passwords can be stored in the system credential store; profile exports only keep credential references. The connection manager supports favorite-first sorting, group summaries, opening favorites, and opening a whole group at once.
 </details>
 
 <details>
