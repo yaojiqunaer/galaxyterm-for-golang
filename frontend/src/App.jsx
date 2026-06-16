@@ -78,6 +78,7 @@ import {
 } from './connectionManager.js';
 import TerminalPane from './components/TerminalPane.jsx';
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
+import { hasWailsMethod } from './desktopBridge.js';
 import * as ExtensionsAPI from '../wailsjs/go/extensions/API.js';
 import * as FilesAPI from '../wailsjs/go/files/API.js';
 import * as ThemeAPI from '../wailsjs/go/internal/Theme.js';
@@ -173,6 +174,9 @@ function App() {
   const [fileEntries, setFileEntries] = useState([]);
   const [fileLoading, setFileLoading] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
+  const [creatingSession, setCreatingSession] = useState(false);
+  const [extensionBusy, setExtensionBusy] = useState(false);
+  const [tunnelBusy, setTunnelBusy] = useState(false);
   const [fileAuthType, setFileAuthType] = useState('password');
   const [fileEditorOpen, setFileEditorOpen] = useState(false);
   const [fileEditorLoading, setFileEditorLoading] = useState(false);
@@ -341,6 +345,7 @@ function App() {
     providerType: auditProviderFilter,
     query: auditQuery,
   }), [auditProviderFilter, auditQuery, auditRecords]);
+  const desktopBridgeReady = hasWailsMethod(['session', 'API', 'CreateSession']);
 
   const openDrawer = (type = providers[0]?.type || 'local', profile = null) => {
     const providerType = profile?.providerType || type;
@@ -376,6 +381,7 @@ function App() {
     let request = buildRequest(newType, label, values);
     let profileId = editingProfileId;
 
+    setCreatingSession(true);
     try {
       if (values.saveProfile) {
         const hasNewCredentialSecret = !!(
@@ -418,6 +424,8 @@ function App() {
       await startProfileRequests([request], { closeDrawer: true });
     } catch (error) {
       message.error(`${t('message.credentialFailed')}: ${error}`);
+    } finally {
+      setCreatingSession(false);
     }
   };
 
@@ -1139,7 +1147,15 @@ function App() {
         />
       </Space>
       {visibleProfiles.length === 0 ? (
-        <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noConnections')} />
+        <Empty
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description={t('empty.noConnections')}
+        >
+          <Space wrap>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => openDrawer('ssh')}>{t('action.quickSsh')}</Button>
+            <Button onClick={() => setSshConfigOpen(true)}>{t('action.importSshConfig')}</Button>
+          </Space>
+        </Empty>
       ) : (
         <List
           className="profile-list"
@@ -1187,8 +1203,8 @@ function App() {
           <Title level={3}>{t('section.officialExtensions')}</Title>
         </div>
         <Space>
-          <Button icon={<FolderOpenOutlined />} onClick={() => setExtensionInstallOpen(true)}>{t('action.installOffline')}</Button>
-          <Button icon={<PlusOutlined />} onClick={registerDemoExtension}>{t('action.addSource')}</Button>
+          <Button icon={<FolderOpenOutlined />} onClick={() => setExtensionInstallOpen(true)} loading={extensionBusy}>{t('action.installOffline')}</Button>
+          <Button icon={<PlusOutlined />} onClick={registerDemoExtension} loading={extensionBusy}>{t('action.addSource')}</Button>
         </Space>
       </div>
       <Alert type="info" showIcon message={t('settings.coreOnly')} />
@@ -1201,7 +1217,7 @@ function App() {
             renderItem={(extension) => (
               <List.Item
                 actions={[
-                  <Button key="uninstall" size="small" danger onClick={() => uninstallExtension(extension.id)}>{t('action.uninstall')}</Button>,
+                  <Button key="uninstall" size="small" danger loading={extensionBusy} onClick={() => uninstallExtension(extension.id)}>{t('action.uninstall')}</Button>,
                 ]}
               >
                 <List.Item.Meta
@@ -1262,10 +1278,17 @@ function App() {
       providers: [{ type: 'demo', nameKey: 'extension.demo', category: 'extension', capabilities: ['stream'] }],
       locales: ['zh-CN', 'en-US'],
     };
-    await ExtensionsAPI.RegisterInstalled(manifest);
-    const items = await ExtensionsAPI.ListInstalled();
-    setInstalledExtensions(Array.isArray(items) ? items : []);
-    message.success(t('message.extensionComing'));
+    setExtensionBusy(true);
+    try {
+      await ExtensionsAPI.RegisterInstalled(manifest);
+      const items = await ExtensionsAPI.ListInstalled();
+      setInstalledExtensions(Array.isArray(items) ? items : []);
+      message.success(t('message.extensionComing'));
+    } catch (error) {
+      message.error(`${t('message.extensionInstallFailed')}: ${error}`);
+    } finally {
+      setExtensionBusy(false);
+    }
   };
 
   const installOfflineExtension = async () => {
@@ -1274,6 +1297,7 @@ function App() {
       message.warning(t('validation.required'));
       return;
     }
+    setExtensionBusy(true);
     try {
       await ExtensionsAPI.InstallOffline(packagePath);
       const items = await ExtensionsAPI.ListInstalled();
@@ -1283,14 +1307,23 @@ function App() {
       message.success(t('message.extensionInstalled'));
     } catch (error) {
       message.error(`${t('message.extensionInstallFailed')}: ${error}`);
+    } finally {
+      setExtensionBusy(false);
     }
   };
 
   const uninstallExtension = async (extensionID) => {
-    await ExtensionsAPI.Uninstall(extensionID);
-    const items = await ExtensionsAPI.ListInstalled();
-    setInstalledExtensions(Array.isArray(items) ? items : []);
-    message.success(t('message.extensionUninstalled'));
+    setExtensionBusy(true);
+    try {
+      await ExtensionsAPI.Uninstall(extensionID);
+      const items = await ExtensionsAPI.ListInstalled();
+      setInstalledExtensions(Array.isArray(items) ? items : []);
+      message.success(t('message.extensionUninstalled'));
+    } catch (error) {
+      message.error(`${t('message.extensionInstallFailed')}: ${error}`);
+    } finally {
+      setExtensionBusy(false);
+    }
   };
 
   const loadFiles = async (overridePath = null) => {
@@ -1729,25 +1762,39 @@ function App() {
 
   const startTunnel = async () => {
     const values = await tunnelForm.validateFields();
-    const info = await TunnelAPI.Start({
-      name: values.name || 'Tunnel',
-      sshHost: values.sshHost,
-      sshPort: values.sshPort || 22,
-      sshUser: values.sshUser,
-      sshPassword: values.sshPassword || '',
-      localHost: values.localHost || '127.0.0.1',
-      localPort: values.localPort,
-      remoteHost: values.remoteHost,
-      remotePort: values.remotePort,
-    });
-    setTunnels((current) => [...current, info]);
-    message.success(t('message.tunnelStarted'));
+    setTunnelBusy(true);
+    try {
+      const info = await TunnelAPI.Start({
+        name: values.name || 'Tunnel',
+        sshHost: values.sshHost,
+        sshPort: values.sshPort || 22,
+        sshUser: values.sshUser,
+        sshPassword: values.sshPassword || '',
+        localHost: values.localHost || '127.0.0.1',
+        localPort: values.localPort,
+        remoteHost: values.remoteHost,
+        remotePort: values.remotePort,
+      });
+      setTunnels((current) => [...current, info]);
+      message.success(t('message.tunnelStarted'));
+    } catch (error) {
+      message.error(`${t('message.tunnelFailed')}: ${error}`);
+    } finally {
+      setTunnelBusy(false);
+    }
   };
 
   const stopTunnel = async (id) => {
-    await TunnelAPI.Stop(id);
-    setTunnels((current) => current.filter((item) => item.id !== id));
-    message.success(t('message.tunnelStopped'));
+    setTunnelBusy(true);
+    try {
+      await TunnelAPI.Stop(id);
+      setTunnels((current) => current.filter((item) => item.id !== id));
+      message.success(t('message.tunnelStopped'));
+    } catch (error) {
+      message.error(`${t('message.tunnelFailed')}: ${error}`);
+    } finally {
+      setTunnelBusy(false);
+    }
   };
 
   const renderTunnels = () => (
@@ -1788,14 +1835,14 @@ function App() {
             <InputNumber min={1} max={65535} />
           </Form.Item>
           <Form.Item>
-            <Button type="primary" onClick={startTunnel}>{t('action.create')}</Button>
+            <Button type="primary" onClick={startTunnel} loading={tunnelBusy}>{t('action.create')}</Button>
           </Form.Item>
         </Form>
         <List
           className="profile-list"
           dataSource={tunnels}
           renderItem={(item) => (
-            <List.Item actions={[<Button key="stop" danger size="small" onClick={() => stopTunnel(item.id)}>{t('action.delete')}</Button>]}>
+            <List.Item actions={[<Button key="stop" danger size="small" loading={tunnelBusy} onClick={() => stopTunnel(item.id)}>{t('action.delete')}</Button>]}>
               <List.Item.Meta title={item.name} description={`${item.localAddr} -> ${item.remoteAddr} via ${item.sshAddr}`} />
             </List.Item>
           )}
@@ -1843,7 +1890,13 @@ function App() {
       <List
         className="profile-list audit-record-list"
         dataSource={visibleAuditRecords}
-        locale={{ emptyText: t('empty.noAuditRecords') }}
+        locale={{
+          emptyText: (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noAuditRecords')}>
+              <Button onClick={() => saveAuditRecord(activeKey)} disabled={!activeKey}>{t('action.saveAuditRecord')}</Button>
+            </Empty>
+          ),
+        }}
         renderItem={(record) => (
           <List.Item
             actions={[
@@ -2183,6 +2236,14 @@ function App() {
         </div>
 
         <Content className="content-area">
+          {!desktopBridgeReady && (
+            <Alert
+              className="bridge-alert"
+              type="warning"
+              showIcon
+              message={t('message.desktopBridgeUnavailable')}
+            />
+          )}
           {renderContent()}
         </Content>
 
@@ -2238,7 +2299,7 @@ function App() {
           <Space>
             <Button onClick={() => setDrawerOpen(false)}>{t('action.cancel')}</Button>
             <Button onClick={testConnection} loading={testingConnection}>{t('action.testConnection')}</Button>
-            <Button type="primary" onClick={createSession}>{t('action.create')}</Button>
+            <Button type="primary" onClick={createSession} loading={creatingSession}>{t('action.create')}</Button>
           </Space>
         )}
       >
@@ -2357,7 +2418,16 @@ function App() {
             <List.Item
               actions={[
                 <Button key="run" size="small" type="primary" onClick={() => runQuickCommand(item.command)}>{t('action.run')}</Button>,
-                <Button key="copy" size="small" onClick={() => navigator.clipboard?.writeText(item.command)}>{t('action.copy')}</Button>,
+                <Button
+                  key="copy"
+                  size="small"
+                  onClick={async () => {
+                    await navigator.clipboard?.writeText(item.command);
+                    message.success(t('message.copied'));
+                  }}
+                >
+                  {t('action.copy')}
+                </Button>,
                 <Button key="delete" size="small" danger onClick={() => deleteQuickCommand(item.id)}>{t('action.delete')}</Button>,
               ]}
             >
