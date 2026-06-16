@@ -26,6 +26,11 @@ Provide secure and reliable remote file access
 </details>
 
 <details>
+<summary><b>🗂 Connection manager and system credentials</b></summary>
+Save non-sensitive SSH connection metadata such as name, group, host, port, username, auth type, and jump-host settings. Passwords, private keys, passphrases, and jump-host passwords can be stored in the system credential store; profile exports only keep credential references.
+</details>
+
+<details>
 <summary><b>🧾 Audit logs and terminal recordings</b></summary>
 Records session open, reconnect, close, error, clear, quick command, and large paste events. Terminal output is stored as asciinema v2 text recordings, which can be played, paused, restarted, and exported as `.cast` or `.log` from the Audit page.
 </details>

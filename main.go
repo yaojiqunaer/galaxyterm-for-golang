@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"galaxyterm/internal"
+	"galaxyterm/internal/credentials"
 	"galaxyterm/internal/extensions"
 	"galaxyterm/internal/files"
 	"galaxyterm/internal/session"
@@ -71,6 +72,7 @@ func main() {
 			session.NewAPI(sessionManager),
 			files.NewAPI(),
 			extensions.NewAPI(),
+			credentials.NewAPI(),
 			terminal.NewAPI(),
 			tunnelAPI,
 			&internal.Theme{},

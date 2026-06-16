@@ -76,6 +76,7 @@ import { parseSshConfigProfiles } from './sshConfigProfiles.js';
 import * as ExtensionsAPI from '../wailsjs/go/extensions/API.js';
 import * as FilesAPI from '../wailsjs/go/files/API.js';
 import * as ThemeAPI from '../wailsjs/go/internal/Theme.js';
+import * as CredentialsAPI from '../wailsjs/go/credentials/API.js';
 import * as SessionAPI from '../wailsjs/go/session/API.js';
 import * as TerminalAPI from '../wailsjs/go/terminal/API.js';
 import * as TunnelAPI from '../wailsjs/go/tunnel/API.js';
@@ -353,6 +354,8 @@ function App() {
       jumpPort: profile?.config?.jumpPort || 22,
       jumpUsername: profile?.auth?.jumpUsername || '',
       jumpPassword: '',
+      credentialRef: profile?.auth?.credentialRef ? JSON.stringify(profile.auth.credentialRef) : '',
+      rememberCredential: !!profile?.auth?.credentialRef,
       shell: profile?.config?.shell || '',
       saveProfile: false,
     });
@@ -366,34 +369,73 @@ function App() {
     const provider = providers.find((item) => item.type === newType) || fallbackProviders[0];
     const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`;
     const label = values.displayName || providerLabel(provider);
-    const request = buildRequest(newType, label, values);
+    let request = buildRequest(newType, label, values);
+    let profileId = editingProfileId;
 
-    if (values.saveProfile) {
-      const nextProfiles = saveProfile(profiles, request, editingProfileId);
-      setProfiles(nextProfiles);
-      message.success(t('message.profileSaved'));
+    try {
+      if (values.saveProfile) {
+        const hasNewCredentialSecret = !!(
+          values.password
+          || values.privateKey
+          || values.passphrase
+          || values.jumpPassword
+        );
+        if (newType === 'ssh' && values.rememberCredential && hasNewCredentialSecret) {
+          profileId = profileId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`);
+          const credentialRef = await CredentialsAPI.SaveSSHCredential({
+            id: profileId,
+            password: values.password || '',
+            privateKey: values.privateKey || '',
+            passphrase: values.passphrase || '',
+            jumpPassword: values.jumpPassword || '',
+          });
+          request = {
+            ...request,
+            auth: {
+              ...request.auth,
+              credentialRef,
+            },
+          };
+        }
+        if (newType === 'ssh' && !values.rememberCredential && editingProfileId) {
+          await CredentialsAPI.DeleteSSHCredential(editingProfileId);
+          request = {
+            ...request,
+            auth: {
+              ...request.auth,
+              credentialRef: null,
+            },
+          };
+        }
+        const nextProfiles = saveProfile(profiles, request, editingProfileId, profileId);
+        setProfiles(nextProfiles);
+        message.success(t('message.profileSaved'));
+      }
+      rememberConnection(request, setRecentConnections);
+      const sessionRequest = await resolveCredentialRequest(request);
+
+      setSessions((current) => [...current, {
+        id,
+        auditEvents: [createAuditEvent({
+          detail: profileDescription(profileFromRequest(request)),
+          sessionId: id,
+          sessionLabel: label,
+          type: 'session.open',
+        })],
+        label,
+        providerType: newType,
+        request: sessionRequest,
+        startedAt: new Date().toISOString(),
+        status: 'connecting',
+        revision: 0,
+      }]);
+      setActiveKey(id);
+      setSelectedNav('sessions');
+      setDrawerOpen(false);
+      message.success(t('terminal.status.connecting'));
+    } catch (error) {
+      message.error(`${t('message.credentialFailed')}: ${error}`);
     }
-    rememberConnection(request, setRecentConnections);
-
-    setSessions((current) => [...current, {
-      id,
-      auditEvents: [createAuditEvent({
-        detail: profileDescription(profileFromRequest(request)),
-        sessionId: id,
-        sessionLabel: label,
-        type: 'session.open',
-      })],
-      label,
-      providerType: newType,
-      request,
-      startedAt: new Date().toISOString(),
-      status: 'connecting',
-      revision: 0,
-    }]);
-    setActiveKey(id);
-    setSelectedNav('sessions');
-    setDrawerOpen(false);
-    message.success(t('terminal.status.connecting'));
   };
 
   const testConnection = async () => {
@@ -403,9 +445,9 @@ function App() {
     }
     const values = await form.validateFields();
     const provider = providers.find((item) => item.type === newType) || fallbackProviders[0];
-    const request = buildRequest(newType, values.displayName || providerLabel(provider), values);
     setTestingConnection(true);
     try {
+      const request = await resolveCredentialRequest(buildRequest(newType, values.displayName || providerLabel(provider), values));
       await TerminalAPI.TestSSHConnection(request);
       message.success(t('message.connectionTestSuccess'));
     } catch (error) {
@@ -418,6 +460,10 @@ function App() {
   const duplicateProfile = (profile) => {
     const copy = {
       ...profile,
+      auth: {
+        ...(profile.auth || {}),
+        credentialRef: null,
+      },
       id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`,
       displayName: `${profile.displayName} Copy`,
     };
@@ -759,10 +805,15 @@ function App() {
     message.success(t('message.workspaceCleared'));
   };
 
-  const deleteProfile = (profileId) => {
+  const deleteProfile = async (profileId) => {
     const nextProfiles = profiles.filter((profile) => profile.id !== profileId);
     persistProfiles(nextProfiles);
     setProfiles(nextProfiles);
+    try {
+      await CredentialsAPI.DeleteSSHCredential(profileId);
+    } catch {
+      // Profiles remain removable even if the OS credential store is unavailable.
+    }
     message.success(t('message.profileDeleted'));
   };
 
@@ -1054,6 +1105,7 @@ function App() {
                   <Space size={8}>
                     <span>{profile.displayName}</span>
                     {profile.favorite && <Tag color="gold">{t('label.favorite')}</Tag>}
+                    {profile.auth?.credentialRef && <Tag color="blue">{t('label.credentialSaved')}</Tag>}
                     {profile.group && <Tag>{profile.group}</Tag>}
                   </Space>
                 )}
@@ -2153,6 +2205,9 @@ function App() {
           )}
           {newType === 'ssh' && (
             <>
+              <Form.Item name="credentialRef" hidden>
+                <Input />
+              </Form.Item>
               <Form.Item name="host" label={t('field.host')} rules={[{ required: true, message: t('validation.required') }]}>
                 <Input placeholder={t('placeholder.host')} />
               </Form.Item>
@@ -2178,7 +2233,7 @@ function App() {
               )}
               {sshAuthType === 'privateKey' && (
                 <>
-                  <Form.Item name="privateKey" label={t('field.privateKey')} rules={[{ required: true, message: t('validation.required') }]}>
+                  <Form.Item name="privateKey" label={t('field.privateKey')}>
                     <Input.TextArea rows={7} placeholder={t('placeholder.privateKey')} />
                   </Form.Item>
                   <Form.Item name="passphrase" label={t('field.passphrase')}>
@@ -2199,6 +2254,10 @@ function App() {
               <Form.Item name="jumpPassword" label={t('field.jumpPassword')}>
                 <Input.Password />
               </Form.Item>
+              <Form.Item name="rememberCredential" valuePropName="checked">
+                <Checkbox>{t('field.rememberCredential')}</Checkbox>
+              </Form.Item>
+              <Alert type="info" showIcon message={t('settings.credentialHint')} />
             </>
           )}
           <Form.Item name="saveProfile" valuePropName="checked">
@@ -2495,6 +2554,7 @@ function sanitizeProfile(profile) {
       username: profile.auth?.username || '',
       authType: profile.auth?.authType || 'password',
       jumpUsername: profile.auth?.jumpUsername || '',
+      credentialRef: profile.auth?.credentialRef || null,
     },
   };
 }
@@ -2769,10 +2829,26 @@ function extensionStatusColor(status) {
   return 'default';
 }
 
-function saveProfile(profiles, request, editingProfileId = '') {
+function parseCredentialRef(value) {
+  if (!value) return null;
+  if (typeof value === 'object') return value;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed?.id ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+async function resolveCredentialRequest(request) {
+  if (request.providerType !== 'ssh' || !request.auth?.credentialRef) return request;
+  return CredentialsAPI.ResolveSSHRequest(request);
+}
+
+function saveProfile(profiles, request, editingProfileId = '', profileId = '') {
   const existingProfile = profiles.find((item) => item.id === editingProfileId);
   const profile = {
-    id: editingProfileId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`),
+    id: editingProfileId || profileId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`),
     providerType: request.providerType,
     displayName: request.displayName,
     group: request.group || '',
@@ -2782,6 +2858,7 @@ function saveProfile(profiles, request, editingProfileId = '') {
       username: request.auth?.username || '',
       authType: request.auth?.authType || 'password',
       jumpUsername: request.auth?.jumpUsername || '',
+      credentialRef: request.auth?.credentialRef || null,
     },
   };
   if (editingProfileId) {
@@ -2883,6 +2960,7 @@ function sanitizeRequest(request) {
       username: request?.auth?.username || '',
       authType: request?.auth?.authType || 'password',
       jumpUsername: request?.auth?.jumpUsername || '',
+      credentialRef: request?.auth?.credentialRef || null,
     },
   };
 }
@@ -2931,6 +3009,7 @@ function joinRemotePath(base, name) {
 
 function buildRequest(type, displayName, values) {
   if (type === 'ssh') {
+    const credentialRef = parseCredentialRef(values.credentialRef);
     return {
       providerType: type,
       displayName,
@@ -2949,6 +3028,7 @@ function buildRequest(type, displayName, values) {
         passphrase: values.passphrase || '',
         jumpUsername: values.jumpUsername || '',
         jumpPassword: values.jumpPassword || '',
+        credentialRef,
       },
     };
   }

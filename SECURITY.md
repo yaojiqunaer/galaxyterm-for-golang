@@ -1,21 +1,21 @@
 # Security Policy
 
-## Supported Versions
+## Credential Storage
 
-Use this section to tell people about which versions of your project are
-currently being supported with security updates.
+GalaxyTerm does not store SSH passwords, private keys, passphrases, or jump-host passwords in profile JSON, workspace snapshots, recent connections, audit exports, or recording exports.
 
-| Version | Supported          |
-| ------- | ------------------ |
-| 5.1.x   | :white_check_mark: |
-| 5.0.x   | :x:                |
-| 4.0.x   | :white_check_mark: |
-| < 4.0   | :x:                |
+When users enable credential saving, secrets are stored through the operating system credential store:
 
-## Reporting a Vulnerability
+- macOS Keychain
+- Windows Credential Manager
+- Linux Secret Service compatible keyrings
 
-Use this section to tell people how to report a vulnerability.
+Connection profiles keep only a credential reference. Exported profiles omit the secret values.
 
-Tell them where to go, how often they can expect to get an update on a
-reported vulnerability, what to expect if the vulnerability is accepted or
-declined, etc.
+## Audit and Recording Data
+
+Audit logs record session lifecycle events, operation summaries, and terminal output recordings. Exports apply basic redaction for common passwords, tokens, Authorization headers, and private key blocks.
+
+## Reporting Vulnerabilities
+
+Please report security issues through a private GitHub security advisory or by contacting the maintainer privately. Do not open a public issue with exploitable details.
