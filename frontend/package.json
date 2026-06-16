@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:audit": "node src/auditLog.test.mjs",
+    "test:insights": "node src/workspaceInsights.test.mjs",
     "test:ssh-config": "node src/sshConfigProfiles.test.mjs"
   },
   "dependencies": {

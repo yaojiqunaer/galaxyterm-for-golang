@@ -2,6 +2,11 @@
   box-sizing: border-box;
 }
 
+* {
+  scrollbar-color: var(--border) transparent;
+  scrollbar-width: thin;
+}
+
 :root {
   --bg: #eef2f5;
   --panel: #ffffff;
@@ -46,6 +51,10 @@ body,
   font-family: Inter, 'Nunito', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
   background: var(--bg);
   color: var(--text);
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 button,
@@ -185,6 +194,11 @@ select {
   margin: 1px 0;
   border-radius: 6px;
   color: var(--muted);
+  transition: background 140ms ease, color 140ms ease, transform 140ms ease;
+}
+
+.workspace-nav .ant-menu-item:hover {
+  transform: translateX(1px);
 }
 
 .workspace-nav .ant-menu-item-selected {
@@ -306,6 +320,7 @@ select {
   flex: 1;
   overflow: auto;
   background: var(--surface);
+  scroll-behavior: smooth;
 }
 
 .terminal-tabs {
@@ -422,6 +437,7 @@ select {
   min-height: 100%;
   padding: 18px 20px;
   background: var(--surface);
+  animation: page-enter 160ms ease;
 }
 
 .workspace-page.narrow {
@@ -457,6 +473,65 @@ select {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
   gap: 12px;
+}
+
+.overview-grid,
+.audit-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.metric-card {
+  position: relative;
+  min-height: 92px;
+  padding: 13px 14px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.metric-card::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: var(--accent);
+  content: '';
+}
+
+.metric-card-success::before {
+  background: var(--success);
+}
+
+.metric-card-warning::before {
+  background: var(--warning);
+}
+
+.metric-card:hover {
+  border-color: var(--accent);
+  background: var(--panel-muted);
+  transform: translateY(-1px);
+}
+
+.metric-card strong,
+.metric-card small {
+  display: block;
+}
+
+.metric-card strong {
+  margin-top: 6px;
+  color: var(--text);
+  font-size: 28px;
+  line-height: 1;
+}
+
+.metric-card small {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .welcome-copy {
@@ -528,6 +603,7 @@ select {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
+  overflow: hidden;
 }
 
 .profile-list .ant-list-item-action {
@@ -619,10 +695,36 @@ code {
 
 .profile-list .ant-list-item {
   padding: 12px 14px !important;
+  transition: background 140ms ease;
+}
+
+.profile-list .ant-list-item:hover {
+  background: var(--panel-muted);
 }
 
 .audit-record-list {
+  margin-top: 12px;
+}
+
+.list-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.list-search {
+  width: min(420px, 100%);
+}
+
+.provider-filter {
+  width: 180px;
+}
+
+.audit-summary-grid {
   margin-top: 14px;
+  margin-bottom: 0;
 }
 
 .audit-player {
@@ -663,10 +765,40 @@ code {
   margin-top: 14px;
 }
 
-.extension-grid .ant-card {
-  border-color: var(--border);
+.extension-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 78px;
+  padding: 13px;
+  border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 140ms ease, background 140ms ease, transform 140ms ease;
+}
+
+.extension-card:hover {
+  border-color: var(--accent);
+  background: var(--panel-muted);
+  transform: translateY(-1px);
+}
+
+.extension-card-body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.extension-card-body .ant-typography {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .file-browser-card {
@@ -758,6 +890,18 @@ code {
   background: var(--panel);
   color: var(--muted);
   font-size: 11px;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .drawer-provider-head {

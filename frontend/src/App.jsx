@@ -66,6 +66,11 @@ import {
   parseAsciinemaCast,
   renderCastFrame,
 } from './auditLog.js';
+import {
+  buildExtensionCatalog,
+  filterAuditRecords,
+  summarizeWorkspace,
+} from './workspaceInsights.js';
 import TerminalPane from './components/TerminalPane.jsx';
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
 import * as ExtensionsAPI from '../wailsjs/go/extensions/API.js';
@@ -150,6 +155,8 @@ function App() {
   const [sessionView, setSessionView] = useState('tabs');
   const [profileQuery, setProfileQuery] = useState('');
   const [groupQuery, setGroupQuery] = useState('all');
+  const [auditQuery, setAuditQuery] = useState('');
+  const [auditProviderFilter, setAuditProviderFilter] = useState('all');
   const [workspaceSummary, setWorkspaceSummary] = useState(() => loadWorkspaceSummary());
   const [quickCommands, setQuickCommands] = useState(() => loadQuickCommands());
   const [recentConnections, setRecentConnections] = useState(() => loadRecentConnections());
@@ -305,6 +312,29 @@ function App() {
     () => filteredProfiles(profiles, profileQuery, groupQuery),
     [profiles, profileQuery, groupQuery],
   );
+  const workspaceInsights = useMemo(() => summarizeWorkspace({
+    auditRecords,
+    installedExtensions,
+    profiles,
+    providers,
+    recentConnections,
+    sessions,
+    tunnels,
+  }), [auditRecords, installedExtensions, profiles, providers, recentConnections, sessions, tunnels]);
+  const extensionCatalog = useMemo(() => buildExtensionCatalog({
+    installedExtensions,
+    officialExtensions,
+    providers,
+  }), [installedExtensions, providers]);
+  const auditProviderOptions = useMemo(() => [
+    { value: 'all', label: t('filter.allProviders') },
+    ...Array.from(new Set(auditRecords.map((record) => record.providerType || 'terminal')))
+      .map((type) => ({ value: type, label: type })),
+  ], [auditRecords]);
+  const visibleAuditRecords = useMemo(() => filterAuditRecords(auditRecords, {
+    providerType: auditProviderFilter,
+    query: auditQuery,
+  }), [auditProviderFilter, auditQuery, auditRecords]);
 
   const openDrawer = (type = providers[0]?.type || 'local', profile = null) => {
     const providerType = profile?.providerType || type;
@@ -928,6 +958,8 @@ function App() {
         </Button>
       </div>
 
+      <WorkspaceOverview insights={workspaceInsights} />
+
       <div className="provider-card-grid">
         {providers.map((provider) => (
           <ProviderCard key={provider.type} provider={provider} openDrawer={openDrawer} />
@@ -1086,23 +1118,22 @@ function App() {
         </>
       )}
       <div className="extension-grid">
-        {providers.map((provider) => (
-          <Card key={provider.type} size="small">
-            <Space direction="vertical">
-              <span className="provider-icon">{providerIcons[provider.type] || <CodeOutlined />}</span>
-              <Text strong>{providerLabel(provider)}</Text>
-              <Tag color="green">{t('extension.status.builtin')}</Tag>
-            </Space>
-          </Card>
-        ))}
-        {officialExtensions.map((extension) => (
-          <Card key={extension.type} size="small">
-            <Space direction="vertical">
-              <span className="provider-icon">{providerIcons[extension.type] || <CodeOutlined />}</span>
-              <Text strong>{t(extension.nameKey)}</Text>
-              <Tag>{t('extension.status.planned')}</Tag>
-            </Space>
-          </Card>
+        {extensionCatalog.map((extension) => (
+          <button
+            className="extension-card"
+            key={`${extension.type}-${extension.status}`}
+            type="button"
+            onClick={() => extension.status === 'planned' && setExtensionInstallOpen(true)}
+          >
+            <span className="provider-icon">{providerIcons[extension.type] || <CodeOutlined />}</span>
+            <span className="extension-card-body">
+              <Text strong>{extension.nameKey ? t(extension.nameKey) : providerLabel(extension)}</Text>
+              <Text type="secondary">{extension.type}</Text>
+            </span>
+            <Tag color={extensionStatusColor(extension.status)}>
+              {t(`extension.status.${extension.status}`)}
+            </Tag>
+          </button>
         ))}
       </div>
     </div>
@@ -1673,9 +1704,32 @@ function App() {
         </Space>
       </div>
       <Alert type="info" showIcon message={t('settings.auditHint')} />
+      <div className="audit-summary-grid">
+        <MetricCard label={t('metric.recordings')} value={auditRecords.length} />
+        <MetricCard label={t('metric.visibleRecords')} value={visibleAuditRecords.length} />
+        <MetricCard
+          label={t('metric.auditEvents')}
+          value={auditRecords.reduce((count, record) => count + (record.auditEvents || []).length, 0)}
+        />
+      </div>
+      <div className="list-toolbar">
+        <Input.Search
+          allowClear
+          className="list-search"
+          value={auditQuery}
+          onChange={(event) => setAuditQuery(event.target.value)}
+          placeholder={t('placeholder.auditSearch')}
+        />
+        <Select
+          className="provider-filter"
+          value={auditProviderFilter}
+          onChange={setAuditProviderFilter}
+          options={auditProviderOptions}
+        />
+      </div>
       <List
         className="profile-list audit-record-list"
-        dataSource={auditRecords}
+        dataSource={visibleAuditRecords}
         locale={{ emptyText: t('empty.noAuditRecords') }}
         renderItem={(record) => (
           <List.Item
@@ -2281,11 +2335,55 @@ function WelcomePanel({ providers, openDrawer }) {
 
 function ProviderCard({ provider, openDrawer }) {
   return (
-    <button className="provider-card" onClick={() => openDrawer(provider.type)}>
+    <button className="provider-card" type="button" onClick={() => openDrawer(provider.type)}>
       <span>{providerIcons[provider.type] || <CodeOutlined />}</span>
       <strong>{providerLabel(provider)}</strong>
       <small>{provider.category === 'builtin' ? t('provider.category.builtin') : t('provider.category.extension')}</small>
     </button>
+  );
+}
+
+function WorkspaceOverview({ insights }) {
+  return (
+    <div className="overview-grid">
+      <MetricCard
+        accent="success"
+        label={t('metric.activeSessions')}
+        meta={`${t('terminal.status.connected')}: ${insights.sessions.connected}`}
+        value={insights.sessions.active}
+      />
+      <MetricCard
+        label={t('metric.savedConnections')}
+        meta={`${t('label.favorite')}: ${insights.profiles.favorites}`}
+        value={insights.profiles.total}
+      />
+      <MetricCard
+        label={t('metric.providers')}
+        meta={`${t('provider.category.extension')}: ${insights.providers.extensions}`}
+        value={insights.providers.total}
+      />
+      <MetricCard
+        accent="warning"
+        label={t('metric.recordings')}
+        meta={`${t('nav.tunnels')}: ${insights.tunnels}`}
+        value={insights.auditRecords}
+      />
+    </div>
+  );
+}
+
+function MetricCard({
+  accent = 'default',
+  label,
+  meta = '',
+  value,
+}) {
+  return (
+    <div className={`metric-card metric-card-${accent}`}>
+      <Text type="secondary">{label}</Text>
+      <strong>{value}</strong>
+      {meta && <small>{meta}</small>}
+    </div>
   );
 }
 
@@ -2663,6 +2761,12 @@ function formatReplayTime(seconds = 0) {
   const minutes = Math.floor(safeSeconds / 60);
   const remainingSeconds = Math.floor(safeSeconds % 60);
   return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
+}
+
+function extensionStatusColor(status) {
+  if (status === 'builtin') return 'green';
+  if (status === 'installed') return 'blue';
+  return 'default';
 }
 
 function saveProfile(profiles, request, editingProfileId = '') {
