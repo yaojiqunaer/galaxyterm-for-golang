@@ -54,6 +54,29 @@ export function buildAsciinemaCast({
   ].join('\n');
 }
 
+export function parseAsciinemaCast(cast = '') {
+  const lines = String(cast).split(/\r?\n/).filter(Boolean);
+  if (lines.length === 0) return { duration: 0, events: [], header: {} };
+  const header = safeJsonParse(lines[0]) || {};
+  const events = lines.slice(1).map((line) => {
+    const item = safeJsonParse(line);
+    if (!Array.isArray(item) || item.length < 3 || item[1] !== 'o') return null;
+    return {
+      data: String(item[2] || ''),
+      time: Number(item[0]) || 0,
+    };
+  }).filter(Boolean);
+  const duration = events.reduce((max, event) => Math.max(max, event.time), 0);
+  return { duration, events, header };
+}
+
+export function renderCastFrame(events = [], time = 0) {
+  return events
+    .filter((event) => event.time <= time)
+    .map((event) => event.data)
+    .join('');
+}
+
 export function buildAuditRecord({
   auditEvents = [],
   cast = '',
@@ -76,6 +99,14 @@ export function buildAuditRecord({
     startedAt,
     title,
   };
+}
+
+function safeJsonParse(value) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
 }
 
 function randomId(prefix) {

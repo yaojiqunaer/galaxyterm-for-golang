@@ -25,8 +25,24 @@ Provides secure and reliable remote ssh access
 Provide secure and reliable remote file access
 </details>
 
+<details>
+<summary><b>🧾 Audit logs and terminal recordings</b></summary>
+Records session open, reconnect, close, error, clear, quick command, and large paste events. Terminal output is stored as asciinema v2 text recordings, which can be played, paused, restarted, and exported as `.cast` or `.log` from the Audit page.
+</details>
+
+<details>
+<summary><b>🔐 Sensitive data redaction</b></summary>
+Audit and recording exports redact common passwords, tokens, Authorization headers, and private key blocks. GalaxyTerm does not record every raw keystroke by default; it records operation summaries and terminal output recordings.
+</details>
+
 ## Architecture
 
 ----
 
 ## Installation
+
+### Local start
+
+```shell
+CGO_LDFLAGS='-framework UniformTypeIdentifiers' go run -tags dev .
+```

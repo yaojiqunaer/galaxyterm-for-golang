@@ -24,11 +24,27 @@
   提供安全可靠的远程文件访问
 </details>
 
+<details>
+  <summary><b>🧾 审计日志与终端录屏</b></summary>
+  记录会话打开、重连、关闭、错误、清屏、快捷命令和大段粘贴等操作事件；终端输出会保存为 asciinema v2 文本录屏，可在审计页按时间轴播放、暂停、重播，并可导出 `.cast` 或 `.log`。
+</details>
+
+<details>
+  <summary><b>🔐 敏感信息脱敏</b></summary>
+  导出审计记录和录屏时会对常见密码、Token、Authorization 头、私钥块等内容做基础脱敏。默认不记录每个按键原文，只记录输入摘要和输出录屏。
+</details>
+
 ## 架构
 
 ----
 
 ## 安装
+
+### 本地启动
+
+```shell
+CGO_LDFLAGS='-framework UniformTypeIdentifiers' go run -tags dev .
+```
 
 ### 前端
 

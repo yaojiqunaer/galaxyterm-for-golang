@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import {
   buildAsciinemaCast,
   createAuditEvent,
+  parseAsciinemaCast,
+  renderCastFrame,
   redactSensitive,
 } from './auditLog.js';
 
@@ -48,3 +50,10 @@ assert.equal(lines[0].version, 2);
 assert.equal(lines[0].title, 'prod');
 assert.deepEqual(lines[1], [0, 'o', 'hello']);
 assert.deepEqual(lines[2], [1.5, 'o', '\nworld']);
+
+const parsed = parseAsciinemaCast(cast);
+assert.equal(parsed.header.width, 80);
+assert.equal(parsed.duration, 1.5);
+assert.equal(parsed.events.length, 2);
+assert.equal(renderCastFrame(parsed.events, 0), 'hello');
+assert.equal(renderCastFrame(parsed.events, 1.5), 'hello\nworld');

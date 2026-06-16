@@ -19,6 +19,7 @@ import {
   Modal,
   Segmented,
   Select,
+  Slider,
   Space,
   Switch,
   Tabs,
@@ -32,6 +33,7 @@ import {
   ApiOutlined,
   AuditOutlined,
   AppstoreAddOutlined,
+  CaretRightOutlined,
   CloudServerOutlined,
   CodeOutlined,
   ClearOutlined,
@@ -48,6 +50,7 @@ import {
   LaptopOutlined,
   MinusOutlined,
   MoreOutlined,
+  PauseOutlined,
   PlusOutlined,
   ReloadOutlined,
   SaveOutlined,
@@ -56,7 +59,13 @@ import {
   StarOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
-import { buildAsciinemaCast, buildAuditRecord, createAuditEvent } from './auditLog.js';
+import {
+  buildAsciinemaCast,
+  buildAuditRecord,
+  createAuditEvent,
+  parseAsciinemaCast,
+  renderCastFrame,
+} from './auditLog.js';
 import TerminalPane from './components/TerminalPane.jsx';
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
 import * as ExtensionsAPI from '../wailsjs/go/extensions/API.js';
@@ -631,7 +640,7 @@ function App() {
       startedAt: recording?.startedAt || session.startedAt || '',
       title: session.label,
     });
-    const nextRecords = persistAuditRecords([record, ...auditRecords]);
+    const nextRecords = persistAuditRecords([record, ...loadAuditRecords()]);
     setAuditRecords(nextRecords);
     setSessions((current) => current.map((item) => (
       item.id === session.id ? { ...item, auditRecordSaved: true } : item
@@ -1721,7 +1730,7 @@ function App() {
                 </List.Item>
               )}
             />
-            <pre className="audit-replay">{replayRecord.screen || t('message.terminalOutputEmpty')}</pre>
+            <AuditReplayPlayer record={replayRecord} />
           </Space>
         )}
       </Drawer>
@@ -2280,6 +2289,83 @@ function ProviderCard({ provider, openDrawer }) {
   );
 }
 
+function AuditReplayPlayer({ record }) {
+  const parsedCast = useMemo(() => parseAsciinemaCast(record?.cast || ''), [record?.cast]);
+  const [playing, setPlaying] = useState(false);
+  const [playhead, setPlayhead] = useState(0);
+  const [speed, setSpeed] = useState(1);
+
+  useEffect(() => {
+    setPlaying(false);
+    setPlayhead(0);
+    setSpeed(1);
+  }, [record?.id]);
+
+  useEffect(() => {
+    if (!playing) return undefined;
+    const interval = window.setInterval(() => {
+      setPlayhead((current) => {
+        const next = Math.min(parsedCast.duration, current + (0.1 * speed));
+        if (next >= parsedCast.duration) {
+          setPlaying(false);
+        }
+        return next;
+      });
+    }, 100);
+    return () => window.clearInterval(interval);
+  }, [parsedCast.duration, playing, speed]);
+
+  const replayText = parsedCast.events.length > 0
+    ? renderCastFrame(parsedCast.events, playhead)
+    : record?.screen || t('message.terminalOutputEmpty');
+  return (
+    <div className="audit-player">
+      <div className="audit-player-toolbar">
+        <Space wrap>
+          <Button
+            icon={playing ? <PauseOutlined /> : <CaretRightOutlined />}
+            onClick={() => setPlaying((current) => !current)}
+            disabled={parsedCast.events.length === 0}
+          >
+            {playing ? t('action.pauseReplay') : t('action.playReplay')}
+          </Button>
+          <Button
+            onClick={() => {
+              setPlayhead(0);
+              setPlaying(true);
+            }}
+            disabled={parsedCast.events.length === 0}
+          >
+            {t('action.restartReplay')}
+          </Button>
+          <Segmented
+            size="small"
+            value={speed}
+            onChange={setSpeed}
+            options={[
+              { value: 0.5, label: '0.5x' },
+              { value: 1, label: '1x' },
+              { value: 2, label: '2x' },
+              { value: 4, label: '4x' },
+            ]}
+          />
+        </Space>
+        <Text type="secondary">{formatReplayTime(playhead)} / {formatReplayTime(parsedCast.duration)}</Text>
+      </div>
+      <Slider
+        disabled={parsedCast.events.length === 0}
+        max={Math.max(parsedCast.duration, 0)}
+        min={0}
+        onChange={setPlayhead}
+        step={0.1}
+        tooltip={{ formatter: formatReplayTime }}
+        value={playhead}
+      />
+      <pre className="audit-replay">{replayText}</pre>
+    </div>
+  );
+}
+
 function loadProfiles() {
   try {
     const raw = localStorage.getItem(profileStorageKey);
@@ -2570,6 +2656,13 @@ function safeFileName(value) {
 
 function timestampFilePart(date = new Date()) {
   return date.toISOString().replace(/[:.]/g, '-');
+}
+
+function formatReplayTime(seconds = 0) {
+  const safeSeconds = Math.max(0, Number(seconds) || 0);
+  const minutes = Math.floor(safeSeconds / 60);
+  const remainingSeconds = Math.floor(safeSeconds % 60);
+  return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
 }
 
 function saveProfile(profiles, request, editingProfileId = '') {

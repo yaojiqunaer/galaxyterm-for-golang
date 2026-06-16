@@ -625,6 +625,24 @@ code {
   margin-top: 14px;
 }
 
+.audit-player {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+}
+
+.audit-player-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+}
+
 .audit-replay {
   min-height: 320px;
   max-height: 52vh;
