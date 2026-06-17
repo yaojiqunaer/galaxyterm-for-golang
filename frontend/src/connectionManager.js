@@ -25,6 +25,29 @@ export function buildConnectionGroups(profiles = []) {
     });
 }
 
+export function buildConnectionGroupNav(profiles = []) {
+  return [
+    { key: 'all', total: profiles.length, type: 'all' },
+    {
+      key: 'favorites',
+      total: profiles.filter((profile) => profile.favorite).length,
+      type: 'favorites',
+    },
+    ...buildConnectionGroups(profiles).map(({
+      credentialCount,
+      favoriteCount,
+      key,
+      total,
+    }) => ({
+      credentialCount,
+      favoriteCount,
+      key,
+      total,
+      type: 'group',
+    })),
+  ];
+}
+
 export function selectBatchProfiles(
   profiles = [],
   {

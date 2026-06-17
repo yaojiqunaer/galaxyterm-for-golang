@@ -74,7 +74,7 @@ import {
   summarizeWorkspace,
 } from './workspaceInsights.js';
 import {
-  buildConnectionGroups,
+  buildConnectionGroupNav,
   selectBatchProfiles,
   ungroupedKey,
 } from './connectionManager.js';
@@ -331,7 +331,7 @@ function App() {
     () => filteredProfiles(profiles, profileQuery, groupQuery),
     [profiles, profileQuery, groupQuery],
   );
-  const connectionGroups = useMemo(() => buildConnectionGroups(profiles), [profiles]);
+  const connectionGroupNav = useMemo(() => buildConnectionGroupNav(profiles), [profiles]);
   const workspaceInsights = useMemo(() => summarizeWorkspace({
     auditRecords,
     installedExtensions,
@@ -1067,167 +1067,181 @@ function App() {
   };
 
   const renderConnections = () => (
-    <div className="workspace-page">
+    <div className="workspace-page connections-page">
       <div className="page-header">
         <div>
           <Text type="secondary">{t('nav.connections')}</Text>
-          <Title level={3}>{t('section.quickConnect')}</Title>
+          <Title level={3}>{t('section.connectionManager')}</Title>
         </div>
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => openDrawer()}>
-          {t('action.newTerminal')}
-        </Button>
+        <Space>
+          <Button icon={<CloudServerOutlined />} onClick={() => openDrawer('ssh')}>
+            {t('action.quickSsh')}
+          </Button>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => openDrawer()}>
+            {t('action.newConnection')}
+          </Button>
+        </Space>
       </div>
 
-      <WorkspaceOverview insights={workspaceInsights} />
-
-      <div className="provider-card-grid">
-        {providers.map((provider) => (
-          <ProviderCard key={provider.type} provider={provider} openDrawer={openDrawer} />
-        ))}
+      <div className="connection-summary-strip">
+        <span>{`${t('metric.savedConnections')}: ${workspaceInsights.profiles.total}`}</span>
+        <span>{`${t('label.favorite')}: ${workspaceInsights.profiles.favorites}`}</span>
+        <span>{`${t('metric.activeSessions')}: ${workspaceInsights.sessions.active}`}</span>
+        <span>{`${t('metric.providers')}: ${workspaceInsights.providers.total}`}</span>
       </div>
 
-      <Divider />
-
-      {recentConnections.length > 0 && (
-        <>
-          <div className="page-header compact">
-            <Title level={4}>{t('section.recentConnections')}</Title>
-            <Button size="small" onClick={clearRecentConnections}>{t('action.clear')}</Button>
-          </div>
-          <div className="recent-connection-list">
-            {recentConnections.slice(0, 6).map((connection) => (
-              <button
-                key={connection.id}
-                className="recent-connection-chip"
-                onClick={() => openDrawer(connection.providerType, recentToProfile(connection))}
-              >
-                <span className="provider-icon">{providerIcons[connection.providerType] || <CodeOutlined />}</span>
-                <span>
-                  <strong>{connection.displayName}</strong>
-                  <small>{connection.description}</small>
-                </span>
-              </button>
-            ))}
-          </div>
-          <Divider />
-        </>
-      )}
-
-      {connectionGroups.length > 0 && (
-        <>
-          <div className="page-header compact">
-            <Title level={4}>{t('section.connectionGroups')}</Title>
+      <div className="connection-manager-layout">
+        <aside className="connection-groups-panel">
+          <div className="connection-panel-head">
+            <Text strong>{t('section.connectionGroups')}</Text>
             <Button
               size="small"
+              type="text"
               icon={<StarFilled />}
               onClick={() => openBatchProfiles({ favoritesOnly: true })}
               disabled={!profiles.some((profile) => profile.favorite)}
-            >
-              {t('action.openFavorites')}
-            </Button>
+            />
           </div>
-          <ConnectionGroupBoard groups={connectionGroups} openBatchProfiles={openBatchProfiles} />
-          <Divider />
-        </>
-      )}
+          <div className="connection-group-nav">
+            {connectionGroupNav.map((item) => (
+              <button
+                key={item.key}
+                className={groupQuery === item.key ? 'connection-group-nav-item active' : 'connection-group-nav-item'}
+                type="button"
+                onClick={() => setGroupQuery(item.key)}
+              >
+                <span>{connectionGroupLabel(item)}</span>
+                <strong>{item.total}</strong>
+              </button>
+            ))}
+          </div>
+        </aside>
 
-      <div className="page-header compact">
-        <Title level={4}>{t('section.savedConnections')}</Title>
-        <Space>
-          <Button
-            size="small"
-            onClick={() => openBatchProfiles({ group: groupQuery })}
-            disabled={visibleProfiles.length === 0}
-          >
-            {groupQuery === 'all' ? t('action.openAll') : t('action.openGroup')}
-          </Button>
-          <Button size="small" onClick={() => setSshConfigOpen(true)}>{t('action.importSshConfig')}</Button>
-          <Button size="small" onClick={() => profileImportRef.current?.click()}>{t('action.import')}</Button>
-          <Button size="small" onClick={exportProfiles} disabled={profiles.length === 0}>{t('action.export')}</Button>
-          <input
-            ref={profileImportRef}
-            type="file"
-            accept="application/json,.json"
-            className="hidden-file-input"
-            onChange={importProfiles}
-          />
-        </Space>
-      </div>
-      <Space className="profile-filters" wrap>
-        <Select
-          value={groupQuery}
-          className="profile-group-filter"
-          onChange={setGroupQuery}
-          options={[
-            { value: 'all', label: t('group.all') },
-            ...connectionGroups.map((group) => ({ value: group.key, label: groupLabel(group.key) })),
-          ]}
-        />
-        <Input.Search
-          className="profile-search"
-          allowClear
-          value={profileQuery}
-          onChange={(event) => setProfileQuery(event.target.value)}
-          placeholder={t('nav.connections')}
-        />
-      </Space>
-      {visibleProfiles.length === 0 ? (
-        <Empty
-          image={Empty.PRESENTED_IMAGE_SIMPLE}
-          description={t('empty.noConnections')}
-        >
-          <Space wrap>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => openDrawer('ssh')}>{t('action.quickSsh')}</Button>
-            <Button onClick={() => setSshConfigOpen(true)}>{t('action.importSshConfig')}</Button>
-          </Space>
-        </Empty>
-      ) : (
-        <List
-          className="profile-list"
-          dataSource={visibleProfiles}
-          renderItem={(profile) => (
-            <List.Item
-              actions={[
-                <Button key="open" size="small" type="primary" onClick={() => openProfile(profile)}>{t('action.connect')}</Button>,
-                <Dropdown
-                  key="manage"
-                  trigger={['click']}
-                  menu={{
-                    items: profileActionModel(profile).filter((action) => action !== 'connect').map((action) => ({
-                      key: action,
-                      danger: action === 'delete',
-                      label: t(`profile.action.${action}`),
-                    })),
-                    onClick: ({ key }) => runProfileAction(key, profile),
-                  }}
-                >
-                  <Button size="small" icon={<MoreOutlined />}>{t('action.manage')}</Button>
-                </Dropdown>,
-                <Tooltip key="favorite" title={profile.favorite ? t('action.unfavorite') : t('action.favorite')}>
-                  <Button
-                    size="small"
-                    icon={profile.favorite ? <StarFilled /> : <StarOutlined />}
-                    onClick={() => toggleProfileFavorite(profile.id)}
-                  />
-                </Tooltip>,
-              ]}
+        <section className="connection-list-panel">
+          <div className="connection-list-header">
+            <div>
+              <Text type="secondary">{t('section.savedConnections')}</Text>
+              <Title level={4}>{connectionGroupLabel(connectionGroupNav.find((item) => item.key === groupQuery) || { key: groupQuery, type: 'group' })}</Title>
+            </div>
+            <Space wrap>
+              <Button
+                size="small"
+                onClick={() => openBatchProfiles(groupQuery === 'favorites' ? { favoritesOnly: true } : { group: groupQuery })}
+              disabled={visibleProfiles.length === 0}
             >
-              <List.Item.Meta
-                avatar={<span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>}
-                title={(
-                  <Space size={8}>
-                    <span>{profile.displayName}</span>
-                    {profile.favorite && <Tag color="gold">{t('label.favorite')}</Tag>}
-                    {profile.auth?.credentialRef && <Tag color="blue">{t('label.credentialSaved')}</Tag>}
-                    {profile.group && <Tag>{profile.group}</Tag>}
-                  </Space>
-                )}
-                description={profileDescription(profile)}
+                {groupQuery === 'all' ? t('action.openAll') : t('action.openGroup')}
+              </Button>
+              <Button size="small" onClick={() => setSshConfigOpen(true)}>{t('action.importSshConfig')}</Button>
+              <Button size="small" onClick={() => profileImportRef.current?.click()}>{t('action.import')}</Button>
+              <Button size="small" onClick={exportProfiles} disabled={profiles.length === 0}>{t('action.export')}</Button>
+              <input
+                ref={profileImportRef}
+                type="file"
+                accept="application/json,.json"
+                className="hidden-file-input"
+                onChange={importProfiles}
               />
-            </List.Item>
+            </Space>
+          </div>
+
+          <div className="connection-list-tools">
+            <Input.Search
+              className="profile-search"
+              allowClear
+              value={profileQuery}
+              onChange={(event) => setProfileQuery(event.target.value)}
+              placeholder={t('placeholder.searchConnections')}
+            />
+            <Space wrap>
+              {providers.map((provider) => (
+                <Button key={provider.type} size="small" icon={providerIcons[provider.type] || <CodeOutlined />} onClick={() => openDrawer(provider.type)}>
+                  {providerLabel(provider)}
+                </Button>
+              ))}
+            </Space>
+          </div>
+
+          {recentConnections.length > 0 && (
+            <div className="recent-connection-rail">
+              <Text type="secondary">{t('section.recentConnections')}</Text>
+              <div className="recent-connection-list compact">
+                {recentConnections.slice(0, 4).map((connection) => (
+                  <button
+                    key={connection.id}
+                    className="recent-connection-chip"
+                    onClick={() => openDrawer(connection.providerType, recentToProfile(connection))}
+                  >
+                    <span className="provider-icon">{providerIcons[connection.providerType] || <CodeOutlined />}</span>
+                    <span>
+                      <strong>{connection.displayName}</strong>
+                      <small>{connection.description}</small>
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <Button size="small" type="text" onClick={clearRecentConnections}>{t('action.clear')}</Button>
+            </div>
           )}
-        />
-      )}
+
+          {visibleProfiles.length === 0 ? (
+            <Empty
+              image={Empty.PRESENTED_IMAGE_SIMPLE}
+              description={t('empty.noConnections')}
+            >
+              <Space wrap>
+                <Button type="primary" icon={<PlusOutlined />} onClick={() => openDrawer('ssh')}>{t('action.quickSsh')}</Button>
+                <Button onClick={() => setSshConfigOpen(true)}>{t('action.importSshConfig')}</Button>
+              </Space>
+            </Empty>
+          ) : (
+            <List
+              className="profile-list connection-profile-list"
+              dataSource={visibleProfiles}
+              renderItem={(profile) => (
+                <List.Item
+                  actions={[
+                    <Button key="open" size="small" type="primary" onClick={() => openProfile(profile)}>{t('action.connect')}</Button>,
+                    <Dropdown
+                      key="manage"
+                      trigger={['click']}
+                      menu={{
+                        items: profileActionModel(profile).filter((action) => action !== 'connect').map((action) => ({
+                          key: action,
+                          danger: action === 'delete',
+                          label: t(`profile.action.${action}`),
+                        })),
+                        onClick: ({ key }) => runProfileAction(key, profile),
+                      }}
+                    >
+                      <Button size="small" icon={<MoreOutlined />}>{t('action.manage')}</Button>
+                    </Dropdown>,
+                    <Tooltip key="favorite" title={profile.favorite ? t('action.unfavorite') : t('action.favorite')}>
+                      <Button
+                        size="small"
+                        icon={profile.favorite ? <StarFilled /> : <StarOutlined />}
+                        onClick={() => toggleProfileFavorite(profile.id)}
+                      />
+                    </Tooltip>,
+                  ]}
+                >
+                  <List.Item.Meta
+                    avatar={<span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>}
+                    title={(
+                      <Space size={8}>
+                        <span>{profile.displayName}</span>
+                        {profile.favorite && <Tag color="gold">{t('label.favorite')}</Tag>}
+                        {profile.auth?.credentialRef && <Tag color="blue">{t('label.credentialSaved')}</Tag>}
+                        {profile.group && <Tag>{profile.group}</Tag>}
+                      </Space>
+                    )}
+                    description={profileDescription(profile)}
+                  />
+                </List.Item>
+              )}
+            />
+          )}
+        </section>
+      </div>
     </div>
   );
 
@@ -2581,58 +2595,6 @@ function ProviderCard({ provider, openDrawer }) {
   );
 }
 
-function WorkspaceOverview({ insights }) {
-  return (
-    <div className="overview-grid">
-      <MetricCard
-        accent="success"
-        label={t('metric.activeSessions')}
-        meta={`${t('terminal.status.connected')}: ${insights.sessions.connected}`}
-        value={insights.sessions.active}
-      />
-      <MetricCard
-        label={t('metric.savedConnections')}
-        meta={`${t('label.favorite')}: ${insights.profiles.favorites}`}
-        value={insights.profiles.total}
-      />
-      <MetricCard
-        label={t('metric.providers')}
-        meta={`${t('provider.category.extension')}: ${insights.providers.extensions}`}
-        value={insights.providers.total}
-      />
-      <MetricCard
-        accent="warning"
-        label={t('metric.recordings')}
-        meta={`${t('nav.tunnels')}: ${insights.tunnels}`}
-        value={insights.auditRecords}
-      />
-    </div>
-  );
-}
-
-function ConnectionGroupBoard({ groups, openBatchProfiles }) {
-  return (
-    <div className="connection-group-grid">
-      {groups.map((group) => (
-        <button
-          className="connection-group-card"
-          key={group.key}
-          type="button"
-          onClick={() => openBatchProfiles({ group: group.key })}
-        >
-          <span className="connection-group-title">{groupLabel(group.key)}</span>
-          <strong>{group.total}</strong>
-          <span>
-            {t('label.favorite')}: {group.favoriteCount}
-            {' · '}
-            {t('label.credentialSaved')}: {group.credentialCount}
-          </span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function SessionTabLabel({ active = false, session }) {
   const display = sessionTabDisplay(session, active);
   return (
@@ -3071,6 +3033,12 @@ function groupLabel(group) {
   return group === ungroupedKey ? t('group.ungrouped') : group;
 }
 
+function connectionGroupLabel(item) {
+  if (item?.type === 'all' || item?.key === 'all') return t('group.all');
+  if (item?.type === 'favorites' || item?.key === 'favorites') return t('group.favorites');
+  return groupLabel(item?.key || ungroupedKey);
+}
+
 function parseCredentialRef(value) {
   if (!value) return null;
   if (typeof value === 'object') return value;
@@ -3124,7 +3092,9 @@ function filteredProfiles(profiles, query, group = 'all') {
   const keyword = query.trim().toLowerCase();
   return profiles.filter((profile) => {
     const profileGroup = profile.group || ungroupedKey;
-    const groupMatched = group === 'all' || profileGroup === group;
+    const groupMatched = group === 'all'
+      || (group === 'favorites' && profile.favorite)
+      || profileGroup === group;
     if (!groupMatched) return false;
     if (!keyword) return true;
     return (

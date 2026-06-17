@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  buildConnectionGroupNav,
   buildConnectionGroups,
   selectBatchProfiles,
 } from './connectionManager.js';
@@ -42,6 +43,13 @@ assert.deepEqual(groups.map((group) => ({
   { credentialCount: 0, favoriteCount: 1, key: '__ungrouped__', total: 1 },
 ]);
 assert.deepEqual(groups[0].profiles.map((profile) => profile.id), ['prod-db', 'prod-web']);
+
+assert.deepEqual(buildConnectionGroupNav(profiles), [
+  { key: 'all', total: 3, type: 'all' },
+  { key: 'favorites', total: 2, type: 'favorites' },
+  { credentialCount: 1, favoriteCount: 1, key: 'Production', total: 2, type: 'group' },
+  { credentialCount: 0, favoriteCount: 1, key: '__ungrouped__', total: 1, type: 'group' },
+]);
 
 assert.deepEqual(
   selectBatchProfiles(profiles, { favoritesOnly: true }).map((profile) => profile.id),
