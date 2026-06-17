@@ -144,6 +144,11 @@ function providerLabel(provider) {
   return t(provider.nameKey, provider.name || provider.type);
 }
 
+function providerTypeLabel(type, providers = []) {
+  const provider = providers.find((item) => item.type === type);
+  return provider ? providerLabel(provider) : type;
+}
+
 function App() {
   const [providers, setProviders] = useState(fallbackProviders);
   const [sessions, setSessions] = useState([]);
@@ -172,6 +177,7 @@ function App() {
   const [sessionView, setSessionView] = useState('tabs');
   const [profileQuery, setProfileQuery] = useState('');
   const [groupQuery, setGroupQuery] = useState('all');
+  const [providerFilter, setProviderFilter] = useState('all');
   const [auditQuery, setAuditQuery] = useState('');
   const [auditProviderFilter, setAuditProviderFilter] = useState('all');
   const [workspaceSummary, setWorkspaceSummary] = useState(() => loadWorkspaceSummary());
@@ -328,8 +334,8 @@ function App() {
 
   const selectedProvider = providers.find((item) => item.type === newType) || providers[0] || fallbackProviders[0];
   const visibleProfiles = useMemo(
-    () => filteredProfiles(profiles, profileQuery, groupQuery),
-    [profiles, profileQuery, groupQuery],
+    () => filteredProfiles(profiles, profileQuery, groupQuery, providerFilter),
+    [profiles, profileQuery, groupQuery, providerFilter],
   );
   const connectionGroupNav = useMemo(() => buildConnectionGroupNav(profiles), [profiles]);
   const workspaceInsights = useMemo(() => summarizeWorkspace({
@@ -1122,13 +1128,17 @@ function App() {
             <div>
               <Text type="secondary">{t('section.savedConnections')}</Text>
               <Title level={4}>{connectionGroupLabel(connectionGroupNav.find((item) => item.key === groupQuery) || { key: groupQuery, type: 'group' })}</Title>
+              <Text type="secondary">{`${t('metric.visibleConnections')}: ${visibleProfiles.length}`}</Text>
             </div>
             <Space wrap>
               <Button
                 size="small"
-                onClick={() => openBatchProfiles(groupQuery === 'favorites' ? { favoritesOnly: true } : { group: groupQuery })}
-              disabled={visibleProfiles.length === 0}
-            >
+                onClick={() => openBatchProfiles({
+                  ...(groupQuery === 'favorites' ? { favoritesOnly: true } : { group: groupQuery }),
+                  providerType: providerFilter,
+                })}
+                disabled={visibleProfiles.length === 0}
+              >
                 {groupQuery === 'all' ? t('action.openAll') : t('action.openGroup')}
               </Button>
               <Button size="small" onClick={() => setSshConfigOpen(true)}>{t('action.importSshConfig')}</Button>
@@ -1152,13 +1162,18 @@ function App() {
               onChange={(event) => setProfileQuery(event.target.value)}
               placeholder={t('placeholder.searchConnections')}
             />
-            <Space wrap>
-              {providers.map((provider) => (
-                <Button key={provider.type} size="small" icon={providerIcons[provider.type] || <CodeOutlined />} onClick={() => openDrawer(provider.type)}>
-                  {providerLabel(provider)}
-                </Button>
-              ))}
-            </Space>
+            <Segmented
+              className="connection-provider-filter"
+              value={providerFilter}
+              onChange={setProviderFilter}
+              options={[
+                { label: t('filter.allProviders'), value: 'all' },
+                ...providers.map((provider) => ({
+                  label: providerLabel(provider),
+                  value: provider.type,
+                })),
+              ]}
+            />
           </div>
 
           {recentConnections.length > 0 && (
@@ -1186,7 +1201,7 @@ function App() {
           {visibleProfiles.length === 0 ? (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={t('empty.noConnections')}
+              description={profiles.length === 0 ? t('empty.noConnections') : t('empty.noConnectionMatches')}
             >
               <Space wrap>
                 <Button type="primary" icon={<PlusOutlined />} onClick={() => openDrawer('ssh')}>{t('action.quickSsh')}</Button>
@@ -1229,12 +1244,20 @@ function App() {
                     title={(
                       <Space size={8}>
                         <span>{profile.displayName}</span>
+                        <Tag>{providerTypeLabel(profile.providerType, providers)}</Tag>
                         {profile.favorite && <Tag color="gold">{t('label.favorite')}</Tag>}
                         {profile.auth?.credentialRef && <Tag color="blue">{t('label.credentialSaved')}</Tag>}
                         {profile.group && <Tag>{profile.group}</Tag>}
                       </Space>
                     )}
-                    description={profileDescription(profile)}
+                    description={(
+                      <span className="connection-profile-description">
+                        <span>{profileDescription(profile)}</span>
+                        {profile.providerType === 'ssh' && profile.config?.jumpHost && (
+                          <small>{`${t('field.jumpHost')}: ${profile.config.jumpHost}`}</small>
+                        )}
+                      </span>
+                    )}
                   />
                 </List.Item>
               )}
@@ -3088,7 +3111,7 @@ function profileDescription(profile) {
   return profile.config?.shell || 'default shell';
 }
 
-function filteredProfiles(profiles, query, group = 'all') {
+function filteredProfiles(profiles, query, group = 'all', providerType = 'all') {
   const keyword = query.trim().toLowerCase();
   return profiles.filter((profile) => {
     const profileGroup = profile.group || ungroupedKey;
@@ -3096,6 +3119,7 @@ function filteredProfiles(profiles, query, group = 'all') {
       || (group === 'favorites' && profile.favorite)
       || profileGroup === group;
     if (!groupMatched) return false;
+    if (providerType !== 'all' && profile.providerType !== providerType) return false;
     if (!keyword) return true;
     return (
       profile.displayName?.toLowerCase().includes(keyword)

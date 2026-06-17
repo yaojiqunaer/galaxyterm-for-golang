@@ -934,6 +934,16 @@ select {
   padding: 10px 14px;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--panel-muted);
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+.connection-list-tools .profile-search {
+  width: clamp(240px, 36%, 320px);
+}
+
+.connection-provider-filter {
+  max-width: 100%;
 }
 
 .recent-connection-rail {
@@ -959,6 +969,17 @@ select {
 .connection-profile-list {
   border: 0;
   border-radius: 0;
+}
+
+.connection-profile-description {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  color: var(--muted);
+}
+
+.connection-profile-description small {
+  color: var(--muted);
 }
 
 .profile-list .ant-list-item-action {

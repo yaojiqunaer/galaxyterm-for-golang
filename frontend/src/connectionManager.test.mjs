@@ -63,3 +63,7 @@ assert.deepEqual(
   selectBatchProfiles(profiles, { group: '__ungrouped__' }).map((profile) => profile.id),
   ['dev-shell'],
 );
+assert.deepEqual(
+  selectBatchProfiles(profiles, { favoritesOnly: true, providerType: 'ssh' }).map((profile) => profile.id),
+  ['prod-db'],
+);
