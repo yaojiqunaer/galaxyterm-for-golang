@@ -8,19 +8,22 @@
 }
 
 :root {
-  --bg: #eef2f5;
-  --panel: #ffffff;
-  --panel-muted: #f7f9fb;
-  --surface: #f4f6f8;
-  --border: #d7e0e8;
-  --border-subtle: #e6edf2;
-  --text: #1f2933;
-  --muted: #697789;
-  --accent: #176b87;
-  --accent-strong: #0f4f68;
-  --accent-soft: #e5f3f7;
-  --terminal-bg: #0b1117;
-  --terminal-chrome: #111922;
+  --bg: #f3f5f7;
+  --panel: #fbfcfd;
+  --panel-muted: #f1f4f7;
+  --surface: #eef2f5;
+  --border: #d9e1e8;
+  --border-subtle: #e8edf2;
+  --text: #1d2630;
+  --muted: #657286;
+  --accent: #0f7792;
+  --accent-strong: #09566d;
+  --accent-soft: #e7f4f7;
+  --terminal-bg: #071013;
+  --terminal-chrome: #0d171c;
+  --terminal-chrome-soft: #122128;
+  --terminal-border: #1f3a44;
+  --terminal-text: #d4dde4;
   --success: #22a06b;
   --warning: #d59a23;
 }
@@ -37,8 +40,11 @@
   --accent: #7dd3fc;
   --accent-strong: #38bdf8;
   --accent-soft: rgba(125, 211, 252, 0.13);
-  --terminal-bg: #05080c;
-  --terminal-chrome: #0a1017;
+  --terminal-bg: #050b0f;
+  --terminal-chrome: #0a1218;
+  --terminal-chrome-soft: #101c24;
+  --terminal-border: #203642;
+  --terminal-text: #d7e2ea;
   --success: #34d399;
   --warning: #f5c542;
 }
@@ -48,7 +54,7 @@ body,
 #root {
   height: 100%;
   margin: 0;
-  font-family: Inter, 'Nunito', 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
+  font-family: Inter, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;
   background: var(--bg);
   color: var(--text);
 }
@@ -312,18 +318,18 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 48px;
-  gap: 12px;
-  padding: 7px 10px;
+  min-height: 46px;
+  gap: 10px;
+  padding: 6px 10px;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--panel);
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .topbar-command-group,
 .topbar-actions {
   min-width: 0;
-  flex-wrap: wrap;
+  flex-wrap: nowrap !important;
 }
 
 .topbar .ant-btn {
@@ -332,7 +338,7 @@ select {
 }
 
 .topbar-command-group {
-  flex: 1 1 460px;
+  flex: 1 1 auto;
 }
 
 .topbar-command-group .ant-space-item {
@@ -341,7 +347,7 @@ select {
 
 .topbar .command-palette-trigger {
   justify-content: flex-start;
-  width: min(420px, 36vw);
+  width: clamp(180px, 30vw, 440px);
   max-width: 100%;
   color: var(--muted);
   background: var(--terminal-chrome);
@@ -361,19 +367,9 @@ select {
   width: clamp(170px, 22vw, 260px);
 }
 
-.topbar-actions .terminal-search + .ant-btn,
-.topbar-actions .terminal-search + .ant-btn + .ant-btn {
-  width: auto;
-}
-
 @media (max-width: 1180px) {
   .topbar {
-    align-items: flex-start;
-  }
-
-  .active-session-pill {
-    order: 3;
-    width: 100%;
+    align-items: center;
   }
 
   .topbar-actions {
@@ -382,11 +378,34 @@ select {
 }
 
 .content-area {
+  position: relative;
   min-height: 0;
   flex: 1;
-  overflow: auto;
+  overflow: hidden;
   background: var(--surface);
   scroll-behavior: smooth;
+}
+
+.content-page-layer,
+.session-page-layer {
+  position: absolute;
+  inset: 0;
+  min-height: 0;
+}
+
+.content-page-layer {
+  overflow: auto;
+}
+
+.content-page-layer.hidden,
+.session-page-layer {
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.session-page-layer.active {
+  pointer-events: auto;
+  visibility: visible;
 }
 
 .bridge-alert {
@@ -405,28 +424,31 @@ select {
   background: var(--terminal-bg);
 }
 
-.session-summary-bar {
+.session-summary-bar,
+.session-strip {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  min-height: 42px;
-  padding: 6px 10px;
+  min-height: 36px;
+  padding: 5px 10px;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--terminal-chrome);
 }
 
-.session-summary-current {
+.session-summary-current,
+.session-strip-current {
   display: flex;
   min-width: 0;
   align-items: center;
   gap: 8px;
 }
 
-.session-summary-current strong {
+.session-summary-current strong,
+.session-strip-current strong {
   min-width: 0;
   overflow: hidden;
-  color: var(--text);
+  color: var(--terminal-text);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -440,8 +462,8 @@ select {
 
 .terminal-tabs .ant-tabs-nav {
   margin: 0;
-  padding: 6px 10px 0;
-  border-bottom: 1px solid var(--border-subtle);
+  padding: 7px 10px 5px;
+  border-bottom: 1px solid var(--terminal-border);
   background: var(--terminal-chrome);
 }
 
@@ -452,18 +474,17 @@ select {
 }
 
 .terminal-tabs .ant-tabs-tab {
-  min-width: 156px;
-  border-color: transparent !important;
-  border-radius: 8px 8px 0 0 !important;
-  background: rgba(255, 255, 255, 0.04) !important;
-  transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+  min-width: 148px;
+  margin-left: 4px !important;
+  border: 1px solid transparent !important;
+  border-radius: 7px !important;
+  background: transparent !important;
+  transition: background 140ms ease, border-color 140ms ease, color 140ms ease;
 }
 
 .terminal-tabs .ant-tabs-tab-active {
-  border-color: rgba(125, 211, 252, 0.48) !important;
-  border-bottom-color: var(--terminal-bg) !important;
-  background: var(--terminal-bg) !important;
-  box-shadow: inset 0 3px 0 var(--accent);
+  border-color: var(--terminal-border) !important;
+  background: var(--terminal-chrome-soft) !important;
 }
 
 .terminal-tabs .ant-tabs-tab:hover {
@@ -481,12 +502,14 @@ select {
 
 .session-tab-label {
   width: 100%;
-  max-width: 220px;
+  max-width: 210px;
+  color: #8795a1;
+  font-size: 13px;
 }
 
 .session-tab-label.active {
-  color: var(--accent);
-  font-weight: 700;
+  color: var(--terminal-text);
+  font-weight: 650;
 }
 
 .session-tab-title {
@@ -545,15 +568,16 @@ select {
   width: 100%;
   height: 100%;
   min-height: 0;
-  padding: 8px;
+  padding: 8px 10px 10px;
   background: var(--terminal-bg);
 }
 
 .terminal-workspace > div,
 .split-terminal > div:last-child > div {
-  border: 1px solid rgba(125, 211, 252, 0.22);
-  border-radius: 8px;
+  border: 1px solid var(--terminal-border);
+  border-radius: 6px;
   overflow: hidden;
+  background: var(--terminal-bg);
 }
 
 .session-grid-page {
@@ -568,9 +592,9 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 42px;
-  padding: 0;
-  border-bottom: 1px solid var(--border-subtle);
+  min-height: 36px;
+  padding: 0 8px 0 0;
+  border-bottom: 1px solid var(--terminal-border);
   background: var(--terminal-chrome);
 }
 
@@ -586,7 +610,7 @@ select {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  background: var(--border-subtle);
+  background: var(--terminal-border);
 }
 
 .split-terminal {

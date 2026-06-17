@@ -77,6 +77,10 @@ export function renderCastFrame(events = [], time = 0) {
     .join('');
 }
 
+export function renderReplayFrame(events = [], time = 0) {
+  return normalizeTerminalReplay(renderCastFrame(events, time));
+}
+
 export function buildAuditRecord({
   auditEvents = [],
   cast = '',
@@ -112,4 +116,13 @@ function safeJsonParse(value) {
 function randomId(prefix) {
   if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
   return `${prefix}-${Date.now()}-${Math.random()}`;
+}
+
+function normalizeTerminalReplay(value = '') {
+  return String(value)
+    .replace(/\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g, '')
+    .replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\r/g, '\n')
+    .replace(/\u0008/g, '');
 }

@@ -4,6 +4,7 @@ import {
   createAuditEvent,
   parseAsciinemaCast,
   renderCastFrame,
+  renderReplayFrame,
   redactSensitive,
 } from './auditLog.js';
 
@@ -57,3 +58,12 @@ assert.equal(parsed.duration, 1.5);
 assert.equal(parsed.events.length, 2);
 assert.equal(renderCastFrame(parsed.events, 0), 'hello');
 assert.equal(renderCastFrame(parsed.events, 1.5), 'hello\nworld');
+
+const ansiCast = buildAsciinemaCast({
+  outputEvents: [
+    { time: 0, data: '\u001b[32mhello\u001b[0m' },
+    { time: 1, data: '\r\n\u001b]0;title\u0007world' },
+  ],
+});
+const parsedAnsiCast = parseAsciinemaCast(ansiCast);
+assert.equal(renderReplayFrame(parsedAnsiCast.events, 1), 'hello\nworld');

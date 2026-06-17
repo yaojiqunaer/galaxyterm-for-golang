@@ -1,5 +1,5 @@
-import zhCN from './locales/zh-CN.json';
-import enUS from './locales/en-US.json';
+import zhCN from './locales/zh-CN.json' with { type: 'json' };
+import enUS from './locales/en-US.json' with { type: 'json' };
 
 const dictionaries = {
   'zh-CN': zhCN,
@@ -23,14 +23,19 @@ function detectLocale() {
   return 'en-US';
 }
 
-export const currentLocale = detectLocale();
+let activeLocale = detectLocale();
 
 export function t(key, fallback = key) {
-  return dictionaries[currentLocale]?.[key] || dictionaries['en-US']?.[key] || fallback;
+  return dictionaries[activeLocale]?.[key] || dictionaries['en-US']?.[key] || fallback;
+}
+
+export function currentLocale() {
+  return activeLocale;
 }
 
 export function setLocale(locale) {
   if (dictionaries[locale]) {
+    activeLocale = locale;
     localStorage.setItem(localeStorageKey, locale);
   }
 }

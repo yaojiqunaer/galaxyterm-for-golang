@@ -93,8 +93,8 @@ function TerminalPane({ request, settings, onAuditEvent, onSessionCreated, onSes
         macOptionIsMeta: true,
         macOptionClickForcesSelection: true,
         scrollback: settings?.scrollback || 5000,
-        fontSize: settings?.fontSize || 13,
-        fontFamily: settings?.fontFamily || 'Consolas,Liberation Mono,Menlo,Courier,monospace',
+        fontSize: settings?.fontSize || 14,
+        fontFamily: settings?.fontFamily || 'SFMono-Regular,JetBrains Mono,Menlo,Consolas,Liberation Mono,monospace',
         theme: terminalTheme,
       });
 
@@ -202,8 +202,8 @@ function TerminalPane({ request, settings, onAuditEvent, onSessionCreated, onSes
 
   useEffect(() => {
     if (!term.current) return;
-    term.current.options.fontSize = settings?.fontSize || 13;
-    term.current.options.fontFamily = settings?.fontFamily || 'Consolas,Liberation Mono,Menlo,Courier,monospace';
+    term.current.options.fontSize = settings?.fontSize || 14;
+    term.current.options.fontFamily = settings?.fontFamily || 'SFMono-Regular,JetBrains Mono,Menlo,Consolas,Liberation Mono,monospace';
     term.current.options.scrollback = settings?.scrollback || 5000;
     fitAddon.current?.fit();
   }, [settings?.fontFamily, settings?.fontSize, settings?.scrollback]);
@@ -235,9 +235,20 @@ async function resolveTerminalTheme(settings = {}) {
   }
   const themeDark = await Theme.GetDarkTheme();
   const themeLight = await Theme.GetLightTheme();
-  if (settings.appTheme === 'dark') return themeDark;
+  if (settings.appTheme === 'dark') return normalizeTerminalTheme(themeDark, true);
   if (settings.appTheme === 'light') return themeLight;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? themeDark : themeLight;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches ? normalizeTerminalTheme(themeDark, true) : themeLight;
+}
+
+function normalizeTerminalTheme(theme, dark = false) {
+  if (!dark) return theme;
+  return {
+    ...theme,
+    background: theme?.background || '#071013',
+    cursor: theme?.cursor || '#e5c07b',
+    foreground: theme?.foreground || '#d7e2ea',
+    selectionBackground: theme?.selectionBackground || '#23424d',
+  };
 }
 
 function isRiskyPaste(data) {

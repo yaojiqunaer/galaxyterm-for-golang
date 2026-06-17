@@ -1,12 +1,14 @@
 export function sessionStatusTone(session = {}) {
-  if (session.status === 'connected') return 'success';
-  if (session.status === 'closed') return 'closed';
+  const status = session?.status;
+  if (status === 'connected') return 'success';
+  if (status === 'closed') return 'closed';
   return 'connecting';
 }
 
 export function sessionStatusLabel(session = {}) {
-  if (session.status === 'connected') return 'connected';
-  if (session.status === 'closed') return 'closed';
+  const status = session?.status;
+  if (status === 'connected') return 'connected';
+  if (status === 'closed') return 'closed';
   return 'connecting';
 }
 
@@ -27,4 +29,25 @@ export function sessionSummary(sessions = []) {
     connecting: 0,
     total: 0,
   });
+}
+
+export function sessionTabDisplay(session = {}, active = false) {
+  return {
+    active,
+    iconType: session.providerType || 'terminal',
+    statusLabel: sessionStatusLabel(session),
+    statusTone: sessionStatusTone(session),
+    title: session.label || session.displayName || session.providerType || 'Terminal',
+  };
+}
+
+export function profileActionModel(profile = {}) {
+  return [
+    'connect',
+    'edit',
+    'rename',
+    'duplicate',
+    profile.favorite ? 'unfavorite' : 'favorite',
+    'delete',
+  ];
 }

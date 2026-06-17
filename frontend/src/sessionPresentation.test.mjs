@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import {
+  profileActionModel,
+  sessionTabDisplay,
   sessionStatusLabel,
   sessionStatusTone,
   sessionSummary,
@@ -26,3 +28,18 @@ assert.deepEqual(sessionSummary([
   connecting: 2,
   total: 4,
 });
+
+assert.deepEqual(sessionTabDisplay({
+  label: 'Local Terminal',
+  providerType: 'local',
+  status: 'connected',
+}, true), {
+  active: true,
+  iconType: 'local',
+  statusLabel: 'connected',
+  statusTone: 'success',
+  title: 'Local Terminal',
+});
+
+assert.deepEqual(profileActionModel({ favorite: false }), ['connect', 'edit', 'rename', 'duplicate', 'favorite', 'delete']);
+assert.deepEqual(profileActionModel({ favorite: true }), ['connect', 'edit', 'rename', 'duplicate', 'unfavorite', 'delete']);

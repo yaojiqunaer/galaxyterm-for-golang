@@ -40,6 +40,7 @@ import {
   CopyOutlined,
   DatabaseOutlined,
   DeleteOutlined,
+  DownOutlined,
   EditOutlined,
   ExportOutlined,
   FileTextOutlined,
@@ -58,13 +59,14 @@ import {
   StarFilled,
   StarOutlined,
   ThunderboltOutlined,
+  UpOutlined,
 } from '@ant-design/icons';
 import {
   buildAsciinemaCast,
   buildAuditRecord,
   createAuditEvent,
   parseAsciinemaCast,
-  renderCastFrame,
+  renderReplayFrame,
 } from './auditLog.js';
 import {
   buildExtensionCatalog,
@@ -77,6 +79,8 @@ import {
   ungroupedKey,
 } from './connectionManager.js';
 import {
+  profileActionModel,
+  sessionTabDisplay,
   sessionStatusLabel,
   sessionStatusTone,
   sessionSummary,
@@ -107,8 +111,8 @@ const profileSchemaVersion = 1;
 const defaultSettings = {
   appTheme: 'dark',
   terminalTheme: 'auto',
-  fontFamily: 'Consolas,Liberation Mono,Menlo,Courier,monospace',
-  fontSize: 13,
+  fontFamily: 'SFMono-Regular,JetBrains Mono,Menlo,Consolas,Liberation Mono,monospace',
+  fontSize: 14,
   scrollback: 5000,
   autoSaveWorkspace: true,
   autoRestoreWorkspace: false,
@@ -145,6 +149,7 @@ function App() {
   const [sessions, setSessions] = useState([]);
   const [profiles, setProfiles] = useState(() => loadProfiles());
   const [settings, setSettings] = useState(() => loadSettings());
+  const [locale, setLocaleState] = useState(() => currentLocale());
   const [terminalThemes, setTerminalThemes] = useState(['auto']);
   const [installedExtensions, setInstalledExtensions] = useState([]);
   const [tunnels, setTunnels] = useState([]);
@@ -309,7 +314,7 @@ function App() {
     if (activeKey && terminalRefs.current[activeKey]?.fit) {
       setTimeout(() => terminalRefs.current[activeKey]?.fit(), 0);
     }
-  }, [activeKey, focusMode]);
+  }, [activeKey, focusMode, selectedNav, sessionView]);
 
   const providerOptions = useMemo(() => providers.map((provider) => ({
     value: provider.type,
@@ -319,7 +324,7 @@ function App() {
         {providerLabel(provider)}
       </span>
     ),
-  })), [providers]);
+  })), [providers, locale]);
 
   const selectedProvider = providers.find((item) => item.type === newType) || providers[0] || fallbackProviders[0];
   const visibleProfiles = useMemo(
@@ -345,7 +350,7 @@ function App() {
     { value: 'all', label: t('filter.allProviders') },
     ...Array.from(new Set(auditRecords.map((record) => record.providerType || 'terminal')))
       .map((type) => ({ value: type, label: type })),
-  ], [auditRecords]);
+  ], [auditRecords, locale]);
   const visibleAuditRecords = useMemo(() => filterAuditRecords(auditRecords, {
     providerType: auditProviderFilter,
     query: auditQuery,
@@ -428,6 +433,7 @@ function App() {
         setProfiles(nextProfiles);
         message.success(t('message.profileSaved'));
       }
+      setDrawerOpen(false);
       await startProfileRequests([request], { closeDrawer: true });
     } catch (error) {
       message.error(`${t('message.credentialFailed')}: ${error}`);
@@ -460,10 +466,10 @@ function App() {
       });
     }
     if (createdSessions.length === 0) return;
+    if (closeDrawer) setDrawerOpen(false);
     setSessions((current) => [...current, ...createdSessions]);
     setActiveKey(createdSessions[createdSessions.length - 1].id);
     setSelectedNav('sessions');
-    if (closeDrawer) setDrawerOpen(false);
     message.success(createdSessions.length > 1
       ? `${t('message.batchSessionsStarted')}: ${createdSessions.length}`
       : t('terminal.status.connecting'));
@@ -860,6 +866,15 @@ function App() {
     openDrawer(profile.providerType, profile);
   };
 
+  const runProfileAction = (action, profile) => {
+    if (action === 'connect') openProfile(profile);
+    if (action === 'edit') openProfileEditor(profile);
+    if (action === 'rename') openProfileEditor(profile);
+    if (action === 'duplicate') duplicateProfile(profile);
+    if (action === 'favorite' || action === 'unfavorite') toggleProfileFavorite(profile.id);
+    if (action === 'delete') deleteProfile(profile.id);
+  };
+
   const openBatchProfiles = async (options) => {
     const selectedProfiles = selectBatchProfiles(profiles, options);
     if (selectedProfiles.length === 0) {
@@ -993,7 +1008,7 @@ function App() {
       return (
         <div className="session-grid-page">
           <div className="session-grid-toolbar">
-            <SessionSummaryBar activeSession={activeSession} summary={currentSessionSummary} />
+            <SessionStrip activeSession={activeSession} summary={currentSessionSummary} />
             <Button size="small" onClick={() => setSessionView('tabs')}>{t('action.tabs')}</Button>
           </div>
           <div className="session-grid">
@@ -1035,7 +1050,6 @@ function App() {
     }
     return (
       <div className="session-tabs-page">
-        <SessionSummaryBar activeSession={activeSession} summary={currentSessionSummary} />
         <Tabs
           className="terminal-tabs"
           type="editable-card"
@@ -1174,7 +1188,21 @@ function App() {
           renderItem={(profile) => (
             <List.Item
               actions={[
-                <Button key="open" size="small" onClick={() => openProfile(profile)}>{t('action.open')}</Button>,
+                <Button key="open" size="small" type="primary" onClick={() => openProfile(profile)}>{t('action.connect')}</Button>,
+                <Dropdown
+                  key="manage"
+                  trigger={['click']}
+                  menu={{
+                    items: profileActionModel(profile).filter((action) => action !== 'connect').map((action) => ({
+                      key: action,
+                      danger: action === 'delete',
+                      label: t(`profile.action.${action}`),
+                    })),
+                    onClick: ({ key }) => runProfileAction(key, profile),
+                  }}
+                >
+                  <Button size="small" icon={<MoreOutlined />}>{t('action.manage')}</Button>
+                </Dropdown>,
                 <Tooltip key="favorite" title={profile.favorite ? t('action.unfavorite') : t('action.favorite')}>
                   <Button
                     size="small"
@@ -1182,9 +1210,6 @@ function App() {
                     onClick={() => toggleProfileFavorite(profile.id)}
                   />
                 </Tooltip>,
-                <Button key="edit" size="small" onClick={() => openProfileEditor(profile)}>{t('action.edit')}</Button>,
-                <Button key="duplicate" size="small" onClick={() => duplicateProfile(profile)}>{t('action.duplicate')}</Button>,
-                <Button key="delete" size="small" danger onClick={() => deleteProfile(profile.id)}>{t('action.delete')}</Button>,
               ]}
             >
               <List.Item.Meta
@@ -1639,11 +1664,11 @@ function App() {
           <Form layout="vertical">
             <Form.Item label={t('field.locale')}>
               <Select
-                value={currentLocale}
+                value={locale}
                 options={availableLocales().map((locale) => ({ value: locale, label: locale }))}
-                onChange={(locale) => {
-                  setLocale(locale);
-                  window.location.reload();
+                onChange={(nextLocale) => {
+                  setLocale(nextLocale);
+                  setLocaleState(nextLocale);
                 }}
               />
             </Form.Item>
@@ -1975,7 +2000,7 @@ function App() {
     if (selectedNav === 'extensions') return renderExtensions();
     if (selectedNav === 'audit') return renderAuditLogs();
     if (selectedNav === 'settings') return renderSettings();
-    return renderSessions();
+    return null;
   };
 
   const isDarkTheme = resolveAppTheme(settings.appTheme) === 'dark';
@@ -2205,20 +2230,13 @@ function App() {
             </Button>
             {sessions.length > 0 && (
               <Dropdown menu={{ items: sessionMenuItems, onClick: ({ key }) => sessionMenuActions[key]?.() }} trigger={['click']}>
-                <Button icon={<MoreOutlined />}>{t('action.sessionActions')}</Button>
+                <Button icon={<MoreOutlined />} aria-label={t('action.sessionActions')} />
               </Dropdown>
             )}
             <Dropdown menu={{ items: workspaceMenuItems, onClick: ({ key }) => workspaceMenuActions[key]?.() }} trigger={['click']}>
-              <Button icon={<MoreOutlined />}>{t('action.workspaceActions')}</Button>
+              <Button icon={<MoreOutlined />} aria-label={t('action.workspaceActions')} />
             </Dropdown>
           </Space>
-          {activeSession && (
-            <div className={`active-session-pill tone-${sessionStatusTone(activeSession)}`}>
-              <span className="session-status-dot" />
-              <span>{activeSession.label}</span>
-              <small>{t(`session.status.${sessionStatusLabel(activeSession)}`)}</small>
-            </div>
-          )}
           <Space className="topbar-actions">
             {activeKey && (
               <>
@@ -2234,8 +2252,12 @@ function App() {
                   onSearch={() => findInTerminal('next')}
                   placeholder={t('placeholder.searchTerminal')}
                 />
-                <Button onClick={() => findInTerminal('previous')} disabled={!terminalSearch.trim()}>{t('action.findPrevious')}</Button>
-                <Button onClick={() => findInTerminal('next')} disabled={!terminalSearch.trim()}>{t('action.findNext')}</Button>
+                <Tooltip title={t('action.findPrevious')}>
+                  <Button icon={<UpOutlined />} onClick={() => findInTerminal('previous')} disabled={!terminalSearch.trim()} />
+                </Tooltip>
+                <Tooltip title={t('action.findNext')}>
+                  <Button icon={<DownOutlined />} onClick={() => findInTerminal('next')} disabled={!terminalSearch.trim()} />
+                </Tooltip>
               </>
             )}
             <Tooltip title={t('action.language')}>
@@ -2259,7 +2281,12 @@ function App() {
               message={t('message.desktopBridgeUnavailable')}
             />
           )}
-          {renderContent()}
+          <div className={selectedNav === 'sessions' ? 'content-page-layer hidden' : 'content-page-layer'}>
+            {renderContent()}
+          </div>
+          <div className={selectedNav === 'sessions' ? 'session-page-layer active' : 'session-page-layer'}>
+            {renderSessions()}
+          </div>
         </Content>
 
         <div className="statusbar">
@@ -2309,6 +2336,7 @@ function App() {
         title={t('drawer.newTerminal')}
         width={420}
         open={drawerOpen}
+        destroyOnHidden
         onClose={() => setDrawerOpen(false)}
         extra={(
           <Space>
@@ -2407,6 +2435,7 @@ function App() {
         title={t('drawer.settings')}
         width={360}
         open={settingsOpen}
+        destroyOnHidden
         onClose={() => setSettingsOpen(false)}
       >
         {renderSettings()}
@@ -2415,6 +2444,7 @@ function App() {
         title={t('drawer.commands')}
         width={420}
         open={commandsOpen}
+        destroyOnHidden
         onClose={() => setCommandsOpen(false)}
       >
         <Form form={commandForm} layout="vertical" className="quick-command-form">
@@ -2455,6 +2485,7 @@ function App() {
         title={t('drawer.renameSession')}
         width={360}
         open={renameOpen}
+        destroyOnHidden
         onClose={() => setRenameOpen(false)}
         extra={<Button type="primary" onClick={renameSession}>{t('action.save')}</Button>}
       >
@@ -2468,6 +2499,7 @@ function App() {
         title={t('drawer.installExtension')}
         width={420}
         open={extensionInstallOpen}
+        destroyOnHidden
         onClose={() => setExtensionInstallOpen(false)}
         extra={<Button type="primary" onClick={installOfflineExtension}>{t('action.installOffline')}</Button>}
       >
@@ -2486,6 +2518,7 @@ function App() {
         title={t('drawer.importSshConfig')}
         width={560}
         open={sshConfigOpen}
+        destroyOnHidden
         onClose={() => setSshConfigOpen(false)}
         extra={<Button type="primary" onClick={importSshConfigProfiles}>{t('action.importSshConfig')}</Button>}
       >
@@ -2601,13 +2634,12 @@ function ConnectionGroupBoard({ groups, openBatchProfiles }) {
 }
 
 function SessionTabLabel({ active = false, session }) {
-  const tone = sessionStatusTone(session);
+  const display = sessionTabDisplay(session, active);
   return (
-    <span className={`tab-label session-tab-label tone-${tone}${active ? ' active' : ''}`}>
+    <span className={`tab-label session-tab-label tone-${display.statusTone}${display.active ? ' active' : ''}`}>
       <span className="session-status-dot" />
-      {providerIcons[session.providerType] || <CodeOutlined />}
-      <span className="session-tab-title">{session.label}</span>
-      {active && <Tag color="blue">{t('label.current')}</Tag>}
+      {providerIcons[display.iconType] || <CodeOutlined />}
+      <span className="session-tab-title">{display.title}</span>
     </span>
   );
 }
@@ -2625,19 +2657,14 @@ function SessionSidebarLabel({ session }) {
   );
 }
 
-function SessionSummaryBar({ activeSession, summary }) {
+function SessionStrip({ activeSession, summary }) {
   return (
-    <div className="session-summary-bar">
-      <div className="session-summary-current">
-        <Text type="secondary">{t('label.current')}</Text>
+    <div className="session-strip">
+      <div className={`session-strip-current tone-${sessionStatusTone(activeSession)}`}>
+        <span className="session-status-dot" />
         <strong>{activeSession?.label || '-'}</strong>
       </div>
-      <Space size={8} wrap>
-        <Tag>{`${t('status.sessions')}: ${summary.total}`}</Tag>
-        <Tag color="green">{`${t('session.status.connected')}: ${summary.connected}`}</Tag>
-        <Tag color="gold">{`${t('session.status.connecting')}: ${summary.connecting}`}</Tag>
-        <Tag>{`${t('session.status.closed')}: ${summary.closed}`}</Tag>
-      </Space>
+      <Text type="secondary">{`${summary.active}/${summary.total}`}</Text>
     </div>
   );
 }
@@ -2684,7 +2711,7 @@ function AuditReplayPlayer({ record }) {
   }, [parsedCast.duration, playing, speed]);
 
   const replayText = parsedCast.events.length > 0
-    ? renderCastFrame(parsedCast.events, playhead)
+    ? renderReplayFrame(parsedCast.events, playhead)
     : record?.screen || t('message.terminalOutputEmpty');
   return (
     <div className="audit-player">
