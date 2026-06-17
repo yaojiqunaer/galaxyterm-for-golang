@@ -64,6 +64,14 @@ select {
   font: inherit;
 }
 
+.ant-btn {
+  white-space: nowrap;
+}
+
+.ant-btn > span {
+  letter-spacing: 0 !important;
+}
+
 .app-shell {
   height: 100vh;
   min-width: 900px;
@@ -231,6 +239,7 @@ select {
 
 .provider-row,
 .session-row {
+  position: relative;
   min-height: 32px;
   padding: 6px 8px !important;
   border-radius: 6px;
@@ -241,6 +250,46 @@ select {
 .session-row:hover,
 .session-row.active {
   background: var(--accent-soft);
+}
+
+.session-row.active::before {
+  position: absolute;
+  inset: 5px auto 5px 0;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--accent);
+  content: '';
+}
+
+.session-sidebar-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  width: 100%;
+}
+
+.session-sidebar-main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.session-sidebar-main span,
+.session-sidebar-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-sidebar-main span {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.session-sidebar-main small {
+  color: var(--muted);
+  font-size: 11px;
 }
 
 .provider-icon,
@@ -268,11 +317,13 @@ select {
   padding: 7px 10px;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--panel);
+  flex-wrap: wrap;
 }
 
 .topbar-command-group,
 .topbar-actions {
   min-width: 0;
+  flex-wrap: wrap;
 }
 
 .topbar .ant-btn {
@@ -281,7 +332,7 @@ select {
 }
 
 .topbar-command-group {
-  flex: 1;
+  flex: 1 1 460px;
 }
 
 .topbar-command-group .ant-space-item {
@@ -307,12 +358,27 @@ select {
 }
 
 .topbar-actions .terminal-search {
-  width: 230px;
+  width: clamp(170px, 22vw, 260px);
 }
 
 .topbar-actions .terminal-search + .ant-btn,
 .topbar-actions .terminal-search + .ant-btn + .ant-btn {
   width: auto;
+}
+
+@media (max-width: 1180px) {
+  .topbar {
+    align-items: flex-start;
+  }
+
+  .active-session-pill {
+    order: 3;
+    width: 100%;
+  }
+
+  .topbar-actions {
+    justify-content: flex-end;
+  }
 }
 
 .content-area {
@@ -331,14 +397,50 @@ select {
   border-color: rgba(245, 197, 66, 0.38);
 }
 
-.terminal-tabs {
+.session-tabs-page {
+  display: flex;
   height: 100%;
+  min-height: 0;
+  flex-direction: column;
+  background: var(--terminal-bg);
+}
+
+.session-summary-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 42px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--terminal-chrome);
+}
+
+.session-summary-current {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.session-summary-current strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminal-tabs {
+  flex: 1;
+  height: 100%;
+  min-height: 0;
   background: var(--terminal-bg);
 }
 
 .terminal-tabs .ant-tabs-nav {
   margin: 0;
-  padding: 5px 8px 0;
+  padding: 6px 10px 0;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--terminal-chrome);
 }
@@ -350,13 +452,23 @@ select {
 }
 
 .terminal-tabs .ant-tabs-tab {
-  border-color: var(--border-subtle) !important;
-  border-radius: 6px 6px 0 0 !important;
-  background: var(--panel-muted) !important;
+  min-width: 156px;
+  border-color: transparent !important;
+  border-radius: 8px 8px 0 0 !important;
+  background: rgba(255, 255, 255, 0.04) !important;
+  transition: background 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
 }
 
 .terminal-tabs .ant-tabs-tab-active {
+  border-color: rgba(125, 211, 252, 0.48) !important;
+  border-bottom-color: var(--terminal-bg) !important;
   background: var(--terminal-bg) !important;
+  box-shadow: inset 0 3px 0 var(--accent);
+}
+
+.terminal-tabs .ant-tabs-tab:hover {
+  border-color: rgba(125, 211, 252, 0.28) !important;
+  background: rgba(125, 211, 252, 0.08) !important;
 }
 
 .tab-label,
@@ -365,6 +477,68 @@ select {
   align-items: center;
   gap: 6px;
   min-width: 0;
+}
+
+.session-tab-label {
+  width: 100%;
+  max-width: 220px;
+}
+
+.session-tab-label.active {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.session-tab-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-status-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--warning);
+  box-shadow: 0 0 0 3px rgba(245, 197, 66, 0.12);
+}
+
+.tone-success .session-status-dot {
+  background: var(--success);
+  box-shadow: 0 0 0 3px rgba(52, 211, 153, 0.13);
+}
+
+.tone-closed .session-status-dot {
+  background: var(--muted);
+  box-shadow: none;
+}
+
+.active-session-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(320px, 100%);
+  min-height: 32px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+  color: var(--text);
+}
+
+.active-session-pill span:not(.session-status-dot) {
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.active-session-pill small {
+  color: var(--muted);
+  white-space: nowrap;
 }
 
 .terminal-workspace {
@@ -377,7 +551,7 @@ select {
 
 .terminal-workspace > div,
 .split-terminal > div:last-child > div {
-  border: 1px solid rgba(125, 211, 252, 0.08);
+  border: 1px solid rgba(125, 211, 252, 0.22);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -394,10 +568,15 @@ select {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 38px;
-  padding: 6px 10px;
+  min-height: 42px;
+  padding: 0;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--terminal-chrome);
+}
+
+.session-grid-toolbar .session-summary-bar {
+  flex: 1;
+  border-bottom: 0;
 }
 
 .session-grid {
@@ -414,7 +593,14 @@ select {
   display: flex;
   flex-direction: column;
   min-height: 280px;
+  border: 1px solid transparent;
   background: var(--terminal-bg);
+  transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.split-terminal.active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.34), 0 0 0 1px rgba(125, 211, 252, 0.12);
 }
 
 .split-terminal-header {
@@ -425,6 +611,11 @@ select {
   padding: 4px 8px;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--terminal-chrome);
+  gap: 10px;
+}
+
+.split-terminal.active .split-terminal-header {
+  background: rgba(125, 211, 252, 0.11);
 }
 
 .split-terminal > div:last-child {

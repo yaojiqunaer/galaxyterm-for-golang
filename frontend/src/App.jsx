@@ -76,6 +76,11 @@ import {
   selectBatchProfiles,
   ungroupedKey,
 } from './connectionManager.js';
+import {
+  sessionStatusLabel,
+  sessionStatusTone,
+  sessionSummary,
+} from './sessionPresentation.js';
 import TerminalPane from './components/TerminalPane.jsx';
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
 import { hasWailsMethod } from './desktopBridge.js';
@@ -345,6 +350,8 @@ function App() {
     providerType: auditProviderFilter,
     query: auditQuery,
   }), [auditProviderFilter, auditQuery, auditRecords]);
+  const currentSessionSummary = useMemo(() => sessionSummary(sessions), [sessions]);
+  const activeSession = sessions.find((session) => session.id === activeKey);
   const desktopBridgeReady = hasWailsMethod(['session', 'API', 'CreateSession']);
 
   const openDrawer = (type = providers[0]?.type || 'local', profile = null) => {
@@ -954,10 +961,7 @@ function App() {
   const items = sessions.map((session) => ({
     key: session.id,
     label: (
-      <span className="tab-label">
-        {providerIcons[session.providerType] || <CodeOutlined />}
-        {session.label}
-      </span>
+      <SessionTabLabel active={session.id === activeKey} session={session} />
     ),
     children: (
       <div className="terminal-workspace">
@@ -989,14 +993,18 @@ function App() {
       return (
         <div className="session-grid-page">
           <div className="session-grid-toolbar">
-            <Text strong>{t('section.sessionGrid')}</Text>
+            <SessionSummaryBar activeSession={activeSession} summary={currentSessionSummary} />
             <Button size="small" onClick={() => setSessionView('tabs')}>{t('action.tabs')}</Button>
           </div>
           <div className="session-grid">
             {sessions.map((session) => (
-              <div className="split-terminal" key={session.id}>
+              <div
+                className={session.id === activeKey ? 'split-terminal active' : 'split-terminal'}
+                key={session.id}
+                onClick={() => setActiveKey(session.id)}
+              >
                 <div className="split-terminal-header">
-                  <span className="tab-label">{providerIcons[session.providerType] || <CodeOutlined />}{session.label}</span>
+                  <SessionTabLabel active={session.id === activeKey} session={session} />
                   <Space>
                     <Button size="small" icon={<EditOutlined />} onClick={() => openRenameSession(session)} />
                     <Button size="small" icon={<ReloadOutlined />} onClick={() => reconnectSession(session.id)} />
@@ -1026,18 +1034,21 @@ function App() {
       );
     }
     return (
-      <Tabs
-        className="terminal-tabs"
-        type="editable-card"
-        hideAdd
-        activeKey={activeKey}
-        onChange={setActiveKey}
-        onEdit={(targetKey, action) => {
-          if (action === 'add') openDrawer();
-          if (action === 'remove') removeSession(targetKey);
-        }}
-        items={items}
-      />
+      <div className="session-tabs-page">
+        <SessionSummaryBar activeSession={activeSession} summary={currentSessionSummary} />
+        <Tabs
+          className="terminal-tabs"
+          type="editable-card"
+          hideAdd
+          activeKey={activeKey}
+          onChange={setActiveKey}
+          onEdit={(targetKey, action) => {
+            if (action === 'add') openDrawer();
+            if (action === 'remove') removeSession(targetKey);
+          }}
+          items={items}
+        />
+      </div>
     );
   };
 
@@ -2171,10 +2182,7 @@ function App() {
                     setActiveKey(session.id);
                   }}
                 >
-                  <Space>
-                    <Badge status={session.status === 'connected' ? 'success' : session.status === 'closed' ? 'default' : 'processing'} />
-                    <span>{session.label}</span>
-                  </Space>
+                  <SessionSidebarLabel session={session} />
                 </List.Item>
               )}
             />
@@ -2204,6 +2212,13 @@ function App() {
               <Button icon={<MoreOutlined />}>{t('action.workspaceActions')}</Button>
             </Dropdown>
           </Space>
+          {activeSession && (
+            <div className={`active-session-pill tone-${sessionStatusTone(activeSession)}`}>
+              <span className="session-status-dot" />
+              <span>{activeSession.label}</span>
+              <small>{t(`session.status.${sessionStatusLabel(activeSession)}`)}</small>
+            </div>
+          )}
           <Space className="topbar-actions">
             {activeKey && (
               <>
@@ -2581,6 +2596,48 @@ function ConnectionGroupBoard({ groups, openBatchProfiles }) {
           </span>
         </button>
       ))}
+    </div>
+  );
+}
+
+function SessionTabLabel({ active = false, session }) {
+  const tone = sessionStatusTone(session);
+  return (
+    <span className={`tab-label session-tab-label tone-${tone}${active ? ' active' : ''}`}>
+      <span className="session-status-dot" />
+      {providerIcons[session.providerType] || <CodeOutlined />}
+      <span className="session-tab-title">{session.label}</span>
+      {active && <Tag color="blue">{t('label.current')}</Tag>}
+    </span>
+  );
+}
+
+function SessionSidebarLabel({ session }) {
+  const tone = sessionStatusTone(session);
+  return (
+    <span className={`session-sidebar-label tone-${tone}`}>
+      <span className="session-status-dot" />
+      <span className="session-sidebar-main">
+        <span>{session.label}</span>
+        <small>{t(`session.status.${sessionStatusLabel(session)}`)}</small>
+      </span>
+    </span>
+  );
+}
+
+function SessionSummaryBar({ activeSession, summary }) {
+  return (
+    <div className="session-summary-bar">
+      <div className="session-summary-current">
+        <Text type="secondary">{t('label.current')}</Text>
+        <strong>{activeSession?.label || '-'}</strong>
+      </div>
+      <Space size={8} wrap>
+        <Tag>{`${t('status.sessions')}: ${summary.total}`}</Tag>
+        <Tag color="green">{`${t('session.status.connected')}: ${summary.connected}`}</Tag>
+        <Tag color="gold">{`${t('session.status.connecting')}: ${summary.connecting}`}</Tag>
+        <Tag>{`${t('session.status.closed')}: ${summary.closed}`}</Tag>
+      </Space>
     </div>
   );
 }
