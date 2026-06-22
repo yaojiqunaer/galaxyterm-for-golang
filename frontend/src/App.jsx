@@ -75,6 +75,7 @@ import {
 } from './workspaceInsights.js';
 import {
   buildConnectionGroupNav,
+  resolveSelectedProfileId,
   selectBatchProfiles,
   ungroupedKey,
 } from './connectionManager.js';
@@ -178,6 +179,7 @@ function App() {
   const [profileQuery, setProfileQuery] = useState('');
   const [groupQuery, setGroupQuery] = useState('all');
   const [providerFilter, setProviderFilter] = useState('all');
+  const [selectedProfileId, setSelectedProfileId] = useState('');
   const [auditQuery, setAuditQuery] = useState('');
   const [auditProviderFilter, setAuditProviderFilter] = useState('all');
   const [workspaceSummary, setWorkspaceSummary] = useState(() => loadWorkspaceSummary());
@@ -337,6 +339,15 @@ function App() {
     () => filteredProfiles(profiles, profileQuery, groupQuery, providerFilter),
     [profiles, profileQuery, groupQuery, providerFilter],
   );
+  const selectedProfile = visibleProfiles.find((profile) => profile.id === selectedProfileId) || visibleProfiles[0] || null;
+
+  useEffect(() => {
+    const nextSelectedProfileId = resolveSelectedProfileId(visibleProfiles, selectedProfileId);
+    if (nextSelectedProfileId !== selectedProfileId) {
+      setSelectedProfileId(nextSelectedProfileId);
+    }
+  }, [selectedProfileId, visibleProfiles]);
+
   const connectionGroupNav = useMemo(() => buildConnectionGroupNav(profiles), [profiles]);
   const workspaceInsights = useMemo(() => summarizeWorkspace({
     auditRecords,
@@ -1176,6 +1187,18 @@ function App() {
             />
           </div>
 
+          {selectedProfile && (
+            <ConnectionProfilePreview
+              profile={selectedProfile}
+              providers={providers}
+              openProfile={openProfile}
+              openProfileEditor={openProfileEditor}
+              duplicateProfile={duplicateProfile}
+              toggleProfileFavorite={toggleProfileFavorite}
+              deleteProfile={deleteProfile}
+            />
+          )}
+
           {recentConnections.length > 0 && (
             <div className="recent-connection-rail">
               <Text type="secondary">{t('section.recentConnections')}</Text>
@@ -1214,6 +1237,21 @@ function App() {
               dataSource={visibleProfiles}
               renderItem={(profile) => (
                 <List.Item
+                  className={selectedProfile?.id === profile.id ? 'connection-profile-row active' : 'connection-profile-row'}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setSelectedProfileId(profile.id)}
+                  onDoubleClick={() => openProfile(profile)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      openProfile(profile);
+                    }
+                    if (event.key === ' ') {
+                      event.preventDefault();
+                      setSelectedProfileId(profile.id);
+                    }
+                  }}
                   actions={[
                     <Button key="open" size="small" type="primary" onClick={() => openProfile(profile)}>{t('action.connect')}</Button>,
                     <Dropdown
@@ -2615,6 +2653,46 @@ function ProviderCard({ provider, openDrawer }) {
       <strong>{providerLabel(provider)}</strong>
       <small>{provider.category === 'builtin' ? t('provider.category.builtin') : t('provider.category.extension')}</small>
     </button>
+  );
+}
+
+function ConnectionProfilePreview({
+  deleteProfile,
+  duplicateProfile,
+  openProfile,
+  openProfileEditor,
+  profile,
+  providers,
+  toggleProfileFavorite,
+}) {
+  return (
+    <div className="connection-profile-preview">
+      <div className="connection-profile-preview-main">
+        <span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>
+        <span>
+          <strong>{profile.displayName}</strong>
+          <small>{profileDescription(profile)}</small>
+        </span>
+      </div>
+      <Space size={6} wrap>
+        <Tag>{providerTypeLabel(profile.providerType, providers)}</Tag>
+        <Tag>{profile.group ? profile.group : t('group.ungrouped')}</Tag>
+        {profile.auth?.credentialRef && <Tag color="blue">{t('label.credentialSaved')}</Tag>}
+      </Space>
+      <Space size={6} wrap>
+        <Button size="small" type="primary" onClick={() => openProfile(profile)}>{t('action.connect')}</Button>
+        <Button size="small" icon={<EditOutlined />} onClick={() => openProfileEditor(profile)}>{t('action.edit')}</Button>
+        <Button size="small" icon={<CopyOutlined />} onClick={() => duplicateProfile(profile)}>{t('action.duplicate')}</Button>
+        <Button
+          size="small"
+          icon={profile.favorite ? <StarFilled /> : <StarOutlined />}
+          onClick={() => toggleProfileFavorite(profile.id)}
+        >
+          {profile.favorite ? t('action.unfavorite') : t('action.favorite')}
+        </Button>
+        <Button size="small" danger icon={<DeleteOutlined />} onClick={() => deleteProfile(profile.id)}>{t('action.delete')}</Button>
+      </Space>
+    </div>
   );
 }
 

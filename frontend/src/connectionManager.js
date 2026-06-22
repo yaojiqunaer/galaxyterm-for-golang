@@ -65,6 +65,11 @@ export function selectBatchProfiles(
   }));
 }
 
+export function resolveSelectedProfileId(profiles = [], selectedProfileId = '') {
+  if (profiles.some((profile) => profile.id === selectedProfileId)) return selectedProfileId;
+  return profiles[0]?.id || '';
+}
+
 function sortProfiles(profiles) {
   return [...profiles].sort((left, right) => {
     const favoriteDelta = Number(!!right.favorite) - Number(!!left.favorite);

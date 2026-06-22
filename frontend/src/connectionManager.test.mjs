@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   buildConnectionGroupNav,
   buildConnectionGroups,
+  resolveSelectedProfileId,
   selectBatchProfiles,
 } from './connectionManager.js';
 
@@ -67,3 +68,7 @@ assert.deepEqual(
   selectBatchProfiles(profiles, { favoritesOnly: true, providerType: 'ssh' }).map((profile) => profile.id),
   ['prod-db'],
 );
+
+assert.equal(resolveSelectedProfileId(profiles, 'prod-web'), 'prod-web');
+assert.equal(resolveSelectedProfileId(profiles.filter((profile) => profile.id !== 'prod-web'), 'prod-web'), 'prod-db');
+assert.equal(resolveSelectedProfileId([], 'prod-web'), '');
