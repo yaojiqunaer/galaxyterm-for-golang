@@ -1136,6 +1136,15 @@ function App() {
     }
     return (
       <div className="session-tabs-page">
+        <div className="terminal-session-toolbar">
+          <SessionStrip activeSession={activeSession} summary={currentSessionSummary} />
+          <Space size={6} wrap>
+            <Button size="small" onClick={() => setSessionView('grid')}>{t('action.grid')}</Button>
+            <Button size="small" icon={<ReloadOutlined />} onClick={() => reconnectSession()} disabled={!activeKey}>{t('action.reconnect')}</Button>
+            <Button size="small" icon={<EditOutlined />} onClick={() => openRenameSession()} disabled={!activeKey}>{t('action.renameSession')}</Button>
+            <Button size="small" danger onClick={() => removeSession(activeKey)} disabled={!activeKey}>{t('action.delete')}</Button>
+          </Space>
+        </div>
         <Tabs
           className="terminal-tabs"
           type="editable-card"
@@ -1271,20 +1280,6 @@ function App() {
             />
           </div>
 
-          {selectedProfile && (
-            <ConnectionProfilePreview
-              profile={selectedProfile}
-              providers={providers}
-              openProfile={openProfile}
-              openProfileEditor={openProfileEditor}
-              duplicateProfile={duplicateProfile}
-              focusProfileSession={focusProfileSession}
-              profileSessionSummary={profileSessionSummary}
-              toggleProfileFavorite={toggleProfileFavorite}
-              confirmDeleteProfile={confirmDeleteProfile}
-            />
-          )}
-
           {recentConnections.length > 0 && (
             <div className="recent-connection-rail">
               <Text type="secondary">{t('section.recentConnections')}</Text>
@@ -1325,9 +1320,15 @@ function App() {
                 const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
                 const actions = [
                   ...(sessionInfo.activeCount > 0
-                    ? [<Button key="focus" size="small" onClick={() => focusProfileSession(profile)}>{t('action.focusSession')}</Button>]
+                    ? [<Button key="focus" size="small" onClick={(event) => {
+                      event.stopPropagation();
+                      focusProfileSession(profile);
+                    }}>{t('action.focusSession')}</Button>]
                     : []),
-                  <Button key="open" size="small" type="primary" onClick={() => openProfile(profile)}>{t('action.connect')}</Button>,
+                  <Button key="open" size="small" type="primary" onClick={(event) => {
+                    event.stopPropagation();
+                    openProfile(profile);
+                  }}>{t('action.connect')}</Button>,
                   <Dropdown
                     key="manage"
                     trigger={['click']}
@@ -1337,16 +1338,22 @@ function App() {
                         danger: action === 'delete',
                         label: t(`profile.action.${action}`),
                       })),
-                      onClick: ({ key }) => runProfileAction(key, profile),
+                      onClick: ({ domEvent, key }) => {
+                        domEvent.stopPropagation();
+                        runProfileAction(key, profile);
+                      },
                     }}
                   >
-                    <Button size="small" icon={<MoreOutlined />}>{t('action.manage')}</Button>
+                    <Button size="small" icon={<MoreOutlined />} onClick={(event) => event.stopPropagation()}>{t('action.manage')}</Button>
                   </Dropdown>,
                   <Tooltip key="favorite" title={profile.favorite ? t('action.unfavorite') : t('action.favorite')}>
                     <Button
                       size="small"
                       icon={profile.favorite ? <StarFilled /> : <StarOutlined />}
-                      onClick={() => toggleProfileFavorite(profile.id)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        toggleProfileFavorite(profile.id);
+                      }}
                     />
                   </Tooltip>,
                 ];
@@ -1397,6 +1404,23 @@ function App() {
             />
           )}
         </section>
+        <aside className="connection-detail-panel">
+          {selectedProfile ? (
+            <ConnectionProfilePreview
+              profile={selectedProfile}
+              providers={providers}
+              openProfile={openProfile}
+              openProfileEditor={openProfileEditor}
+              duplicateProfile={duplicateProfile}
+              focusProfileSession={focusProfileSession}
+              profileSessionSummary={profileSessionSummary}
+              toggleProfileFavorite={toggleProfileFavorite}
+              confirmDeleteProfile={confirmDeleteProfile}
+            />
+          ) : (
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noConnectionMatches')} />
+          )}
+        </aside>
       </div>
     </div>
   );
@@ -2831,26 +2855,46 @@ function ConnectionProfilePreview({
   const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
   return (
     <div className="connection-profile-preview">
-      <div className="connection-profile-preview-main">
-        <span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>
-        <span>
-          <strong>{profile.displayName}</strong>
-          <small>{profileDescription(profile)}</small>
-          {profile.lastUsedAt && <small>{`${t('label.lastUsed')}: ${formatProfileLastUsed(profile.lastUsedAt)}`}</small>}
-        </span>
+      <div className="connection-profile-hero">
+        <span className="provider-icon large">{providerIcons[profile.providerType] || <CodeOutlined />}</span>
+        <div>
+          <Text type="secondary">{providerTypeLabel(profile.providerType, providers)}</Text>
+          <Title level={4}>{profile.displayName}</Title>
+          <Text className="connection-profile-endpoint">{profileDescription(profile)}</Text>
+        </div>
       </div>
-      <Space size={6} wrap>
-        <Tag>{providerTypeLabel(profile.providerType, providers)}</Tag>
-        <Tag>{profile.group ? profile.group : t('group.ungrouped')}</Tag>
-        {sessionInfo.activeCount > 0 && <Tag color="green">{`${t('label.openSessions')}: ${sessionInfo.activeCount}`}</Tag>}
-        {profile.auth?.credentialRef && <Tag color="blue">{t('label.credentialSaved')}</Tag>}
-      </Space>
-      <Space size={6} wrap>
+      <div className="connection-profile-actions">
         {sessionInfo.activeCount > 0 && (
           <Button size="small" onClick={() => focusProfileSession(profile)}>{t('action.focusSession')}</Button>
         )}
         <Button size="small" type="primary" onClick={() => openProfile(profile)}>{t('action.connect')}</Button>
         <Button size="small" icon={<EditOutlined />} onClick={() => openProfileEditor(profile)}>{t('action.edit')}</Button>
+      </div>
+      <div className="connection-profile-tags">
+        <Tag>{profile.group ? profile.group : t('group.ungrouped')}</Tag>
+        {sessionInfo.activeCount > 0 && <Tag color="green">{`${t('label.openSessions')}: ${sessionInfo.activeCount}`}</Tag>}
+        {profile.favorite && <Tag color="gold">{t('label.favorite')}</Tag>}
+        {profile.auth?.credentialRef && <Tag color="blue">{t('label.credentialSaved')}</Tag>}
+      </div>
+      <div className="connection-profile-facts">
+        <span>
+          <small>{t('field.host')}</small>
+          <strong>{profile.config?.host || profile.config?.shell || 'default shell'}</strong>
+        </span>
+        <span>
+          <small>{t('field.username')}</small>
+          <strong>{profile.auth?.username || '-'}</strong>
+        </span>
+        <span>
+          <small>{t('label.lastUsed')}</small>
+          <strong>{profile.lastUsedAt ? formatProfileLastUsed(profile.lastUsedAt) : '-'}</strong>
+        </span>
+        <span>
+          <small>{t('field.jumpHost')}</small>
+          <strong>{profile.config?.jumpHost || '-'}</strong>
+        </span>
+      </div>
+      <Space size={6} wrap>
         <Button size="small" icon={<CopyOutlined />} onClick={() => duplicateProfile(profile)}>{t('action.duplicate')}</Button>
         <Button
           size="small"
