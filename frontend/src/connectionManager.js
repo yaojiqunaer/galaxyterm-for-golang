@@ -54,6 +54,7 @@ export function selectBatchProfiles(
     favoritesOnly = false,
     group = 'all',
     providerType = 'all',
+    sortBy = 'favorites',
   } = {},
 ) {
   return sortConnectionProfiles(profiles.filter((profile) => {
@@ -62,7 +63,7 @@ export function selectBatchProfiles(
     const profileGroup = profile.group || ungroupedKey;
     const matchesGroup = group === 'all' || profileGroup === group;
     return matchesFavorite && matchesProvider && matchesGroup;
-  }));
+  }), sortBy);
 }
 
 export function resolveSelectedProfileId(profiles = [], selectedProfileId = '') {
@@ -81,6 +82,10 @@ export function sortConnectionProfiles(profiles = [], sortBy = 'favorites') {
       return compareGroup(left.group || ungroupedKey, right.group || ungroupedKey)
         || compareText(left.displayName, right.displayName);
     }
+    if (sortBy === 'recent') {
+      return compareDateDesc(left.lastUsedAt, right.lastUsedAt)
+        || compareText(left.displayName, right.displayName);
+    }
     const favoriteDelta = Number(!!right.favorite) - Number(!!left.favorite);
     return favoriteDelta || compareText(left.displayName, right.displayName);
   });
@@ -94,4 +99,10 @@ function compareGroup(left, right) {
   if (left === ungroupedKey && right !== ungroupedKey) return 1;
   if (right === ungroupedKey && left !== ungroupedKey) return -1;
   return compareText(left, right);
+}
+
+function compareDateDesc(left, right) {
+  const leftTime = Date.parse(left || '') || 0;
+  const rightTime = Date.parse(right || '') || 0;
+  return rightTime - leftTime;
 }

@@ -342,6 +342,7 @@ function App() {
     [profiles, profileQuery, groupQuery, providerFilter, profileSort],
   );
   const selectedProfile = visibleProfiles.find((profile) => profile.id === selectedProfileId) || visibleProfiles[0] || null;
+  const hasProfileFilters = profileQuery.trim() || groupQuery !== 'all' || providerFilter !== 'all' || profileSort !== 'favorites';
 
   useEffect(() => {
     const nextSelectedProfileId = resolveSelectedProfileId(visibleProfiles, selectedProfileId);
@@ -522,6 +523,7 @@ function App() {
       },
       id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`,
       displayName: `${profile.displayName} Copy`,
+      lastUsedAt: '',
     };
     const nextProfiles = [...profiles, copy];
     persistProfiles(nextProfiles);
@@ -876,6 +878,15 @@ function App() {
   const openProfile = async (profile) => {
     try {
       await startProfileRequests([profileToRequest(profile)]);
+      markProfilesUsed([profile.id]);
+    } catch (error) {
+      message.error(`${t('message.credentialFailed')}: ${error}`);
+    }
+  };
+
+  const openRecentConnection = async (connection) => {
+    try {
+      await startProfileRequests([connection.request || profileToRequest(recentToProfile(connection))]);
     } catch (error) {
       message.error(`${t('message.credentialFailed')}: ${error}`);
     }
@@ -885,26 +896,59 @@ function App() {
     openDrawer(profile.providerType, profile);
   };
 
+  const confirmDeleteProfile = (profile) => {
+    Modal.confirm({
+      title: t('confirm.deleteProfileTitle'),
+      content: `${profile.displayName} · ${profileDescription(profile)}`,
+      okButtonProps: { danger: true },
+      okText: t('action.delete'),
+      cancelText: t('action.cancel'),
+      onOk: () => deleteProfile(profile.id),
+    });
+  };
+
   const runProfileAction = (action, profile) => {
     if (action === 'connect') openProfile(profile);
     if (action === 'edit') openProfileEditor(profile);
     if (action === 'rename') openProfileEditor(profile);
     if (action === 'duplicate') duplicateProfile(profile);
     if (action === 'favorite' || action === 'unfavorite') toggleProfileFavorite(profile.id);
-    if (action === 'delete') deleteProfile(profile.id);
+    if (action === 'delete') confirmDeleteProfile(profile);
+  };
+
+  const clearProfileFilters = () => {
+    setProfileQuery('');
+    setGroupQuery('all');
+    setProviderFilter('all');
+    setProfileSort('favorites');
   };
 
   const openBatchProfiles = async (options) => {
-    const selectedProfiles = selectBatchProfiles(profiles, options);
+    const selectedProfiles = selectBatchProfiles(profiles, {
+      sortBy: profileSort,
+      ...options,
+    });
     if (selectedProfiles.length === 0) {
       message.info(t('message.noBatchConnections'));
       return;
     }
     try {
       await startProfileRequests(selectedProfiles.map(profileToRequest));
+      markProfilesUsed(selectedProfiles.map((profile) => profile.id));
     } catch (error) {
       message.error(`${t('message.credentialFailed')}: ${error}`);
     }
+  };
+
+  const markProfilesUsed = (profileIds) => {
+    const usedIds = new Set(profileIds.filter(Boolean));
+    if (usedIds.size === 0) return;
+    const usedAt = new Date().toISOString();
+    const nextProfiles = profiles.map((profile) => (
+      usedIds.has(profile.id) ? { ...profile, lastUsedAt: usedAt } : profile
+    ));
+    persistProfiles(nextProfiles);
+    setProfiles(nextProfiles);
   };
 
   const clearRecentConnections = () => {
@@ -1021,7 +1065,16 @@ function App() {
 
   const renderSessions = () => {
     if (sessions.length === 0) {
-      return <WelcomePanel providers={providers} openDrawer={openDrawer} />;
+      return (
+        <SessionEmptyPanel
+          openDrawer={openDrawer}
+          openProfile={openProfile}
+          openRecentConnection={openRecentConnection}
+          profiles={profiles}
+          recentConnections={recentConnections}
+          restoreWorkspace={restoreWorkspace}
+        />
+      );
     }
     if (sessionView === 'grid') {
       return (
@@ -1144,6 +1197,9 @@ function App() {
               <Text type="secondary">{`${t('metric.visibleConnections')}: ${visibleProfiles.length}`}</Text>
             </div>
             <Space wrap>
+              {hasProfileFilters && (
+                <Button size="small" onClick={clearProfileFilters}>{t('action.clearFilters')}</Button>
+              )}
               <Button
                 size="small"
                 onClick={() => openBatchProfiles({
@@ -1193,6 +1249,7 @@ function App() {
               onChange={setProfileSort}
               options={[
                 { value: 'favorites', label: t('sort.favorites') },
+                { value: 'recent', label: t('sort.recent') },
                 { value: 'name', label: t('sort.name') },
                 { value: 'provider', label: t('sort.provider') },
                 { value: 'group', label: t('sort.group') },
@@ -1208,7 +1265,7 @@ function App() {
               openProfileEditor={openProfileEditor}
               duplicateProfile={duplicateProfile}
               toggleProfileFavorite={toggleProfileFavorite}
-              deleteProfile={deleteProfile}
+              confirmDeleteProfile={confirmDeleteProfile}
             />
           )}
 
@@ -1220,7 +1277,7 @@ function App() {
                   <button
                     key={connection.id}
                     className="recent-connection-chip"
-                    onClick={() => openDrawer(connection.providerType, recentToProfile(connection))}
+                    onClick={() => openRecentConnection(connection)}
                   >
                     <span className="provider-icon">{providerIcons[connection.providerType] || <CodeOutlined />}</span>
                     <span>
@@ -1297,6 +1354,7 @@ function App() {
                         <span>{profile.displayName}</span>
                         <Tag>{providerTypeLabel(profile.providerType, providers)}</Tag>
                         {profile.favorite && <Tag color="gold">{t('label.favorite')}</Tag>}
+                        {profile.lastUsedAt && <Tag>{`${t('label.lastUsed')}: ${formatProfileLastUsed(profile.lastUsedAt)}`}</Tag>}
                         {profile.auth?.credentialRef && <Tag color="blue">{t('label.credentialSaved')}</Tag>}
                         {profile.group && <Tag>{profile.group}</Tag>}
                       </Space>
@@ -2659,6 +2717,72 @@ function WelcomePanel({ providers, openDrawer }) {
   );
 }
 
+function SessionEmptyPanel({
+  openDrawer,
+  openProfile,
+  openRecentConnection,
+  profiles,
+  recentConnections,
+  restoreWorkspace,
+}) {
+  const suggestedProfiles = sortConnectionProfiles(profiles, 'recent').slice(0, 4);
+  return (
+    <div className="session-empty-panel">
+      <div className="session-empty-primary">
+        <Text type="secondary">{t('nav.sessions')}</Text>
+        <Title level={2}>{t('session.empty.title')}</Title>
+        <Text>{t('session.empty.description')}</Text>
+        <Space className="session-empty-actions" wrap>
+          <Button type="primary" icon={<LaptopOutlined />} onClick={() => openDrawer('local')}>
+            {t('provider.local.name')}
+          </Button>
+          <Button icon={<CloudServerOutlined />} onClick={() => openDrawer('ssh')}>
+            {t('provider.ssh.name')}
+          </Button>
+          <Button icon={<ReloadOutlined />} onClick={() => restoreWorkspace()}>
+            {t('action.restoreWorkspace')}
+          </Button>
+        </Space>
+      </div>
+      <div className="session-empty-side">
+        <Text strong>{t('section.savedConnections')}</Text>
+        {suggestedProfiles.length === 0 ? (
+          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noConnections')} />
+        ) : (
+          <div className="session-empty-profile-list">
+            {suggestedProfiles.map((profile) => (
+              <button key={profile.id} type="button" onClick={() => openProfile(profile)}>
+                <span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>
+                <span>
+                  <strong>{profile.displayName}</strong>
+                  <small>{profileDescription(profile)}</small>
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+        {recentConnections.length > 0 && (
+          <>
+            <Divider />
+            <Text strong>{t('section.recentConnections')}</Text>
+            <div className="session-empty-profile-list compact">
+              {recentConnections.slice(0, 3).map((connection) => (
+                <button key={connection.id} type="button" onClick={() => openRecentConnection(connection)}>
+                  <span className="provider-icon">{providerIcons[connection.providerType] || <CodeOutlined />}</span>
+                  <span>
+                    <strong>{connection.displayName}</strong>
+                    <small>{connection.description}</small>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function ProviderCard({ provider, openDrawer }) {
   return (
     <button className="provider-card" type="button" onClick={() => openDrawer(provider.type)}>
@@ -2670,7 +2794,7 @@ function ProviderCard({ provider, openDrawer }) {
 }
 
 function ConnectionProfilePreview({
-  deleteProfile,
+  confirmDeleteProfile,
   duplicateProfile,
   openProfile,
   openProfileEditor,
@@ -2685,6 +2809,7 @@ function ConnectionProfilePreview({
         <span>
           <strong>{profile.displayName}</strong>
           <small>{profileDescription(profile)}</small>
+          {profile.lastUsedAt && <small>{`${t('label.lastUsed')}: ${formatProfileLastUsed(profile.lastUsedAt)}`}</small>}
         </span>
       </div>
       <Space size={6} wrap>
@@ -2703,7 +2828,7 @@ function ConnectionProfilePreview({
         >
           {profile.favorite ? t('action.unfavorite') : t('action.favorite')}
         </Button>
-        <Button size="small" danger icon={<DeleteOutlined />} onClick={() => deleteProfile(profile.id)}>{t('action.delete')}</Button>
+        <Button size="small" danger icon={<DeleteOutlined />} onClick={() => confirmDeleteProfile(profile)}>{t('action.delete')}</Button>
       </Space>
     </div>
   );
@@ -2864,6 +2989,7 @@ function sanitizeProfile(profile) {
     group: profile.group || '',
     config: { ...(profile.config || {}) },
     favorite: !!profile.favorite,
+    lastUsedAt: profile.lastUsedAt || '',
     auth: {
       username: profile.auth?.username || '',
       authType: profile.auth?.authType || 'password',
@@ -3135,6 +3261,20 @@ function formatReplayTime(seconds = 0) {
   const minutes = Math.floor(safeSeconds / 60);
   const remainingSeconds = Math.floor(safeSeconds % 60);
   return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
+}
+
+function formatProfileLastUsed(value = '') {
+  const timestamp = Date.parse(value);
+  if (!timestamp) return '-';
+  const diffSeconds = Math.max(0, Math.floor((Date.now() - timestamp) / 1000));
+  if (diffSeconds < 60) return t('time.justNow');
+  const diffMinutes = Math.floor(diffSeconds / 60);
+  if (diffMinutes < 60) return `${diffMinutes}${t('time.minuteShort')}`;
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) return `${diffHours}${t('time.hourShort')}`;
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) return `${diffDays}${t('time.dayShort')}`;
+  return new Date(timestamp).toLocaleDateString();
 }
 
 function extensionStatusColor(status) {

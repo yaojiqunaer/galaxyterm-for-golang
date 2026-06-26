@@ -13,6 +13,7 @@ const profiles = [
     displayName: 'Prod DB',
     favorite: true,
     group: 'Production',
+    lastUsedAt: '2026-06-25T10:00:00.000Z',
     providerType: 'ssh',
     auth: { credentialRef: { id: 'prod-db' } },
   },
@@ -21,6 +22,7 @@ const profiles = [
     displayName: 'Prod Web',
     favorite: false,
     group: 'Production',
+    lastUsedAt: '2026-06-26T10:00:00.000Z',
     providerType: 'ssh',
     auth: {},
   },
@@ -62,6 +64,10 @@ assert.deepEqual(
   ['prod-db', 'prod-web'],
 );
 assert.deepEqual(
+  selectBatchProfiles(profiles, { group: 'Production', providerType: 'ssh', sortBy: 'recent' }).map((profile) => profile.id),
+  ['prod-web', 'prod-db'],
+);
+assert.deepEqual(
   selectBatchProfiles(profiles, { group: '__ungrouped__' }).map((profile) => profile.id),
   ['dev-shell'],
 );
@@ -73,6 +79,7 @@ assert.deepEqual(
 assert.deepEqual(sortConnectionProfiles(profiles, 'name').map((profile) => profile.id), ['dev-shell', 'prod-db', 'prod-web']);
 assert.deepEqual(sortConnectionProfiles(profiles, 'provider').map((profile) => profile.id), ['dev-shell', 'prod-db', 'prod-web']);
 assert.deepEqual(sortConnectionProfiles(profiles, 'group').map((profile) => profile.id), ['prod-db', 'prod-web', 'dev-shell']);
+assert.deepEqual(sortConnectionProfiles(profiles, 'recent').map((profile) => profile.id), ['prod-web', 'prod-db', 'dev-shell']);
 
 assert.equal(resolveSelectedProfileId(profiles, 'prod-web'), 'prod-web');
 assert.equal(resolveSelectedProfileId(profiles.filter((profile) => profile.id !== 'prod-web'), 'prod-web'), 'prod-db');
