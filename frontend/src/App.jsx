@@ -281,6 +281,14 @@ function App() {
         event.preventDefault();
         setPaletteOpen(true);
       }
+      if (/^[1-9]$/.test(key) && sessions.length > 0) {
+        const nextSession = sessions[Number(key) - 1];
+        if (nextSession) {
+          event.preventDefault();
+          setActiveKey(nextSession.id);
+          setSelectedNav('sessions');
+        }
+      }
       if (key === 'f' && event.shiftKey && sessions.length > 0) {
         event.preventDefault();
         setFocusMode((current) => !current);
@@ -2202,7 +2210,9 @@ function App() {
     profiles,
     quickCommands,
     providers,
+    sessions,
     setSelectedNav,
+    setActiveKey,
     openDrawer,
     openProfile,
     runQuickCommand,
@@ -2393,7 +2403,7 @@ function App() {
             <List
               size="small"
               dataSource={sessions}
-              renderItem={(session) => (
+              renderItem={(session, index) => (
                 <List.Item
                   className={session.id === activeKey ? 'session-row active' : 'session-row'}
                   onClick={() => {
@@ -2402,6 +2412,7 @@ function App() {
                   }}
                 >
                   <SessionSidebarLabel session={session} />
+                  {index < 9 && <Text code>{index + 1}</Text>}
                 </List.Item>
               )}
             />
@@ -2518,8 +2529,13 @@ function App() {
             <List.Item className="command-palette-row" onClick={() => runPaletteAction(item)}>
               <List.Item.Meta
                 avatar={<span className="provider-icon">{item.icon}</span>}
-                title={item.title}
-                description={`${item.group} · ${item.description}`}
+                title={(
+                  <span className="command-palette-title">
+                    <strong>{item.title}</strong>
+                    <small>{item.group}</small>
+                  </span>
+                )}
+                description={item.description}
               />
             </List.Item>
           )}
@@ -3241,6 +3257,19 @@ function buildPaletteItems(actions) {
     run: () => actions.openProfile(profile),
   }));
 
+  const sessionItems = actions.sessions.map((session, index) => ({
+    id: `session:${session.id}`,
+    group: t('palette.group.sessions'),
+    title: session.label,
+    description: `${sessionStatusLabel(session.status)} · ${profileDescription(profileFromRequest(session.request))}`,
+    icon: providerIcons[session.providerType] || <CodeOutlined />,
+    keywords: `${session.label} ${session.providerType} ${session.status} ${index + 1}`,
+    run: () => {
+      actions.setActiveKey(session.id);
+      actions.setSelectedNav('sessions');
+    },
+  }));
+
   const quickCommandItems = actions.quickCommands.map((command) => ({
     id: `command:${command.id}`,
     group: t('palette.group.commands'),
@@ -3290,7 +3319,7 @@ function buildPaletteItems(actions) {
     },
   ];
 
-  return [...navigation, ...providerItems, ...profileItems, ...quickCommandItems, ...workspaceItems];
+  return [...navigation, ...sessionItems, ...providerItems, ...profileItems, ...quickCommandItems, ...workspaceItems];
 }
 
 function filterPaletteItems(items, query) {

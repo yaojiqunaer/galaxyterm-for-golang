@@ -236,6 +236,7 @@
   "settings.auditHint": "审计默认记录会话事件、输出录屏和操作摘要。导出前会对密码、Token、私钥等常见敏感内容做脱敏。",
   "settings.sshConfigImportHint": "仅解析 Host、HostName、User、Port、IdentityFile 元数据，不读取私钥文件内容，也不会保存密码。",
   "palette.group.navigation": "导航",
+  "palette.group.sessions": "会话",
   "palette.group.providers": "终端类型",
   "palette.group.connections": "连接",
   "palette.group.commands": "命令",

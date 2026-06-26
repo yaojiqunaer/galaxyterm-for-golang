@@ -246,10 +246,18 @@ select {
 .provider-row,
 .session-row {
   position: relative;
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
   min-height: 32px;
   padding: 6px 8px !important;
   border-radius: 6px;
   cursor: pointer;
+}
+
+.session-row .ant-typography {
+  flex: 0 0 auto;
+  font-size: 10px;
 }
 
 .provider-row:hover,
@@ -351,6 +359,7 @@ select {
   max-width: 100%;
   color: var(--muted);
   background: var(--terminal-chrome);
+  border-color: var(--terminal-border);
 }
 
 .topbar .command-palette-trigger .ant-typography {
@@ -1322,12 +1331,39 @@ select {
 }
 
 .command-palette-row {
-  padding: 10px 12px !important;
+  padding: 9px 12px !important;
   cursor: pointer;
+  transition: background 120ms ease;
 }
 
 .command-palette-row:hover {
   background: var(--accent-soft);
+}
+
+.command-palette-row .ant-list-item-meta {
+  align-items: center;
+}
+
+.command-palette-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.command-palette-title strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.command-palette-title small {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
 }
 
 code {

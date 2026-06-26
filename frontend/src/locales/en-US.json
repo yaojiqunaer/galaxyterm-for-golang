@@ -236,6 +236,7 @@
   "settings.auditHint": "Audit records include session events, output recordings, and operation summaries by default. Passwords, tokens, private keys, and common secrets are redacted before export.",
   "settings.sshConfigImportHint": "Parses Host, HostName, User, Port, and IdentityFile metadata only. It does not read private key files or save passwords.",
   "palette.group.navigation": "Navigation",
+  "palette.group.sessions": "Sessions",
   "palette.group.providers": "Terminal Types",
   "palette.group.connections": "Connections",
   "palette.group.commands": "Commands",
