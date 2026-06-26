@@ -9,7 +9,7 @@ export function buildConnectionGroups(profiles = []) {
   });
   return [...groups.entries()]
     .map(([key, items]) => {
-      const sortedProfiles = sortProfiles(items);
+      const sortedProfiles = sortConnectionProfiles(items);
       return {
         credentialCount: sortedProfiles.filter((profile) => profile.auth?.credentialRef).length,
         favoriteCount: sortedProfiles.filter((profile) => profile.favorite).length,
@@ -56,7 +56,7 @@ export function selectBatchProfiles(
     providerType = 'all',
   } = {},
 ) {
-  return sortProfiles(profiles.filter((profile) => {
+  return sortConnectionProfiles(profiles.filter((profile) => {
     const matchesFavorite = !favoritesOnly || profile.favorite;
     const matchesProvider = providerType === 'all' || profile.providerType === providerType;
     const profileGroup = profile.group || ungroupedKey;
@@ -70,10 +70,28 @@ export function resolveSelectedProfileId(profiles = [], selectedProfileId = '') 
   return profiles[0]?.id || '';
 }
 
-function sortProfiles(profiles) {
+export function sortConnectionProfiles(profiles = [], sortBy = 'favorites') {
   return [...profiles].sort((left, right) => {
+    if (sortBy === 'name') return compareText(left.displayName, right.displayName);
+    if (sortBy === 'provider') {
+      return compareText(left.providerType, right.providerType)
+        || compareText(left.displayName, right.displayName);
+    }
+    if (sortBy === 'group') {
+      return compareGroup(left.group || ungroupedKey, right.group || ungroupedKey)
+        || compareText(left.displayName, right.displayName);
+    }
     const favoriteDelta = Number(!!right.favorite) - Number(!!left.favorite);
-    if (favoriteDelta !== 0) return favoriteDelta;
-    return (left.displayName || '').localeCompare(right.displayName || '');
+    return favoriteDelta || compareText(left.displayName, right.displayName);
   });
+}
+
+function compareText(left = '', right = '') {
+  return String(left || '').localeCompare(String(right || ''));
+}
+
+function compareGroup(left, right) {
+  if (left === ungroupedKey && right !== ungroupedKey) return 1;
+  if (right === ungroupedKey && left !== ungroupedKey) return -1;
+  return compareText(left, right);
 }

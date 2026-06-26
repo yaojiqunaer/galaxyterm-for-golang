@@ -77,6 +77,7 @@ import {
   buildConnectionGroupNav,
   resolveSelectedProfileId,
   selectBatchProfiles,
+  sortConnectionProfiles,
   ungroupedKey,
 } from './connectionManager.js';
 import {
@@ -179,6 +180,7 @@ function App() {
   const [profileQuery, setProfileQuery] = useState('');
   const [groupQuery, setGroupQuery] = useState('all');
   const [providerFilter, setProviderFilter] = useState('all');
+  const [profileSort, setProfileSort] = useState('favorites');
   const [selectedProfileId, setSelectedProfileId] = useState('');
   const [auditQuery, setAuditQuery] = useState('');
   const [auditProviderFilter, setAuditProviderFilter] = useState('all');
@@ -336,8 +338,8 @@ function App() {
 
   const selectedProvider = providers.find((item) => item.type === newType) || providers[0] || fallbackProviders[0];
   const visibleProfiles = useMemo(
-    () => filteredProfiles(profiles, profileQuery, groupQuery, providerFilter),
-    [profiles, profileQuery, groupQuery, providerFilter],
+    () => sortConnectionProfiles(filteredProfiles(profiles, profileQuery, groupQuery, providerFilter), profileSort),
+    [profiles, profileQuery, groupQuery, providerFilter, profileSort],
   );
   const selectedProfile = visibleProfiles.find((profile) => profile.id === selectedProfileId) || visibleProfiles[0] || null;
 
@@ -1183,6 +1185,17 @@ function App() {
                   label: providerLabel(provider),
                   value: provider.type,
                 })),
+              ]}
+            />
+            <Select
+              className="connection-sort-select"
+              value={profileSort}
+              onChange={setProfileSort}
+              options={[
+                { value: 'favorites', label: t('sort.favorites') },
+                { value: 'name', label: t('sort.name') },
+                { value: 'provider', label: t('sort.provider') },
+                { value: 'group', label: t('sort.group') },
               ]}
             />
           </div>

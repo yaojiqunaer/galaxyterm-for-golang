@@ -4,6 +4,7 @@ import {
   buildConnectionGroups,
   resolveSelectedProfileId,
   selectBatchProfiles,
+  sortConnectionProfiles,
 } from './connectionManager.js';
 
 const profiles = [
@@ -68,6 +69,10 @@ assert.deepEqual(
   selectBatchProfiles(profiles, { favoritesOnly: true, providerType: 'ssh' }).map((profile) => profile.id),
   ['prod-db'],
 );
+
+assert.deepEqual(sortConnectionProfiles(profiles, 'name').map((profile) => profile.id), ['dev-shell', 'prod-db', 'prod-web']);
+assert.deepEqual(sortConnectionProfiles(profiles, 'provider').map((profile) => profile.id), ['dev-shell', 'prod-db', 'prod-web']);
+assert.deepEqual(sortConnectionProfiles(profiles, 'group').map((profile) => profile.id), ['prod-db', 'prod-web', 'dev-shell']);
 
 assert.equal(resolveSelectedProfileId(profiles, 'prod-web'), 'prod-web');
 assert.equal(resolveSelectedProfileId(profiles.filter((profile) => profile.id !== 'prod-web'), 'prod-web'), 'prod-db');
