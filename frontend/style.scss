@@ -1336,8 +1336,13 @@ select {
   transition: background 120ms ease;
 }
 
-.command-palette-row:hover {
+.command-palette-row:hover,
+.command-palette-row.active {
   background: var(--accent-soft);
+}
+
+.command-palette-row.active {
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .command-palette-row .ant-list-item-meta {

@@ -91,6 +91,10 @@ import {
 import TerminalPane from './components/TerminalPane.jsx';
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
 import { hasWailsMethod } from './desktopBridge.js';
+import {
+  filterPaletteItems,
+  resolvePaletteIndex,
+} from './paletteModel.js';
 import * as ExtensionsAPI from '../wailsjs/go/extensions/API.js';
 import * as FilesAPI from '../wailsjs/go/files/API.js';
 import * as ThemeAPI from '../wailsjs/go/internal/Theme.js';
@@ -176,6 +180,7 @@ function App() {
   const [focusMode, setFocusMode] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteQuery, setPaletteQuery] = useState('');
+  const [paletteActiveIndex, setPaletteActiveIndex] = useState(-1);
   const [selectedNav, setSelectedNav] = useState('connections');
   const [sessionView, setSessionView] = useState('tabs');
   const [profileQuery, setProfileQuery] = useState('');
@@ -1036,6 +1041,7 @@ function App() {
     item.run();
     setPaletteOpen(false);
     setPaletteQuery('');
+    setPaletteActiveIndex(-1);
   };
 
   const addQuickCommand = async () => {
@@ -2222,6 +2228,54 @@ function App() {
     restoreWorkspace,
   });
   const visiblePaletteItems = filterPaletteItems(paletteItems, paletteQuery);
+  const displayedPaletteItems = visiblePaletteItems.slice(0, 12);
+
+  useEffect(() => {
+    if (!paletteOpen) {
+      setPaletteActiveIndex(-1);
+      return;
+    }
+    setPaletteActiveIndex(displayedPaletteItems.length > 0 ? 0 : -1);
+  }, [paletteOpen, paletteQuery, displayedPaletteItems.length]);
+
+  const closePalette = () => {
+    setPaletteOpen(false);
+    setPaletteQuery('');
+    setPaletteActiveIndex(-1);
+  };
+
+  const runActivePaletteAction = () => {
+    const item = displayedPaletteItems[paletteActiveIndex] || displayedPaletteItems[0];
+    if (item) runPaletteAction(item);
+  };
+
+  const handlePaletteKeyDown = (event) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      setPaletteActiveIndex((current) => resolvePaletteIndex(displayedPaletteItems.length, current, 'next'));
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      setPaletteActiveIndex((current) => resolvePaletteIndex(displayedPaletteItems.length, current, 'previous'));
+    }
+    if (event.key === 'Home') {
+      event.preventDefault();
+      setPaletteActiveIndex(resolvePaletteIndex(displayedPaletteItems.length, paletteActiveIndex, 'first'));
+    }
+    if (event.key === 'End') {
+      event.preventDefault();
+      setPaletteActiveIndex(resolvePaletteIndex(displayedPaletteItems.length, paletteActiveIndex, 'last'));
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      runActivePaletteAction();
+    }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      closePalette();
+    }
+  };
+
   const workspaceMenuActions = {
     saveWorkspace,
     restoreWorkspace: () => restoreWorkspace(),
@@ -2507,26 +2561,25 @@ function App() {
         footer={null}
         width={620}
         className="command-palette-modal"
-        onCancel={() => {
-          setPaletteOpen(false);
-          setPaletteQuery('');
-        }}
+        onCancel={closePalette}
       >
         <Input
           autoFocus
           value={paletteQuery}
           onChange={(event) => setPaletteQuery(event.target.value)}
-          onPressEnter={() => {
-            if (visiblePaletteItems[0]) runPaletteAction(visiblePaletteItems[0]);
-          }}
+          onKeyDown={handlePaletteKeyDown}
           placeholder={t('placeholder.commandPalette')}
         />
         <List
           className="command-palette-list"
-          dataSource={visiblePaletteItems.slice(0, 12)}
+          dataSource={displayedPaletteItems}
           locale={{ emptyText: t('empty.noCommands') }}
-          renderItem={(item) => (
-            <List.Item className="command-palette-row" onClick={() => runPaletteAction(item)}>
+          renderItem={(item, index) => (
+            <List.Item
+              className={index === paletteActiveIndex ? 'command-palette-row active' : 'command-palette-row'}
+              onClick={() => runPaletteAction(item)}
+              onMouseEnter={() => setPaletteActiveIndex(index)}
+            >
               <List.Item.Meta
                 avatar={<span className="provider-icon">{item.icon}</span>}
                 title={(
@@ -3320,17 +3373,6 @@ function buildPaletteItems(actions) {
   ];
 
   return [...navigation, ...sessionItems, ...providerItems, ...profileItems, ...quickCommandItems, ...workspaceItems];
-}
-
-function filterPaletteItems(items, query) {
-  const keyword = query.trim().toLowerCase();
-  if (!keyword) return items;
-  return items.filter((item) => (
-    item.title?.toLowerCase().includes(keyword)
-    || item.description?.toLowerCase().includes(keyword)
-    || item.group?.toLowerCase().includes(keyword)
-    || item.keywords?.toLowerCase().includes(keyword)
-  ));
 }
 
 function downloadJson(fileName, payload) {
