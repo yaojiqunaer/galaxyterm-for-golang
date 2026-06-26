@@ -71,6 +71,22 @@ export function resolveSelectedProfileId(profiles = [], selectedProfileId = '') 
   return profiles[0]?.id || '';
 }
 
+export function summarizeProfileSessions(profiles = [], sessions = []) {
+  const profileIds = new Set(profiles.map((profile) => profile.id).filter(Boolean));
+  const summary = new Map(profiles.map((profile) => [profile.id, {
+    activeCount: 0,
+    focusSessionId: '',
+  }]));
+  sessions.forEach((session) => {
+    const profileId = session.request?.profileId;
+    if (!profileIds.has(profileId) || session.status === 'closed') return;
+    const item = summary.get(profileId);
+    item.activeCount += 1;
+    if (!item.focusSessionId) item.focusSessionId = session.id;
+  });
+  return summary;
+}
+
 export function sortConnectionProfiles(profiles = [], sortBy = 'favorites') {
   return [...profiles].sort((left, right) => {
     if (sortBy === 'name') return compareText(left.displayName, right.displayName);

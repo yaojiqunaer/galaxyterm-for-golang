@@ -77,6 +77,7 @@ import {
   buildConnectionGroupNav,
   resolveSelectedProfileId,
   selectBatchProfiles,
+  summarizeProfileSessions,
   sortConnectionProfiles,
   ungroupedKey,
 } from './connectionManager.js';
@@ -337,6 +338,7 @@ function App() {
   })), [providers, locale]);
 
   const selectedProvider = providers.find((item) => item.type === newType) || providers[0] || fallbackProviders[0];
+  const profileSessionSummary = useMemo(() => summarizeProfileSessions(profiles, sessions), [profiles, sessions]);
   const visibleProfiles = useMemo(
     () => sortConnectionProfiles(filteredProfiles(profiles, profileQuery, groupQuery, providerFilter), profileSort),
     [profiles, profileQuery, groupQuery, providerFilter, profileSort],
@@ -449,6 +451,8 @@ function App() {
             },
           };
         }
+        profileId = profileId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`);
+        request = { ...request, profileId };
         const nextProfiles = saveProfile(profiles, request, editingProfileId, profileId);
         setProfiles(nextProfiles);
         message.success(t('message.profileSaved'));
@@ -896,6 +900,16 @@ function App() {
     openDrawer(profile.providerType, profile);
   };
 
+  const focusProfileSession = (profile) => {
+    const summary = profileSessionSummary.get(profile.id);
+    if (!summary?.focusSessionId) {
+      openProfile(profile);
+      return;
+    }
+    setActiveKey(summary.focusSessionId);
+    setSelectedNav('sessions');
+  };
+
   const confirmDeleteProfile = (profile) => {
     Modal.confirm({
       title: t('confirm.deleteProfileTitle'),
@@ -1264,6 +1278,8 @@ function App() {
               openProfile={openProfile}
               openProfileEditor={openProfileEditor}
               duplicateProfile={duplicateProfile}
+              focusProfileSession={focusProfileSession}
+              profileSessionSummary={profileSessionSummary}
               toggleProfileFavorite={toggleProfileFavorite}
               confirmDeleteProfile={confirmDeleteProfile}
             />
@@ -1305,7 +1321,36 @@ function App() {
             <List
               className="profile-list connection-profile-list"
               dataSource={visibleProfiles}
-              renderItem={(profile) => (
+              renderItem={(profile) => {
+                const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
+                const actions = [
+                  ...(sessionInfo.activeCount > 0
+                    ? [<Button key="focus" size="small" onClick={() => focusProfileSession(profile)}>{t('action.focusSession')}</Button>]
+                    : []),
+                  <Button key="open" size="small" type="primary" onClick={() => openProfile(profile)}>{t('action.connect')}</Button>,
+                  <Dropdown
+                    key="manage"
+                    trigger={['click']}
+                    menu={{
+                      items: profileActionModel(profile).filter((action) => action !== 'connect').map((action) => ({
+                        key: action,
+                        danger: action === 'delete',
+                        label: t(`profile.action.${action}`),
+                      })),
+                      onClick: ({ key }) => runProfileAction(key, profile),
+                    }}
+                  >
+                    <Button size="small" icon={<MoreOutlined />}>{t('action.manage')}</Button>
+                  </Dropdown>,
+                  <Tooltip key="favorite" title={profile.favorite ? t('action.unfavorite') : t('action.favorite')}>
+                    <Button
+                      size="small"
+                      icon={profile.favorite ? <StarFilled /> : <StarOutlined />}
+                      onClick={() => toggleProfileFavorite(profile.id)}
+                    />
+                  </Tooltip>,
+                ];
+                return (
                 <List.Item
                   className={selectedProfile?.id === profile.id ? 'connection-profile-row active' : 'connection-profile-row'}
                   role="button"
@@ -1322,30 +1367,7 @@ function App() {
                       setSelectedProfileId(profile.id);
                     }
                   }}
-                  actions={[
-                    <Button key="open" size="small" type="primary" onClick={() => openProfile(profile)}>{t('action.connect')}</Button>,
-                    <Dropdown
-                      key="manage"
-                      trigger={['click']}
-                      menu={{
-                        items: profileActionModel(profile).filter((action) => action !== 'connect').map((action) => ({
-                          key: action,
-                          danger: action === 'delete',
-                          label: t(`profile.action.${action}`),
-                        })),
-                        onClick: ({ key }) => runProfileAction(key, profile),
-                      }}
-                    >
-                      <Button size="small" icon={<MoreOutlined />}>{t('action.manage')}</Button>
-                    </Dropdown>,
-                    <Tooltip key="favorite" title={profile.favorite ? t('action.unfavorite') : t('action.favorite')}>
-                      <Button
-                        size="small"
-                        icon={profile.favorite ? <StarFilled /> : <StarOutlined />}
-                        onClick={() => toggleProfileFavorite(profile.id)}
-                      />
-                    </Tooltip>,
-                  ]}
+                  actions={actions}
                 >
                   <List.Item.Meta
                     avatar={<span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>}
@@ -1353,6 +1375,7 @@ function App() {
                       <Space size={8}>
                         <span>{profile.displayName}</span>
                         <Tag>{providerTypeLabel(profile.providerType, providers)}</Tag>
+                        {sessionInfo.activeCount > 0 && <Tag color="green">{`${t('label.openSessions')}: ${sessionInfo.activeCount}`}</Tag>}
                         {profile.favorite && <Tag color="gold">{t('label.favorite')}</Tag>}
                         {profile.lastUsedAt && <Tag>{`${t('label.lastUsed')}: ${formatProfileLastUsed(profile.lastUsedAt)}`}</Tag>}
                         {profile.auth?.credentialRef && <Tag color="blue">{t('label.credentialSaved')}</Tag>}
@@ -1369,7 +1392,8 @@ function App() {
                     )}
                   />
                 </List.Item>
-              )}
+                );
+              }}
             />
           )}
         </section>
@@ -2796,12 +2820,15 @@ function ProviderCard({ provider, openDrawer }) {
 function ConnectionProfilePreview({
   confirmDeleteProfile,
   duplicateProfile,
+  focusProfileSession,
   openProfile,
   openProfileEditor,
   profile,
+  profileSessionSummary,
   providers,
   toggleProfileFavorite,
 }) {
+  const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
   return (
     <div className="connection-profile-preview">
       <div className="connection-profile-preview-main">
@@ -2815,9 +2842,13 @@ function ConnectionProfilePreview({
       <Space size={6} wrap>
         <Tag>{providerTypeLabel(profile.providerType, providers)}</Tag>
         <Tag>{profile.group ? profile.group : t('group.ungrouped')}</Tag>
+        {sessionInfo.activeCount > 0 && <Tag color="green">{`${t('label.openSessions')}: ${sessionInfo.activeCount}`}</Tag>}
         {profile.auth?.credentialRef && <Tag color="blue">{t('label.credentialSaved')}</Tag>}
       </Space>
       <Space size={6} wrap>
+        {sessionInfo.activeCount > 0 && (
+          <Button size="small" onClick={() => focusProfileSession(profile)}>{t('action.focusSession')}</Button>
+        )}
         <Button size="small" type="primary" onClick={() => openProfile(profile)}>{t('action.connect')}</Button>
         <Button size="small" icon={<EditOutlined />} onClick={() => openProfileEditor(profile)}>{t('action.edit')}</Button>
         <Button size="small" icon={<CopyOutlined />} onClick={() => duplicateProfile(profile)}>{t('action.duplicate')}</Button>
@@ -3109,6 +3140,7 @@ function profileFromRequest(request) {
 
 function profileToRequest(profile) {
   return {
+    profileId: profile.id,
     providerType: profile.providerType,
     displayName: profile.displayName,
     group: profile.group || '',
@@ -3318,6 +3350,7 @@ function saveProfile(profiles, request, editingProfileId = '', profileId = '') {
     group: request.group || '',
     config: request.config,
     favorite: !!existingProfile?.favorite,
+    lastUsedAt: existingProfile?.lastUsedAt || '',
     auth: {
       username: request.auth?.username || '',
       authType: request.auth?.authType || 'password',

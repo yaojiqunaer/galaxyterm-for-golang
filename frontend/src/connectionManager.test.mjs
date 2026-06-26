@@ -4,6 +4,7 @@ import {
   buildConnectionGroups,
   resolveSelectedProfileId,
   selectBatchProfiles,
+  summarizeProfileSessions,
   sortConnectionProfiles,
 } from './connectionManager.js';
 
@@ -80,6 +81,17 @@ assert.deepEqual(sortConnectionProfiles(profiles, 'name').map((profile) => profi
 assert.deepEqual(sortConnectionProfiles(profiles, 'provider').map((profile) => profile.id), ['dev-shell', 'prod-db', 'prod-web']);
 assert.deepEqual(sortConnectionProfiles(profiles, 'group').map((profile) => profile.id), ['prod-db', 'prod-web', 'dev-shell']);
 assert.deepEqual(sortConnectionProfiles(profiles, 'recent').map((profile) => profile.id), ['prod-web', 'prod-db', 'dev-shell']);
+
+const profileSessions = summarizeProfileSessions(profiles, [
+  { id: 's1', status: 'connected', request: { profileId: 'prod-db' } },
+  { id: 's2', status: 'connecting', request: { profileId: 'prod-db' } },
+  { id: 's3', status: 'closed', request: { profileId: 'prod-db' } },
+  { id: 's4', status: 'connected', request: { profileId: 'prod-web' } },
+  { id: 's5', status: 'connected', request: { profileId: 'missing' } },
+]);
+assert.deepEqual(profileSessions.get('prod-db'), { activeCount: 2, focusSessionId: 's1' });
+assert.deepEqual(profileSessions.get('prod-web'), { activeCount: 1, focusSessionId: 's4' });
+assert.deepEqual(profileSessions.get('dev-shell'), { activeCount: 0, focusSessionId: '' });
 
 assert.equal(resolveSelectedProfileId(profiles, 'prod-web'), 'prod-web');
 assert.equal(resolveSelectedProfileId(profiles.filter((profile) => profile.id !== 'prod-web'), 'prod-web'), 'prod-db');
