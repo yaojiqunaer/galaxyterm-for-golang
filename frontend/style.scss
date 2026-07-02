@@ -1176,6 +1176,11 @@ select {
   border-radius: 0;
 }
 
+.connection-empty-state {
+  margin: 0;
+  padding: 42px 16px;
+}
+
 .connection-profile-list:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;

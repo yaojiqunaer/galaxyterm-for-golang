@@ -1351,13 +1351,22 @@ function App() {
 
           {visibleProfiles.length === 0 ? (
             <Empty
+              className="connection-empty-state"
               image={Empty.PRESENTED_IMAGE_SIMPLE}
               description={profiles.length === 0 ? t('empty.noConnections') : t('empty.noConnectionMatches')}
             >
-              <Space wrap>
-                <Button type="primary" icon={<PlusOutlined />} onClick={() => openDrawer('ssh')}>{t('action.quickSsh')}</Button>
-                <Button onClick={() => setSshConfigOpen(true)}>{t('action.importSshConfig')}</Button>
-              </Space>
+              {profiles.length === 0 ? (
+                <Space wrap>
+                  <Button type="primary" icon={<PlusOutlined />} onClick={() => openDrawer('ssh')}>{t('action.quickSsh')}</Button>
+                  <Button onClick={() => setSshConfigOpen(true)}>{t('action.importSshConfig')}</Button>
+                </Space>
+              ) : (
+                <Space wrap>
+                  <Button type="primary" onClick={clearProfileFilters}>{t('action.clearFilters')}</Button>
+                  <Button icon={<PlusOutlined />} onClick={() => openDrawer('ssh')}>{t('action.quickSsh')}</Button>
+                  <Button onClick={() => setSshConfigOpen(true)}>{t('action.importSshConfig')}</Button>
+                </Space>
+              )}
             </Empty>
           ) : (
             <List
