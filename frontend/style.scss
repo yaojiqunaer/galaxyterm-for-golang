@@ -1176,6 +1176,11 @@ select {
   border-radius: 0;
 }
 
+.connection-profile-list:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 .connection-profile-row {
   cursor: pointer;
   outline: none;

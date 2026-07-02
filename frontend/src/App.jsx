@@ -95,6 +95,7 @@ import {
   filterPaletteItems,
   resolvePaletteIndex,
 } from './paletteModel.js';
+import { resolveListIndex } from './listNavigation.js';
 import * as ExtensionsAPI from '../wailsjs/go/extensions/API.js';
 import * as FilesAPI from '../wailsjs/go/files/API.js';
 import * as ThemeAPI from '../wailsjs/go/internal/Theme.js';
@@ -367,6 +368,36 @@ function App() {
       setSelectedProfileId(nextSelectedProfileId);
     }
   }, [selectedProfileId, visibleProfiles]);
+
+  const moveSelectedProfile = (action) => {
+    const currentIndex = visibleProfiles.findIndex((profile) => profile.id === selectedProfile?.id);
+    const nextIndex = resolveListIndex(visibleProfiles.length, currentIndex, action);
+    const nextProfile = visibleProfiles[nextIndex];
+    if (nextProfile) setSelectedProfileId(nextProfile.id);
+  };
+
+  const handleConnectionListKeyDown = (event) => {
+    if (event.key === 'ArrowDown') {
+      event.preventDefault();
+      moveSelectedProfile('next');
+    }
+    if (event.key === 'ArrowUp') {
+      event.preventDefault();
+      moveSelectedProfile('previous');
+    }
+    if (event.key === 'Home') {
+      event.preventDefault();
+      moveSelectedProfile('first');
+    }
+    if (event.key === 'End') {
+      event.preventDefault();
+      moveSelectedProfile('last');
+    }
+    if (event.key === 'Enter' && selectedProfile) {
+      event.preventDefault();
+      openProfile(selectedProfile);
+    }
+  };
 
   const connectionGroupNav = useMemo(() => buildConnectionGroupNav(profiles), [profiles]);
   const workspaceInsights = useMemo(() => summarizeWorkspace({
@@ -1332,6 +1363,9 @@ function App() {
             <List
               className="profile-list connection-profile-list"
               dataSource={visibleProfiles}
+              role="listbox"
+              tabIndex={0}
+              onKeyDown={handleConnectionListKeyDown}
               renderItem={(profile) => {
                 const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
                 const actions = [
@@ -1376,8 +1410,9 @@ function App() {
                 return (
                 <List.Item
                   className={selectedProfile?.id === profile.id ? 'connection-profile-row active' : 'connection-profile-row'}
-                  role="button"
-                  tabIndex={0}
+                  role="option"
+                  aria-selected={selectedProfile?.id === profile.id}
+                  tabIndex={-1}
                   onClick={() => setSelectedProfileId(profile.id)}
                   onDoubleClick={() => openProfile(profile)}
                   onKeyDown={(event) => {
