@@ -139,6 +139,88 @@ select {
   background: var(--accent-soft);
 }
 
+[data-density='compact'] .brand-block {
+  min-height: 54px;
+  padding: 10px 12px;
+}
+
+[data-density='compact'] .workspace-nav {
+  padding: 6px 8px;
+}
+
+[data-density='compact'] .workspace-nav .ant-menu-item {
+  height: 28px;
+  margin: 0;
+}
+
+[data-density='compact'] .sidebar-section {
+  padding: 8px 10px;
+}
+
+[data-density='compact'] .section-title {
+  height: 24px;
+}
+
+[data-density='compact'] .provider-row,
+[data-density='compact'] .session-row {
+  min-height: 28px;
+  padding: 4px 7px !important;
+}
+
+[data-density='compact'] .topbar {
+  min-height: 40px;
+  padding: 4px 8px;
+}
+
+[data-density='compact'] .workspace-page {
+  padding: 14px 16px;
+}
+
+[data-density='compact'] .connection-summary-strip,
+[data-density='compact'] .connection-list-header,
+[data-density='compact'] .connection-list-tools,
+[data-density='compact'] .recent-connection-rail {
+  padding-block: 7px;
+}
+
+[data-density='compact'] .connection-panel-head {
+  min-height: 36px;
+  padding: 6px 8px;
+}
+
+[data-density='compact'] .connection-group-nav-item {
+  min-height: 30px;
+  padding: 5px 8px;
+}
+
+[data-density='compact'] .profile-list .ant-list-item {
+  padding: 8px 12px !important;
+}
+
+[data-density='compact'] .connection-profile-preview {
+  gap: 10px;
+  padding: 12px;
+}
+
+[data-density='compact'] .terminal-session-toolbar,
+[data-density='compact'] .session-summary-bar,
+[data-density='compact'] .session-strip {
+  min-height: 34px;
+}
+
+[data-density='compact'] .terminal-tabs .ant-tabs-nav {
+  padding-top: 3px;
+}
+
+[data-density='compact'] .terminal-tabs .ant-tabs-tab {
+  min-width: 132px;
+  padding: 5px 10px !important;
+}
+
+[data-density='compact'] .statusbar {
+  min-height: 20px;
+}
+
 .theme-dark .provider-card,
 .theme-dark .profile-list,
 .theme-dark .file-browser-card,

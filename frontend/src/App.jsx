@@ -121,6 +121,7 @@ const defaultSettings = {
   fontFamily: 'SFMono-Regular,JetBrains Mono,Menlo,Consolas,Liberation Mono,monospace',
   fontSize: 14,
   scrollback: 5000,
+  interfaceDensity: 'comfortable',
   autoSaveWorkspace: true,
   autoRestoreWorkspace: false,
 };
@@ -255,6 +256,7 @@ function App() {
   useEffect(() => {
     persistSettings(settings);
     document.documentElement.dataset.appTheme = resolveAppTheme(settings.appTheme);
+    document.documentElement.dataset.density = settings.interfaceDensity || defaultSettings.interfaceDensity;
   }, [settings]);
 
   useEffect(() => {
@@ -1892,6 +1894,17 @@ function App() {
                 onChange={(value) => setSettings((current) => ({ ...current, appTheme: value }))}
               />
             </Form.Item>
+            <Form.Item label={t('field.interfaceDensity')}>
+              <Segmented
+                block
+                value={settings.interfaceDensity || defaultSettings.interfaceDensity}
+                options={[
+                  { value: 'comfortable', label: t('density.comfortable') },
+                  { value: 'compact', label: t('density.compact') },
+                ]}
+                onChange={(value) => setSettings((current) => ({ ...current, interfaceDensity: value }))}
+              />
+            </Form.Item>
             <Text type="secondary">{t('settings.languageHint')}</Text>
           </Form>
         </Card>
@@ -3521,9 +3534,13 @@ function loadSettings() {
 }
 
 function normalizeSettings(settings) {
+  const interfaceDensity = ['comfortable', 'compact'].includes(settings.interfaceDensity)
+    ? settings.interfaceDensity
+    : defaultSettings.interfaceDensity;
   return {
     ...defaultSettings,
     ...settings,
+    interfaceDensity,
     fontSize: clampNumber(settings.fontSize, 10, 24, defaultSettings.fontSize),
     scrollback: clampNumber(settings.scrollback, 500, 100000, defaultSettings.scrollback),
   };
