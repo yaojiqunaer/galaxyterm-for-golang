@@ -77,6 +77,7 @@
   "label.auditEvents": "审计事件",
   "label.credentialSaved": "凭据已保存",
   "label.current": "当前",
+  "hint.connectionListKeyboard": "↑↓ 选择 · Enter 打开 · 双击连接",
   "profile.action.connect": "进入终端",
   "profile.action.edit": "编辑连接",
   "profile.action.rename": "重命名",

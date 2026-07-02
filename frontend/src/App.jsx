@@ -1325,6 +1325,9 @@ function App() {
                 { value: 'group', label: t('sort.group') },
               ]}
             />
+            {visibleProfiles.length > 0 && (
+              <Text type="secondary" className="connection-list-hint">{t('hint.connectionListKeyboard')}</Text>
+            )}
           </div>
 
           {recentConnections.length > 0 && (

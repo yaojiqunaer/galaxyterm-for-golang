@@ -1151,6 +1151,12 @@ select {
   width: 132px;
 }
 
+.connection-list-hint {
+  margin-left: auto;
+  font-size: 12px;
+  white-space: nowrap;
+}
+
 .recent-connection-rail {
   padding: 9px 14px;
   border-bottom: 1px solid var(--border-subtle);
@@ -1313,6 +1319,11 @@ select {
   .connection-group-nav-item {
     min-width: 150px;
     flex: 1 1 150px;
+  }
+
+  .connection-list-hint {
+    width: 100%;
+    margin-left: 0;
   }
 
   .connection-detail-panel {
