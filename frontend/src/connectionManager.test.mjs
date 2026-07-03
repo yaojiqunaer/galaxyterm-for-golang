@@ -3,6 +3,8 @@ import {
   buildConnectionGroupNav,
   buildConnectionGroups,
   buildConnectionProfileBadges,
+  buildConnectionProfileFacts,
+  buildConnectionProfileSubtitle,
   filterConnectionProfiles,
   resolveSelectedProfileId,
   selectBatchProfiles,
@@ -121,6 +123,29 @@ assert.deepEqual(buildConnectionProfileBadges(profiles[2], { activeCount: 1 }), 
   { key: 'sessions', tone: 'success', value: 1 },
   { key: 'favorite', tone: 'warning', value: true },
 ]);
+assert.deepEqual(buildConnectionProfileFacts(profiles[0]), [
+  { key: 'host', value: '10.0.0.10' },
+  { key: 'port', value: 22 },
+  { key: 'username', value: '-' },
+  { key: 'lastUsed', value: '2026-06-25T10:00:00.000Z' },
+]);
+assert.deepEqual(buildConnectionProfileFacts({
+  ...profiles[1],
+  config: { ...profiles[1].config, jumpHost: 'jump.example.com' },
+}), [
+  { key: 'host', value: '10.0.0.20' },
+  { key: 'port', value: 22 },
+  { key: 'username', value: 'deploy' },
+  { key: 'lastUsed', value: '2026-06-26T10:00:00.000Z' },
+  { key: 'jumpHost', value: 'jump.example.com' },
+]);
+assert.deepEqual(buildConnectionProfileFacts(profiles[2]), [
+  { key: 'shell', value: '/bin/zsh' },
+  { key: 'lastUsed', value: '' },
+]);
+assert.equal(buildConnectionProfileSubtitle(profiles[0]), '10.0.0.10:22');
+assert.equal(buildConnectionProfileSubtitle(profiles[1]), 'deploy@10.0.0.20:22');
+assert.equal(buildConnectionProfileSubtitle(profiles[2]), '/bin/zsh');
 
 const profileSessions = summarizeProfileSessions(profiles, [
   { id: 's1', status: 'connected', request: { profileId: 'prod-db' } },

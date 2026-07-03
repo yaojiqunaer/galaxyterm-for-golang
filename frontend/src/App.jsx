@@ -76,6 +76,8 @@ import {
 import {
   buildConnectionGroupNav,
   buildConnectionProfileBadges,
+  buildConnectionProfileFacts,
+  buildConnectionProfileSubtitle,
   filterConnectionProfiles,
   resolveSelectedProfileId,
   selectBatchProfiles,
@@ -1485,7 +1487,7 @@ function App() {
                     )}
                     description={(
                       <span className="connection-profile-description">
-                        <span className="connection-profile-endpoint-line">{profileDescription(profile)}</span>
+                        <span className="connection-profile-endpoint-line">{buildConnectionProfileSubtitle(profile)}</span>
                         <span className="connection-profile-badges">
                           {badges.map((badge) => (
                             <span key={badge.key} className={`connection-profile-badge tone-${badge.tone}`}>
@@ -2572,12 +2574,12 @@ function App() {
                     <List.Item
                       className={sessionInfo.activeCount > 0 ? 'quick-profile-row active' : 'quick-profile-row'}
                       onClick={() => focusProfileSession(profile)}
-                      title={`${profile.displayName} · ${profileDescription(profile)}`}
+                      title={`${profile.displayName} · ${buildConnectionProfileSubtitle(profile)}`}
                     >
                       <span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>
                       <span className="quick-profile-main">
                         <span>{profile.displayName}</span>
-                        <small>{profileDescription(profile)}</small>
+                        <small>{buildConnectionProfileSubtitle(profile)}</small>
                         {badges.length > 0 && (
                           <span className="quick-profile-badges">
                             {badges.map((badge) => (
@@ -3035,7 +3037,7 @@ function SessionEmptyPanel({
                 <span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>
                 <span>
                   <strong>{profile.displayName}</strong>
-                  <small>{profileDescription(profile)}</small>
+                  <small>{buildConnectionProfileSubtitle(profile)}</small>
                 </span>
               </button>
             ))}
@@ -3086,6 +3088,7 @@ function ConnectionProfilePreview({
 }) {
   const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
   const badges = buildConnectionProfileBadges(profile, sessionInfo);
+  const facts = buildConnectionProfileFacts(profile);
   return (
     <div className="connection-profile-preview">
       <div className="connection-profile-hero">
@@ -3093,7 +3096,7 @@ function ConnectionProfilePreview({
         <div>
           <Text type="secondary">{providerTypeLabel(profile.providerType, providers)}</Text>
           <Title level={4}>{profile.displayName}</Title>
-          <Text className="connection-profile-endpoint">{profileDescription(profile)}</Text>
+          <Text className="connection-profile-endpoint">{buildConnectionProfileSubtitle(profile)}</Text>
         </div>
       </div>
       <div className="connection-profile-actions">
@@ -3111,22 +3114,12 @@ function ConnectionProfilePreview({
         ))}
       </div>
       <div className="connection-profile-facts">
-        <span>
-          <small>{t('field.host')}</small>
-          <strong>{profile.config?.host || profile.config?.shell || 'default shell'}</strong>
-        </span>
-        <span>
-          <small>{t('field.username')}</small>
-          <strong>{profile.auth?.username || '-'}</strong>
-        </span>
-        <span>
-          <small>{t('label.lastUsed')}</small>
-          <strong>{profile.lastUsedAt ? formatProfileLastUsed(profile.lastUsedAt) : '-'}</strong>
-        </span>
-        <span>
-          <small>{t('field.jumpHost')}</small>
-          <strong>{profile.config?.jumpHost || '-'}</strong>
-        </span>
+        {facts.map((fact) => (
+          <span key={fact.key}>
+            <small>{connectionProfileFactLabel(fact.key)}</small>
+            <strong>{connectionProfileFactValue(fact)}</strong>
+          </span>
+        ))}
       </div>
       <Space size={6} wrap>
         <Button size="small" icon={<CopyOutlined />} onClick={() => duplicateProfile(profile)}>{t('action.duplicate')}</Button>
@@ -3469,9 +3462,9 @@ function buildPaletteItems(actions) {
     id: `profile:${profile.id}`,
     group: t('palette.group.connections'),
     title: profile.displayName,
-    description: profileDescription(profile),
+    description: buildConnectionProfileSubtitle(profile),
     icon: providerIcons[profile.providerType] || <CodeOutlined />,
-    keywords: `${profile.displayName} ${profile.group || ''} ${profileDescription(profile)}`,
+    keywords: `${profile.displayName} ${profile.group || ''} ${buildConnectionProfileSubtitle(profile)}`,
     run: () => actions.openProfile(profile),
   }));
 
@@ -3605,6 +3598,21 @@ function connectionProfileBadgeLabel(badge) {
   if (badge.key === 'favorite') return t('label.favorite');
   if (badge.key === 'credential') return t('label.credentialSaved');
   return String(badge.value || badge.key);
+}
+
+function connectionProfileFactLabel(key) {
+  if (key === 'host') return t('field.host');
+  if (key === 'port') return t('field.port');
+  if (key === 'username') return t('field.username');
+  if (key === 'shell') return t('field.shell');
+  if (key === 'lastUsed') return t('label.lastUsed');
+  if (key === 'jumpHost') return t('field.jumpHost');
+  return key;
+}
+
+function connectionProfileFactValue(fact) {
+  if (fact.key === 'lastUsed') return fact.value ? formatProfileLastUsed(fact.value) : '-';
+  return fact.value || '-';
 }
 
 function connectionGroupLabel(item) {

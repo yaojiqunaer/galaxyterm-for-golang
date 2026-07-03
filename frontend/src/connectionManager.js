@@ -182,6 +182,32 @@ export function buildConnectionProfileBadges(profile = {}, sessionInfo = {}) {
   ].filter(Boolean);
 }
 
+export function buildConnectionProfileFacts(profile = {}) {
+  if (profile.providerType === 'ssh') {
+    return [
+      { key: 'host', value: profile.config?.host || '-' },
+      { key: 'port', value: profile.config?.port || 22 },
+      { key: 'username', value: profile.auth?.username || '-' },
+      { key: 'lastUsed', value: profile.lastUsedAt || '' },
+      profile.config?.jumpHost && { key: 'jumpHost', value: profile.config.jumpHost },
+    ].filter(Boolean);
+  }
+  return [
+    { key: 'shell', value: profile.config?.shell || 'default shell' },
+    { key: 'lastUsed', value: profile.lastUsedAt || '' },
+  ];
+}
+
+export function buildConnectionProfileSubtitle(profile = {}) {
+  if (profile.providerType === 'ssh') {
+    const host = profile.config?.host || '-';
+    const port = profile.config?.port || 22;
+    const username = profile.auth?.username;
+    return `${username ? `${username}@` : ''}${host}:${port}`;
+  }
+  return profile.config?.shell || 'default shell';
+}
+
 function compareText(left = '', right = '') {
   return String(left || '').localeCompare(String(right || ''));
 }
