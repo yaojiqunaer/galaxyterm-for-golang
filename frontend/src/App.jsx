@@ -75,6 +75,7 @@ import {
 } from './workspaceInsights.js';
 import {
   buildConnectionGroupNav,
+  filterConnectionProfiles,
   resolveSelectedProfileId,
   selectBatchProfiles,
   summarizeProfileSessions,
@@ -356,7 +357,11 @@ function App() {
   const selectedProvider = providers.find((item) => item.type === newType) || providers[0] || fallbackProviders[0];
   const profileSessionSummary = useMemo(() => summarizeProfileSessions(profiles, sessions), [profiles, sessions]);
   const visibleProfiles = useMemo(
-    () => sortConnectionProfiles(filteredProfiles(profiles, profileQuery, groupQuery, providerFilter), profileSort),
+    () => sortConnectionProfiles(filterConnectionProfiles(profiles, {
+      group: groupQuery,
+      providerType: providerFilter,
+      query: profileQuery,
+    }), profileSort),
     [profiles, profileQuery, groupQuery, providerFilter, profileSort],
   );
   const selectedProfile = visibleProfiles.find((profile) => profile.id === selectedProfileId) || visibleProfiles[0] || null;
@@ -3548,26 +3553,6 @@ function profileDescription(profile) {
     return `${profile.auth?.username || '-'}@${profile.config?.host || '-'}:${profile.config?.port || 22}`;
   }
   return profile.config?.shell || 'default shell';
-}
-
-function filteredProfiles(profiles, query, group = 'all', providerType = 'all') {
-  const keyword = query.trim().toLowerCase();
-  return profiles.filter((profile) => {
-    const profileGroup = profile.group || ungroupedKey;
-    const groupMatched = group === 'all'
-      || (group === 'favorites' && profile.favorite)
-      || profileGroup === group;
-    if (!groupMatched) return false;
-    if (providerType !== 'all' && profile.providerType !== providerType) return false;
-    if (!keyword) return true;
-    return (
-      profile.displayName?.toLowerCase().includes(keyword)
-      || profile.group?.toLowerCase().includes(keyword)
-      || profile.providerType?.toLowerCase().includes(keyword)
-      || profile.config?.host?.toLowerCase().includes(keyword)
-      || profile.auth?.username?.toLowerCase().includes(keyword)
-    );
-  }).sort((left, right) => Number(!!right.favorite) - Number(!!left.favorite));
 }
 
 function loadSettings() {

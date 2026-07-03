@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   buildConnectionGroupNav,
   buildConnectionGroups,
+  filterConnectionProfiles,
   resolveSelectedProfileId,
   selectBatchProfiles,
   summarizeProfileSessions,
@@ -16,6 +17,7 @@ const profiles = [
     group: 'Production',
     lastUsedAt: '2026-06-25T10:00:00.000Z',
     providerType: 'ssh',
+    config: { host: '10.0.0.10', port: 22 },
     auth: { credentialRef: { id: 'prod-db' } },
   },
   {
@@ -25,7 +27,8 @@ const profiles = [
     group: 'Production',
     lastUsedAt: '2026-06-26T10:00:00.000Z',
     providerType: 'ssh',
-    auth: {},
+    config: { host: '10.0.0.20', port: 22 },
+    auth: { username: 'deploy' },
   },
   {
     id: 'dev-shell',
@@ -33,6 +36,7 @@ const profiles = [
     favorite: true,
     group: '',
     providerType: 'local',
+    config: { shell: '/bin/zsh' },
     auth: {},
   },
 ];
@@ -75,6 +79,23 @@ assert.deepEqual(
 assert.deepEqual(
   selectBatchProfiles(profiles, { favoritesOnly: true, providerType: 'ssh' }).map((profile) => profile.id),
   ['prod-db'],
+);
+
+assert.deepEqual(
+  filterConnectionProfiles(profiles, { query: 'prod deploy' }).map((profile) => profile.id),
+  ['prod-web'],
+);
+assert.deepEqual(
+  filterConnectionProfiles(profiles, { group: 'favorites', query: 'ssh' }).map((profile) => profile.id),
+  ['prod-db'],
+);
+assert.deepEqual(
+  filterConnectionProfiles(profiles, { providerType: 'local', query: 'zsh' }).map((profile) => profile.id),
+  ['dev-shell'],
+);
+assert.deepEqual(
+  filterConnectionProfiles(profiles, { query: 'prod missing' }).map((profile) => profile.id),
+  [],
 );
 
 assert.deepEqual(sortConnectionProfiles(profiles, 'name').map((profile) => profile.id), ['dev-shell', 'prod-db', 'prod-web']);

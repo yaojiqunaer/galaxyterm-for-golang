@@ -66,6 +66,35 @@ export function selectBatchProfiles(
   }), sortBy);
 }
 
+export function filterConnectionProfiles(
+  profiles = [],
+  {
+    group = 'all',
+    providerType = 'all',
+    query = '',
+  } = {},
+) {
+  const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  return profiles.filter((profile) => {
+    const profileGroup = profile.group || ungroupedKey;
+    const groupMatched = group === 'all'
+      || (group === 'favorites' && profile.favorite)
+      || profileGroup === group;
+    if (!groupMatched) return false;
+    if (providerType !== 'all' && profile.providerType !== providerType) return false;
+    if (tokens.length === 0) return true;
+    const searchable = [
+      profile.displayName,
+      profile.group,
+      profile.providerType,
+      profile.config?.host,
+      profile.config?.shell,
+      profile.auth?.username,
+    ].filter(Boolean).join(' ').toLowerCase();
+    return tokens.every((token) => searchable.includes(token));
+  });
+}
+
 export function resolveSelectedProfileId(profiles = [], selectedProfileId = '') {
   if (profiles.some((profile) => profile.id === selectedProfileId)) return selectedProfileId;
   return profiles[0]?.id || '';
