@@ -94,6 +94,7 @@ import {
   sessionStatusTone,
   sessionSummary,
 } from './sessionPresentation.js';
+import { buildAppearanceSummary } from './settingsPresentation.js';
 import TerminalPane from './components/TerminalPane.jsx';
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
 import { hasWailsMethod } from './desktopBridge.js';
@@ -1962,6 +1963,14 @@ function App() {
           <Title level={3}>{t('section.preferences')}</Title>
         </div>
       </div>
+      <div className="settings-appearance-strip">
+        {buildAppearanceSummary(settings).map((item) => (
+          <span key={item.key}>
+            <small>{settingsSummaryLabel(item.key)}</small>
+            <strong>{settingsSummaryValue(item)}</strong>
+          </span>
+        ))}
+      </div>
       <Space direction="vertical" size={14} className="settings-stack">
         <Card title={t('settings.interface')}>
           <Form layout="vertical">
@@ -3620,6 +3629,20 @@ function connectionProfileFactLabel(key) {
 function connectionProfileFactValue(fact) {
   if (fact.key === 'lastUsed') return fact.value ? formatProfileLastUsed(fact.value) : '-';
   return fact.value || '-';
+}
+
+function settingsSummaryLabel(key) {
+  if (key === 'appTheme') return t('field.appTheme');
+  if (key === 'interfaceDensity') return t('field.interfaceDensity');
+  if (key === 'terminalTheme') return t('field.terminalTheme');
+  return key;
+}
+
+function settingsSummaryValue(item) {
+  if (item.key === 'appTheme') return t(`theme.${item.value}`);
+  if (item.key === 'interfaceDensity') return t(`density.${item.value}`);
+  if (item.key === 'terminalTheme') return item.value === 'auto' ? t('theme.auto') : item.value;
+  return item.value;
 }
 
 function connectionGroupLabel(item) {

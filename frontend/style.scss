@@ -1529,6 +1529,10 @@ select {
   .connection-detail-panel {
     order: -1;
   }
+
+  .settings-appearance-strip {
+    grid-template-columns: 1fr;
+  }
 }
 
 .recent-connection-list {
@@ -1851,6 +1855,39 @@ code {
 
 .settings-stack {
   width: 100%;
+}
+
+.settings-appearance-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.settings-appearance-strip span {
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.settings-appearance-strip small,
+.settings-appearance-strip strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-appearance-strip small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.settings-appearance-strip strong {
+  margin-top: 3px;
+  color: var(--text);
 }
 
 .settings-row {
