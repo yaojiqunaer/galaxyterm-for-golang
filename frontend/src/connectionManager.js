@@ -136,6 +136,17 @@ export function sortConnectionProfiles(profiles = [], sortBy = 'favorites') {
   });
 }
 
+export function sortSidebarProfiles(profiles = [], limit = 5) {
+  return [...profiles]
+    .sort((left, right) => {
+      const favoriteDelta = Number(!!right.favorite) - Number(!!left.favorite);
+      return favoriteDelta
+        || compareDateDesc(left.lastUsedAt, right.lastUsedAt)
+        || compareText(left.displayName, right.displayName);
+    })
+    .slice(0, limit);
+}
+
 function compareText(left = '', right = '') {
   return String(left || '').localeCompare(String(right || ''));
 }

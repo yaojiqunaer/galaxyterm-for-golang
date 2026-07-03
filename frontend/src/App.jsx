@@ -80,6 +80,7 @@ import {
   selectBatchProfiles,
   summarizeProfileSessions,
   sortConnectionProfiles,
+  sortSidebarProfiles,
   ungroupedKey,
 } from './connectionManager.js';
 import {
@@ -366,6 +367,7 @@ function App() {
   );
   const selectedProfile = visibleProfiles.find((profile) => profile.id === selectedProfileId) || visibleProfiles[0] || null;
   const hasProfileFilters = profileQuery.trim() || groupQuery !== 'all' || providerFilter !== 'all' || profileSort !== 'favorites';
+  const sidebarQuickProfiles = useMemo(() => sortSidebarProfiles(profiles, 5), [profiles]);
 
   useEffect(() => {
     const nextSelectedProfileId = resolveSelectedProfileId(visibleProfiles, selectedProfileId);
@@ -2512,6 +2514,32 @@ function App() {
               </List.Item>
             )}
           />
+          {sidebarQuickProfiles.length > 0 && (
+            <div className="sidebar-quick-profiles">
+              <div className="section-title compact">{t('section.savedConnections')}</div>
+              <List
+                size="small"
+                dataSource={sidebarQuickProfiles}
+                renderItem={(profile) => {
+                  const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
+                  return (
+                    <List.Item
+                      className={sessionInfo.activeCount > 0 ? 'quick-profile-row active' : 'quick-profile-row'}
+                      onClick={() => focusProfileSession(profile)}
+                      title={`${profile.displayName} · ${profileDescription(profile)}`}
+                    >
+                      <span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>
+                      <span className="quick-profile-main">
+                        <span>{profile.displayName}</span>
+                        <small>{profileDescription(profile)}</small>
+                      </span>
+                      {profile.favorite && <StarFilled className="quick-profile-star" />}
+                    </List.Item>
+                  );
+                }}
+              />
+            </div>
+          )}
         </div>
 
         <div className="sidebar-section sidebar-fill">

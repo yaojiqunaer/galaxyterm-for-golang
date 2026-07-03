@@ -162,6 +162,7 @@ select {
 }
 
 [data-density='compact'] .provider-row,
+[data-density='compact'] .quick-profile-row,
 [data-density='compact'] .session-row {
   min-height: 28px;
   padding: 4px 7px !important;
@@ -325,7 +326,12 @@ select {
   text-transform: uppercase;
 }
 
+.section-title.compact {
+  margin-top: 6px;
+}
+
 .provider-row,
+.quick-profile-row,
 .session-row {
   position: relative;
   display: flex !important;
@@ -337,15 +343,64 @@ select {
   cursor: pointer;
 }
 
+.quick-profile-row {
+  align-items: center;
+}
+
 .session-row .ant-typography {
   flex: 0 0 auto;
   font-size: 10px;
 }
 
 .provider-row:hover,
+.quick-profile-row:hover,
+.quick-profile-row.active,
 .session-row:hover,
 .session-row.active {
   background: var(--accent-soft);
+}
+
+.quick-profile-row.active::before {
+  position: absolute;
+  inset: 5px auto 5px 0;
+  width: 3px;
+  border-radius: 999px;
+  background: var(--success);
+  content: '';
+}
+
+.sidebar-quick-profiles {
+  margin-top: 6px;
+}
+
+.quick-profile-main {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.quick-profile-main span,
+.quick-profile-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-profile-main span {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.quick-profile-main small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.quick-profile-star {
+  flex: 0 0 auto;
+  color: var(--warning);
+  font-size: 12px;
 }
 
 .session-row.active::before {
