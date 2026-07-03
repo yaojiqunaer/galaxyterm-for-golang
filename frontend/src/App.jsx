@@ -97,7 +97,12 @@ import {
   filterPaletteItems,
   resolvePaletteIndex,
 } from './paletteModel.js';
-import { resolveListIndex } from './listNavigation.js';
+import {
+  resolveListIndex,
+  resolveBracketSessionAction,
+  resolveNumberedSessionIndex,
+  resolveRelativeSessionIndex,
+} from './listNavigation.js';
 import * as ExtensionsAPI from '../wailsjs/go/extensions/API.js';
 import * as FilesAPI from '../wailsjs/go/files/API.js';
 import * as ThemeAPI from '../wailsjs/go/internal/Theme.js';
@@ -291,8 +296,20 @@ function App() {
         event.preventDefault();
         setPaletteOpen(true);
       }
-      if (/^[1-9]$/.test(key) && sessions.length > 0) {
-        const nextSession = sessions[Number(key) - 1];
+      const numberedSessionIndex = resolveNumberedSessionIndex(key, sessions.length);
+      if (numberedSessionIndex >= 0) {
+        const nextSession = sessions[numberedSessionIndex];
+        if (nextSession) {
+          event.preventDefault();
+          setActiveKey(nextSession.id);
+          setSelectedNav('sessions');
+        }
+      }
+      const relativeSessionAction = resolveBracketSessionAction(event);
+      if (relativeSessionAction && sessions.length > 0) {
+        const sessionIds = sessions.map((session) => session.id);
+        const nextIndex = resolveRelativeSessionIndex(sessionIds, activeKey, relativeSessionAction);
+        const nextSession = sessions[nextIndex];
         if (nextSession) {
           event.preventDefault();
           setActiveKey(nextSession.id);
@@ -337,7 +354,7 @@ function App() {
     };
     window.addEventListener('keydown', handleKeydown);
     return () => window.removeEventListener('keydown', handleKeydown);
-  }, [activeKey, sessions.length]);
+  }, [activeKey, sessions]);
 
   useEffect(() => {
     if (activeKey && terminalRefs.current[activeKey]?.fit) {
@@ -2051,6 +2068,8 @@ function App() {
               ['Cmd/Ctrl + N', t('action.newTerminal')],
               ['Cmd/Ctrl + P', t('action.commandPalette')],
               ['Cmd/Ctrl + K', t('action.commands')],
+              ['Cmd/Ctrl + 1..9', t('shortcut.switchNumberedSession')],
+              ['Cmd/Ctrl + Shift + [ / ]', t('shortcut.switchAdjacentSession')],
               ['Cmd/Ctrl + R', t('action.reconnect')],
               ['Cmd/Ctrl + Shift + F', t('action.focusMode')],
               ['Cmd/Ctrl + Shift + C', t('action.copySelection')],
@@ -2550,7 +2569,10 @@ function App() {
         </div>
 
         <div className="sidebar-section sidebar-fill">
-          <div className="section-title">{t('section.activeSessions')}</div>
+          <div className="section-title with-hint">
+            <span>{t('section.activeSessions')}</span>
+            {sessions.length > 0 && <Text code>{t('shortcut.numberedSession')}</Text>}
+          </div>
           {sessions.length === 0 ? (
             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noSessions')} />
           ) : (

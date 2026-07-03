@@ -330,6 +330,22 @@ select {
   margin-top: 6px;
 }
 
+.section-title.with-hint {
+  gap: 8px;
+}
+
+.section-title.with-hint span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.section-title.with-hint code {
+  flex: 0 0 auto;
+  opacity: 0.78;
+}
+
 .provider-row,
 .quick-profile-row,
 .session-row {
