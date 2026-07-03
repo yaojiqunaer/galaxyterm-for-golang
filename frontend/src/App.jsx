@@ -94,7 +94,10 @@ import {
   sessionStatusTone,
   sessionSummary,
 } from './sessionPresentation.js';
-import { buildAppearanceSummary } from './settingsPresentation.js';
+import {
+  buildAppearanceSummary,
+  buildShortcutGroups,
+} from './settingsPresentation.js';
 import TerminalPane from './components/TerminalPane.jsx';
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
 import { hasWailsMethod } from './desktopBridge.js';
@@ -2093,29 +2096,23 @@ function App() {
         </Card>
 
         <Card title={t('settings.shortcuts')}>
-          <List
-            size="small"
-            dataSource={[
-              ['Cmd/Ctrl + N', t('action.newTerminal')],
-              ['Cmd/Ctrl + P', t('action.commandPalette')],
-              ['Cmd/Ctrl + K', t('action.commands')],
-              ['Cmd/Ctrl + 1..9', t('shortcut.switchNumberedSession')],
-              ['Cmd/Ctrl + Shift + [ / ]', t('shortcut.switchAdjacentSession')],
-              ['Cmd/Ctrl + R', t('action.reconnect')],
-              ['Cmd/Ctrl + Shift + F', t('action.focusMode')],
-              ['Cmd/Ctrl + Shift + C', t('action.copySelection')],
-              ['Cmd/Ctrl + Shift + V', t('action.pasteClipboard')],
-              ['Cmd/Ctrl + L', t('action.clearTerminal')],
-              ['Cmd/Ctrl + +/-/0', t('action.zoomReset')],
-              [t('action.sessionActions'), t('action.exportTranscript')],
-            ]}
-            renderItem={([shortcut, action]) => (
-              <List.Item>
-                <Text code>{shortcut}</Text>
-                <Text>{action}</Text>
-              </List.Item>
-            )}
-          />
+          <div className="shortcut-group-grid">
+            {buildShortcutGroups().map((group) => (
+              <div key={group.key} className="shortcut-group">
+                <Text strong>{t(`shortcut.group.${group.key}`)}</Text>
+                <List
+                  size="small"
+                  dataSource={group.items}
+                  renderItem={([shortcut, actionKey]) => (
+                    <List.Item>
+                      <Text code>{shortcut}</Text>
+                      <Text>{t(actionKey)}</Text>
+                    </List.Item>
+                  )}
+                />
+              </div>
+            ))}
+          </div>
         </Card>
       </Space>
     </div>

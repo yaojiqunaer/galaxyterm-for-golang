@@ -1901,6 +1901,30 @@ code {
   font-size: 12px;
 }
 
+.shortcut-group-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.shortcut-group {
+  min-width: 0;
+}
+
+.shortcut-group .ant-typography strong {
+  display: block;
+  margin-bottom: 6px;
+}
+
+.shortcut-group .ant-list-item {
+  gap: 10px;
+  padding-inline: 0 !important;
+}
+
+.shortcut-group code {
+  flex: 0 0 auto;
+}
+
 .remote-file-row {
   cursor: default;
 }

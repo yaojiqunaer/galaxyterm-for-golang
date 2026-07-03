@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
-import { buildAppearanceSummary } from './settingsPresentation.js';
+import {
+  buildAppearanceSummary,
+  buildShortcutGroups,
+} from './settingsPresentation.js';
 
 assert.deepEqual(buildAppearanceSummary({
   appTheme: 'system',
@@ -18,4 +21,13 @@ assert.deepEqual(buildAppearanceSummary({
   { key: 'appTheme', value: 'dark' },
   { key: 'interfaceDensity', value: 'comfortable' },
   { key: 'terminalTheme', value: 'Catppuccin' },
+]);
+
+assert.deepEqual(buildShortcutGroups().map((group) => ({
+  key: group.key,
+  count: group.items.length,
+})), [
+  { key: 'terminal', count: 7 },
+  { key: 'sessions', count: 4 },
+  { key: 'workspace', count: 2 },
 ]);
