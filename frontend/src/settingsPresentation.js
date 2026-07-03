@@ -48,6 +48,14 @@ export function buildTerminalPreview(settings = {}) {
   };
 }
 
+export function buildWorkspaceSnapshotSummary(summary = null) {
+  return {
+    count: summary?.count || 0,
+    hasSnapshot: !!summary,
+    updatedAt: summary?.updatedAt || '',
+  };
+}
+
 function clampNumber(value, min, max, fallback) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;

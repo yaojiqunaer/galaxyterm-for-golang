@@ -98,6 +98,7 @@ import {
   buildAppearanceSummary,
   buildShortcutGroups,
   buildTerminalPreview,
+  buildWorkspaceSnapshotSummary,
 } from './settingsPresentation.js';
 import TerminalPane from './components/TerminalPane.jsx';
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
@@ -2078,13 +2079,7 @@ function App() {
                 onChange={(checked) => setSettings((current) => ({ ...current, autoRestoreWorkspace: checked }))}
               />
             </Space>
-            <Alert
-              type="info"
-              showIcon
-              message={workspaceSummary
-                ? `${t('settings.workspaceSnapshot')}: ${workspaceSummary.count} · ${workspaceSummary.updatedAt}`
-                : t('message.noWorkspaceSnapshot')}
-            />
+            <WorkspaceSnapshotStatus summary={buildWorkspaceSnapshotSummary(workspaceSummary)} />
             <Space wrap>
               <Button icon={<SaveOutlined />} onClick={saveWorkspace}>{t('action.saveWorkspace')}</Button>
               <Button icon={<ReloadOutlined />} onClick={() => restoreWorkspace()}>{t('action.restoreWorkspace')}</Button>
@@ -3098,6 +3093,18 @@ function TerminalSettingsPreview({ preview }) {
       >
         <code>{'galaxyterm % ssh prod\nconnected | audit enabled\n$ kubectl get pods'}</code>
       </pre>
+    </div>
+  );
+}
+
+function WorkspaceSnapshotStatus({ summary }) {
+  return (
+    <div className={summary.hasSnapshot ? 'workspace-snapshot-status active' : 'workspace-snapshot-status'}>
+      <span>
+        <small>{t('settings.workspaceSnapshot')}</small>
+        <strong>{summary.hasSnapshot ? summary.count : t('message.noWorkspaceSnapshot')}</strong>
+      </span>
+      {summary.hasSnapshot && <small>{summary.updatedAt}</small>}
     </div>
   );
 }

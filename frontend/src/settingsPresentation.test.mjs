@@ -3,6 +3,7 @@ import {
   buildAppearanceSummary,
   buildShortcutGroups,
   buildTerminalPreview,
+  buildWorkspaceSnapshotSummary,
 } from './settingsPresentation.js';
 
 assert.deepEqual(buildAppearanceSummary({
@@ -54,3 +55,14 @@ assert.deepEqual(buildTerminalPreview({}), {
 
 assert.equal(buildTerminalPreview({ fontSize: 99 }).fontSize, 24);
 assert.equal(buildTerminalPreview({ fontSize: 2 }).fontSize, 10);
+
+assert.deepEqual(buildWorkspaceSnapshotSummary(null), {
+  count: 0,
+  hasSnapshot: false,
+  updatedAt: '',
+});
+assert.deepEqual(buildWorkspaceSnapshotSummary({ count: 3, updatedAt: '2026-07-04 12:00' }), {
+  count: 3,
+  hasSnapshot: true,
+  updatedAt: '2026-07-04 12:00',
+});

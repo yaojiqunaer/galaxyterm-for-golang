@@ -1942,6 +1942,39 @@ code {
   white-space: pre-wrap;
 }
 
+.workspace-snapshot-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+}
+
+.workspace-snapshot-status.active {
+  border-color: rgb(23 107 135 / 24%);
+  background: var(--accent-soft);
+}
+
+.workspace-snapshot-status span {
+  min-width: 0;
+}
+
+.workspace-snapshot-status small,
+.workspace-snapshot-status strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.workspace-snapshot-status small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .shortcut-group-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
