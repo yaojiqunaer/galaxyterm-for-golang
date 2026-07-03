@@ -208,6 +208,14 @@ export function buildConnectionProfileSubtitle(profile = {}) {
   return profile.config?.shell || 'default shell';
 }
 
+export function buildConnectionProfileHints(sessionInfo = {}) {
+  return [
+    sessionInfo.activeCount > 0 && 'focusOpenSession',
+    'enterOpen',
+    'doubleClickOpen',
+  ].filter(Boolean);
+}
+
 function compareText(left = '', right = '') {
   return String(left || '').localeCompare(String(right || ''));
 }

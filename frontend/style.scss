@@ -1436,6 +1436,20 @@ select {
   flex: 1;
 }
 
+.connection-profile-hints {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.connection-profile-hints span {
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: var(--panel-muted);
+}
+
 .connection-profile-facts {
   display: grid;
   grid-template-columns: 1fr;

@@ -77,6 +77,7 @@ import {
   buildConnectionGroupNav,
   buildConnectionProfileBadges,
   buildConnectionProfileFacts,
+  buildConnectionProfileHints,
   buildConnectionProfileSubtitle,
   filterConnectionProfiles,
   resolveSelectedProfileId,
@@ -3089,6 +3090,7 @@ function ConnectionProfilePreview({
   const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
   const badges = buildConnectionProfileBadges(profile, sessionInfo);
   const facts = buildConnectionProfileFacts(profile);
+  const hints = buildConnectionProfileHints(sessionInfo);
   return (
     <div className="connection-profile-preview">
       <div className="connection-profile-hero">
@@ -3132,6 +3134,11 @@ function ConnectionProfilePreview({
         </Button>
         <Button size="small" danger icon={<DeleteOutlined />} onClick={() => confirmDeleteProfile(profile)}>{t('action.delete')}</Button>
       </Space>
+      <div className="connection-profile-hints">
+        {hints.map((hint) => (
+          <span key={hint}>{t(`connection.hint.${hint}`)}</span>
+        ))}
+      </div>
     </div>
   );
 }

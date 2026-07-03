@@ -4,6 +4,7 @@ import {
   buildConnectionGroups,
   buildConnectionProfileBadges,
   buildConnectionProfileFacts,
+  buildConnectionProfileHints,
   buildConnectionProfileSubtitle,
   filterConnectionProfiles,
   resolveSelectedProfileId,
@@ -146,6 +147,8 @@ assert.deepEqual(buildConnectionProfileFacts(profiles[2]), [
 assert.equal(buildConnectionProfileSubtitle(profiles[0]), '10.0.0.10:22');
 assert.equal(buildConnectionProfileSubtitle(profiles[1]), 'deploy@10.0.0.20:22');
 assert.equal(buildConnectionProfileSubtitle(profiles[2]), '/bin/zsh');
+assert.deepEqual(buildConnectionProfileHints({ activeCount: 0 }), ['enterOpen', 'doubleClickOpen']);
+assert.deepEqual(buildConnectionProfileHints({ activeCount: 2 }), ['focusOpenSession', 'enterOpen', 'doubleClickOpen']);
 
 const profileSessions = summarizeProfileSessions(profiles, [
   { id: 's1', status: 'connected', request: { profileId: 'prod-db' } },
