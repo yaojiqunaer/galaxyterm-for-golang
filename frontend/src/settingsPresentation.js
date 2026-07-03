@@ -38,3 +38,18 @@ export function buildShortcutGroups() {
     },
   ];
 }
+
+export function buildTerminalPreview(settings = {}) {
+  return {
+    fontFamily: settings.fontFamily || 'Menlo, Monaco, Consolas, monospace',
+    fontSize: clampNumber(settings.fontSize, 10, 24, 14),
+    scrollback: settings.scrollback || 10000,
+    terminalTheme: settings.terminalTheme || 'auto',
+  };
+}
+
+function clampNumber(value, min, max, fallback) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+}

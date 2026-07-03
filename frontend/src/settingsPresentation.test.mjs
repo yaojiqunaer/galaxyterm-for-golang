@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   buildAppearanceSummary,
   buildShortcutGroups,
+  buildTerminalPreview,
 } from './settingsPresentation.js';
 
 assert.deepEqual(buildAppearanceSummary({
@@ -31,3 +32,25 @@ assert.deepEqual(buildShortcutGroups().map((group) => ({
   { key: 'sessions', count: 4 },
   { key: 'workspace', count: 2 },
 ]);
+
+assert.deepEqual(buildTerminalPreview({
+  fontFamily: 'JetBrains Mono',
+  fontSize: 15,
+  scrollback: 5000,
+  terminalTheme: 'Tokyo Night',
+}), {
+  fontFamily: 'JetBrains Mono',
+  fontSize: 15,
+  scrollback: 5000,
+  terminalTheme: 'Tokyo Night',
+});
+
+assert.deepEqual(buildTerminalPreview({}), {
+  fontFamily: 'Menlo, Monaco, Consolas, monospace',
+  fontSize: 14,
+  scrollback: 10000,
+  terminalTheme: 'auto',
+});
+
+assert.equal(buildTerminalPreview({ fontSize: 99 }).fontSize, 24);
+assert.equal(buildTerminalPreview({ fontSize: 2 }).fontSize, 10);

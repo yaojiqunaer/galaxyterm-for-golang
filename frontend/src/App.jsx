@@ -97,6 +97,7 @@ import {
 import {
   buildAppearanceSummary,
   buildShortcutGroups,
+  buildTerminalPreview,
 } from './settingsPresentation.js';
 import TerminalPane from './components/TerminalPane.jsx';
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
@@ -2015,6 +2016,7 @@ function App() {
         </Card>
 
         <Card title={t('settings.terminal')}>
+          <TerminalSettingsPreview preview={buildTerminalPreview(settings)} />
           <Form layout="vertical">
             <Form.Item label={t('field.terminalTheme')}>
               <Select
@@ -3079,6 +3081,24 @@ function ProviderCard({ provider, openDrawer }) {
       <strong>{providerLabel(provider)}</strong>
       <small>{provider.category === 'builtin' ? t('provider.category.builtin') : t('provider.category.extension')}</small>
     </button>
+  );
+}
+
+function TerminalSettingsPreview({ preview }) {
+  return (
+    <div className="terminal-settings-preview">
+      <div className="terminal-settings-preview-head">
+        <span>{preview.terminalTheme === 'auto' ? t('theme.auto') : preview.terminalTheme}</span>
+        <small>{`${preview.fontSize}px | ${preview.scrollback}`}</small>
+      </div>
+      <pre style={{
+        fontFamily: preview.fontFamily,
+        fontSize: preview.fontSize,
+      }}
+      >
+        <code>{'galaxyterm % ssh prod\nconnected | audit enabled\n$ kubectl get pods'}</code>
+      </pre>
+    </div>
   );
 }
 

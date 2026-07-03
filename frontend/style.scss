@@ -1901,6 +1901,47 @@ code {
   font-size: 12px;
 }
 
+.terminal-settings-preview {
+  overflow: hidden;
+  margin-bottom: 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--terminal-bg);
+  color: var(--terminal-fg);
+}
+
+.terminal-settings-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 10px;
+  border-bottom: 1px solid rgb(148 163 184 / 18%);
+  background: rgb(148 163 184 / 8%);
+}
+
+.terminal-settings-preview-head span,
+.terminal-settings-preview-head small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminal-settings-preview-head small {
+  flex: 0 0 auto;
+  color: var(--terminal-muted);
+}
+
+.terminal-settings-preview pre {
+  min-height: 96px;
+  margin: 0;
+  padding: 12px;
+  overflow: hidden;
+  color: inherit;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
 .shortcut-group-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
