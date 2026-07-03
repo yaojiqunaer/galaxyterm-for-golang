@@ -3085,6 +3085,7 @@ function ConnectionProfilePreview({
   toggleProfileFavorite,
 }) {
   const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
+  const badges = buildConnectionProfileBadges(profile, sessionInfo);
   return (
     <div className="connection-profile-preview">
       <div className="connection-profile-hero">
@@ -3103,10 +3104,11 @@ function ConnectionProfilePreview({
         <Button size="small" icon={<EditOutlined />} onClick={() => openProfileEditor(profile)}>{t('action.edit')}</Button>
       </div>
       <div className="connection-profile-tags">
-        <Tag>{profile.group ? profile.group : t('group.ungrouped')}</Tag>
-        {sessionInfo.activeCount > 0 && <Tag color="green">{`${t('label.openSessions')}: ${sessionInfo.activeCount}`}</Tag>}
-        {profile.favorite && <Tag color="gold">{t('label.favorite')}</Tag>}
-        {profile.auth?.credentialRef && <Tag color="blue">{t('label.credentialSaved')}</Tag>}
+        {badges.map((badge) => (
+          <span key={badge.key} className={`connection-profile-badge tone-${badge.tone}`}>
+            {connectionProfileBadgeLabel(badge)}
+          </span>
+        ))}
       </div>
       <div className="connection-profile-facts">
         <span>
