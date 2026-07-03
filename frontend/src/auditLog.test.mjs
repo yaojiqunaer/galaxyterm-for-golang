@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   buildAsciinemaCast,
+  buildAuditRecordSummary,
   createAuditEvent,
   parseAsciinemaCast,
   renderCastFrame,
@@ -67,3 +68,25 @@ const ansiCast = buildAsciinemaCast({
 });
 const parsedAnsiCast = parseAsciinemaCast(ansiCast);
 assert.equal(renderReplayFrame(parsedAnsiCast.events, 1), 'hello\nworld');
+
+const summary = buildAuditRecordSummary({
+  auditEvents: [{ type: 'copy' }, { type: 'paste' }],
+  cast,
+  providerType: 'ssh',
+  title: 'prod',
+});
+assert.deepEqual(summary, {
+  duration: 1.5,
+  eventCount: 2,
+  hasRecording: true,
+  providerType: 'ssh',
+  title: 'prod',
+});
+
+assert.deepEqual(buildAuditRecordSummary({ title: '' }), {
+  duration: 0,
+  eventCount: 0,
+  hasRecording: false,
+  providerType: 'terminal',
+  title: 'Untitled',
+});

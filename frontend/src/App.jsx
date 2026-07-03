@@ -64,6 +64,7 @@ import {
 import {
   buildAsciinemaCast,
   buildAuditRecord,
+  buildAuditRecordSummary,
   createAuditEvent,
   parseAsciinemaCast,
   renderReplayFrame,
@@ -2218,7 +2219,7 @@ function App() {
           <Button danger onClick={clearAuditRecords} disabled={auditRecords.length === 0}>{t('action.clear')}</Button>
         </Space>
       </div>
-      <Alert type="info" showIcon message={t('settings.auditHint')} />
+      <div className="audit-hint-strip">{t('settings.auditHint')}</div>
       <div className="audit-summary-grid">
         <MetricCard label={t('metric.recordings')} value={auditRecords.length} />
         <MetricCard label={t('metric.visibleRecords')} value={visibleAuditRecords.length} />
@@ -2252,32 +2253,39 @@ function App() {
             </Empty>
           ),
         }}
-        renderItem={(record) => (
-          <List.Item
-            actions={[
-              <Button key="replay" size="small" onClick={() => setReplayRecord(record)}>{t('action.replay')}</Button>,
-              <Button key="cast" size="small" onClick={() => exportAuditRecord(record, 'cast')}>{t('action.exportCast')}</Button>,
-              <Button key="log" size="small" onClick={() => exportAuditRecord(record, 'log')}>{t('action.exportLog')}</Button>,
-              <Button key="delete" size="small" danger onClick={() => deleteAuditRecord(record.id)}>{t('action.delete')}</Button>,
-            ]}
-          >
-            <List.Item.Meta
-              avatar={<span className="provider-icon"><AuditOutlined /></span>}
-              title={(
-                <Space size={8}>
-                  <span>{record.title}</span>
-                  <Tag>{record.providerType || 'terminal'}</Tag>
-                </Space>
-              )}
-              description={(
-                <Space direction="vertical" size={2}>
-                  <Text type="secondary">{`${record.startedAt || '-'} -> ${record.endedAt || '-'}`}</Text>
-                  <Text type="secondary">{`${t('label.auditEvents')}: ${(record.auditEvents || []).length}`}</Text>
-                </Space>
-              )}
-            />
-          </List.Item>
-        )}
+        renderItem={(record) => {
+          const summary = buildAuditRecordSummary(record);
+          return (
+            <List.Item
+              actions={[
+                <Button key="replay" size="small" onClick={() => setReplayRecord(record)}>{t('action.replay')}</Button>,
+                <Button key="cast" size="small" onClick={() => exportAuditRecord(record, 'cast')}>{t('action.exportCast')}</Button>,
+                <Button key="log" size="small" onClick={() => exportAuditRecord(record, 'log')}>{t('action.exportLog')}</Button>,
+                <Button key="delete" size="small" danger onClick={() => deleteAuditRecord(record.id)}>{t('action.delete')}</Button>,
+              ]}
+            >
+              <List.Item.Meta
+                avatar={<span className="provider-icon"><AuditOutlined /></span>}
+                title={(
+                  <span className="audit-record-title">
+                    <strong>{summary.title}</strong>
+                    <small>{summary.providerType}</small>
+                  </span>
+                )}
+                description={(
+                  <span className="audit-record-description">
+                    <span>{`${record.startedAt || '-'} -> ${record.endedAt || '-'}`}</span>
+                    <span className="audit-record-badges">
+                      <span>{`${t('label.auditEvents')}: ${summary.eventCount}`}</span>
+                      <span>{`${t('label.duration')}: ${formatReplayTime(summary.duration)}`}</span>
+                      {summary.hasRecording && <span>{t('label.recording')}</span>}
+                    </span>
+                  </span>
+                )}
+              />
+            </List.Item>
+          );
+        }}
       />
       <Drawer
         title={replayRecord ? `${t('action.replay')} · ${replayRecord.title}` : t('action.replay')}

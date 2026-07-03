@@ -105,6 +105,17 @@ export function buildAuditRecord({
   };
 }
 
+export function buildAuditRecordSummary(record = {}) {
+  const parsedCast = parseAsciinemaCast(record.cast || '');
+  return {
+    duration: parsedCast.duration,
+    eventCount: (record.auditEvents || []).length,
+    hasRecording: parsedCast.events.length > 0,
+    providerType: record.providerType || 'terminal',
+    title: record.title || 'Untitled',
+  };
+}
+
 function safeJsonParse(value) {
   try {
     return JSON.parse(value);

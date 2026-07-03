@@ -75,6 +75,8 @@
   "label.lastUsed": "Last used",
   "label.openSessions": "Open",
   "label.auditEvents": "Audit Events",
+  "label.duration": "Duration",
+  "label.recording": "Recording",
   "label.credentialSaved": "Credential Saved",
   "label.current": "Current",
   "hint.connectionListKeyboard": "↑↓ select · Enter open · double-click connect",
