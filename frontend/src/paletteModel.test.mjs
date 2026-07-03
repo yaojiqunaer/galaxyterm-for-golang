@@ -30,6 +30,41 @@ assert.deepEqual(filterPaletteItems(items, 'PROD').map((item) => item.title), ['
 assert.deepEqual(filterPaletteItems(items, 'record').map((item) => item.title), ['Audit Logs']);
 assert.deepEqual(filterPaletteItems(items, 'kubernetes').map((item) => item.title), ['Deploy']);
 
+assert.deepEqual(filterPaletteItems([
+  {
+    title: 'Audit Logs',
+    description: 'SSH session recordings',
+    group: 'Navigation',
+    keywords: 'security ssh',
+  },
+  {
+    title: 'Production SSH',
+    description: 'ssh root@10.0.0.2',
+    group: 'Connections',
+    keywords: 'server',
+  },
+  {
+    title: 'SSH Terminal',
+    description: 'Open a saved server',
+    group: 'Providers',
+    keywords: 'terminal shell',
+  },
+], 'ssh').map((item) => item.title), ['SSH Terminal', 'Production SSH', 'Audit Logs']);
+assert.deepEqual(filterPaletteItems([
+  {
+    title: 'Production SSH',
+    description: 'root@10.0.0.2:22',
+    group: 'Connections',
+    keywords: 'server terminal',
+  },
+  {
+    title: 'Audit Logs',
+    description: 'SSH recordings',
+    group: 'Navigation',
+    keywords: 'production',
+  },
+], 'prod ssh').map((item) => item.title), ['Production SSH', 'Audit Logs']);
+
 assert.equal(resolvePaletteIndex(0, 0, 'next'), -1);
 assert.equal(resolvePaletteIndex(3, -1, 'next'), 0);
 assert.equal(resolvePaletteIndex(3, 0, 'previous'), 2);

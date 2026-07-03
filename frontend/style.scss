@@ -1529,6 +1529,27 @@ select {
   text-transform: uppercase;
 }
 
+.palette-empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 148px;
+  padding: 22px 14px;
+  color: var(--muted);
+  gap: 10px;
+  text-align: center;
+  flex-direction: column;
+}
+
+.palette-empty-state strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.palette-empty-state span {
+  max-width: 360px;
+}
+
 code {
   padding: 2px 6px;
   border-radius: 5px;

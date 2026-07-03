@@ -2316,6 +2316,13 @@ function App() {
     if (item) runPaletteAction(item);
   };
 
+  const runPaletteEmptyAction = (action) => {
+    closePalette();
+    if (action === 'local') openDrawer('local');
+    if (action === 'ssh') openDrawer('ssh');
+    if (action === 'connections') setSelectedNav('connections');
+  };
+
   const handlePaletteKeyDown = (event) => {
     if (event.key === 'ArrowDown') {
       event.preventDefault();
@@ -2666,7 +2673,19 @@ function App() {
         <List
           className="command-palette-list"
           dataSource={displayedPaletteItems}
-          locale={{ emptyText: t('empty.noCommands') }}
+          locale={{
+            emptyText: (
+              <div className="palette-empty-state">
+                <strong>{t('palette.empty.title')}</strong>
+                <span>{t('palette.empty.description')}</span>
+                <Space wrap>
+                  <Button size="small" type="primary" onClick={() => runPaletteEmptyAction('local')}>{t('action.newTerminal')}</Button>
+                  <Button size="small" onClick={() => runPaletteEmptyAction('ssh')}>{t('action.quickSsh')}</Button>
+                  <Button size="small" onClick={() => runPaletteEmptyAction('connections')}>{t('nav.connections')}</Button>
+                </Space>
+              </div>
+            ),
+          }}
           renderItem={(item, index) => (
             <List.Item
               className={index === paletteActiveIndex ? 'command-palette-row active' : 'command-palette-row'}

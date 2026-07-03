@@ -247,6 +247,8 @@
   "palette.group.workspace": "Workspace",
   "palette.group.settings": "Settings",
   "palette.description.navigation": "Switch workspace page",
+  "palette.empty.title": "No matching commands",
+  "palette.empty.description": "Create a terminal or return to connection management.",
   "message.profileSaved": "Connection saved",
   "message.profileDeleted": "Connection deleted",
   "message.extensionComing": "Extension installation will be added in the next phase",

@@ -247,6 +247,8 @@
   "palette.group.workspace": "工作区",
   "palette.group.settings": "设置",
   "palette.description.navigation": "切换工作台页面",
+  "palette.empty.title": "没有匹配的命令",
+  "palette.empty.description": "可以直接创建终端，或回到连接管理。",
   "message.profileSaved": "连接已保存",
   "message.profileDeleted": "连接已删除",
   "message.extensionComing": "扩展安装器将在下一阶段接入",
