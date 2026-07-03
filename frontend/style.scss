@@ -413,6 +413,19 @@ select {
   font-size: 11px;
 }
 
+.quick-profile-badges {
+  display: flex;
+  gap: 4px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.quick-profile-badges .connection-profile-badge {
+  height: 18px;
+  padding: 0 6px;
+  font-size: 10px;
+}
+
 .quick-profile-star {
   flex: 0 0 auto;
   color: var(--warning);
@@ -1178,8 +1191,33 @@ select {
 }
 
 .connection-group-nav-item strong {
+  flex: 0 0 auto;
   color: inherit;
   font-size: 13px;
+}
+
+.connection-group-nav-label {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.connection-group-nav-label > span,
+.connection-group-nav-label small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connection-group-nav-label small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.connection-group-nav-item.active .connection-group-nav-label small,
+.connection-group-nav-item:hover .connection-group-nav-label small {
+  color: inherit;
+  opacity: 0.78;
 }
 
 .connection-list-panel {
@@ -1268,6 +1306,14 @@ select {
   outline: none;
 }
 
+.connection-profile-row .ant-list-item-meta {
+  min-width: 0;
+}
+
+.connection-profile-row .ant-list-item-meta-content {
+  min-width: 0;
+}
+
 .connection-profile-row.active {
   background: var(--accent-soft);
 }
@@ -1308,6 +1354,75 @@ select {
   color: var(--muted);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.connection-profile-title {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 8px;
+}
+
+.connection-profile-title strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connection-profile-title small {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.connection-profile-endpoint-line {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connection-profile-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.connection-profile-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  height: 20px;
+  padding: 0 7px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--panel-muted);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.connection-profile-badge.tone-success {
+  border-color: rgb(34 197 94 / 28%);
+  background: rgb(34 197 94 / 10%);
+  color: var(--success);
+}
+
+.connection-profile-badge.tone-warning {
+  border-color: rgb(245 158 11 / 30%);
+  background: rgb(245 158 11 / 12%);
+  color: var(--warning);
+}
+
+.connection-profile-badge.tone-info {
+  border-color: rgb(23 107 135 / 24%);
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .connection-profile-actions,

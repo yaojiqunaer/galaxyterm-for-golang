@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   buildConnectionGroupNav,
   buildConnectionGroups,
+  buildConnectionProfileBadges,
   filterConnectionProfiles,
   resolveSelectedProfileId,
   selectBatchProfiles,
@@ -55,8 +56,8 @@ assert.deepEqual(groups.map((group) => ({
 assert.deepEqual(groups[0].profiles.map((profile) => profile.id), ['prod-db', 'prod-web']);
 
 assert.deepEqual(buildConnectionGroupNav(profiles), [
-  { key: 'all', total: 3, type: 'all' },
-  { key: 'favorites', total: 2, type: 'favorites' },
+  { credentialCount: 1, favoriteCount: 2, key: 'all', total: 3, type: 'all' },
+  { credentialCount: 1, favoriteCount: 2, key: 'favorites', total: 2, type: 'favorites' },
   { credentialCount: 1, favoriteCount: 1, key: 'Production', total: 2, type: 'group' },
   { credentialCount: 0, favoriteCount: 1, key: '__ungrouped__', total: 1, type: 'group' },
 ]);
@@ -105,6 +106,21 @@ assert.deepEqual(sortConnectionProfiles(profiles, 'group').map((profile) => prof
 assert.deepEqual(sortConnectionProfiles(profiles, 'recent').map((profile) => profile.id), ['prod-web', 'prod-db', 'dev-shell']);
 assert.deepEqual(sortSidebarProfiles(profiles).map((profile) => profile.id), ['prod-db', 'dev-shell', 'prod-web']);
 assert.deepEqual(sortSidebarProfiles(profiles, 2).map((profile) => profile.id), ['prod-db', 'dev-shell']);
+
+assert.deepEqual(buildConnectionProfileBadges(profiles[0], { activeCount: 2 }), [
+  { key: 'group', tone: 'default', value: 'Production' },
+  { key: 'sessions', tone: 'success', value: 2 },
+  { key: 'favorite', tone: 'warning', value: true },
+  { key: 'credential', tone: 'info', value: true },
+]);
+assert.deepEqual(buildConnectionProfileBadges(profiles[1], { activeCount: 0 }), [
+  { key: 'group', tone: 'default', value: 'Production' },
+]);
+assert.deepEqual(buildConnectionProfileBadges(profiles[2], { activeCount: 1 }), [
+  { key: 'group', tone: 'default', value: '__ungrouped__' },
+  { key: 'sessions', tone: 'success', value: 1 },
+  { key: 'favorite', tone: 'warning', value: true },
+]);
 
 const profileSessions = summarizeProfileSessions(profiles, [
   { id: 's1', status: 'connected', request: { profileId: 'prod-db' } },

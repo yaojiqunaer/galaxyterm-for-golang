@@ -26,11 +26,21 @@ export function buildConnectionGroups(profiles = []) {
 }
 
 export function buildConnectionGroupNav(profiles = []) {
+  const credentialCount = profiles.filter((profile) => profile.auth?.credentialRef).length;
+  const favoriteCount = profiles.filter((profile) => profile.favorite).length;
   return [
-    { key: 'all', total: profiles.length, type: 'all' },
     {
+      credentialCount,
+      favoriteCount,
+      key: 'all',
+      total: profiles.length,
+      type: 'all',
+    },
+    {
+      credentialCount: profiles.filter((profile) => profile.favorite && profile.auth?.credentialRef).length,
+      favoriteCount,
       key: 'favorites',
-      total: profiles.filter((profile) => profile.favorite).length,
+      total: favoriteCount,
       type: 'favorites',
     },
     ...buildConnectionGroups(profiles).map(({
@@ -145,6 +155,31 @@ export function sortSidebarProfiles(profiles = [], limit = 5) {
         || compareText(left.displayName, right.displayName);
     })
     .slice(0, limit);
+}
+
+export function buildConnectionProfileBadges(profile = {}, sessionInfo = {}) {
+  return [
+    {
+      key: 'group',
+      tone: 'default',
+      value: profile.group || ungroupedKey,
+    },
+    sessionInfo.activeCount > 0 && {
+      key: 'sessions',
+      tone: 'success',
+      value: sessionInfo.activeCount,
+    },
+    profile.favorite && {
+      key: 'favorite',
+      tone: 'warning',
+      value: true,
+    },
+    profile.auth?.credentialRef && {
+      key: 'credential',
+      tone: 'info',
+      value: true,
+    },
+  ].filter(Boolean);
 }
 
 function compareText(left = '', right = '') {

@@ -75,6 +75,7 @@ import {
 } from './workspaceInsights.js';
 import {
   buildConnectionGroupNav,
+  buildConnectionProfileBadges,
   filterConnectionProfiles,
   resolveSelectedProfileId,
   selectBatchProfiles,
@@ -1276,7 +1277,17 @@ function App() {
                 type="button"
                 onClick={() => setGroupQuery(item.key)}
               >
-                <span>{connectionGroupLabel(item)}</span>
+                <span className="connection-group-nav-label">
+                  <span>{connectionGroupLabel(item)}</span>
+                  {(item.favoriteCount > 0 || item.credentialCount > 0) && (
+                    <small>
+                      {[
+                        item.favoriteCount > 0 ? `${t('label.favorite')}: ${item.favoriteCount}` : '',
+                        item.credentialCount > 0 ? `${t('label.credentialSaved')}: ${item.credentialCount}` : '',
+                      ].filter(Boolean).join(' · ')}
+                    </small>
+                  )}
+                </span>
                 <strong>{item.total}</strong>
               </button>
             ))}
@@ -1443,6 +1454,7 @@ function App() {
                     />
                   </Tooltip>,
                 ];
+                const badges = buildConnectionProfileBadges(profile, sessionInfo);
                 return (
                 <List.Item
                   className={selectedProfile?.id === profile.id ? 'connection-profile-row active' : 'connection-profile-row'}
@@ -1466,19 +1478,26 @@ function App() {
                   <List.Item.Meta
                     avatar={<span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>}
                     title={(
-                      <Space size={8}>
-                        <span>{profile.displayName}</span>
-                        <Tag>{providerTypeLabel(profile.providerType, providers)}</Tag>
-                        {sessionInfo.activeCount > 0 && <Tag color="green">{`${t('label.openSessions')}: ${sessionInfo.activeCount}`}</Tag>}
-                        {profile.favorite && <Tag color="gold">{t('label.favorite')}</Tag>}
-                        {profile.lastUsedAt && <Tag>{`${t('label.lastUsed')}: ${formatProfileLastUsed(profile.lastUsedAt)}`}</Tag>}
-                        {profile.auth?.credentialRef && <Tag color="blue">{t('label.credentialSaved')}</Tag>}
-                        {profile.group && <Tag>{profile.group}</Tag>}
-                      </Space>
+                      <span className="connection-profile-title">
+                        <strong>{profile.displayName}</strong>
+                        <small>{providerTypeLabel(profile.providerType, providers)}</small>
+                      </span>
                     )}
                     description={(
                       <span className="connection-profile-description">
-                        <span>{profileDescription(profile)}</span>
+                        <span className="connection-profile-endpoint-line">{profileDescription(profile)}</span>
+                        <span className="connection-profile-badges">
+                          {badges.map((badge) => (
+                            <span key={badge.key} className={`connection-profile-badge tone-${badge.tone}`}>
+                              {connectionProfileBadgeLabel(badge)}
+                            </span>
+                          ))}
+                          {profile.lastUsedAt && (
+                            <span className="connection-profile-badge tone-default">
+                              {`${t('label.lastUsed')}: ${formatProfileLastUsed(profile.lastUsedAt)}`}
+                            </span>
+                          )}
+                        </span>
                         {profile.providerType === 'ssh' && profile.config?.jumpHost && (
                           <small>{`${t('field.jumpHost')}: ${profile.config.jumpHost}`}</small>
                         )}
@@ -2548,6 +2567,7 @@ function App() {
                 dataSource={sidebarQuickProfiles}
                 renderItem={(profile) => {
                   const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
+                  const badges = buildConnectionProfileBadges(profile, sessionInfo).filter((badge) => badge.key !== 'group').slice(0, 2);
                   return (
                     <List.Item
                       className={sessionInfo.activeCount > 0 ? 'quick-profile-row active' : 'quick-profile-row'}
@@ -2558,6 +2578,15 @@ function App() {
                       <span className="quick-profile-main">
                         <span>{profile.displayName}</span>
                         <small>{profileDescription(profile)}</small>
+                        {badges.length > 0 && (
+                          <span className="quick-profile-badges">
+                            {badges.map((badge) => (
+                              <span key={badge.key} className={`connection-profile-badge tone-${badge.tone}`}>
+                                {connectionProfileBadgeLabel(badge)}
+                              </span>
+                            ))}
+                          </span>
+                        )}
                       </span>
                       {profile.favorite && <StarFilled className="quick-profile-star" />}
                     </List.Item>
@@ -3566,6 +3595,14 @@ function extensionStatusColor(status) {
 
 function groupLabel(group) {
   return group === ungroupedKey ? t('group.ungrouped') : group;
+}
+
+function connectionProfileBadgeLabel(badge) {
+  if (badge.key === 'group') return groupLabel(badge.value);
+  if (badge.key === 'sessions') return `${t('label.openSessions')}: ${badge.value}`;
+  if (badge.key === 'favorite') return t('label.favorite');
+  if (badge.key === 'credential') return t('label.credentialSaved');
+  return String(badge.value || badge.key);
 }
 
 function connectionGroupLabel(item) {
