@@ -116,6 +116,17 @@ export function buildAuditRecordSummary(record = {}) {
   };
 }
 
+export function resolveReplayEventTime(events = [], currentTime = 0, direction = 'next') {
+  if (events.length === 0) return 0;
+  const times = events.map((event) => Number(event.time) || 0).sort((left, right) => left - right);
+  if (direction === 'previous') {
+    const previous = [...times].reverse().find((time) => time < currentTime);
+    return previous ?? times[0];
+  }
+  const next = times.find((time) => time > currentTime);
+  return next ?? times[times.length - 1];
+}
+
 function safeJsonParse(value) {
   try {
     return JSON.parse(value);

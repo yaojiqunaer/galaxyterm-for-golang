@@ -68,6 +68,7 @@ import {
   createAuditEvent,
   parseAsciinemaCast,
   renderReplayFrame,
+  resolveReplayEventTime,
 } from './auditLog.js';
 import {
   buildExtensionCatalog,
@@ -3284,6 +3285,18 @@ function AuditReplayPlayer({ record }) {
           >
             {t('action.restartReplay')}
           </Button>
+          <Button
+            onClick={() => setPlayhead(resolveReplayEventTime(parsedCast.events, playhead, 'previous'))}
+            disabled={parsedCast.events.length === 0}
+          >
+            {t('action.previousEvent')}
+          </Button>
+          <Button
+            onClick={() => setPlayhead(resolveReplayEventTime(parsedCast.events, playhead, 'next'))}
+            disabled={parsedCast.events.length === 0}
+          >
+            {t('action.nextEvent')}
+          </Button>
           <Segmented
             size="small"
             value={speed}
@@ -3296,7 +3309,9 @@ function AuditReplayPlayer({ record }) {
             ]}
           />
         </Space>
-        <Text type="secondary">{formatReplayTime(playhead)} / {formatReplayTime(parsedCast.duration)}</Text>
+        <Text type="secondary">
+          {`${formatReplayTime(playhead)} / ${formatReplayTime(parsedCast.duration)} | ${t('label.auditEvents')}: ${parsedCast.events.length}`}
+        </Text>
       </div>
       <Slider
         disabled={parsedCast.events.length === 0}

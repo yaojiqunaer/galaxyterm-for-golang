@@ -38,6 +38,8 @@
   "action.playReplay": "Play",
   "action.pauseReplay": "Pause",
   "action.restartReplay": "Restart",
+  "action.previousEvent": "Previous Event",
+  "action.nextEvent": "Next Event",
   "action.saveAuditRecord": "Save Audit Record",
   "action.pasteClipboard": "Paste Clipboard",
   "action.clearTerminal": "Clear Terminal",

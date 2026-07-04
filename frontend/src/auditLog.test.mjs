@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   buildAsciinemaCast,
   buildAuditRecordSummary,
+  resolveReplayEventTime,
   createAuditEvent,
   parseAsciinemaCast,
   renderCastFrame,
@@ -90,3 +91,8 @@ assert.deepEqual(buildAuditRecordSummary({ title: '' }), {
   providerType: 'terminal',
   title: 'Untitled',
 });
+
+assert.equal(resolveReplayEventTime(parsed.events, 0.2, 'next'), 1.5);
+assert.equal(resolveReplayEventTime(parsed.events, 1.5, 'previous'), 0);
+assert.equal(resolveReplayEventTime(parsed.events, 2, 'next'), 1.5);
+assert.equal(resolveReplayEventTime([], 2, 'previous'), 0);

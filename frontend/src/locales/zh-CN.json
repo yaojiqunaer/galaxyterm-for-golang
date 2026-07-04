@@ -38,6 +38,8 @@
   "action.playReplay": "播放",
   "action.pauseReplay": "暂停",
   "action.restartReplay": "重播",
+  "action.previousEvent": "上一事件",
+  "action.nextEvent": "下一事件",
   "action.saveAuditRecord": "保存审计记录",
   "action.pasteClipboard": "粘贴剪贴板",
   "action.clearTerminal": "清屏",
