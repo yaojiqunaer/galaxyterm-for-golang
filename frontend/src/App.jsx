@@ -116,6 +116,10 @@ import {
   resolvePaletteIndex,
 } from './paletteModel.js';
 import {
+  buildQuickCommandSummary,
+  filterQuickCommands,
+} from './quickCommands.js';
+import {
   resolveListIndex,
   resolveBracketSessionAction,
   resolveNumberedSessionIndex,
@@ -219,6 +223,7 @@ function App() {
   const [auditProviderFilter, setAuditProviderFilter] = useState('all');
   const [workspaceSummary, setWorkspaceSummary] = useState(() => loadWorkspaceSummary());
   const [quickCommands, setQuickCommands] = useState(() => loadQuickCommands());
+  const [commandQuery, setCommandQuery] = useState('');
   const [recentConnections, setRecentConnections] = useState(() => loadRecentConnections());
   const [auditRecords, setAuditRecords] = useState(() => loadAuditRecords());
   const [replayRecord, setReplayRecord] = useState(null);
@@ -468,6 +473,10 @@ function App() {
   }), [auditProviderFilter, auditQuery, auditRecords]);
   const currentSessionSummary = useMemo(() => sessionSummary(sessions), [sessions]);
   const activeSession = sessions.find((session) => session.id === activeKey);
+  const visibleQuickCommands = useMemo(() => filterQuickCommands(quickCommands, commandQuery), [commandQuery, quickCommands]);
+  const quickCommandSummary = useMemo(() => (
+    buildQuickCommandSummary(quickCommands, { activeSession })
+  ), [activeSession, quickCommands]);
   const desktopBridgeReady = hasWailsMethod(['session', 'API', 'CreateSession']);
 
   const openDrawer = (type = providers[0]?.type || 'local', profile = null) => {
@@ -2988,27 +2997,68 @@ function App() {
       </Drawer>
       <Drawer
         title={t('drawer.commands')}
-        width={420}
+        width={560}
         open={commandsOpen}
         destroyOnHidden
         onClose={() => setCommandsOpen(false)}
       >
-        <Form form={commandForm} layout="vertical" className="quick-command-form">
-          <Form.Item name="name" label={t('field.name')} rules={[{ required: true, message: t('validation.required') }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="command" label={t('field.command')} rules={[{ required: true, message: t('validation.required') }]}>
-            <Input.TextArea rows={3} />
-          </Form.Item>
-          <Button type="primary" onClick={addQuickCommand}>{t('action.addCommand')}</Button>
-        </Form>
-        <Divider />
+        <div className="quick-command-summary">
+          <span>
+            <small>{t('metric.commands')}</small>
+            <strong>{quickCommandSummary.total}</strong>
+          </span>
+          <span>
+            <small>{t('metric.multiLineCommands')}</small>
+            <strong>{quickCommandSummary.multiLine}</strong>
+          </span>
+          <span className={quickCommandSummary.canRun ? 'active' : ''}>
+            <small>{t('metric.targetSession')}</small>
+            <strong>{quickCommandSummary.target || t('command.noTarget')}</strong>
+          </span>
+        </div>
+        <Alert type={quickCommandSummary.canRun ? 'info' : 'warning'} showIcon message={t('command.drawerHint')} />
+        <div className="quick-command-panel">
+          <Form form={commandForm} layout="vertical" className="quick-command-form">
+            <Form.Item name="name" label={t('field.name')} rules={[{ required: true, message: t('validation.required') }]}>
+              <Input />
+            </Form.Item>
+            <Form.Item name="command" label={t('field.command')} rules={[{ required: true, message: t('validation.required') }]}>
+              <Input.TextArea rows={3} />
+            </Form.Item>
+            <Button type="primary" onClick={addQuickCommand}>{t('action.addCommand')}</Button>
+          </Form>
+        </div>
+        <Input.Search
+          allowClear
+          className="quick-command-search"
+          value={commandQuery}
+          onChange={(event) => setCommandQuery(event.target.value)}
+          placeholder={t('placeholder.searchCommands')}
+        />
         <List
-          dataSource={quickCommands}
+          className="quick-command-list"
+          dataSource={visibleQuickCommands}
+          locale={{
+            emptyText: (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description={quickCommands.length === 0 ? t('empty.noQuickCommands') : t('empty.noCommands')}
+              />
+            ),
+          }}
           renderItem={(item) => (
             <List.Item
+              className="quick-command-row"
               actions={[
-                <Button key="run" size="small" type="primary" onClick={() => runQuickCommand(item.command)}>{t('action.run')}</Button>,
+                <Button
+                  key="run"
+                  size="small"
+                  type="primary"
+                  disabled={!quickCommandSummary.canRun}
+                  onClick={() => runQuickCommand(item.command)}
+                >
+                  {t('action.run')}
+                </Button>,
                 <Button
                   key="copy"
                   size="small"
@@ -3022,7 +3072,10 @@ function App() {
                 <Button key="delete" size="small" danger onClick={() => deleteQuickCommand(item.id)}>{t('action.delete')}</Button>,
               ]}
             >
-              <List.Item.Meta title={item.name} description={<code>{item.command}</code>} />
+              <List.Item.Meta
+                title={<span className="quick-command-title">{item.name}</span>}
+                description={<pre className="quick-command-code">{item.command}</pre>}
+              />
             </List.Item>
           )}
         />

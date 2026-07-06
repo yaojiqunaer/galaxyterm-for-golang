@@ -2010,6 +2010,95 @@ code {
   margin-bottom: 10px;
 }
 
+.quick-command-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.quick-command-summary span {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+}
+
+.quick-command-summary span.active {
+  border-color: rgb(34 197 94 / 28%);
+  background: rgb(34 197 94 / 10%);
+}
+
+.quick-command-summary small,
+.quick-command-summary strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-command-summary small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.quick-command-summary strong {
+  margin-top: 2px;
+  color: var(--text);
+}
+
+.quick-command-panel {
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.quick-command-search {
+  margin: 12px 0 10px;
+}
+
+.quick-command-list {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.quick-command-row {
+  align-items: flex-start !important;
+}
+
+.quick-command-row .ant-list-item-meta {
+  min-width: 0;
+}
+
+.quick-command-title {
+  display: block;
+  overflow: hidden;
+  color: var(--text);
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-command-code {
+  max-width: 100%;
+  margin: 5px 0 0;
+  padding: 7px 9px;
+  overflow: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--terminal-bg);
+  color: var(--terminal-text);
+  font-family: Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
 .remote-file-list {
   border: 0;
 }
