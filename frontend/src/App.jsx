@@ -113,6 +113,7 @@ import TerminalPane from './components/TerminalPane.jsx';
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
 import { hasWailsMethod } from './desktopBridge.js';
 import {
+  buildPaletteSummary,
   filterPaletteItems,
   resolvePaletteIndex,
 } from './paletteModel.js';
@@ -2562,6 +2563,7 @@ function App() {
   });
   const visiblePaletteItems = filterPaletteItems(paletteItems, paletteQuery);
   const displayedPaletteItems = visiblePaletteItems.slice(0, 12);
+  const paletteSummary = buildPaletteSummary(visiblePaletteItems);
 
   useEffect(() => {
     if (!paletteOpen) {
@@ -2949,6 +2951,18 @@ function App() {
           onKeyDown={handlePaletteKeyDown}
           placeholder={t('placeholder.commandPalette')}
         />
+        <div className="command-palette-summary">
+          <span>
+            <small>{t('metric.visibleResults')}</small>
+            <strong>{paletteSummary.total}</strong>
+          </span>
+          {paletteSummary.groups.slice(0, 5).map((group) => (
+            <span key={group.group}>
+              <small>{group.group}</small>
+              <strong>{group.count}</strong>
+            </span>
+          ))}
+        </div>
         <List
           className="command-palette-list"
           dataSource={displayedPaletteItems}

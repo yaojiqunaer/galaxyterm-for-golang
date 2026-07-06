@@ -101,6 +101,7 @@
   "metric.activeSessions": "活动会话",
   "metric.savedConnections": "保存连接",
   "metric.visibleConnections": "当前连接",
+  "metric.visibleResults": "当前结果",
   "metric.providers": "终端类型",
   "metric.recordings": "录屏记录",
   "metric.visibleRecords": "当前结果",

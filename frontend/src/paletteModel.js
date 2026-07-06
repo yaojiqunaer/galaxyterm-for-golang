@@ -8,6 +8,24 @@ export function filterPaletteItems(items = [], query = '') {
     .map((entry) => entry.item);
 }
 
+export function buildPaletteSummary(items = []) {
+  const groups = [];
+  const seen = new Map();
+  items.forEach((item) => {
+    const group = item.group || '';
+    if (!group) return;
+    if (!seen.has(group)) {
+      seen.set(group, { group, count: 0 });
+      groups.push(seen.get(group));
+    }
+    seen.get(group).count += 1;
+  });
+  return {
+    total: items.length,
+    groups,
+  };
+}
+
 function scorePaletteItem(item, keywords) {
   const title = item.title?.toLowerCase() || '';
   const description = item.description?.toLowerCase() || '';

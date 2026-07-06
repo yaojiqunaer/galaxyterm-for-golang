@@ -101,6 +101,7 @@
   "metric.activeSessions": "Active Sessions",
   "metric.savedConnections": "Saved Connections",
   "metric.visibleConnections": "Visible Connections",
+  "metric.visibleResults": "Visible Results",
   "metric.providers": "Terminal Types",
   "metric.recordings": "Recordings",
   "metric.visibleRecords": "Visible Results",

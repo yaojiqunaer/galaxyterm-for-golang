@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  buildPaletteSummary,
   filterPaletteItems,
   resolvePaletteIndex,
 } from './paletteModel.js';
@@ -29,6 +30,20 @@ assert.deepEqual(filterPaletteItems(items, '').map((item) => item.title), ['Prod
 assert.deepEqual(filterPaletteItems(items, 'PROD').map((item) => item.title), ['Prod Web']);
 assert.deepEqual(filterPaletteItems(items, 'record').map((item) => item.title), ['Audit Logs']);
 assert.deepEqual(filterPaletteItems(items, 'kubernetes').map((item) => item.title), ['Deploy']);
+
+assert.deepEqual(buildPaletteSummary(items), {
+  total: 3,
+  groups: [
+    { group: 'Connections', count: 1 },
+    { group: 'Navigation', count: 1 },
+    { group: 'Commands', count: 1 },
+  ],
+});
+
+assert.deepEqual(buildPaletteSummary([]), {
+  total: 0,
+  groups: [],
+});
 
 assert.deepEqual(filterPaletteItems([
   {
