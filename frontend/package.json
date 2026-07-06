@@ -14,6 +14,7 @@
     "test:insights": "node src/workspaceInsights.test.mjs",
     "test:list-navigation": "node src/listNavigation.test.mjs",
     "test:palette": "node src/paletteModel.test.mjs",
+    "test:remote-workspace": "node src/remoteWorkspace.test.mjs",
     "test:settings": "node src/settingsPresentation.test.mjs",
     "test:sessions": "node src/sessionPresentation.test.mjs",
     "test:ssh-config": "node src/sshConfigProfiles.test.mjs"

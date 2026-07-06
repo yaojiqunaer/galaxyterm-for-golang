@@ -1870,6 +1870,121 @@ code {
   background: var(--panel);
 }
 
+.remote-workspace-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.remote-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.remote-browser-shell,
+.tunnel-workbench {
+  display: grid;
+  grid-template-columns: 330px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.remote-context-panel,
+.remote-file-panel {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.remote-context-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px;
+}
+
+.remote-context-panel > .ant-typography-secondary {
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.remote-context-form {
+  margin-top: 10px;
+}
+
+.remote-context-form .ant-form-item {
+  flex: 1;
+  margin-bottom: 10px;
+}
+
+.remote-form-row {
+  display: flex;
+  width: 100%;
+}
+
+.remote-form-row .ant-space-item {
+  min-width: 0;
+  flex: 1;
+}
+
+.remote-form-row .ant-input-number {
+  width: 100%;
+}
+
+.remote-file-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--panel-muted);
+}
+
+.remote-file-toolbar > div:first-child {
+  min-width: 0;
+}
+
+.remote-file-toolbar .ant-typography-secondary {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+.remote-breadcrumbs {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+  overflow: auto;
+  white-space: nowrap;
+}
+
+.remote-breadcrumbs button {
+  max-width: 180px;
+  overflow: hidden;
+  padding: 3px 7px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.remote-breadcrumbs button:hover {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.remote-breadcrumb-separator {
+  color: var(--muted);
+}
+
 .file-browser-form {
   gap: 8px 0;
   margin-bottom: 14px;
@@ -1896,7 +2011,7 @@ code {
 }
 
 .remote-file-list {
-  border-top: 1px solid var(--border-subtle);
+  border: 0;
 }
 
 .file-toolbar {
@@ -2057,6 +2172,65 @@ code {
   background: var(--panel-muted);
 }
 
+.remote-file-row.directory {
+  cursor: pointer;
+}
+
+.remote-file-title,
+.remote-file-meta,
+.tunnel-route {
+  display: flex;
+  min-width: 0;
+  gap: 8px;
+}
+
+.remote-file-title {
+  align-items: center;
+}
+
+.remote-file-title strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.remote-file-meta {
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.remote-file-meta span {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tunnel-list {
+  border: 0;
+  border-radius: 0;
+}
+
+.tunnel-row .ant-list-item-meta {
+  min-width: 0;
+}
+
+.tunnel-route {
+  flex-direction: column;
+  color: var(--muted);
+}
+
+.tunnel-route span,
+.tunnel-route small {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .remote-file-editor {
   min-height: 68vh !important;
   font-family: Consolas, 'Liberation Mono', Menlo, Courier, monospace;
@@ -2158,5 +2332,11 @@ code {
   .session-empty-panel {
     grid-template-columns: 1fr;
     padding: 18px;
+  }
+
+  .remote-summary-grid,
+  .remote-browser-shell,
+  .tunnel-workbench {
+    grid-template-columns: 1fr;
   }
 }

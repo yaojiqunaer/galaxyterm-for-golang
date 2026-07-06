@@ -102,6 +102,12 @@ import {
   buildTerminalPreview,
   buildWorkspaceSnapshotSummary,
 } from './settingsPresentation.js';
+import {
+  buildRemoteFileBreadcrumbs,
+  buildRemoteFileSummary,
+  buildTunnelDisplay,
+  buildTunnelSummary,
+} from './remoteWorkspace.js';
 import TerminalPane from './components/TerminalPane.jsx';
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
 import { hasWailsMethod } from './desktopBridge.js';
@@ -239,6 +245,7 @@ function App() {
   const [fileForm] = Form.useForm();
   const [tunnelForm] = Form.useForm();
   const [commandForm] = Form.useForm();
+  const watchedFilePath = Form.useWatch('path', fileForm);
   const terminalRefs = useRef({});
   const profileImportRef = useRef(null);
 
@@ -1836,90 +1843,136 @@ function App() {
     }
   };
 
-  const renderFiles = () => (
-    <div className="workspace-page">
-      <div className="page-header">
-        <div>
-          <Text type="secondary">{t('nav.files')}</Text>
-          <Title level={3}>{t('section.remoteFiles')}</Title>
-        </div>
-      </div>
-      <Card className="file-browser-card">
-        <Form form={fileForm} layout="inline" className="file-browser-form" initialValues={{ port: 22, path: '.' }}>
-          <Form.Item name="host" label={t('field.host')} rules={[{ required: true, message: t('validation.required') }]}>
-            <Input placeholder={t('placeholder.host')} />
-          </Form.Item>
-          <Form.Item name="port" label={t('field.port')}>
-            <InputNumber min={1} max={65535} />
-          </Form.Item>
-          <Form.Item name="username" label={t('field.username')} rules={[{ required: true, message: t('validation.required') }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="authType" label={t('field.authType')} initialValue="password">
-            <Select
-              className="file-auth-select"
-              onChange={setFileAuthType}
-              options={[
-                { value: 'password', label: t('auth.password') },
-                { value: 'privateKey', label: t('auth.privateKey') },
-              ]}
-            />
-          </Form.Item>
-          {fileAuthType === 'password' && (
-            <Form.Item name="password" label={t('field.password')}>
-              <Input.Password />
-            </Form.Item>
-          )}
-          {fileAuthType === 'privateKey' && (
-            <>
-              <Form.Item name="privateKey" label={t('field.privateKey')} rules={[{ required: true, message: t('validation.required') }]}>
-                <Input.TextArea rows={2} className="file-private-key-input" />
-              </Form.Item>
-              <Form.Item name="passphrase" label={t('field.passphrase')}>
-                <Input.Password />
-              </Form.Item>
-            </>
-          )}
-          <Form.Item name="path" label={t('field.path')}>
-            <Input />
-          </Form.Item>
-          <Form.Item>
+  const renderFiles = () => {
+    const currentPath = watchedFilePath || fileForm.getFieldValue('path') || '.';
+    const fileSummary = buildRemoteFileSummary(fileEntries, { path: currentPath, loading: fileLoading });
+    const breadcrumbs = buildRemoteFileBreadcrumbs(fileSummary.path);
+    return (
+      <div className="workspace-page remote-workspace-page">
+        <div className="page-header">
+          <div>
+            <Text type="secondary">{t('nav.files')}</Text>
+            <Title level={3}>{t('section.remoteFiles')}</Title>
+          </div>
+          <Space wrap>
+            <Button icon={<ReloadOutlined />} onClick={() => loadFiles()} loading={fileLoading}>{t('action.refresh')}</Button>
             <Button type="primary" onClick={() => loadFiles()} loading={fileLoading}>{t('action.open')}</Button>
-          </Form.Item>
-        </Form>
-        <Space className="file-toolbar">
-          <Button onClick={goParent}>{t('action.up')}</Button>
-          <Button onClick={() => loadFiles()} loading={fileLoading}>{t('action.refresh')}</Button>
-          <Button onClick={() => setMkdirOpen(true)}>{t('action.mkdir')}</Button>
-          <Button onClick={() => setUploadOpen(true)}>{t('action.uploadText')}</Button>
-        </Space>
-        <List
-          className="remote-file-list"
-          loading={fileLoading}
-          dataSource={fileEntries}
-          locale={{ emptyText: t('empty.noFiles') }}
-          renderItem={(entry) => (
-            <List.Item
-              className="remote-file-row"
-              actions={[
-                !entry.isDir && <Button key="edit" size="small" onClick={() => openRemoteFileEditor(entry)} loading={fileEditorLoading}>{t('action.edit')}</Button>,
-                !entry.isDir && <Button key="download" size="small" onClick={() => downloadRemoteFile(entry)}>{t('action.download')}</Button>,
-                <Button key="delete" size="small" danger onClick={() => deleteRemoteEntry(entry)}>{t('action.delete')}</Button>,
-              ].filter(Boolean)}
-              onDoubleClick={() => {
-                if (entry.isDir) loadFiles(entry.path);
-                if (!entry.isDir) openRemoteFileEditor(entry);
+          </Space>
+        </div>
+        <div className="remote-summary-grid">
+          <MetricCard label={t('metric.directories')} value={fileSummary.directories} />
+          <MetricCard label={t('metric.files')} value={fileSummary.files} />
+          <MetricCard label={t('metric.totalSize')} value={fileSummary.readableSize} />
+        </div>
+        <div className="remote-browser-shell">
+          <div className="remote-context-panel">
+            <Text strong>{t('section.quickConnect')}</Text>
+            <Text type="secondary">{t('file.browserHint')}</Text>
+            <Form form={fileForm} layout="vertical" className="remote-context-form" initialValues={{ port: 22, path: '.' }}>
+              <Form.Item name="host" label={t('field.host')} rules={[{ required: true, message: t('validation.required') }]}>
+                <Input placeholder={t('placeholder.host')} />
+              </Form.Item>
+              <Space size={8} className="remote-form-row">
+                <Form.Item name="port" label={t('field.port')}>
+                  <InputNumber min={1} max={65535} />
+                </Form.Item>
+                <Form.Item name="username" label={t('field.username')} rules={[{ required: true, message: t('validation.required') }]}>
+                  <Input />
+                </Form.Item>
+              </Space>
+              <Form.Item name="authType" label={t('field.authType')} initialValue="password">
+                <Segmented
+                  block
+                  onChange={setFileAuthType}
+                  options={[
+                    { value: 'password', label: t('auth.password') },
+                    { value: 'privateKey', label: t('auth.privateKey') },
+                  ]}
+                />
+              </Form.Item>
+              {fileAuthType === 'password' && (
+                <Form.Item name="password" label={t('field.password')}>
+                  <Input.Password />
+                </Form.Item>
+              )}
+              {fileAuthType === 'privateKey' && (
+                <>
+                  <Form.Item name="privateKey" label={t('field.privateKey')} rules={[{ required: true, message: t('validation.required') }]}>
+                    <Input.TextArea rows={4} />
+                  </Form.Item>
+                  <Form.Item name="passphrase" label={t('field.passphrase')}>
+                    <Input.Password />
+                  </Form.Item>
+                </>
+              )}
+              <Form.Item name="path" label={t('field.path')}>
+                <Input />
+              </Form.Item>
+            </Form>
+          </div>
+          <div className="remote-file-panel">
+            <div className="remote-file-toolbar">
+              <div className="remote-breadcrumbs">
+                {breadcrumbs.map((crumb, index) => (
+                  <React.Fragment key={crumb.key}>
+                    {index > 0 && <span className="remote-breadcrumb-separator">/</span>}
+                    <button type="button" onClick={() => loadFiles(crumb.path)}>
+                      {crumb.label}
+                    </button>
+                  </React.Fragment>
+                ))}
+              </div>
+              <Space wrap>
+                <Button onClick={goParent}>{t('action.up')}</Button>
+                <Button onClick={() => setMkdirOpen(true)}>{t('action.mkdir')}</Button>
+                <Button onClick={() => setUploadOpen(true)}>{t('action.uploadText')}</Button>
+              </Space>
+            </div>
+            <List
+              className="remote-file-list"
+              loading={fileLoading}
+              dataSource={fileEntries}
+              locale={{
+                emptyText: (
+                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noFiles')}>
+                    <Button type="primary" onClick={() => loadFiles()} loading={fileLoading}>{t('action.open')}</Button>
+                  </Empty>
+                ),
               }}
-            >
-              <List.Item.Meta
-                avatar={<span className="provider-icon">{entry.isDir ? <FolderOpenOutlined /> : <CodeOutlined />}</span>}
-                title={entry.name}
-                description={`${entry.mode} · ${entry.size} · ${entry.modTime}`}
-              />
-            </List.Item>
-          )}
-        />
-      </Card>
+              renderItem={(entry) => (
+                <List.Item
+                  className={entry.isDir ? 'remote-file-row directory' : 'remote-file-row'}
+                  actions={[
+                    !entry.isDir && <Button key="edit" size="small" onClick={() => openRemoteFileEditor(entry)} loading={fileEditorLoading}>{t('action.edit')}</Button>,
+                    !entry.isDir && <Button key="download" size="small" onClick={() => downloadRemoteFile(entry)}>{t('action.download')}</Button>,
+                    <Button key="delete" size="small" danger onClick={() => deleteRemoteEntry(entry)}>{t('action.delete')}</Button>,
+                  ].filter(Boolean)}
+                  onDoubleClick={() => {
+                    if (entry.isDir) loadFiles(entry.path);
+                    if (!entry.isDir) openRemoteFileEditor(entry);
+                  }}
+                >
+                  <List.Item.Meta
+                    avatar={<span className="provider-icon">{entry.isDir ? <FolderOpenOutlined /> : <CodeOutlined />}</span>}
+                    title={(
+                      <span className="remote-file-title">
+                        <strong>{entry.name}</strong>
+                        {entry.isDir && <span className="connection-profile-badge tone-info">{t('field.path')}</span>}
+                      </span>
+                    )}
+                    description={(
+                      <span className="remote-file-meta">
+                        <span>{entry.mode}</span>
+                        <span>{entry.isDir ? '-' : entry.size}</span>
+                        <span>{entry.modTime}</span>
+                      </span>
+                    )}
+                  />
+                </List.Item>
+              )}
+            />
+          </div>
+        </div>
       <Drawer
         title={t('action.mkdir')}
         width={320}
@@ -1960,7 +2013,8 @@ function App() {
         </Form>
       </Drawer>
     </div>
-  );
+    );
+  };
 
   const renderSettings = () => (
     <div className="workspace-page narrow">
@@ -2154,59 +2208,110 @@ function App() {
     }
   };
 
-  const renderTunnels = () => (
-    <div className="workspace-page">
-      <div className="page-header">
-        <div>
-          <Text type="secondary">{t('nav.tunnels')}</Text>
-          <Title level={3}>{t('section.tunnels')}</Title>
+  const renderTunnels = () => {
+    const tunnelSummary = buildTunnelSummary(tunnels);
+    return (
+      <div className="workspace-page remote-workspace-page">
+        <div className="page-header">
+          <div>
+            <Text type="secondary">{t('nav.tunnels')}</Text>
+            <Title level={3}>{t('section.tunnels')}</Title>
+          </div>
+          <Button type="primary" onClick={startTunnel} loading={tunnelBusy}>{t('action.create')}</Button>
+        </div>
+        <div className="remote-summary-grid">
+          <MetricCard label={t('metric.activeTunnels')} value={tunnelSummary.total} />
+          <MetricCard label={t('metric.localPorts')} value={tunnelSummary.localPorts.length || 0} meta={tunnelSummary.localPorts.join(', ')} />
+          <MetricCard label={t('metric.remoteHosts')} value={tunnelSummary.remoteHosts.length || 0} meta={tunnelSummary.remoteHosts.join(', ')} />
+        </div>
+        <div className="tunnel-workbench">
+          <div className="remote-context-panel">
+            <Text strong>{t('section.quickConnect')}</Text>
+            <Text type="secondary">{t('tunnel.formHint')}</Text>
+            <Form form={tunnelForm} layout="vertical" className="remote-context-form" initialValues={{ sshPort: 22, localHost: '127.0.0.1' }}>
+              <Form.Item name="name" label={t('field.name')}>
+                <Input />
+              </Form.Item>
+              <Space size={8} className="remote-form-row">
+                <Form.Item name="sshHost" label={t('field.host')} rules={[{ required: true, message: t('validation.required') }]}>
+                  <Input placeholder={t('placeholder.host')} />
+                </Form.Item>
+                <Form.Item name="sshPort" label={t('field.port')}>
+                  <InputNumber min={1} max={65535} />
+                </Form.Item>
+              </Space>
+              <Form.Item name="sshUser" label={t('field.username')} rules={[{ required: true, message: t('validation.required') }]}>
+                <Input />
+              </Form.Item>
+              <Form.Item name="sshPassword" label={t('field.password')}>
+                <Input.Password />
+              </Form.Item>
+              <Space size={8} className="remote-form-row">
+                <Form.Item name="localHost" label={t('field.localHost')}>
+                  <Input />
+                </Form.Item>
+                <Form.Item name="localPort" label={t('field.localPort')} rules={[{ required: true, message: t('validation.required') }]}>
+                  <InputNumber min={1} max={65535} />
+                </Form.Item>
+              </Space>
+              <Space size={8} className="remote-form-row">
+                <Form.Item name="remoteHost" label={t('field.remoteHost')} rules={[{ required: true, message: t('validation.required') }]}>
+                  <Input />
+                </Form.Item>
+                <Form.Item name="remotePort" label={t('field.remotePort')} rules={[{ required: true, message: t('validation.required') }]}>
+                  <InputNumber min={1} max={65535} />
+                </Form.Item>
+              </Space>
+            </Form>
+          </div>
+          <div className="remote-file-panel">
+            <div className="remote-file-toolbar">
+              <div>
+                <Text strong>{t('section.tunnels')}</Text>
+                <Text type="secondary">{t('tunnel.listHint')}</Text>
+              </div>
+            </div>
+            <List
+              className="profile-list tunnel-list"
+              dataSource={tunnels}
+              locale={{
+                emptyText: (
+                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noTunnels')}>
+                    <Button type="primary" onClick={startTunnel} loading={tunnelBusy}>{t('action.create')}</Button>
+                  </Empty>
+                ),
+              }}
+              renderItem={(item) => {
+                const display = buildTunnelDisplay(item);
+                return (
+                  <List.Item
+                    className="tunnel-row"
+                    actions={[<Button key="stop" danger size="small" loading={tunnelBusy} onClick={() => stopTunnel(item.id)}>{t('action.delete')}</Button>]}
+                  >
+                    <List.Item.Meta
+                      avatar={<span className="provider-icon"><ApiOutlined /></span>}
+                      title={(
+                        <span className="remote-file-title">
+                          <strong>{display.name}</strong>
+                          <span className="connection-profile-badge tone-success">{display.localPort}</span>
+                        </span>
+                      )}
+                      description={(
+                        <span className="tunnel-route">
+                          <span>{display.route}</span>
+                          <small>{t('tunnel.via')} {display.via}</small>
+                        </span>
+                      )}
+                    />
+                  </List.Item>
+                );
+              }}
+            />
+          </div>
         </div>
       </div>
-      <Card>
-        <Form form={tunnelForm} layout="inline" className="file-browser-form" initialValues={{ sshPort: 22, localHost: '127.0.0.1' }}>
-          <Form.Item name="name" label={t('field.name')}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="sshHost" label={t('field.host')} rules={[{ required: true, message: t('validation.required') }]}>
-            <Input placeholder={t('placeholder.host')} />
-          </Form.Item>
-          <Form.Item name="sshPort" label={t('field.port')}>
-            <InputNumber min={1} max={65535} />
-          </Form.Item>
-          <Form.Item name="sshUser" label={t('field.username')} rules={[{ required: true, message: t('validation.required') }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="sshPassword" label={t('field.password')}>
-            <Input.Password />
-          </Form.Item>
-          <Form.Item name="localHost" label={t('field.localHost')}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="localPort" label={t('field.localPort')} rules={[{ required: true, message: t('validation.required') }]}>
-            <InputNumber min={1} max={65535} />
-          </Form.Item>
-          <Form.Item name="remoteHost" label={t('field.remoteHost')} rules={[{ required: true, message: t('validation.required') }]}>
-            <Input />
-          </Form.Item>
-          <Form.Item name="remotePort" label={t('field.remotePort')} rules={[{ required: true, message: t('validation.required') }]}>
-            <InputNumber min={1} max={65535} />
-          </Form.Item>
-          <Form.Item>
-            <Button type="primary" onClick={startTunnel} loading={tunnelBusy}>{t('action.create')}</Button>
-          </Form.Item>
-        </Form>
-        <List
-          className="profile-list"
-          dataSource={tunnels}
-          renderItem={(item) => (
-            <List.Item actions={[<Button key="stop" danger size="small" loading={tunnelBusy} onClick={() => stopTunnel(item.id)}>{t('action.delete')}</Button>]}>
-              <List.Item.Meta title={item.name} description={`${item.localAddr} -> ${item.remoteAddr} via ${item.sshAddr}`} />
-            </List.Item>
-          )}
-        />
-      </Card>
-    </div>
-  );
+    );
+  };
 
   const renderAuditLogs = () => (
     <div className="workspace-page">
