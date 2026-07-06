@@ -1824,15 +1824,98 @@ code {
   white-space: pre-wrap;
 }
 
+.extensions-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.extension-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.extension-core-banner,
+.extension-section {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.extension-core-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 14px;
+}
+
+.extension-core-banner .ant-typography-secondary {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+}
+
+.extension-section {
+  overflow: hidden;
+}
+
+.extension-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--panel-muted);
+}
+
+.extension-section-head h4 {
+  margin: 2px 0 0;
+}
+
+.installed-extension-list {
+  border: 0;
+  border-radius: 0;
+}
+
+.installed-extension-title,
+.installed-extension-description {
+  display: flex;
+  min-width: 0;
+  gap: 8px;
+}
+
+.installed-extension-title {
+  align-items: center;
+}
+
+.installed-extension-title strong,
+.installed-extension-description > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.installed-extension-description {
+  flex-direction: column;
+  color: var(--muted);
+}
+
 .extension-grid {
-  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 10px;
+  padding: 12px;
 }
 
 .extension-card {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  min-height: 78px;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 104px;
   padding: 13px;
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -1849,6 +1932,16 @@ code {
   transform: translateY(-1px);
 }
 
+.extension-card-installed,
+.extension-card-builtin {
+  cursor: default;
+}
+
+.extension-card-installed:hover,
+.extension-card-builtin:hover {
+  transform: none;
+}
+
 .extension-card-body {
   display: flex;
   flex: 1;
@@ -1862,6 +1955,38 @@ code {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.extension-card-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.extension-card-facts small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.extension-card-side {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  flex-direction: column;
+}
+
+.extension-action {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.extension-action.tone-primary {
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .file-browser-card {

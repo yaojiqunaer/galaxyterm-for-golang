@@ -120,6 +120,12 @@ import {
   filterQuickCommands,
 } from './quickCommands.js';
 import {
+  buildExtensionAction,
+  buildExtensionCardFacts,
+  buildExtensionSummary,
+  buildInstalledExtensionRows,
+} from './extensionPresentation.js';
+import {
   resolveListIndex,
   resolveBracketSessionAction,
   resolveNumberedSessionIndex,
@@ -462,6 +468,12 @@ function App() {
     officialExtensions,
     providers,
   }), [installedExtensions, providers]);
+  const extensionSummary = useMemo(() => (
+    buildExtensionSummary({ providers, installedExtensions })
+  ), [installedExtensions, providers]);
+  const installedExtensionRows = useMemo(() => (
+    buildInstalledExtensionRows(installedExtensions)
+  ), [installedExtensions]);
   const auditProviderOptions = useMemo(() => [
     { value: 'all', label: t('filter.allProviders') },
     ...Array.from(new Set(auditRecords.map((record) => record.providerType || 'terminal')))
@@ -1559,75 +1571,109 @@ function App() {
   );
 
   const renderExtensions = () => (
-    <div className="workspace-page">
+    <div className="workspace-page extensions-page">
       <div className="page-header">
         <div>
           <Text type="secondary">{t('nav.extensions')}</Text>
-          <Title level={3}>{t('section.officialExtensions')}</Title>
+          <Title level={3}>{t('section.extensionManager')}</Title>
         </div>
         <Space>
           <Button icon={<FolderOpenOutlined />} onClick={() => setExtensionInstallOpen(true)} loading={extensionBusy}>{t('action.installOffline')}</Button>
           <Button icon={<PlusOutlined />} onClick={registerDemoExtension} loading={extensionBusy}>{t('action.addSource')}</Button>
         </Space>
       </div>
-      <Alert type="info" showIcon message={t('settings.coreOnly')} />
-      {installedExtensions.length > 0 && (
-        <>
-          <Divider />
-          <Title level={4}>{t('section.installedProviders')}</Title>
-          <List
-            dataSource={installedExtensions}
-            renderItem={(extension) => (
-              <List.Item
-                actions={[
-                  <Button key="uninstall" size="small" danger loading={extensionBusy} onClick={() => uninstallExtension(extension.id)}>{t('action.uninstall')}</Button>,
-                ]}
-              >
-                <List.Item.Meta
-                  title={(
-                    <Space size={8}>
-                      <span>{extension.name}</span>
-                      <Tag color="green">{t('extension.status.installed')}</Tag>
-                    </Space>
-                  )}
-                  description={(
-                    <Space direction="vertical" size={4}>
-                      <Text type="secondary">{`${extension.id} · ${extension.version}`}</Text>
-                      <Space wrap>
-                        {(extension.providers || []).map((provider) => (
-                          <Tag key={provider.type}>{provider.type}</Tag>
-                        ))}
-                        {(extension.providers || []).flatMap((provider) => provider.capabilities || []).map((capability) => (
-                          <Tag key={capability} color="blue">{capability}</Tag>
-                        ))}
-                      </Space>
-                    </Space>
-                  )}
-                />
-              </List.Item>
-            )}
-          />
-        </>
-      )}
-      <div className="extension-grid">
-        {extensionCatalog.map((extension) => (
-          <button
-            className="extension-card"
-            key={`${extension.type}-${extension.status}`}
-            type="button"
-            onClick={() => extension.status === 'planned' && setExtensionInstallOpen(true)}
-          >
-            <span className="provider-icon">{providerIcons[extension.type] || <CodeOutlined />}</span>
-            <span className="extension-card-body">
-              <Text strong>{extension.nameKey ? t(extension.nameKey) : providerLabel(extension)}</Text>
-              <Text type="secondary">{extension.type}</Text>
-            </span>
-            <Tag color={extensionStatusColor(extension.status)}>
-              {t(`extension.status.${extension.status}`)}
-            </Tag>
-          </button>
-        ))}
+      <div className="extension-summary-grid">
+        <MetricCard label={t('metric.builtinProviders')} value={extensionSummary.builtinProviders} />
+        <MetricCard label={t('metric.extensionProviders')} value={extensionSummary.extensionProviders} />
+        <MetricCard label={t('metric.installedExtensions')} value={extensionSummary.installedExtensions} />
       </div>
+      <div className="extension-core-banner">
+        <div>
+          <Text strong>{t('extension.coreTitle')}</Text>
+          <Text type="secondary">{t('settings.coreOnly')}</Text>
+        </div>
+        <Button icon={<FolderOpenOutlined />} onClick={() => setExtensionInstallOpen(true)}>{t('action.installOffline')}</Button>
+      </div>
+      <section className="extension-section">
+        <div className="extension-section-head">
+          <div>
+            <Text type="secondary">{t('extension.installedHint')}</Text>
+            <Title level={4}>{t('section.installedExtensions')}</Title>
+          </div>
+        </div>
+        <List
+          className="profile-list installed-extension-list"
+          dataSource={installedExtensionRows}
+          locale={{ emptyText: t('empty.noInstalledExtensions') }}
+          renderItem={(extension) => (
+            <List.Item
+              actions={[
+                <Button key="uninstall" size="small" danger loading={extensionBusy} onClick={() => uninstallExtension(extension.id)}>{t('action.uninstall')}</Button>,
+              ]}
+            >
+              <List.Item.Meta
+                avatar={<span className="provider-icon"><AppstoreAddOutlined /></span>}
+                title={(
+                  <span className="installed-extension-title">
+                    <strong>{extension.name}</strong>
+                    <span className="connection-profile-badge tone-success">{extension.version}</span>
+                  </span>
+                )}
+                description={(
+                  <span className="installed-extension-description">
+                    <span>{extension.id}</span>
+                    <span className="connection-profile-badges">
+                      {extension.providers.map((provider) => <span key={provider} className="connection-profile-badge tone-info">{provider}</span>)}
+                      {extension.capabilities.map((capability) => <span key={capability} className="connection-profile-badge">{capability}</span>)}
+                    </span>
+                  </span>
+                )}
+              />
+            </List.Item>
+          )}
+        />
+      </section>
+      <section className="extension-section">
+        <div className="extension-section-head">
+          <div>
+            <Text type="secondary">{t('extension.officialHint')}</Text>
+            <Title level={4}>{t('section.officialExtensions')}</Title>
+          </div>
+        </div>
+      <div className="extension-grid">
+        {extensionCatalog.map((extension) => {
+          const action = buildExtensionAction(extension);
+          const facts = buildExtensionCardFacts(extension);
+          const CardTag = action.enabled ? 'button' : 'div';
+          return (
+            <CardTag
+              className={`extension-card extension-card-${extension.status}`}
+              key={`${extension.type}-${extension.status}`}
+              type={action.enabled ? 'button' : undefined}
+              onClick={() => action.enabled && setExtensionInstallOpen(true)}
+            >
+              <span className="provider-icon">{providerIcons[extension.type] || <CodeOutlined />}</span>
+              <span className="extension-card-body">
+                <Text strong>{extension.nameKey ? t(extension.nameKey) : providerLabel(extension)}</Text>
+                <span className="extension-card-facts">
+                  {facts.map((fact) => (
+                    <small key={fact.key}>{extensionFactLabel(fact.key)}: {extensionFactValue(fact)}</small>
+                  ))}
+                </span>
+              </span>
+              <span className="extension-card-side">
+                <Tag color={extensionStatusColor(extension.status)}>
+                  {t(`extension.status.${extension.status}`)}
+                </Tag>
+                <span className={`extension-action tone-${action.tone}`}>
+                  {t(`extension.action.${action.key}`)}
+                </span>
+              </span>
+            </CardTag>
+          );
+        })}
+      </div>
+      </section>
     </div>
   );
 
@@ -3807,6 +3853,15 @@ function extensionStatusColor(status) {
   if (status === 'builtin') return 'green';
   if (status === 'installed') return 'blue';
   return 'default';
+}
+
+function extensionFactLabel(key) {
+  return t(`extension.fact.${key}`);
+}
+
+function extensionFactValue(fact) {
+  if (fact.key === 'status') return t(`extension.status.${fact.value}`);
+  return fact.value || '-';
 }
 
 function groupLabel(group) {

@@ -10,6 +10,7 @@
     "test:audit": "node src/auditLog.test.mjs",
     "test:connections": "node src/connectionManager.test.mjs",
     "test:desktop-bridge": "node src/desktopBridge.test.mjs",
+    "test:extensions": "node src/extensionPresentation.test.mjs",
     "test:i18n": "node src/i18n.test.mjs",
     "test:insights": "node src/workspaceInsights.test.mjs",
     "test:list-navigation": "node src/listNavigation.test.mjs",
