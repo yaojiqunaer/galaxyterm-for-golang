@@ -126,6 +126,12 @@ import {
   buildInstalledExtensionRows,
 } from './extensionPresentation.js';
 import {
+  defaultExtensionSources,
+  normalizeExtensionSource,
+  removeExtensionSource,
+  upsertExtensionSource,
+} from './extensionSources.js';
+import {
   resolveListIndex,
   resolveBracketSessionAction,
   resolveNumberedSessionIndex,
@@ -149,6 +155,7 @@ const workspaceStorageKey = 'galaxyterm.workspaceSnapshot';
 const commandStorageKey = 'galaxyterm.quickCommands';
 const recentConnectionStorageKey = 'galaxyterm.recentConnections';
 const auditRecordStorageKey = 'galaxyterm.auditRecords';
+const extensionSourceStorageKey = 'galaxyterm.extensionSources';
 const profileSchemaVersion = 1;
 
 const defaultSettings = {
@@ -201,13 +208,17 @@ function App() {
   const [locale, setLocaleState] = useState(() => currentLocale());
   const [terminalThemes, setTerminalThemes] = useState(['auto']);
   const [installedExtensions, setInstalledExtensions] = useState([]);
+  const [extensionSources, setExtensionSources] = useState(() => loadExtensionSources());
   const [tunnels, setTunnels] = useState([]);
   const [activeKey, setActiveKey] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [extensionInstallOpen, setExtensionInstallOpen] = useState(false);
+  const [extensionSourceOpen, setExtensionSourceOpen] = useState(false);
   const [extensionPackagePath, setExtensionPackagePath] = useState('');
+  const [extensionSourceName, setExtensionSourceName] = useState('');
+  const [extensionSourceUrl, setExtensionSourceUrl] = useState('');
   const [sshConfigOpen, setSshConfigOpen] = useState(false);
   const [sshConfigContent, setSshConfigContent] = useState('');
   const [renameOpen, setRenameOpen] = useState(false);
@@ -1579,7 +1590,7 @@ function App() {
         </div>
         <Space>
           <Button icon={<FolderOpenOutlined />} onClick={() => setExtensionInstallOpen(true)} loading={extensionBusy}>{t('action.installOffline')}</Button>
-          <Button icon={<PlusOutlined />} onClick={registerDemoExtension} loading={extensionBusy}>{t('action.addSource')}</Button>
+          <Button icon={<PlusOutlined />} onClick={() => setExtensionSourceOpen(true)}>{t('action.addSource')}</Button>
         </Space>
       </div>
       <div className="extension-summary-grid">
@@ -1594,6 +1605,44 @@ function App() {
         </div>
         <Button icon={<FolderOpenOutlined />} onClick={() => setExtensionInstallOpen(true)}>{t('action.installOffline')}</Button>
       </div>
+      <section className="extension-section">
+        <div className="extension-section-head">
+          <div>
+            <Text type="secondary">{t('extension.sourceHint')}</Text>
+            <Title level={4}>{t('section.extensionSources')}</Title>
+          </div>
+          <Button size="small" icon={<PlusOutlined />} onClick={() => setExtensionSourceOpen(true)}>{t('action.addSource')}</Button>
+        </div>
+        <List
+          className="profile-list installed-extension-list"
+          dataSource={extensionSources}
+          locale={{
+            emptyText: (
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noExtensionSources')}>
+                <Button size="small" type="primary" onClick={() => setExtensionSourceOpen(true)}>{t('action.addSource')}</Button>
+              </Empty>
+            ),
+          }}
+          renderItem={(source) => (
+            <List.Item
+              actions={[
+                <Button key="delete" size="small" danger onClick={() => deleteExtensionSource(source.id)}>{t('action.delete')}</Button>,
+              ]}
+            >
+              <List.Item.Meta
+                avatar={<span className="provider-icon"><GlobalOutlined /></span>}
+                title={(
+                  <span className="installed-extension-title">
+                    <strong>{source.name}</strong>
+                    <span className="connection-profile-badge tone-info">{source.type}</span>
+                  </span>
+                )}
+                description={<span className="installed-extension-description"><span>{source.url}</span></span>}
+              />
+            </List.Item>
+          )}
+        />
+      </section>
       <section className="extension-section">
         <div className="extension-section-head">
           <div>
@@ -1677,27 +1726,30 @@ function App() {
     </div>
   );
 
-  const registerDemoExtension = async () => {
-    const manifest = {
-      id: 'galaxyterm-extension-demo',
-      name: 'Demo Extension',
-      version: '0.1.0',
-      apiVersion: 'v1',
-      description: 'Local extension manifest preview',
-      providers: [{ type: 'demo', nameKey: 'extension.demo', category: 'extension', capabilities: ['stream'] }],
-      locales: ['zh-CN', 'en-US'],
-    };
-    setExtensionBusy(true);
-    try {
-      await ExtensionsAPI.RegisterInstalled(manifest);
-      const items = await ExtensionsAPI.ListInstalled();
-      setInstalledExtensions(Array.isArray(items) ? items : []);
-      message.success(t('message.extensionComing'));
-    } catch (error) {
-      message.error(`${t('message.extensionInstallFailed')}: ${error}`);
-    } finally {
-      setExtensionBusy(false);
+  const saveExtensionSource = () => {
+    const source = normalizeExtensionSource({
+      name: extensionSourceName,
+      url: extensionSourceUrl,
+      type: 'github',
+    });
+    if (!source) {
+      message.warning(t('validation.required'));
+      return;
     }
+    const nextSources = upsertExtensionSource(extensionSources, source);
+    persistExtensionSources(nextSources);
+    setExtensionSources(nextSources);
+    setExtensionSourceName('');
+    setExtensionSourceUrl('');
+    setExtensionSourceOpen(false);
+    message.success(t('message.extensionSourceSaved'));
+  };
+
+  const deleteExtensionSource = (sourceId) => {
+    const nextSources = removeExtensionSource(extensionSources, sourceId);
+    persistExtensionSources(nextSources);
+    setExtensionSources(nextSources);
+    message.success(t('message.extensionSourceDeleted'));
   };
 
   const installOfflineExtension = async () => {
@@ -3160,6 +3212,32 @@ function App() {
         </Form>
       </Drawer>
       <Drawer
+        title={t('drawer.extensionSources')}
+        width={440}
+        open={extensionSourceOpen}
+        destroyOnHidden
+        onClose={() => setExtensionSourceOpen(false)}
+        extra={<Button type="primary" onClick={saveExtensionSource}>{t('action.save')}</Button>}
+      >
+        <Alert type="info" showIcon message={t('extension.sourceDrawerHint')} />
+        <Form layout="vertical" className="terminal-form">
+          <Form.Item label={t('field.name')} required>
+            <Input
+              value={extensionSourceName}
+              onChange={(event) => setExtensionSourceName(event.target.value)}
+              placeholder={t('placeholder.extensionSourceName')}
+            />
+          </Form.Item>
+          <Form.Item label={t('field.url')} required>
+            <Input
+              value={extensionSourceUrl}
+              onChange={(event) => setExtensionSourceUrl(event.target.value)}
+              placeholder={t('placeholder.extensionSourceUrl')}
+            />
+          </Form.Item>
+        </Form>
+      </Drawer>
+      <Drawer
         title={t('drawer.importSshConfig')}
         width={560}
         open={sshConfigOpen}
@@ -3608,6 +3686,20 @@ function loadQuickCommands() {
 
 function persistQuickCommands(commands) {
   localStorage.setItem(commandStorageKey, JSON.stringify(commands));
+}
+
+function loadExtensionSources() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(extensionSourceStorageKey) || '[]');
+    if (!Array.isArray(parsed) || parsed.length === 0) return defaultExtensionSources;
+    return parsed.map(normalizeExtensionSource).filter(Boolean);
+  } catch {
+    return defaultExtensionSources;
+  }
+}
+
+function persistExtensionSources(sources) {
+  localStorage.setItem(extensionSourceStorageKey, JSON.stringify(sources));
 }
 
 function loadRecentConnections() {
