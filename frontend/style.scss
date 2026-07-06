@@ -1903,7 +1903,9 @@ code {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  max-height: calc(100vh - 250px);
   padding: 14px;
+  overflow: auto;
 }
 
 .remote-context-panel > .ant-typography-secondary {
@@ -2061,10 +2063,16 @@ code {
 }
 
 .quick-command-list {
+  max-height: calc(100vh - 430px);
   overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--panel);
+}
+
+.quick-command-list .ant-list-items {
+  max-height: inherit;
+  overflow: auto;
 }
 
 .quick-command-row {

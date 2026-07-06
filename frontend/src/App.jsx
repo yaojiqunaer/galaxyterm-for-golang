@@ -2245,7 +2245,7 @@ function App() {
                 <Form.Item name="sshHost" label={t('field.host')} rules={[{ required: true, message: t('validation.required') }]}>
                   <Input placeholder={t('placeholder.host')} />
                 </Form.Item>
-                <Form.Item name="sshPort" label={t('field.port')}>
+                <Form.Item name="sshPort" label={t('field.port')} initialValue={22}>
                   <InputNumber min={1} max={65535} />
                 </Form.Item>
               </Space>
@@ -2256,7 +2256,7 @@ function App() {
                 <Input.Password />
               </Form.Item>
               <Space size={8} className="remote-form-row">
-                <Form.Item name="localHost" label={t('field.localHost')}>
+                <Form.Item name="localHost" label={t('field.localHost')} initialValue="127.0.0.1">
                   <Input />
                 </Form.Item>
                 <Form.Item name="localPort" label={t('field.localPort')} rules={[{ required: true, message: t('validation.required') }]}>
