@@ -31,6 +31,14 @@ export function sessionSummary(sessions = []) {
   });
 }
 
+export function buildSessionStatusFacts(summary = {}) {
+  return [
+    { key: 'connected', value: summary.connected || 0, tone: 'success' },
+    { key: 'connecting', value: summary.connecting || 0, tone: 'warning' },
+    { key: 'closed', value: summary.closed || 0, tone: 'closed' },
+  ].filter((item) => item.value > 0);
+}
+
 export function sessionTabDisplay(session = {}, active = false) {
   return {
     active,

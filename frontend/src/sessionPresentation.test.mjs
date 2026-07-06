@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  buildSessionStatusFacts,
   profileActionModel,
   sessionTabDisplay,
   sessionStatusLabel,
@@ -28,6 +29,26 @@ assert.deepEqual(sessionSummary([
   connecting: 2,
   total: 4,
 });
+
+assert.deepEqual(buildSessionStatusFacts({
+  active: 3,
+  closed: 1,
+  connected: 2,
+  connecting: 1,
+  total: 4,
+}), [
+  { key: 'connected', value: 2, tone: 'success' },
+  { key: 'connecting', value: 1, tone: 'warning' },
+  { key: 'closed', value: 1, tone: 'closed' },
+]);
+
+assert.deepEqual(buildSessionStatusFacts({
+  active: 0,
+  closed: 0,
+  connected: 0,
+  connecting: 0,
+  total: 0,
+}), []);
 
 assert.deepEqual(sessionTabDisplay({
   label: 'Local Terminal',

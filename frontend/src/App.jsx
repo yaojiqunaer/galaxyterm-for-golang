@@ -90,6 +90,7 @@ import {
   ungroupedKey,
 } from './connectionManager.js';
 import {
+  buildSessionStatusFacts,
   profileActionModel,
   sessionTabDisplay,
   sessionStatusLabel,
@@ -1216,7 +1217,7 @@ function App() {
       return (
         <div className="session-grid-page">
           <div className="session-grid-toolbar">
-            <SessionStrip activeSession={activeSession} summary={currentSessionSummary} />
+            <SessionStrip activeSession={activeSession} providers={providers} summary={currentSessionSummary} />
             <Button size="small" onClick={() => setSessionView('tabs')}>{t('action.tabs')}</Button>
           </div>
           <div className="session-grid">
@@ -1259,7 +1260,7 @@ function App() {
     return (
       <div className="session-tabs-page">
         <div className="terminal-session-toolbar">
-          <SessionStrip activeSession={activeSession} summary={currentSessionSummary} />
+          <SessionStrip activeSession={activeSession} providers={providers} summary={currentSessionSummary} />
           <Space size={6} wrap>
             <Button size="small" onClick={() => setSessionView('grid')}>{t('action.grid')}</Button>
             <Button size="small" icon={<ReloadOutlined />} onClick={() => reconnectSession()} disabled={!activeKey}>{t('action.reconnect')}</Button>
@@ -3491,14 +3492,29 @@ function SessionSidebarLabel({ session }) {
   );
 }
 
-function SessionStrip({ activeSession, summary }) {
+function SessionStrip({ activeSession, providers = [], summary }) {
+  const facts = buildSessionStatusFacts(summary);
   return (
     <div className="session-strip">
       <div className={`session-strip-current tone-${sessionStatusTone(activeSession)}`}>
         <span className="session-status-dot" />
-        <strong>{activeSession?.label || '-'}</strong>
+        <span className="session-strip-title">
+          <strong>{activeSession?.label || '-'}</strong>
+          <small>{activeSession ? providerTypeLabel(activeSession.providerType, providers) : t('empty.noSessions')}</small>
+        </span>
       </div>
-      <Text type="secondary">{`${summary.active}/${summary.total}`}</Text>
+      <div className="session-strip-facts">
+        {facts.map((fact) => (
+          <span key={fact.key} className={`session-fact tone-${fact.tone}`}>
+            <small>{t(`session.status.${fact.key}`)}</small>
+            <strong>{fact.value}</strong>
+          </span>
+        ))}
+        <span className="session-fact">
+          <small>{t('label.openSessions')}</small>
+          <strong>{`${summary.active}/${summary.total}`}</strong>
+        </span>
+      </div>
     </div>
   );
 }

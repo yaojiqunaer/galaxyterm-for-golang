@@ -619,6 +619,12 @@ select {
   gap: 8px;
 }
 
+.session-strip-title {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
 .session-summary-current strong,
 .session-strip-current strong {
   min-width: 0;
@@ -626,6 +632,57 @@ select {
   color: var(--terminal-text);
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.session-strip-title small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-strip-facts {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: auto;
+}
+
+.session-fact {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  min-height: 24px;
+  padding: 2px 7px;
+  border: 1px solid var(--terminal-border);
+  border-radius: 999px;
+  background: var(--terminal-chrome-soft);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.session-fact strong {
+  color: var(--terminal-text);
+  font-size: 12px;
+}
+
+.session-fact small {
+  font-size: 10px;
+}
+
+.session-fact.tone-success {
+  border-color: rgb(52 211 153 / 25%);
+  color: var(--success);
+}
+
+.session-fact.tone-warning {
+  border-color: rgb(245 197 66 / 25%);
+  color: var(--warning);
+}
+
+.session-fact.tone-closed {
+  opacity: 0.72;
 }
 
 .terminal-tabs {
