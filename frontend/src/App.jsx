@@ -98,6 +98,7 @@ import {
 import {
   buildSessionCloseConfirm,
   buildSessionStatusFacts,
+  filterSessions,
   profileActionModel,
   sessionTabDisplay,
   sessionStatusLabel,
@@ -262,6 +263,8 @@ function App() {
   const [paletteActiveIndex, setPaletteActiveIndex] = useState(-1);
   const [selectedNav, setSelectedNav] = useState('connections');
   const [sessionView, setSessionView] = useState('tabs');
+  const [sessionQuery, setSessionQuery] = useState('');
+  const [sessionStatusFilter, setSessionStatusFilter] = useState('active');
   const [profileQuery, setProfileQuery] = useState('');
   const [groupQuery, setGroupQuery] = useState('all');
   const [providerFilter, setProviderFilter] = useState('all');
@@ -565,6 +568,15 @@ function App() {
   }), [auditProviderFilter, auditQuery, auditRecords]);
   const currentSessionSummary = useMemo(() => sessionSummary(sessions), [sessions]);
   const activeSession = sessions.find((session) => session.id === activeKey);
+  const visibleSessions = useMemo(() => filterSessions(sessions, {
+    activeKey,
+    query: sessionQuery,
+    status: sessionStatusFilter,
+  }), [activeKey, sessionQuery, sessionStatusFilter, sessions]);
+  const sidebarSessions = useMemo(() => filterSessions(sessions, {
+    activeKey,
+    status: 'active',
+  }), [activeKey, sessions]);
   const visibleQuickCommands = useMemo(() => filterQuickCommands(quickCommands, commandQuery), [commandQuery, quickCommands]);
   const visibleCommandHistory = useMemo(() => filterCommandHistory(commandHistory, {
     providerType: historyScope === 'all' ? 'all' : activeSession?.providerType || 'all',
@@ -1381,6 +1393,47 @@ function App() {
         />
       );
     }
+    const sessionFilterControls = (
+      <div className="session-filter-bar">
+        <Input
+          allowClear
+          className="session-filter-search"
+          placeholder={t('placeholder.searchSessions')}
+          value={sessionQuery}
+          onChange={(event) => setSessionQuery(event.target.value)}
+        />
+        <Segmented
+          size="small"
+          value={sessionStatusFilter}
+          options={[
+            { value: 'active', label: t('filter.activeSessions') },
+            { value: 'all', label: t('filter.allSessions') },
+            { value: 'connected', label: t('session.status.connected') },
+            { value: 'connecting', label: t('session.status.connecting') },
+            { value: 'closed', label: t('session.status.closed') },
+          ]}
+          onChange={setSessionStatusFilter}
+        />
+        <Text type="secondary">{t('session.filterSummary', { count: visibleSessions.length, total: sessions.length })}</Text>
+      </div>
+    );
+    const sessionSwitcher = (
+      <div className="session-switcher-list">
+        {visibleSessions.length === 0 ? (
+          <Empty className="session-filter-empty" image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noSessionMatches')} />
+        ) : visibleSessions.map((session, index) => (
+          <button
+            key={session.id}
+            type="button"
+            className={session.id === activeKey ? 'session-switcher-item active' : 'session-switcher-item'}
+            onClick={() => setActiveKey(session.id)}
+          >
+            <SessionTabLabel active={session.id === activeKey} session={session} />
+            {index < 9 && <Text code>{index + 1}</Text>}
+          </button>
+        ))}
+      </div>
+    );
     if (sessionView === 'grid') {
       return (
         <div className="session-grid-page">
@@ -1388,6 +1441,8 @@ function App() {
             <SessionStrip activeSession={activeSession} providers={providers} summary={currentSessionSummary} />
             <Button size="small" onClick={() => setSessionView('tabs')}>{t('action.tabs')}</Button>
           </div>
+          {sessionFilterControls}
+          {sessionSwitcher}
           <div className="session-grid">
             {sessions.map((session) => (
               <div
@@ -1437,6 +1492,8 @@ function App() {
             <Button size="small" danger onClick={() => confirmRemoveSession(activeKey)} disabled={!activeKey}>{t('action.delete')}</Button>
           </Space>
         </div>
+        {sessionFilterControls}
+        {sessionSwitcher}
         <Tabs
           className="terminal-tabs"
           type="editable-card"
@@ -3181,12 +3238,12 @@ function App() {
             <span>{t('section.activeSessions')}</span>
             {sessions.length > 0 && <Text code>{numberedSessionShortcut}</Text>}
           </div>
-          {sessions.length === 0 ? (
+          {sidebarSessions.length === 0 ? (
             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noSessions')} />
           ) : (
             <List
               size="small"
-              dataSource={sessions}
+              dataSource={sidebarSessions}
               renderItem={(session, index) => (
                 <List.Item
                   className={session.id === activeKey ? 'session-row active' : 'session-row'}

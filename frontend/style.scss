@@ -725,6 +725,62 @@ select {
   background: transparent;
 }
 
+.session-filter-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--terminal-border);
+  background: color-mix(in srgb, var(--terminal-chrome) 82%, var(--terminal-bg));
+}
+
+.session-filter-search {
+  min-width: 180px;
+  max-width: 280px;
+}
+
+.session-filter-bar > .ant-typography {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.session-switcher-list {
+  display: flex;
+  gap: 6px;
+  min-height: 38px;
+  padding: 6px 10px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--terminal-border);
+  background: var(--terminal-bg);
+}
+
+.session-switcher-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 260px;
+  min-height: 26px;
+  padding: 4px 8px;
+  border: 1px solid var(--terminal-border);
+  border-radius: 7px;
+  background: var(--terminal-chrome-soft);
+  color: var(--terminal-text);
+  cursor: pointer;
+}
+
+.session-switcher-item.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--terminal-bg));
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.session-filter-empty {
+  flex: 1;
+  min-width: 220px;
+  margin: 0 !important;
+}
+
 .terminal-tabs .ant-tabs-nav {
   margin: 0;
   padding: 5px 8px 0;

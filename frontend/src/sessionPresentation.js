@@ -39,6 +39,26 @@ export function buildSessionStatusFacts(summary = {}) {
   ].filter((item) => item.value > 0);
 }
 
+export function filterSessions(sessions = [], options = {}) {
+  const queryTokens = String(options.query || '')
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .filter(Boolean);
+  const status = ['all', 'active', 'connected', 'connecting', 'closed'].includes(options.status)
+    ? options.status
+    : 'all';
+
+  return [...sessions]
+    .filter((session) => matchesSessionStatus(session, status))
+    .filter((session) => matchesSessionQuery(session, queryTokens))
+    .sort((left, right) => {
+      if (left.id === options.activeKey) return -1;
+      if (right.id === options.activeKey) return 1;
+      return 0;
+    });
+}
+
 export function buildSessionCloseConfirm(target) {
   if (Array.isArray(target)) {
     if (target.length === 0) return null;
@@ -83,4 +103,25 @@ export function profileActionModel(profile = {}) {
     profile.favorite ? 'unfavorite' : 'favorite',
     'delete',
   ];
+}
+
+function matchesSessionStatus(session, status) {
+  if (status === 'all') return true;
+  if (status === 'active') return sessionStatusTone(session) !== 'closed';
+  return sessionStatusLabel(session) === status;
+}
+
+function matchesSessionQuery(session = {}, queryTokens = []) {
+  if (queryTokens.length === 0) return true;
+  const searchText = [
+    session.id,
+    session.label,
+    session.displayName,
+    session.providerType,
+    session.status,
+    session.config?.host,
+    session.config?.username,
+    session.config?.workingDirectory,
+  ].filter(Boolean).join(' ').toLowerCase();
+  return queryTokens.every((token) => searchText.includes(token));
 }

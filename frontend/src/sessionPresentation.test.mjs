@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   buildSessionCloseConfirm,
   buildSessionStatusFacts,
+  filterSessions,
   profileActionModel,
   sessionTabDisplay,
   sessionStatusLabel,
@@ -50,6 +51,36 @@ assert.deepEqual(buildSessionStatusFacts({
   connecting: 0,
   total: 0,
 }), []);
+
+const sessionFilterFixture = [
+  { id: '1', label: 'Prod SSH', providerType: 'ssh', status: 'connected', config: { host: 'prod.example.com', username: 'root' } },
+  { id: '2', label: 'Local Shell', providerType: 'local', status: 'connecting', config: { workingDirectory: '/repo/galaxyterm' } },
+  { id: '3', label: 'Redis Cache', providerType: 'redis', status: 'closed', config: { host: 'cache.internal' } },
+];
+
+assert.deepEqual(filterSessions(sessionFilterFixture, {
+  activeKey: '2',
+  query: '',
+  status: 'all',
+}).map((session) => session.id), ['2', '1', '3']);
+
+assert.deepEqual(filterSessions(sessionFilterFixture, {
+  activeKey: '2',
+  query: 'prod root',
+  status: 'all',
+}).map((session) => session.id), ['1']);
+
+assert.deepEqual(filterSessions(sessionFilterFixture, {
+  activeKey: '2',
+  query: '',
+  status: 'active',
+}).map((session) => session.id), ['2', '1']);
+
+assert.deepEqual(filterSessions(sessionFilterFixture, {
+  activeKey: '2',
+  query: '',
+  status: 'closed',
+}).map((session) => session.id), ['3']);
 
 assert.deepEqual(buildSessionCloseConfirm({
   label: 'Prod Shell',
