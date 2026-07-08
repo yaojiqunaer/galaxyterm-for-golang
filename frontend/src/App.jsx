@@ -48,6 +48,7 @@ import {
   FullscreenExitOutlined,
   FullscreenOutlined,
   GlobalOutlined,
+  QuestionCircleOutlined,
   LaptopOutlined,
   MinusOutlined,
   MoreOutlined,
@@ -216,6 +217,7 @@ function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [commandsOpen, setCommandsOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
   const [extensionInstallOpen, setExtensionInstallOpen] = useState(false);
   const [extensionSourceOpen, setExtensionSourceOpen] = useState(false);
   const [extensionPackagePath, setExtensionPackagePath] = useState('');
@@ -324,6 +326,11 @@ function App() {
 
   useEffect(() => {
     const handleKeydown = (event) => {
+      if (event.key === '?' && !isEditableTarget(event.target)) {
+        event.preventDefault();
+        setHelpOpen(true);
+        return;
+      }
       const commandKey = event.metaKey || event.ctrlKey;
       if (!commandKey) return;
       const key = event.key.toLowerCase();
@@ -2280,6 +2287,65 @@ function App() {
     </div>
   );
 
+  const renderHelpPanel = () => (
+    <div className="help-panel">
+      <div className="help-hero">
+        <div>
+          <Text type="secondary">{t('help.kicker')}</Text>
+          <Title level={4}>{t('help.title')}</Title>
+          <Text type="secondary">{t('help.description')}</Text>
+        </div>
+        <Space wrap>
+          <Tag color="processing">{`${t('metric.activeSessions')}: ${workspaceInsights.sessions.active}`}</Tag>
+          <Tag color="cyan">{`${t('metric.providers')}: ${workspaceInsights.providers.total}`}</Tag>
+          <Tag color="gold">{`${t('metric.auditRecords')}: ${auditRecords.length}`}</Tag>
+        </Space>
+      </div>
+
+      <Alert type="info" showIcon message={t('help.quickOpenHint')} />
+
+      <div className="help-shortcut-grid">
+        {buildShortcutGroups().map((group) => (
+          <section key={group.key} className="help-shortcut-card">
+            <Text strong>{t(`shortcut.group.${group.key}`)}</Text>
+            <List
+              size="small"
+              dataSource={group.items}
+              renderItem={([shortcut, actionKey]) => (
+                <List.Item>
+                  <Text code>{shortcut}</Text>
+                  <Text>{t(actionKey)}</Text>
+                </List.Item>
+              )}
+            />
+          </section>
+        ))}
+      </div>
+
+      <div className="help-workflow-grid">
+        {[
+          ['connections', 'nav.connections', 'help.workflow.connections'],
+          ['sessions', 'nav.sessions', 'help.workflow.sessions'],
+          ['audit', 'nav.audit', 'help.workflow.audit'],
+          ['extensions', 'nav.extensions', 'help.workflow.extensions'],
+        ].map(([key, titleKey, bodyKey]) => (
+          <button
+            key={key}
+            type="button"
+            className="help-workflow-card"
+            onClick={() => {
+              setSelectedNav(key);
+              setHelpOpen(false);
+            }}
+          >
+            <Text strong>{t(titleKey)}</Text>
+            <Text type="secondary">{t(bodyKey)}</Text>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+
   const startTunnel = async () => {
     const values = await tunnelForm.validateFields();
     setTunnelBusy(true);
@@ -2558,6 +2624,7 @@ function App() {
     runQuickCommand,
     setCommandsOpen,
     setSettingsOpen,
+    setHelpOpen,
     saveWorkspace,
     restoreWorkspace,
   });
@@ -2622,6 +2689,7 @@ function App() {
     saveWorkspace,
     restoreWorkspace: () => restoreWorkspace(),
     quickCommands: () => setCommandsOpen(true),
+    help: () => setHelpOpen(true),
     extensions: () => setSelectedNav('extensions'),
     settings: () => setSelectedNav('settings'),
   };
@@ -2629,6 +2697,7 @@ function App() {
     { key: 'saveWorkspace', icon: <SaveOutlined />, label: t('action.saveWorkspace') },
     { key: 'restoreWorkspace', icon: <ReloadOutlined />, label: t('action.restoreWorkspace') },
     { key: 'quickCommands', icon: <CodeOutlined />, label: t('action.commands') },
+    { key: 'help', icon: <QuestionCircleOutlined />, label: t('action.help') },
     { key: 'extensions', icon: <AppstoreAddOutlined />, label: t('nav.extensions') },
     { key: 'settings', icon: <SettingOutlined />, label: t('nav.settings') },
   ];
@@ -2901,13 +2970,16 @@ function App() {
               </>
             )}
             <Tooltip title={t('action.language')}>
-              <Button icon={<GlobalOutlined />} onClick={() => setSettingsOpen(true)} />
+              <Button aria-label={t('action.language')} icon={<GlobalOutlined />} onClick={() => setSettingsOpen(true)} />
+            </Tooltip>
+            <Tooltip title={t('action.help')}>
+              <Button aria-label={t('action.help')} icon={<QuestionCircleOutlined />} onClick={() => setHelpOpen(true)} />
             </Tooltip>
             <Tooltip title={t('nav.extensions')}>
-              <Button icon={<AppstoreAddOutlined />} onClick={() => setSelectedNav('extensions')} />
+              <Button aria-label={t('nav.extensions')} icon={<AppstoreAddOutlined />} onClick={() => setSelectedNav('extensions')} />
             </Tooltip>
             <Tooltip title={t('nav.settings')}>
-              <Button icon={<SettingOutlined />} onClick={() => setSelectedNav('settings')} />
+              <Button aria-label={t('nav.settings')} icon={<SettingOutlined />} onClick={() => setSelectedNav('settings')} />
             </Tooltip>
           </Space>
         </div>
@@ -3107,6 +3179,15 @@ function App() {
         onClose={() => setSettingsOpen(false)}
       >
         {renderSettings()}
+      </Drawer>
+      <Drawer
+        title={t('drawer.help')}
+        width={620}
+        open={helpOpen}
+        destroyOnHidden
+        onClose={() => setHelpOpen(false)}
+      >
+        {renderHelpPanel()}
       </Drawer>
       <Drawer
         title={t('drawer.commands')}
@@ -3907,6 +3988,15 @@ function buildPaletteItems(actions) {
       icon: <GlobalOutlined />,
       keywords: 'language locale settings',
       run: () => actions.setSettingsOpen(true),
+    },
+    {
+      id: 'help:shortcuts',
+      group: t('palette.group.settings'),
+      title: t('action.help'),
+      description: t('help.quickOpenHint'),
+      icon: <QuestionCircleOutlined />,
+      keywords: 'help shortcuts keyboard audit replay search session ?',
+      run: () => actions.setHelpOpen(true),
     },
     {
       id: 'commands:manage',

@@ -18,6 +18,7 @@ export function buildShortcutGroups() {
         ['Cmd/Ctrl + L', 'action.clearTerminal'],
         ['Cmd/Ctrl + +/-/0', 'action.zoomReset'],
         ['Cmd/Ctrl + R', 'action.reconnect'],
+        ['?', 'action.help'],
       ],
     },
     {
@@ -30,10 +31,28 @@ export function buildShortcutGroups() {
       ],
     },
     {
+      key: 'search',
+      items: [
+        ['Top search', 'shortcut.searchTerminal'],
+        ['Enter', 'action.findNext'],
+        ['Previous button', 'action.findPrevious'],
+      ],
+    },
+    {
+      key: 'audit',
+      items: [
+        ['Session menu', 'action.saveAuditRecord'],
+        ['Audit page', 'action.replay'],
+        ['Audit page', 'action.exportCast'],
+      ],
+    },
+    {
       key: 'workspace',
       items: [
         ['Cmd/Ctrl + P', 'action.commandPalette'],
         ['Cmd/Ctrl + K', 'action.commands'],
+        ['Workspace menu', 'action.saveWorkspace'],
+        ['Workspace menu', 'action.restoreWorkspace'],
       ],
     },
   ];

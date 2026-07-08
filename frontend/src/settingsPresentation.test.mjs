@@ -29,10 +29,14 @@ assert.deepEqual(buildShortcutGroups().map((group) => ({
   key: group.key,
   count: group.items.length,
 })), [
-  { key: 'terminal', count: 7 },
+  { key: 'terminal', count: 8 },
   { key: 'sessions', count: 4 },
-  { key: 'workspace', count: 2 },
+  { key: 'search', count: 3 },
+  { key: 'audit', count: 3 },
+  { key: 'workspace', count: 4 },
 ]);
+
+assert.equal(buildShortcutGroups().some((group) => group.items.some(([shortcut]) => shortcut === '?')), true);
 
 assert.deepEqual(buildTerminalPreview({
   fontFamily: 'JetBrains Mono',
