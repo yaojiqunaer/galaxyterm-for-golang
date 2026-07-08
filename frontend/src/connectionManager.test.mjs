@@ -8,6 +8,7 @@ import {
   buildConnectionProfileHints,
   buildConnectionProfileSubtitle,
   filterConnectionProfiles,
+  filterRecentConnectionsByProviders,
   isProfileProviderAvailable,
   resolveSelectedProfileId,
   selectBatchProfiles,
@@ -179,6 +180,13 @@ assert.deepEqual(buildConnectionProfileBadges(profiles[2], { activeCount: 0 }, {
 
 assert.equal(isProfileProviderAvailable(profiles[0], [{ type: 'ssh' }, { type: 'local' }]), true);
 assert.equal(isProfileProviderAvailable(profiles[0], [{ type: 'local' }]), false);
+
+assert.deepEqual(filterRecentConnectionsByProviders([
+  { id: 'recent-ssh', providerType: 'ssh' },
+  { id: 'recent-mysql', providerType: 'mysql' },
+  { id: 'recent-request-redis', request: { providerType: 'redis' } },
+], [{ type: 'ssh' }, { type: 'redis' }]).map((item) => item.id), ['recent-ssh', 'recent-request-redis']);
+
 assert.deepEqual(buildConnectionProfileFacts(profiles[0]), [
   { key: 'host', value: '10.0.0.10' },
   { key: 'port', value: 22 },

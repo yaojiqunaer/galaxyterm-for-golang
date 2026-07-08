@@ -86,6 +86,7 @@ import {
   buildConnectionProfileHints,
   buildConnectionProfileSubtitle,
   filterConnectionProfiles,
+  filterRecentConnectionsByProviders,
   isProfileProviderAvailable,
   resolveSelectedProfileId,
   selectBatchProfiles,
@@ -473,6 +474,10 @@ function App() {
   const sidebarQuickProfiles = useMemo(
     () => sortSidebarProfiles(profiles, 5, { availableProviders: providers }),
     [profiles, providers],
+  );
+  const visibleRecentConnections = useMemo(
+    () => filterRecentConnectionsByProviders(recentConnections, providers),
+    [recentConnections, providers],
   );
 
   useEffect(() => {
@@ -1359,7 +1364,7 @@ function App() {
           openRecentConnection={openRecentConnection}
           profiles={profiles}
           providers={providers}
-          recentConnections={recentConnections}
+          recentConnections={visibleRecentConnections}
           restoreWorkspace={restoreWorkspace}
         />
       );
@@ -1568,11 +1573,11 @@ function App() {
             )}
           </div>
 
-          {recentConnections.length > 0 && (
+          {visibleRecentConnections.length > 0 && (
             <div className="recent-connection-rail">
               <Text type="secondary">{t('section.recentConnections')}</Text>
               <div className="recent-connection-list compact">
-                {recentConnections.slice(0, 4).map((connection) => (
+                {visibleRecentConnections.slice(0, 4).map((connection) => (
                   <button
                     key={connection.id}
                     className="recent-connection-chip"

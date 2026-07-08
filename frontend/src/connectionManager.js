@@ -234,6 +234,14 @@ export function isProfileProviderAvailable(profile = {}, providers = []) {
   return providers.some((provider) => provider.type === profile.providerType);
 }
 
+export function filterRecentConnectionsByProviders(connections = [], providers = []) {
+  const providerTypes = new Set(providers.map((provider) => provider.type).filter(Boolean));
+  return connections.filter((connection) => {
+    const providerType = connection.providerType || connection.request?.providerType;
+    return providerTypes.has(providerType);
+  });
+}
+
 export function buildConnectionProfileFacts(profile = {}) {
   if (profile.providerType === 'ssh') {
     return [
