@@ -8,6 +8,7 @@ import {
   buildConnectionProfileHints,
   buildConnectionProfileSubtitle,
   filterConnectionProfiles,
+  isProfileProviderAvailable,
   resolveSelectedProfileId,
   selectBatchProfiles,
   summarizeProfileSessions,
@@ -159,6 +160,14 @@ assert.deepEqual(buildConnectionProfileBadges(profiles[2], { activeCount: 1 }), 
   { key: 'sessions', tone: 'success', value: 1 },
   { key: 'favorite', tone: 'warning', value: true },
 ]);
+assert.deepEqual(buildConnectionProfileBadges(profiles[2], { activeCount: 0 }, { providerAvailable: false }), [
+  { key: 'group', tone: 'default', value: '__ungrouped__' },
+  { key: 'favorite', tone: 'warning', value: true },
+  { key: 'providerUnavailable', tone: 'warning', value: true },
+]);
+
+assert.equal(isProfileProviderAvailable(profiles[0], [{ type: 'ssh' }, { type: 'local' }]), true);
+assert.equal(isProfileProviderAvailable(profiles[0], [{ type: 'local' }]), false);
 assert.deepEqual(buildConnectionProfileFacts(profiles[0]), [
   { key: 'host', value: '10.0.0.10' },
   { key: 'port', value: 22 },

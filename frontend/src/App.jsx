@@ -86,6 +86,7 @@ import {
   buildConnectionProfileHints,
   buildConnectionProfileSubtitle,
   filterConnectionProfiles,
+  isProfileProviderAvailable,
   resolveSelectedProfileId,
   selectBatchProfiles,
   summarizeProfileSessions,
@@ -1099,6 +1100,10 @@ function App() {
   };
 
   const openProfile = async (profile) => {
+    if (!isProfileProviderAvailable(profile, providers)) {
+      message.warning(t('message.providerUnavailable'));
+      return;
+    }
     try {
       await startProfileRequests([profileToRequest(profile)]);
       markProfilesUsed([profile.id]);
@@ -1108,6 +1113,11 @@ function App() {
   };
 
   const openRecentConnection = async (connection) => {
+    const providerType = connection.providerType || connection.request?.providerType;
+    if (!providers.some((provider) => provider.type === providerType)) {
+      message.warning(t('message.providerUnavailable'));
+      return;
+    }
     try {
       await startProfileRequests([connection.request || profileToRequest(recentToProfile(connection))]);
     } catch (error) {
@@ -1601,6 +1611,7 @@ function App() {
               onKeyDown={handleConnectionListKeyDown}
               renderItem={(profile) => {
                 const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
+                const providerAvailable = isProfileProviderAvailable(profile, providers);
                 const actions = [
                   ...(sessionInfo.activeCount > 0
                     ? [<Button key="focus" size="small" onClick={(event) => {
@@ -1611,7 +1622,7 @@ function App() {
                   <Button key="open" size="small" type="primary" onClick={(event) => {
                     event.stopPropagation();
                     openProfile(profile);
-                  }}>{t('action.connect')}</Button>,
+                  }} disabled={!providerAvailable}>{t('action.connect')}</Button>,
                   <Dropdown
                     key="manage"
                     trigger={['click']}
@@ -1640,7 +1651,7 @@ function App() {
                     />
                   </Tooltip>,
                 ];
-                const badges = buildConnectionProfileBadges(profile, sessionInfo);
+                const badges = buildConnectionProfileBadges(profile, sessionInfo, { providerAvailable });
                 return (
                 <List.Item
                   className={selectedProfile?.id === profile.id ? 'connection-profile-row active' : 'connection-profile-row'}
@@ -3850,7 +3861,8 @@ function ConnectionProfilePreview({
   toggleProfileFavorite,
 }) {
   const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
-  const badges = buildConnectionProfileBadges(profile, sessionInfo);
+  const providerAvailable = isProfileProviderAvailable(profile, providers);
+  const badges = buildConnectionProfileBadges(profile, sessionInfo, { providerAvailable });
   const facts = buildConnectionProfileFacts(profile);
   const hints = buildConnectionProfileHints(sessionInfo);
   return (
@@ -3867,7 +3879,7 @@ function ConnectionProfilePreview({
         {sessionInfo.activeCount > 0 && (
           <Button size="small" onClick={() => focusProfileSession(profile)}>{t('action.focusSession')}</Button>
         )}
-        <Button size="small" type="primary" onClick={() => openProfile(profile)}>{t('action.connect')}</Button>
+        <Button size="small" type="primary" disabled={!providerAvailable} onClick={() => openProfile(profile)}>{t('action.connect')}</Button>
         <Button size="small" icon={<EditOutlined />} onClick={() => openProfileEditor(profile)}>{t('action.edit')}</Button>
       </div>
       <div className="connection-profile-tags">
@@ -4441,6 +4453,7 @@ function connectionProfileBadgeLabel(badge) {
   if (badge.key === 'sessions') return `${t('label.openSessions')}: ${badge.value}`;
   if (badge.key === 'favorite') return t('label.favorite');
   if (badge.key === 'credential') return t('label.credentialSaved');
+  if (badge.key === 'providerUnavailable') return t('label.providerUnavailable');
   return String(badge.value || badge.key);
 }
 

@@ -191,7 +191,7 @@ export function sortSidebarProfiles(profiles = [], limit = 5) {
     .slice(0, limit);
 }
 
-export function buildConnectionProfileBadges(profile = {}, sessionInfo = {}) {
+export function buildConnectionProfileBadges(profile = {}, sessionInfo = {}, options = {}) {
   return [
     {
       key: 'group',
@@ -213,7 +213,16 @@ export function buildConnectionProfileBadges(profile = {}, sessionInfo = {}) {
       tone: 'info',
       value: true,
     },
+    options.providerAvailable === false && {
+      key: 'providerUnavailable',
+      tone: 'warning',
+      value: true,
+    },
   ].filter(Boolean);
+}
+
+export function isProfileProviderAvailable(profile = {}, providers = []) {
+  return providers.some((provider) => provider.type === profile.providerType);
 }
 
 export function buildConnectionProfileFacts(profile = {}) {
