@@ -105,6 +105,39 @@ export function filterConnectionProfiles(
   });
 }
 
+export function buildConnectionEmptyState({
+  profileCount = 0,
+  visibleCount = 0,
+  hasFilters = false,
+} = {}) {
+  if (visibleCount > 0) return null;
+  if (profileCount === 0) {
+    return {
+      kind: 'empty',
+      titleKey: 'connection.empty.noProfiles.title',
+      descriptionKey: 'connection.empty.noProfiles.description',
+      primaryAction: 'quickSsh',
+      secondaryActions: ['importSshConfig', 'newConnection'],
+    };
+  }
+  if (hasFilters) {
+    return {
+      kind: 'filtered',
+      titleKey: 'connection.empty.filtered.title',
+      descriptionKey: 'connection.empty.filtered.description',
+      primaryAction: 'clearFilters',
+      secondaryActions: ['quickSsh', 'importSshConfig'],
+    };
+  }
+  return {
+    kind: 'emptyGroup',
+    titleKey: 'connection.empty.group.title',
+    descriptionKey: 'connection.empty.group.description',
+    primaryAction: 'quickSsh',
+    secondaryActions: ['clearFilters', 'importSshConfig'],
+  };
+}
+
 export function resolveSelectedProfileId(profiles = [], selectedProfileId = '') {
   if (profiles.some((profile) => profile.id === selectedProfileId)) return selectedProfileId;
   return profiles[0]?.id || '';

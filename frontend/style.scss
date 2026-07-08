@@ -1206,6 +1206,10 @@ select {
   min-height: 0;
 }
 
+.connection-manager-layout.no-detail {
+  grid-template-columns: 232px minmax(420px, 1fr);
+}
+
 .connection-groups-panel,
 .connection-list-panel,
 .connection-detail-panel {
@@ -1365,6 +1369,29 @@ select {
 .connection-empty-state {
   margin: 0;
   padding: 42px 16px;
+}
+
+.connection-empty-copy {
+  display: flex;
+  max-width: 420px;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0 auto;
+}
+
+.connection-empty-copy strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.connection-empty-copy small {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.connection-empty-actions {
+  justify-content: center;
 }
 
 .connection-profile-list:focus-visible {
@@ -1603,6 +1630,34 @@ select {
 
   .settings-appearance-strip {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-height: 760px) {
+  .connections-page {
+    gap: 8px;
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+
+  .connections-page .page-header {
+    margin-bottom: 4px;
+  }
+
+  .connection-summary-strip span {
+    padding-block: 3px;
+  }
+
+  .connection-list-header {
+    padding: 10px 14px;
+  }
+
+  .connection-list-tools {
+    padding: 8px 14px;
+  }
+
+  .connection-empty-state {
+    padding: 22px 16px;
   }
 }
 

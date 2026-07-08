@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   buildConnectionGroupNav,
   buildConnectionGroups,
+  buildConnectionEmptyState,
   buildConnectionProfileBadges,
   buildConnectionProfileFacts,
   buildConnectionProfileHints,
@@ -102,6 +103,36 @@ assert.deepEqual(
   filterConnectionProfiles(profiles, { query: 'prod missing' }).map((profile) => profile.id),
   [],
 );
+
+assert.deepEqual(buildConnectionEmptyState({
+  profileCount: 0,
+  visibleCount: 0,
+  hasFilters: false,
+}), {
+  kind: 'empty',
+  titleKey: 'connection.empty.noProfiles.title',
+  descriptionKey: 'connection.empty.noProfiles.description',
+  primaryAction: 'quickSsh',
+  secondaryActions: ['importSshConfig', 'newConnection'],
+});
+
+assert.deepEqual(buildConnectionEmptyState({
+  profileCount: 3,
+  visibleCount: 0,
+  hasFilters: true,
+}), {
+  kind: 'filtered',
+  titleKey: 'connection.empty.filtered.title',
+  descriptionKey: 'connection.empty.filtered.description',
+  primaryAction: 'clearFilters',
+  secondaryActions: ['quickSsh', 'importSshConfig'],
+});
+
+assert.equal(buildConnectionEmptyState({
+  profileCount: 3,
+  visibleCount: 2,
+  hasFilters: true,
+}), null);
 
 assert.deepEqual(sortConnectionProfiles(profiles, 'name').map((profile) => profile.id), ['dev-shell', 'prod-db', 'prod-web']);
 assert.deepEqual(sortConnectionProfiles(profiles, 'provider').map((profile) => profile.id), ['dev-shell', 'prod-db', 'prod-web']);

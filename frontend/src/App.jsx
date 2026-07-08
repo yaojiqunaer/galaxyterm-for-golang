@@ -48,6 +48,7 @@ import {
   FullscreenExitOutlined,
   FullscreenOutlined,
   GlobalOutlined,
+  ImportOutlined,
   QuestionCircleOutlined,
   LaptopOutlined,
   MinusOutlined,
@@ -78,6 +79,7 @@ import {
 } from './workspaceInsights.js';
 import {
   buildConnectionGroupNav,
+  buildConnectionEmptyState,
   buildConnectionProfileBadges,
   buildConnectionProfileFacts,
   buildConnectionProfileHints,
@@ -434,6 +436,11 @@ function App() {
   );
   const selectedProfile = visibleProfiles.find((profile) => profile.id === selectedProfileId) || visibleProfiles[0] || null;
   const hasProfileFilters = profileQuery.trim() || groupQuery !== 'all' || providerFilter !== 'all' || profileSort !== 'favorites';
+  const connectionEmptyState = useMemo(() => buildConnectionEmptyState({
+    profileCount: profiles.length,
+    visibleCount: visibleProfiles.length,
+    hasFilters: !!hasProfileFilters,
+  }), [hasProfileFilters, profiles.length, visibleProfiles.length]);
   const sidebarQuickProfiles = useMemo(() => sortSidebarProfiles(profiles, 5), [profiles]);
 
   useEffect(() => {
@@ -1316,7 +1323,7 @@ function App() {
         <span>{`${t('metric.providers')}: ${workspaceInsights.providers.total}`}</span>
       </div>
 
-      <div className="connection-manager-layout">
+      <div className={selectedProfile ? 'connection-manager-layout' : 'connection-manager-layout no-detail'}>
         <aside className="connection-groups-panel">
           <div className="connection-panel-head">
             <Text strong>{t('section.connectionGroups')}</Text>
@@ -1446,24 +1453,35 @@ function App() {
             </div>
           )}
 
-          {visibleProfiles.length === 0 ? (
+          {visibleProfiles.length === 0 && connectionEmptyState ? (
             <Empty
               className="connection-empty-state"
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description={profiles.length === 0 ? t('empty.noConnections') : t('empty.noConnectionMatches')}
-            >
-              {profiles.length === 0 ? (
-                <Space wrap>
-                  <Button type="primary" icon={<PlusOutlined />} onClick={() => openDrawer('ssh')}>{t('action.quickSsh')}</Button>
-                  <Button onClick={() => setSshConfigOpen(true)}>{t('action.importSshConfig')}</Button>
-                </Space>
-              ) : (
-                <Space wrap>
-                  <Button type="primary" onClick={clearProfileFilters}>{t('action.clearFilters')}</Button>
-                  <Button icon={<PlusOutlined />} onClick={() => openDrawer('ssh')}>{t('action.quickSsh')}</Button>
-                  <Button onClick={() => setSshConfigOpen(true)}>{t('action.importSshConfig')}</Button>
-                </Space>
+              description={(
+                <span className="connection-empty-copy">
+                  <strong>{t(connectionEmptyState.titleKey)}</strong>
+                  <small>{t(connectionEmptyState.descriptionKey)}</small>
+                </span>
               )}
+            >
+              <Space wrap className="connection-empty-actions">
+                <ConnectionEmptyAction
+                  action={connectionEmptyState.primaryAction}
+                  clearProfileFilters={clearProfileFilters}
+                  openDrawer={openDrawer}
+                  primary
+                  setSshConfigOpen={setSshConfigOpen}
+                />
+                {connectionEmptyState.secondaryActions.map((action) => (
+                  <ConnectionEmptyAction
+                    action={action}
+                    clearProfileFilters={clearProfileFilters}
+                    key={action}
+                    openDrawer={openDrawer}
+                    setSshConfigOpen={setSshConfigOpen}
+                  />
+                ))}
+              </Space>
             </Empty>
           ) : (
             <List
@@ -1569,8 +1587,8 @@ function App() {
             />
           )}
         </section>
-        <aside className="connection-detail-panel">
-          {selectedProfile ? (
+        {selectedProfile && (
+          <aside className="connection-detail-panel">
             <ConnectionProfilePreview
               profile={selectedProfile}
               providers={providers}
@@ -1582,10 +1600,8 @@ function App() {
               toggleProfileFavorite={toggleProfileFavorite}
               confirmDeleteProfile={confirmDeleteProfile}
             />
-          ) : (
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noConnectionMatches')} />
-          )}
-        </aside>
+          </aside>
+        )}
       </div>
     </div>
   );
@@ -3481,6 +3497,48 @@ function TerminalSettingsPreview({ preview }) {
         <code>{'galaxyterm % ssh prod\nconnected | audit enabled\n$ kubectl get pods'}</code>
       </pre>
     </div>
+  );
+}
+
+function ConnectionEmptyAction({
+  action,
+  clearProfileFilters,
+  openDrawer,
+  primary = false,
+  setSshConfigOpen,
+}) {
+  const actionMap = {
+    clearFilters: {
+      icon: <ClearOutlined />,
+      label: t('action.clearFilters'),
+      onClick: clearProfileFilters,
+    },
+    importSshConfig: {
+      icon: <ImportOutlined />,
+      label: t('action.importSshConfig'),
+      onClick: () => setSshConfigOpen(true),
+    },
+    newConnection: {
+      icon: <PlusOutlined />,
+      label: t('action.newConnection'),
+      onClick: () => openDrawer(),
+    },
+    quickSsh: {
+      icon: <CloudServerOutlined />,
+      label: t('action.quickSsh'),
+      onClick: () => openDrawer('ssh'),
+    },
+  };
+  const item = actionMap[action];
+  if (!item) return null;
+  return (
+    <Button
+      icon={item.icon}
+      onClick={item.onClick}
+      type={primary ? 'primary' : 'default'}
+    >
+      {item.label}
+    </Button>
   );
 }
 
