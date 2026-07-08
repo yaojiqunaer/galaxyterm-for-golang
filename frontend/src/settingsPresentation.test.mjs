@@ -7,6 +7,9 @@ import {
   buildTerminalDefaults,
   buildTerminalPreview,
   buildWorkspaceSnapshotSummary,
+  isCommandShortcut,
+  normalizeShortcutModifier,
+  shortcutModifierLabel,
 } from './settingsPresentation.js';
 
 assert.deepEqual(buildAppearanceSummary({
@@ -56,6 +59,16 @@ assert.deepEqual(buildShortcutGroups().map((group) => ({
 ]);
 
 assert.equal(buildShortcutGroups().some((group) => group.items.some(([shortcut]) => shortcut === '?')), true);
+assert.equal(buildShortcutGroups({ shortcutModifier: 'meta' })[0].items[0][0], 'Cmd + N');
+assert.equal(buildShortcutGroups({ shortcutModifier: 'ctrl' })[0].items[0][0], 'Ctrl + N');
+assert.equal(buildShortcutGroups({ shortcutModifier: 'bogus' })[0].items[0][0], 'Cmd/Ctrl + N');
+assert.equal(shortcutModifierLabel('meta'), 'Cmd');
+assert.equal(shortcutModifierLabel('ctrl'), 'Ctrl');
+assert.equal(normalizeShortcutModifier('bogus'), 'auto');
+assert.equal(isCommandShortcut({ metaKey: true, ctrlKey: false }, { shortcutModifier: 'meta' }), true);
+assert.equal(isCommandShortcut({ metaKey: false, ctrlKey: true }, { shortcutModifier: 'meta' }), false);
+assert.equal(isCommandShortcut({ metaKey: false, ctrlKey: true }, { shortcutModifier: 'ctrl' }), true);
+assert.equal(isCommandShortcut({ metaKey: false, ctrlKey: true }, { shortcutModifier: 'auto' }), true);
 
 assert.deepEqual(buildTerminalPreview({
   fontFamily: 'JetBrains Mono',

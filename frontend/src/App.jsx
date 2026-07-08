@@ -111,8 +111,11 @@ import {
   buildShortcutGroups,
   buildTerminalDefaults,
   buildTerminalPreview,
+  isCommandShortcut,
+  normalizeShortcutModifier,
   buildWorkspaceSnapshotSummary,
   normalizeLogLevel,
+  shortcutModifierLabel,
 } from './settingsPresentation.js';
 import {
   buildRemoteFileBreadcrumbs,
@@ -193,6 +196,7 @@ const defaultSettings = {
   defaultWorkingDirectory: '',
   disabledExtensionIds: [],
   logLevel: 'info',
+  shortcutModifier: 'auto',
 };
 
 const fallbackProviders = [
@@ -358,7 +362,7 @@ function App() {
         setHelpOpen(true);
         return;
       }
-      const commandKey = event.metaKey || event.ctrlKey;
+      const commandKey = isCommandShortcut(event, settings);
       if (!commandKey) return;
       const key = event.key.toLowerCase();
       if (key === 'n') {
@@ -431,7 +435,7 @@ function App() {
     };
     window.addEventListener('keydown', handleKeydown);
     return () => window.removeEventListener('keydown', handleKeydown);
-  }, [activeKey, sessions]);
+  }, [activeKey, sessions, settings.shortcutModifier]);
 
   useEffect(() => {
     if (activeKey && terminalRefs.current[activeKey]?.fit) {
@@ -453,6 +457,14 @@ function App() {
       </span>
     ),
   })), [providers, locale]);
+  const shortcutModifier = normalizeShortcutModifier(settings.shortcutModifier);
+  const shortcutLabel = shortcutModifierLabel(shortcutModifier);
+  const shortcutGroups = useMemo(
+    () => buildShortcutGroups({ shortcutModifier }),
+    [shortcutModifier],
+  );
+  const commandPaletteShortcut = `${shortcutLabel} + P`;
+  const numberedSessionShortcut = `${shortcutLabel} + 1..9`;
 
   const selectedProvider = providers.find((item) => item.type === newType) || providers[0] || fallbackProviders[0];
   const profileSessionSummary = useMemo(() => summarizeProfileSessions(profiles, sessions), [profiles, sessions]);
@@ -2510,8 +2522,22 @@ function App() {
         </Card>
 
         <Card title={t('settings.shortcuts')}>
+          <Form layout="vertical" className="settings-shortcut-form">
+            <Form.Item label={t('field.shortcutModifier')}>
+              <Select
+                value={shortcutModifier}
+                options={[
+                  { value: 'auto', label: t('shortcutModifier.auto') },
+                  { value: 'meta', label: t('shortcutModifier.meta') },
+                  { value: 'ctrl', label: t('shortcutModifier.ctrl') },
+                ]}
+                onChange={(value) => setSettings((current) => ({ ...current, shortcutModifier: value }))}
+              />
+            </Form.Item>
+            <Text type="secondary">{t('settings.shortcutModifierHint', { shortcut: shortcutLabel })}</Text>
+          </Form>
           <div className="shortcut-group-grid">
-            {buildShortcutGroups().map((group) => (
+            {shortcutGroups.map((group) => (
               <div key={group.key} className="shortcut-group">
                 <Text strong>{t(`shortcut.group.${group.key}`)}</Text>
                 <List
@@ -2547,10 +2573,10 @@ function App() {
         </Space>
       </div>
 
-      <Alert type="info" showIcon message={t('help.quickOpenHint')} />
+      <Alert type="info" showIcon message={t('help.quickOpenHint', { shortcut: commandPaletteShortcut })} />
 
       <div className="help-shortcut-grid">
-        {buildShortcutGroups().map((group) => (
+        {shortcutGroups.map((group) => (
           <section key={group.key} className="help-shortcut-card">
             <Text strong>{t(`shortcut.group.${group.key}`)}</Text>
             <List
@@ -2872,6 +2898,7 @@ function App() {
     setHelpOpen,
     saveWorkspace,
     restoreWorkspace,
+    commandPaletteShortcut,
   });
   const visiblePaletteItems = filterPaletteItems(paletteItems, paletteQuery);
   const displayedPaletteItems = visiblePaletteItems.slice(0, 12);
@@ -3152,7 +3179,7 @@ function App() {
         <div className="sidebar-section sidebar-fill">
           <div className="section-title with-hint">
             <span>{t('section.activeSessions')}</span>
-            {sessions.length > 0 && <Text code>{t('shortcut.numberedSession')}</Text>}
+            {sessions.length > 0 && <Text code>{numberedSessionShortcut}</Text>}
           </div>
           {sessions.length === 0 ? (
             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noSessions')} />
@@ -3188,7 +3215,7 @@ function App() {
             </Button>
             <Button className="command-palette-trigger" icon={<ThunderboltOutlined />} onClick={() => setPaletteOpen(true)}>
               {t('placeholder.commandPalette')}
-              <Text code>⌘P</Text>
+              <Text code>{commandPaletteShortcut}</Text>
             </Button>
             {sessions.length > 0 && (
               <Dropdown menu={{ items: sessionMenuItems, onClick: ({ key }) => sessionMenuActions[key]?.() }} trigger={['click']}>
@@ -4393,7 +4420,7 @@ function buildPaletteItems(actions) {
       id: 'help:shortcuts',
       group: t('palette.group.settings'),
       title: t('action.help'),
-      description: t('help.quickOpenHint'),
+      description: t('help.quickOpenHint', { shortcut: actions.commandPaletteShortcut }),
       icon: <QuestionCircleOutlined />,
       keywords: 'help shortcuts keyboard audit replay search session ?',
       run: () => actions.setHelpOpen(true),
@@ -4513,6 +4540,7 @@ function settingsSummaryLabel(key) {
   if (key === 'defaultProviderType') return t('field.defaultProviderType');
   if (key === 'defaultWorkingDirectory') return t('field.defaultWorkingDirectory');
   if (key === 'logLevel') return t('field.logLevel');
+  if (key === 'shortcutModifier') return t('field.shortcutModifier');
   return key;
 }
 
@@ -4523,6 +4551,7 @@ function settingsSummaryValue(item) {
   if (item.key === 'terminalTheme') return item.value === 'auto' ? t('theme.auto') : item.value;
   if (item.key === 'defaultWorkingDirectory') return item.value || t('label.default');
   if (item.key === 'logLevel') return t(`logLevel.${item.value}`);
+  if (item.key === 'shortcutModifier') return t(`shortcutModifier.${item.value}`);
   return item.value;
 }
 
@@ -4607,6 +4636,7 @@ function normalizeSettings(settings) {
       ? [...new Set(settings.disabledExtensionIds.map((item) => String(item)).filter(Boolean))]
       : [],
     logLevel: normalizeLogLevel(settings.logLevel),
+    shortcutModifier: normalizeShortcutModifier(settings.shortcutModifier),
     fontSize: clampNumber(settings.fontSize, 10, 24, defaultSettings.fontSize),
     scrollback: clampNumber(settings.scrollback, 500, 100000, defaultSettings.scrollback),
   };

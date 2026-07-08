@@ -6,27 +6,30 @@ export function buildAppearanceSummary(settings = {}) {
   ];
 }
 
-export function buildShortcutGroups() {
+const shortcutModifiers = ['auto', 'meta', 'ctrl'];
+
+export function buildShortcutGroups(settings = {}) {
+  const modifier = shortcutModifierLabel(settings.shortcutModifier);
   return [
     {
       key: 'terminal',
       items: [
-        ['Cmd/Ctrl + N', 'action.newTerminal'],
-        ['Cmd/Ctrl + K', 'action.commands'],
-        ['Cmd/Ctrl + Shift + C', 'action.copySelection'],
-        ['Cmd/Ctrl + Shift + V', 'action.pasteClipboard'],
-        ['Cmd/Ctrl + L', 'action.clearTerminal'],
-        ['Cmd/Ctrl + +/-/0', 'action.zoomReset'],
-        ['Cmd/Ctrl + R', 'action.reconnect'],
+        [`${modifier} + N`, 'action.newTerminal'],
+        [`${modifier} + K`, 'action.commands'],
+        [`${modifier} + Shift + C`, 'action.copySelection'],
+        [`${modifier} + Shift + V`, 'action.pasteClipboard'],
+        [`${modifier} + L`, 'action.clearTerminal'],
+        [`${modifier} + +/-/0`, 'action.zoomReset'],
+        [`${modifier} + R`, 'action.reconnect'],
         ['?', 'action.help'],
       ],
     },
     {
       key: 'sessions',
       items: [
-        ['Cmd/Ctrl + 1..9', 'shortcut.switchNumberedSession'],
-        ['Cmd/Ctrl + Shift + [ / ]', 'shortcut.switchAdjacentSession'],
-        ['Cmd/Ctrl + Shift + F', 'action.focusMode'],
+        [`${modifier} + 1..9`, 'shortcut.switchNumberedSession'],
+        [`${modifier} + Shift + [ / ]`, 'shortcut.switchAdjacentSession'],
+        [`${modifier} + Shift + F`, 'action.focusMode'],
         ['Session menu', 'action.exportTranscript'],
         ['Session menu', 'action.commandHistory'],
       ],
@@ -50,13 +53,32 @@ export function buildShortcutGroups() {
     {
       key: 'workspace',
       items: [
-        ['Cmd/Ctrl + P', 'action.commandPalette'],
-        ['Cmd/Ctrl + K', 'action.commands'],
+        [`${modifier} + P`, 'action.commandPalette'],
+        [`${modifier} + K`, 'action.commands'],
         ['Workspace menu', 'action.saveWorkspace'],
         ['Workspace menu', 'action.restoreWorkspace'],
       ],
     },
   ];
+}
+
+export function isCommandShortcut(event = {}, settings = {}) {
+  const modifier = normalizeShortcutModifier(settings.shortcutModifier);
+  if (modifier === 'meta') return !!event.metaKey;
+  if (modifier === 'ctrl') return !!event.ctrlKey;
+  return !!(event.metaKey || event.ctrlKey);
+}
+
+export function normalizeShortcutModifier(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return shortcutModifiers.includes(normalized) ? normalized : 'auto';
+}
+
+export function shortcutModifierLabel(value) {
+  const modifier = normalizeShortcutModifier(value);
+  if (modifier === 'meta') return 'Cmd';
+  if (modifier === 'ctrl') return 'Ctrl';
+  return 'Cmd/Ctrl';
 }
 
 export function buildSecuritySummary(settings = {}) {

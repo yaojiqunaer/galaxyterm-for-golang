@@ -2630,6 +2630,15 @@ code {
   font-size: 11px;
 }
 
+.settings-shortcut-form {
+  max-width: 360px;
+  margin-bottom: 14px;
+}
+
+.settings-shortcut-form .ant-form-item {
+  margin-bottom: 6px;
+}
+
 .shortcut-group-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
