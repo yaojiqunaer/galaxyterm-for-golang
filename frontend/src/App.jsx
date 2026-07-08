@@ -2930,7 +2930,7 @@ function App() {
             <Button type="primary" icon={<PlusOutlined />} onClick={() => openDrawer()}>
               {t('action.newTerminal')}
             </Button>
-            <Button icon={<CloudServerOutlined />} onClick={() => openDrawer('ssh')}>
+            <Button className="topbar-secondary-action" icon={<CloudServerOutlined />} onClick={() => openDrawer('ssh')}>
               {t('action.quickSsh')}
             </Button>
             <Button className="command-palette-trigger" icon={<ThunderboltOutlined />} onClick={() => setPaletteOpen(true)}>

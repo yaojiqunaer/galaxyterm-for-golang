@@ -550,6 +550,20 @@ select {
   .topbar-actions {
     justify-content: flex-end;
   }
+
+  .topbar .command-palette-trigger {
+    width: clamp(180px, 34vw, 360px);
+  }
+}
+
+@media (max-width: 1080px) {
+  .topbar-secondary-action {
+    display: none;
+  }
+
+  .topbar .command-palette-trigger {
+    width: clamp(180px, 38vw, 340px);
+  }
 }
 
 .content-area {
