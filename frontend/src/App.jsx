@@ -97,6 +97,7 @@ import {
 } from './connectionManager.js';
 import {
   buildSessionCloseConfirm,
+  buildSessionContextFacts,
   buildSessionStatusFacts,
   filterSessions,
   profileActionModel,
@@ -568,6 +569,10 @@ function App() {
   }), [auditProviderFilter, auditQuery, auditRecords]);
   const currentSessionSummary = useMemo(() => sessionSummary(sessions), [sessions]);
   const activeSession = sessions.find((session) => session.id === activeKey);
+  const activeSessionRecording = activeKey ? terminalRefs.current[activeKey]?.recording?.() : null;
+  const activeSessionContextFacts = buildSessionContextFacts(activeSession, {
+    recordingActive: !!activeSessionRecording?.startedAt && activeSession?.status !== 'closed',
+  });
   const visibleSessions = useMemo(() => filterSessions(sessions, {
     activeKey,
     query: sessionQuery,
@@ -1438,7 +1443,12 @@ function App() {
       return (
         <div className="session-grid-page">
           <div className="session-grid-toolbar">
-            <SessionStrip activeSession={activeSession} providers={providers} summary={currentSessionSummary} />
+            <SessionStrip
+              activeSession={activeSession}
+              contextFacts={activeSessionContextFacts}
+              providers={providers}
+              summary={currentSessionSummary}
+            />
             <Button size="small" onClick={() => setSessionView('tabs')}>{t('action.tabs')}</Button>
           </div>
           {sessionFilterControls}
@@ -1484,7 +1494,12 @@ function App() {
     return (
       <div className="session-tabs-page">
         <div className="terminal-session-toolbar">
-          <SessionStrip activeSession={activeSession} providers={providers} summary={currentSessionSummary} />
+          <SessionStrip
+            activeSession={activeSession}
+            contextFacts={activeSessionContextFacts}
+            providers={providers}
+            summary={currentSessionSummary}
+          />
           <Space size={6} wrap>
             <Button size="small" onClick={() => setSessionView('grid')}>{t('action.grid')}</Button>
             <Button size="small" icon={<ReloadOutlined />} onClick={() => reconnectSession()} disabled={!activeKey}>{t('action.reconnect')}</Button>
@@ -4058,7 +4073,12 @@ function SessionSidebarLabel({ session }) {
   );
 }
 
-function SessionStrip({ activeSession, providers = [], summary }) {
+function SessionStrip({
+  activeSession,
+  contextFacts = [],
+  providers = [],
+  summary,
+}) {
   const facts = buildSessionStatusFacts(summary);
   return (
     <div className="session-strip">
@@ -4070,6 +4090,12 @@ function SessionStrip({ activeSession, providers = [], summary }) {
         </span>
       </div>
       <div className="session-strip-facts">
+        {contextFacts.map((fact) => (
+          <span key={fact.key} className={`session-fact session-context-fact tone-${fact.tone}`}>
+            <small>{sessionContextFactLabel(fact)}</small>
+            <strong>{sessionContextFactValue(fact)}</strong>
+          </span>
+        ))}
         {facts.map((fact) => (
           <span key={fact.key} className={`session-fact tone-${fact.tone}`}>
             <small>{t(`session.status.${fact.key}`)}</small>
@@ -4610,6 +4636,20 @@ function settingsSummaryValue(item) {
   if (item.key === 'logLevel') return t(`logLevel.${item.value}`);
   if (item.key === 'shortcutModifier') return t(`shortcutModifier.${item.value}`);
   return item.value;
+}
+
+function sessionContextFactLabel(fact) {
+  if (fact.key === 'provider') return t('label.provider');
+  if (fact.key === 'target') return t('label.target');
+  if (fact.key === 'user') return t('label.user');
+  if (fact.key === 'audit') return t('label.auditEvents');
+  if (fact.key === 'recording') return t('label.recording');
+  return fact.key;
+}
+
+function sessionContextFactValue(fact) {
+  if (fact.key === 'recording') return t(`recording.state.${fact.value}`);
+  return fact.value || '-';
 }
 
 function connectionGroupLabel(item) {

@@ -39,6 +39,26 @@ export function buildSessionStatusFacts(summary = {}) {
   ].filter((item) => item.value > 0);
 }
 
+export function buildSessionContextFacts(session, options = {}) {
+  if (!session) return [];
+  const facts = [
+    { key: 'provider', value: session.providerType || 'terminal', tone: 'neutral' },
+  ];
+  const target = resolveSessionTarget(session);
+  if (target) facts.push({ key: 'target', value: target, tone: 'neutral' });
+  if (session.config?.username) {
+    facts.push({ key: 'user', value: session.config.username, tone: 'neutral' });
+  }
+  const auditCount = (session.auditEvents || []).length;
+  facts.push({ key: 'audit', value: auditCount, tone: auditCount > 0 ? 'success' : 'neutral' });
+  facts.push({
+    key: 'recording',
+    value: resolveRecordingState(session, options),
+    tone: options.recordingActive ? 'success' : session.auditRecordSaved ? 'closed' : 'warning',
+  });
+  return facts;
+}
+
 export function filterSessions(sessions = [], options = {}) {
   const queryTokens = String(options.query || '')
     .trim()
@@ -124,4 +144,18 @@ function matchesSessionQuery(session = {}, queryTokens = []) {
     session.config?.workingDirectory,
   ].filter(Boolean).join(' ').toLowerCase();
   return queryTokens.every((token) => searchText.includes(token));
+}
+
+function resolveSessionTarget(session = {}) {
+  const { config = {} } = session;
+  if (config.host) {
+    return config.port ? `${config.host}:${config.port}` : config.host;
+  }
+  return config.workingDirectory || config.cwd || '';
+}
+
+function resolveRecordingState(session = {}, options = {}) {
+  if (options.recordingActive) return 'active';
+  if (session.auditRecordSaved) return 'saved';
+  return 'pending';
 }

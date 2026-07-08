@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  buildSessionContextFacts,
   buildSessionCloseConfirm,
   buildSessionStatusFacts,
   filterSessions,
@@ -51,6 +52,33 @@ assert.deepEqual(buildSessionStatusFacts({
   connecting: 0,
   total: 0,
 }), []);
+
+assert.deepEqual(buildSessionContextFacts({
+  label: 'Prod SSH',
+  providerType: 'ssh',
+  status: 'connected',
+  config: { host: 'prod.example.com', port: 2222, username: 'root' },
+  auditEvents: [{ type: 'terminal.open' }, { type: 'terminal.copy' }],
+}, { recordingActive: true }), [
+  { key: 'provider', value: 'ssh', tone: 'neutral' },
+  { key: 'target', value: 'prod.example.com:2222', tone: 'neutral' },
+  { key: 'user', value: 'root', tone: 'neutral' },
+  { key: 'audit', value: 2, tone: 'success' },
+  { key: 'recording', value: 'active', tone: 'success' },
+]);
+
+assert.deepEqual(buildSessionContextFacts({
+  providerType: 'local',
+  config: { workingDirectory: '/repo/galaxyterm' },
+  auditRecordSaved: true,
+}, { recordingActive: false }), [
+  { key: 'provider', value: 'local', tone: 'neutral' },
+  { key: 'target', value: '/repo/galaxyterm', tone: 'neutral' },
+  { key: 'audit', value: 0, tone: 'neutral' },
+  { key: 'recording', value: 'saved', tone: 'closed' },
+]);
+
+assert.deepEqual(buildSessionContextFacts(null), []);
 
 const sessionFilterFixture = [
   { id: '1', label: 'Prod SSH', providerType: 'ssh', status: 'connected', config: { host: 'prod.example.com', username: 'root' } },

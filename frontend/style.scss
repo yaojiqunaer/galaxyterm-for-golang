@@ -667,6 +667,7 @@ select {
   display: inline-flex;
   align-items: baseline;
   gap: 5px;
+  min-width: 0;
   min-height: 24px;
   padding: 2px 7px;
   border: 1px solid var(--terminal-border);
@@ -679,6 +680,16 @@ select {
 .session-fact strong {
   color: var(--terminal-text);
   font-size: 12px;
+}
+
+.session-context-fact {
+  max-width: 230px;
+}
+
+.session-context-fact strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .session-fact small {
