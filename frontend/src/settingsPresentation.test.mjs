@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   buildAppearanceSummary,
+  buildSecuritySummary,
   buildShortcutGroups,
   buildTerminalPreview,
   buildWorkspaceSnapshotSummary,
@@ -23,6 +24,14 @@ assert.deepEqual(buildAppearanceSummary({
   { key: 'appTheme', value: 'dark' },
   { key: 'interfaceDensity', value: 'comfortable' },
   { key: 'terminalTheme', value: 'Catppuccin' },
+]);
+
+assert.deepEqual(buildSecuritySummary({}), [
+  { key: 'confirmDangerousActions', value: true },
+]);
+
+assert.deepEqual(buildSecuritySummary({ confirmDangerousActions: false }), [
+  { key: 'confirmDangerousActions', value: false },
 ]);
 
 assert.deepEqual(buildShortcutGroups().map((group) => ({

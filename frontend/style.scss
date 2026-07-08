@@ -2493,6 +2493,38 @@ code {
   color: var(--text);
 }
 
+.settings-mini-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+}
+
+.settings-mini-summary span {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-muted);
+}
+
+.settings-mini-summary small,
+.settings-mini-summary strong {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.settings-mini-summary small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.settings-mini-summary strong {
+  margin-top: 3px;
+  color: var(--text);
+}
+
 .settings-row {
   justify-content: space-between;
   width: 100%;

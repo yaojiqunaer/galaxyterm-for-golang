@@ -104,6 +104,7 @@ import {
 } from './sessionPresentation.js';
 import {
   buildAppearanceSummary,
+  buildSecuritySummary,
   buildShortcutGroups,
   buildTerminalPreview,
   buildWorkspaceSnapshotSummary,
@@ -180,6 +181,7 @@ const defaultSettings = {
   interfaceDensity: 'comfortable',
   autoSaveWorkspace: true,
   autoRestoreWorkspace: false,
+  confirmDangerousActions: true,
 };
 
 const fallbackProviders = [
@@ -725,6 +727,10 @@ function App() {
   };
 
   const confirmRemoveSession = (targetKey) => {
+    if (settings.confirmDangerousActions === false) {
+      removeSession(targetKey);
+      return;
+    }
     const session = sessions.find((item) => item.id === targetKey);
     const confirm = buildSessionCloseConfirm(session);
     if (!confirm) return;
@@ -747,6 +753,10 @@ function App() {
   };
 
   const confirmCloseAllSessions = () => {
+    if (settings.confirmDangerousActions === false) {
+      closeAllSessions();
+      return;
+    }
     const confirm = buildSessionCloseConfirm(sessions);
     if (!confirm) return;
     Modal.confirm({
@@ -1092,6 +1102,10 @@ function App() {
   };
 
   const confirmDeleteProfile = (profile) => {
+    if (settings.confirmDangerousActions === false) {
+      deleteProfile(profile.id);
+      return;
+    }
     Modal.confirm({
       title: t('confirm.deleteProfileTitle'),
       content: `${profile.displayName} · ${profileDescription(profile)}`,
@@ -2344,7 +2358,27 @@ function App() {
         </Card>
 
         <Card title={t('settings.security')}>
-          <Alert type="success" showIcon message={t('settings.secretsHint')} />
+          <Space direction="vertical" className="settings-stack">
+            <Alert type="success" showIcon message={t('settings.secretsHint')} />
+            <div className="settings-mini-summary">
+              {buildSecuritySummary(settings).map((item) => (
+                <span key={item.key}>
+                  <small>{settingsSummaryLabel(item.key)}</small>
+                  <strong>{settingsSummaryValue(item)}</strong>
+                </span>
+              ))}
+            </div>
+            <Space align="center" className="settings-row">
+              <div>
+                <Text strong>{t('field.confirmDangerousActions')}</Text>
+                <Text type="secondary">{t('settings.dangerousConfirmHint')}</Text>
+              </div>
+              <Switch
+                checked={settings.confirmDangerousActions !== false}
+                onChange={(checked) => setSettings((current) => ({ ...current, confirmDangerousActions: checked }))}
+              />
+            </Space>
+          </Space>
         </Card>
 
         <Card title={t('settings.shortcuts')}>
@@ -4328,6 +4362,7 @@ function connectionProfileFactValue(fact) {
 
 function settingsSummaryLabel(key) {
   if (key === 'appTheme') return t('field.appTheme');
+  if (key === 'confirmDangerousActions') return t('field.confirmDangerousActions');
   if (key === 'interfaceDensity') return t('field.interfaceDensity');
   if (key === 'terminalTheme') return t('field.terminalTheme');
   return key;
@@ -4335,6 +4370,7 @@ function settingsSummaryLabel(key) {
 
 function settingsSummaryValue(item) {
   if (item.key === 'appTheme') return t(`theme.${item.value}`);
+  if (item.key === 'confirmDangerousActions') return item.value ? t('label.enabled') : t('label.disabled');
   if (item.key === 'interfaceDensity') return t(`density.${item.value}`);
   if (item.key === 'terminalTheme') return item.value === 'auto' ? t('theme.auto') : item.value;
   return item.value;
@@ -4413,6 +4449,7 @@ function normalizeSettings(settings) {
   return {
     ...defaultSettings,
     ...settings,
+    confirmDangerousActions: settings.confirmDangerousActions !== false,
     interfaceDensity,
     fontSize: clampNumber(settings.fontSize, 10, 24, defaultSettings.fontSize),
     scrollback: clampNumber(settings.scrollback, 500, 100000, defaultSettings.scrollback),

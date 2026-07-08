@@ -59,6 +59,12 @@ export function buildShortcutGroups() {
   ];
 }
 
+export function buildSecuritySummary(settings = {}) {
+  return [
+    { key: 'confirmDangerousActions', value: settings.confirmDangerousActions !== false },
+  ];
+}
+
 export function buildTerminalPreview(settings = {}) {
   return {
     fontFamily: settings.fontFamily || 'Menlo, Monaco, Consolas, monospace',
