@@ -65,6 +65,12 @@ export function buildSecuritySummary(settings = {}) {
   ];
 }
 
+export function buildOperationalSummary(settings = {}) {
+  return [
+    { key: 'logLevel', value: normalizeLogLevel(settings.logLevel) },
+  ];
+}
+
 export function buildTerminalPreview(settings = {}) {
   return {
     fontFamily: settings.fontFamily || 'Menlo, Monaco, Consolas, monospace',
@@ -92,6 +98,11 @@ export function buildWorkspaceSnapshotSummary(summary = null) {
     hasSnapshot: !!summary,
     updatedAt: summary?.updatedAt || '',
   };
+}
+
+export function normalizeLogLevel(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return ['error', 'warn', 'info', 'debug'].includes(normalized) ? normalized : 'info';
 }
 
 function clampNumber(value, min, max, fallback) {

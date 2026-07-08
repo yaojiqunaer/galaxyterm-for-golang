@@ -104,11 +104,13 @@ import {
 } from './sessionPresentation.js';
 import {
   buildAppearanceSummary,
+  buildOperationalSummary,
   buildSecuritySummary,
   buildShortcutGroups,
   buildTerminalDefaults,
   buildTerminalPreview,
   buildWorkspaceSnapshotSummary,
+  normalizeLogLevel,
 } from './settingsPresentation.js';
 import {
   buildRemoteFileBreadcrumbs,
@@ -187,6 +189,7 @@ const defaultSettings = {
   defaultProviderType: 'local',
   defaultWorkingDirectory: '',
   disabledExtensionIds: [],
+  logLevel: 'info',
 };
 
 const fallbackProviders = [
@@ -2437,6 +2440,12 @@ function App() {
                   <strong>{settingsSummaryValue(item)}</strong>
                 </span>
               ))}
+              {buildOperationalSummary(settings).map((item) => (
+                <span key={item.key}>
+                  <small>{settingsSummaryLabel(item.key)}</small>
+                  <strong>{settingsSummaryValue(item)}</strong>
+                </span>
+              ))}
             </div>
             <Space align="center" className="settings-row">
               <div>
@@ -2448,6 +2457,21 @@ function App() {
                 onChange={(checked) => setSettings((current) => ({ ...current, confirmDangerousActions: checked }))}
               />
             </Space>
+            <Form layout="vertical">
+              <Form.Item label={t('field.logLevel')}>
+                <Select
+                  value={settings.logLevel}
+                  options={[
+                    { value: 'error', label: t('logLevel.error') },
+                    { value: 'warn', label: t('logLevel.warn') },
+                    { value: 'info', label: t('logLevel.info') },
+                    { value: 'debug', label: t('logLevel.debug') },
+                  ]}
+                  onChange={(value) => setSettings((current) => ({ ...current, logLevel: value }))}
+                />
+              </Form.Item>
+              <Text type="secondary">{t('settings.logLevelHint')}</Text>
+            </Form>
           </Space>
         </Card>
 
@@ -4443,6 +4467,7 @@ function settingsSummaryLabel(key) {
   if (key === 'terminalTheme') return t('field.terminalTheme');
   if (key === 'defaultProviderType') return t('field.defaultProviderType');
   if (key === 'defaultWorkingDirectory') return t('field.defaultWorkingDirectory');
+  if (key === 'logLevel') return t('field.logLevel');
   return key;
 }
 
@@ -4452,6 +4477,7 @@ function settingsSummaryValue(item) {
   if (item.key === 'interfaceDensity') return t(`density.${item.value}`);
   if (item.key === 'terminalTheme') return item.value === 'auto' ? t('theme.auto') : item.value;
   if (item.key === 'defaultWorkingDirectory') return item.value || t('label.default');
+  if (item.key === 'logLevel') return t(`logLevel.${item.value}`);
   return item.value;
 }
 
@@ -4535,6 +4561,7 @@ function normalizeSettings(settings) {
     disabledExtensionIds: Array.isArray(settings.disabledExtensionIds)
       ? [...new Set(settings.disabledExtensionIds.map((item) => String(item)).filter(Boolean))]
       : [],
+    logLevel: normalizeLogLevel(settings.logLevel),
     fontSize: clampNumber(settings.fontSize, 10, 24, defaultSettings.fontSize),
     scrollback: clampNumber(settings.scrollback, 500, 100000, defaultSettings.scrollback),
   };

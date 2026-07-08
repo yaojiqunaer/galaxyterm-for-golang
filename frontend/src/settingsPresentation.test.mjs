@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   buildAppearanceSummary,
+  buildOperationalSummary,
   buildSecuritySummary,
   buildShortcutGroups,
   buildTerminalDefaults,
@@ -33,6 +34,14 @@ assert.deepEqual(buildSecuritySummary({}), [
 
 assert.deepEqual(buildSecuritySummary({ confirmDangerousActions: false }), [
   { key: 'confirmDangerousActions', value: false },
+]);
+
+assert.deepEqual(buildOperationalSummary({ logLevel: 'debug' }), [
+  { key: 'logLevel', value: 'debug' },
+]);
+
+assert.deepEqual(buildOperationalSummary({ logLevel: 'verbose' }), [
+  { key: 'logLevel', value: 'info' },
 ]);
 
 assert.deepEqual(buildShortcutGroups().map((group) => ({
