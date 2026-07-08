@@ -28,6 +28,7 @@ export function buildShortcutGroups() {
         ['Cmd/Ctrl + Shift + [ / ]', 'shortcut.switchAdjacentSession'],
         ['Cmd/Ctrl + Shift + F', 'action.focusMode'],
         ['Session menu', 'action.exportTranscript'],
+        ['Session menu', 'action.commandHistory'],
       ],
     },
     {

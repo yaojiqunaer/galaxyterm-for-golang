@@ -8,7 +8,14 @@ import * as SessionAPI from '../../wailsjs/go/session/API.js';
 import * as Theme from '../../wailsjs/go/internal/Theme.js';
 import { t } from '../i18n.js';
 
-function TerminalPane({ request, settings, onAuditEvent, onSessionCreated, onSessionClosed }, ref) {
+function TerminalPane({
+  request,
+  settings,
+  onAuditEvent,
+  onCommandSubmitted,
+  onSessionCreated,
+  onSessionClosed,
+}, ref) {
   const containerRef = useRef(null);
   const term = useRef(null);
   const fitAddon = useRef(null);
@@ -17,6 +24,7 @@ function TerminalPane({ request, settings, onAuditEvent, onSessionCreated, onSes
   const startedAt = useRef(new Date());
   const transcript = useRef([]);
   const outputEvents = useRef([]);
+  const inputLine = useRef('');
 
   useImperativeHandle(ref, () => ({
     fit: () => {
@@ -156,6 +164,7 @@ function TerminalPane({ request, settings, onAuditEvent, onSessionCreated, onSes
         } else if (data.includes('\r') || data.includes('\n')) {
           onAuditEvent?.({ type: 'input.enter' });
         }
+        trackSubmittedCommands(data, inputLine, onCommandSubmitted);
         SessionAPI.Send(createdSessionId, data);
       });
 
@@ -258,6 +267,25 @@ function isRiskyPaste(data) {
 
 function elapsedSeconds(startedAt) {
   return Math.max(0, Number(((Date.now() - startedAt.getTime()) / 1000).toFixed(6)));
+}
+
+function trackSubmittedCommands(data, inputLineRef, onCommandSubmitted) {
+  if (String(data || '').includes('\u001b')) return;
+  for (const char of String(data || '')) {
+    if (char === '\r' || char === '\n') {
+      const command = inputLineRef.current.trim();
+      if (command) onCommandSubmitted?.(command);
+      inputLineRef.current = '';
+      continue;
+    }
+    if (char === '\u007f' || char === '\b') {
+      inputLineRef.current = inputLineRef.current.slice(0, -1);
+      continue;
+    }
+    if (char >= ' ' && char !== '\u001b') {
+      inputLineRef.current += char;
+    }
+  }
 }
 
 function terminalBufferText(terminal) {

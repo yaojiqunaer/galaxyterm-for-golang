@@ -8,6 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "test:audit": "node src/auditLog.test.mjs",
+    "test:command-history": "node src/commandHistory.test.mjs",
     "test:connections": "node src/connectionManager.test.mjs",
     "test:desktop-bridge": "node src/desktopBridge.test.mjs",
     "test:extensions": "node src/extensionPresentation.test.mjs",

@@ -48,6 +48,7 @@ import {
   FullscreenExitOutlined,
   FullscreenOutlined,
   GlobalOutlined,
+  HistoryOutlined,
   ImportOutlined,
   QuestionCircleOutlined,
   LaptopOutlined,
@@ -121,6 +122,11 @@ import {
   resolvePaletteIndex,
 } from './paletteModel.js';
 import {
+  buildCommandHistoryEntry,
+  filterCommandHistory,
+  upsertCommandHistory,
+} from './commandHistory.js';
+import {
   buildQuickCommandSummary,
   filterQuickCommands,
 } from './quickCommands.js';
@@ -158,6 +164,7 @@ const profileStorageKey = 'galaxyterm.connectionProfiles';
 const settingsStorageKey = 'galaxyterm.settings';
 const workspaceStorageKey = 'galaxyterm.workspaceSnapshot';
 const commandStorageKey = 'galaxyterm.quickCommands';
+const commandHistoryStorageKey = 'galaxyterm.commandHistory';
 const recentConnectionStorageKey = 'galaxyterm.recentConnections';
 const auditRecordStorageKey = 'galaxyterm.auditRecords';
 const extensionSourceStorageKey = 'galaxyterm.extensionSources';
@@ -246,7 +253,11 @@ function App() {
   const [auditProviderFilter, setAuditProviderFilter] = useState('all');
   const [workspaceSummary, setWorkspaceSummary] = useState(() => loadWorkspaceSummary());
   const [quickCommands, setQuickCommands] = useState(() => loadQuickCommands());
+  const [commandHistory, setCommandHistory] = useState(() => loadCommandHistory());
   const [commandQuery, setCommandQuery] = useState('');
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyQuery, setHistoryQuery] = useState('');
+  const [historyScope, setHistoryScope] = useState('provider');
   const [recentConnections, setRecentConnections] = useState(() => loadRecentConnections());
   const [auditRecords, setAuditRecords] = useState(() => loadAuditRecords());
   const [replayRecord, setReplayRecord] = useState(null);
@@ -513,6 +524,11 @@ function App() {
   const currentSessionSummary = useMemo(() => sessionSummary(sessions), [sessions]);
   const activeSession = sessions.find((session) => session.id === activeKey);
   const visibleQuickCommands = useMemo(() => filterQuickCommands(quickCommands, commandQuery), [commandQuery, quickCommands]);
+  const visibleCommandHistory = useMemo(() => filterCommandHistory(commandHistory, {
+    providerType: historyScope === 'all' ? 'all' : activeSession?.providerType || 'all',
+    query: historyQuery,
+    sessionId: historyScope === 'session' ? activeKey : '',
+  }), [activeKey, activeSession?.providerType, commandHistory, historyQuery, historyScope]);
   const quickCommandSummary = useMemo(() => (
     buildQuickCommandSummary(quickCommands, { activeSession })
   ), [activeSession, quickCommands]);
@@ -1156,9 +1172,30 @@ function App() {
       return;
     }
     activeTerminal.send(command.endsWith('\n') ? command : `${command}\n`);
+    recordCommandHistory(command);
     appendAuditEvent(activeKey, 'quick-command.run', command);
     setCommandsOpen(false);
     setPaletteOpen(false);
+  };
+
+  const recordCommandHistory = (command, session = activeSession) => {
+    const entry = buildCommandHistoryEntry(command, {
+      providerType: session?.providerType,
+      sessionId: session?.id || activeKey,
+      sessionLabel: session?.label || '',
+    });
+    if (!entry) return;
+    setCommandHistory((current) => {
+      const nextHistory = upsertCommandHistory(current, entry);
+      persistCommandHistory(nextHistory);
+      return nextHistory;
+    });
+  };
+
+  const runHistoryCommand = (item) => {
+    if (!item?.command) return;
+    runQuickCommand(item.command);
+    setHistoryOpen(false);
   };
 
   const runPaletteAction = (item) => {
@@ -1203,6 +1240,7 @@ function App() {
           request={session.request}
           settings={settings}
           onAuditEvent={(event) => appendAuditEvent(session.id, event.type, event.detail)}
+          onCommandSubmitted={(command) => recordCommandHistory(command, session)}
           onSessionCreated={(backendSessionId) => {
             setSessions((current) => current.map((item) => (
               item.id === session.id ? { ...item, backendSessionId, status: 'connected' } : item
@@ -1259,6 +1297,7 @@ function App() {
                   request={session.request}
                   settings={settings}
                   onAuditEvent={(event) => appendAuditEvent(session.id, event.type, event.detail)}
+                  onCommandSubmitted={(command) => recordCommandHistory(command, session)}
                   onSessionCreated={(backendSessionId) => {
                     setSessions((current) => current.map((item) => (
                       item.id === session.id ? { ...item, backendSessionId, status: 'connected' } : item
@@ -2705,6 +2744,7 @@ function App() {
     saveWorkspace,
     restoreWorkspace: () => restoreWorkspace(),
     quickCommands: () => setCommandsOpen(true),
+    commandHistory: () => setHistoryOpen(true),
     help: () => setHelpOpen(true),
     extensions: () => setSelectedNav('extensions'),
     settings: () => setSelectedNav('settings'),
@@ -2713,6 +2753,7 @@ function App() {
     { key: 'saveWorkspace', icon: <SaveOutlined />, label: t('action.saveWorkspace') },
     { key: 'restoreWorkspace', icon: <ReloadOutlined />, label: t('action.restoreWorkspace') },
     { key: 'quickCommands', icon: <CodeOutlined />, label: t('action.commands') },
+    { key: 'commandHistory', icon: <HistoryOutlined />, label: t('action.commandHistory') },
     { key: 'help', icon: <QuestionCircleOutlined />, label: t('action.help') },
     { key: 'extensions', icon: <AppstoreAddOutlined />, label: t('nav.extensions') },
     { key: 'settings', icon: <SettingOutlined />, label: t('nav.settings') },
@@ -2726,6 +2767,7 @@ function App() {
     reset: resetActiveTerminal,
     copyTranscript: copyTerminalTranscript,
     exportTranscript: exportTerminalTranscript,
+    history: () => setHistoryOpen(true),
     saveAudit: () => {
       const record = saveAuditRecord(activeKey);
       if (record) message.success(t('message.auditRecordSaved'));
@@ -2768,6 +2810,11 @@ function App() {
       key: 'copyTranscript',
       icon: <FileTextOutlined />,
       label: t('action.copyTranscript'),
+    },
+    activeKey && {
+      key: 'history',
+      icon: <HistoryOutlined />,
+      label: t('action.commandHistory'),
     },
     activeKey && {
       key: 'exportTranscript',
@@ -3285,6 +3332,82 @@ function App() {
               <List.Item.Meta
                 title={<span className="quick-command-title">{item.name}</span>}
                 description={<pre className="quick-command-code">{item.command}</pre>}
+              />
+            </List.Item>
+          )}
+        />
+      </Drawer>
+      <Drawer
+        title={t('drawer.commandHistory')}
+        width={620}
+        open={historyOpen}
+        destroyOnHidden
+        onClose={() => setHistoryOpen(false)}
+      >
+        <div className="command-history-tools">
+          <Segmented
+            value={historyScope}
+            onChange={setHistoryScope}
+            options={[
+              { value: 'provider', label: t('history.scope.provider') },
+              { value: 'session', label: t('history.scope.session'), disabled: !activeKey },
+              { value: 'all', label: t('history.scope.all') },
+            ]}
+          />
+          <Input.Search
+            allowClear
+            value={historyQuery}
+            onChange={(event) => setHistoryQuery(event.target.value)}
+            placeholder={t('placeholder.searchHistory')}
+          />
+        </div>
+        <Alert type="info" showIcon message={t('history.drawerHint')} />
+        <List
+          className="command-history-list"
+          dataSource={visibleCommandHistory}
+          locale={{
+            emptyText: (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description={commandHistory.length === 0 ? t('empty.noCommandHistory') : t('empty.noCommands')}
+              />
+            ),
+          }}
+          renderItem={(item) => (
+            <List.Item
+              className="command-history-row"
+              actions={[
+                <Button
+                  key="run"
+                  size="small"
+                  type="primary"
+                  disabled={!activeKey}
+                  onClick={() => runHistoryCommand(item)}
+                >
+                  {t('action.run')}
+                </Button>,
+                <Button
+                  key="copy"
+                  size="small"
+                  onClick={async () => {
+                    await navigator.clipboard?.writeText(item.command);
+                    message.success(t('message.copied'));
+                  }}
+                >
+                  {t('action.copy')}
+                </Button>,
+              ]}
+            >
+              <List.Item.Meta
+                avatar={<span className="provider-icon">{providerIcons[item.providerType] || <CodeOutlined />}</span>}
+                title={<pre className="command-history-code">{item.command}</pre>}
+                description={(
+                  <span className="command-history-meta">
+                    <span>{item.sessionLabel || item.providerType}</span>
+                    <span>{item.providerType}</span>
+                    {item.updatedAt && <span>{formatProfileLastUsed(item.updatedAt)}</span>}
+                  </span>
+                )}
               />
             </List.Item>
           )}
@@ -3855,6 +3978,20 @@ function loadQuickCommands() {
 
 function persistQuickCommands(commands) {
   localStorage.setItem(commandStorageKey, JSON.stringify(commands));
+}
+
+function loadCommandHistory() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(commandHistoryStorageKey) || '[]');
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((item) => item?.command && item?.providerType).slice(0, 80);
+  } catch {
+    return [];
+  }
+}
+
+function persistCommandHistory(history) {
+  localStorage.setItem(commandHistoryStorageKey, JSON.stringify(history.slice(0, 80)));
 }
 
 function loadExtensionSources() {

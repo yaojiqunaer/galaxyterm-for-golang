@@ -2387,6 +2387,67 @@ code {
   white-space: pre-wrap;
 }
 
+.command-history-tools {
+  display: grid;
+  grid-template-columns: minmax(220px, auto) minmax(220px, 1fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.command-history-list {
+  margin-top: 12px;
+  max-height: calc(100vh - 260px);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.command-history-list .ant-list-items {
+  max-height: inherit;
+  overflow: auto;
+}
+
+.command-history-row {
+  align-items: flex-start !important;
+}
+
+.command-history-row .ant-list-item-meta {
+  min-width: 0;
+}
+
+.command-history-code {
+  max-width: 100%;
+  margin: 0;
+  overflow: auto;
+  color: var(--text);
+  font-family: Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.command-history-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.command-history-meta span {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .command-history-tools {
+    grid-template-columns: 1fr;
+  }
+}
+
 .remote-file-list {
   border: 0;
 }

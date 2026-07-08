@@ -30,7 +30,7 @@ assert.deepEqual(buildShortcutGroups().map((group) => ({
   count: group.items.length,
 })), [
   { key: 'terminal', count: 8 },
-  { key: 'sessions', count: 4 },
+  { key: 'sessions', count: 5 },
   { key: 'search', count: 3 },
   { key: 'audit', count: 3 },
   { key: 'workspace', count: 4 },
