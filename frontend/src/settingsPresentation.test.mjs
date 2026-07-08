@@ -3,6 +3,7 @@ import {
   buildAppearanceSummary,
   buildSecuritySummary,
   buildShortcutGroups,
+  buildTerminalDefaults,
   buildTerminalPreview,
   buildWorkspaceSnapshotSummary,
 } from './settingsPresentation.js';
@@ -68,6 +69,27 @@ assert.deepEqual(buildTerminalPreview({}), {
 
 assert.equal(buildTerminalPreview({ fontSize: 99 }).fontSize, 24);
 assert.equal(buildTerminalPreview({ fontSize: 2 }).fontSize, 10);
+
+assert.deepEqual(buildTerminalDefaults({
+  defaultProviderType: 'ssh',
+  defaultWorkingDirectory: '  /Users/me/project  ',
+}, [
+  { type: 'local' },
+  { type: 'ssh' },
+]), {
+  defaultProviderType: 'ssh',
+  defaultWorkingDirectory: '/Users/me/project',
+});
+
+assert.deepEqual(buildTerminalDefaults({
+  defaultProviderType: 'missing',
+}, [
+  { type: 'local' },
+  { type: 'ssh' },
+]), {
+  defaultProviderType: 'local',
+  defaultWorkingDirectory: '',
+});
 
 assert.deepEqual(buildWorkspaceSnapshotSummary(null), {
   count: 0,

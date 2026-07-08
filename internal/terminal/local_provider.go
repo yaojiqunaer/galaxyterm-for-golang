@@ -17,9 +17,10 @@ import (
 )
 
 type localDriver struct {
-	args []string
-	tty  *os.File
-	mu   sync.Mutex
+	args             []string
+	workingDirectory string
+	tty              *os.File
+	mu               sync.Mutex
 }
 
 func NewLocalProvider() session.Provider {
@@ -31,7 +32,10 @@ func NewLocalProvider() session.Provider {
 		Category:     "builtin",
 		Capabilities: []string{"stream", "resize"},
 		NewDriver: func(req session.CreateSessionRequest) (session.Driver, error) {
-			return &localDriver{args: localShellArgs(req.Config)}, nil
+			return &localDriver{
+				args:             localShellArgs(req.Config),
+				workingDirectory: localWorkingDirectory(req.Config),
+			}, nil
 		},
 	}
 }
@@ -42,6 +46,9 @@ func (d *localDriver) Start(ctx context.Context, emit session.Emitter) error {
 		return err
 	}
 	cmd.Env = append(os.Environ(), "TERM="+string(internal.XTERM_256_COLOR))
+	if d.workingDirectory != "" {
+		cmd.Dir = d.workingDirectory
+	}
 
 	tty, err := pty.Start(cmd)
 	if err != nil {
@@ -98,6 +105,17 @@ func localShellArgs(config map[string]interface{}) []string {
 		shell = "/bin/sh"
 	}
 	return []string{shell, "-li"}
+}
+
+func localWorkingDirectory(config map[string]interface{}) string {
+	for _, key := range []string{"workingDirectory", "cwd"} {
+		if raw, ok := config[key].(string); ok {
+			if value := strings.TrimSpace(raw); value != "" {
+				return value
+			}
+		}
+	}
+	return ""
 }
 
 func commandFromArgs(args []string) (*exec.Cmd, error) {

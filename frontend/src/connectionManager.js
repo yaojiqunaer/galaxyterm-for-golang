@@ -99,6 +99,7 @@ export function filterConnectionProfiles(
       profile.providerType,
       profile.config?.host,
       profile.config?.shell,
+      profile.config?.workingDirectory,
       profile.auth?.username,
     ].filter(Boolean).join(' ').toLowerCase();
     return tokens.every((token) => searchable.includes(token));
@@ -227,8 +228,9 @@ export function buildConnectionProfileFacts(profile = {}) {
   }
   return [
     { key: 'shell', value: profile.config?.shell || 'default shell' },
+    profile.config?.workingDirectory && { key: 'workingDirectory', value: profile.config.workingDirectory },
     { key: 'lastUsed', value: profile.lastUsedAt || '' },
-  ];
+  ].filter(Boolean);
 }
 
 export function buildConnectionProfileSubtitle(profile = {}) {

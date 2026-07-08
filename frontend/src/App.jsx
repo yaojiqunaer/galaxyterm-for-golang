@@ -106,6 +106,7 @@ import {
   buildAppearanceSummary,
   buildSecuritySummary,
   buildShortcutGroups,
+  buildTerminalDefaults,
   buildTerminalPreview,
   buildWorkspaceSnapshotSummary,
 } from './settingsPresentation.js';
@@ -182,6 +183,8 @@ const defaultSettings = {
   autoSaveWorkspace: true,
   autoRestoreWorkspace: false,
   confirmDangerousActions: true,
+  defaultProviderType: 'local',
+  defaultWorkingDirectory: '',
 };
 
 const fallbackProviders = [
@@ -535,9 +538,13 @@ function App() {
   const quickCommandSummary = useMemo(() => (
     buildQuickCommandSummary(quickCommands, { activeSession })
   ), [activeSession, quickCommands]);
+  const terminalDefaults = useMemo(
+    () => buildTerminalDefaults(settings, providers.length > 0 ? providers : fallbackProviders),
+    [providers, settings],
+  );
   const desktopBridgeReady = hasWailsMethod(['session', 'API', 'CreateSession']);
 
-  const openDrawer = (type = providers[0]?.type || 'local', profile = null) => {
+  const openDrawer = (type = terminalDefaults.defaultProviderType, profile = null) => {
     const providerType = profile?.providerType || type;
     setNewType(providerType);
     form.setFieldsValue({
@@ -557,6 +564,7 @@ function App() {
       credentialRef: profile?.auth?.credentialRef ? JSON.stringify(profile.auth.credentialRef) : '',
       rememberCredential: !!profile?.auth?.credentialRef,
       shell: profile?.config?.shell || '',
+      workingDirectory: profile?.config?.workingDirectory || terminalDefaults.defaultWorkingDirectory,
       saveProfile: false,
     });
     setEditingProfileId(profile?.id || '');
@@ -2298,6 +2306,24 @@ function App() {
                 onChange={(value) => setSettings((current) => ({ ...current, terminalTheme: value }))}
               />
             </Form.Item>
+            <Form.Item label={t('field.defaultProviderType')}>
+              <Select
+                value={terminalDefaults.defaultProviderType}
+                options={providerOptions}
+                onChange={(value) => setSettings((current) => ({ ...current, defaultProviderType: value }))}
+              />
+            </Form.Item>
+            <Form.Item label={t('field.defaultWorkingDirectory')}>
+              <Input
+                value={settings.defaultWorkingDirectory}
+                placeholder={t('placeholder.defaultWorkingDirectory')}
+                onChange={(event) => setSettings((current) => ({
+                  ...current,
+                  defaultWorkingDirectory: event.target.value,
+                }))}
+              />
+            </Form.Item>
+            <Text type="secondary">{t('settings.terminalDefaultsHint')}</Text>
             <Form.Item label={t('field.fontFamily')}>
               <Input
                 value={settings.fontFamily}
@@ -3229,9 +3255,14 @@ function App() {
             <Input placeholder={t('placeholder.group')} />
           </Form.Item>
           {newType === 'local' && (
-            <Form.Item name="shell" label={t('field.shell')}>
-              <Input placeholder={t('placeholder.shell')} />
-            </Form.Item>
+            <>
+              <Form.Item name="shell" label={t('field.shell')}>
+                <Input placeholder={t('placeholder.shell')} />
+              </Form.Item>
+              <Form.Item name="workingDirectory" label={t('field.workingDirectory')}>
+                <Input placeholder={t('placeholder.workingDirectory')} />
+              </Form.Item>
+            </>
           )}
           {newType === 'ssh' && (
             <>
@@ -4350,6 +4381,7 @@ function connectionProfileFactLabel(key) {
   if (key === 'port') return t('field.port');
   if (key === 'username') return t('field.username');
   if (key === 'shell') return t('field.shell');
+  if (key === 'workingDirectory') return t('field.workingDirectory');
   if (key === 'lastUsed') return t('label.lastUsed');
   if (key === 'jumpHost') return t('field.jumpHost');
   return key;
@@ -4365,6 +4397,8 @@ function settingsSummaryLabel(key) {
   if (key === 'confirmDangerousActions') return t('field.confirmDangerousActions');
   if (key === 'interfaceDensity') return t('field.interfaceDensity');
   if (key === 'terminalTheme') return t('field.terminalTheme');
+  if (key === 'defaultProviderType') return t('field.defaultProviderType');
+  if (key === 'defaultWorkingDirectory') return t('field.defaultWorkingDirectory');
   return key;
 }
 
@@ -4373,6 +4407,7 @@ function settingsSummaryValue(item) {
   if (item.key === 'confirmDangerousActions') return item.value ? t('label.enabled') : t('label.disabled');
   if (item.key === 'interfaceDensity') return t(`density.${item.value}`);
   if (item.key === 'terminalTheme') return item.value === 'auto' ? t('theme.auto') : item.value;
+  if (item.key === 'defaultWorkingDirectory') return item.value || t('label.default');
   return item.value;
 }
 
@@ -4451,6 +4486,8 @@ function normalizeSettings(settings) {
     ...settings,
     confirmDangerousActions: settings.confirmDangerousActions !== false,
     interfaceDensity,
+    defaultProviderType: String(settings.defaultProviderType || defaultSettings.defaultProviderType).trim() || defaultSettings.defaultProviderType,
+    defaultWorkingDirectory: String(settings.defaultWorkingDirectory || '').trim(),
     fontSize: clampNumber(settings.fontSize, 10, 24, defaultSettings.fontSize),
     scrollback: clampNumber(settings.scrollback, 500, 100000, defaultSettings.scrollback),
   };
@@ -4578,6 +4615,7 @@ function buildRequest(type, displayName, values) {
     group: values.group || '',
     config: {
       shell: values.shell || '',
+      workingDirectory: values.workingDirectory || '',
     },
     auth: {},
   };

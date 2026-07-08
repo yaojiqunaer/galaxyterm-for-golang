@@ -42,7 +42,7 @@ const profiles = [
     favorite: true,
     group: '',
     providerType: 'local',
-    config: { shell: '/bin/zsh' },
+    config: { shell: '/bin/zsh', workingDirectory: '/Users/me/dev' },
     auth: {},
   },
 ];
@@ -97,6 +97,10 @@ assert.deepEqual(
 );
 assert.deepEqual(
   filterConnectionProfiles(profiles, { providerType: 'local', query: 'zsh' }).map((profile) => profile.id),
+  ['dev-shell'],
+);
+assert.deepEqual(
+  filterConnectionProfiles(profiles, { providerType: 'local', query: 'Users/me/dev' }).map((profile) => profile.id),
   ['dev-shell'],
 );
 assert.deepEqual(
@@ -173,6 +177,7 @@ assert.deepEqual(buildConnectionProfileFacts({
 ]);
 assert.deepEqual(buildConnectionProfileFacts(profiles[2]), [
   { key: 'shell', value: '/bin/zsh' },
+  { key: 'workingDirectory', value: '/Users/me/dev' },
   { key: 'lastUsed', value: '' },
 ]);
 assert.equal(buildConnectionProfileSubtitle(profiles[0]), '10.0.0.10:22');

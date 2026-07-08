@@ -74,6 +74,18 @@ export function buildTerminalPreview(settings = {}) {
   };
 }
 
+export function buildTerminalDefaults(settings = {}, providers = []) {
+  const providerTypes = providers.map((provider) => provider.type).filter(Boolean);
+  const fallbackProviderType = providerTypes[0] || 'local';
+  const configuredProviderType = String(settings.defaultProviderType || '').trim();
+  return {
+    defaultProviderType: providerTypes.includes(configuredProviderType)
+      ? configuredProviderType
+      : fallbackProviderType,
+    defaultWorkingDirectory: String(settings.defaultWorkingDirectory || '').trim(),
+  };
+}
+
 export function buildWorkspaceSnapshotSummary(summary = null) {
   return {
     count: summary?.count || 0,
