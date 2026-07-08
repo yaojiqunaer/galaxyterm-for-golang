@@ -39,6 +39,31 @@ export function buildSessionStatusFacts(summary = {}) {
   ].filter((item) => item.value > 0);
 }
 
+export function buildSessionCloseConfirm(target) {
+  if (Array.isArray(target)) {
+    if (target.length === 0) return null;
+    return {
+      contentKey: 'confirm.closeAllSessionsContent',
+      contentValues: {
+        count: target.length,
+      },
+      okActionKey: 'action.closeAll',
+      titleKey: 'confirm.closeAllSessionsTitle',
+    };
+  }
+  if (!target) return null;
+  return {
+    contentKey: 'confirm.closeSessionContent',
+    contentValues: {
+      name: target.label || target.displayName || target.providerType || 'Terminal',
+      provider: target.providerType || 'terminal',
+      status: sessionStatusLabel(target),
+    },
+    okActionKey: 'action.closeSession',
+    titleKey: 'confirm.closeSessionTitle',
+  };
+}
+
 export function sessionTabDisplay(session = {}, active = false) {
   return {
     active,

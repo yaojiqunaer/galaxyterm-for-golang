@@ -25,8 +25,14 @@ function detectLocale() {
 
 let activeLocale = detectLocale();
 
-export function t(key, fallback = key) {
-  return dictionaries[activeLocale]?.[key] || dictionaries['en-US']?.[key] || fallback;
+export function t(key, fallbackOrValues = key) {
+  const values = isPlainObject(fallbackOrValues) ? fallbackOrValues : null;
+  const fallback = values ? key : fallbackOrValues;
+  const template = dictionaries[activeLocale]?.[key] || dictionaries['en-US']?.[key] || fallback;
+  if (!values || typeof template !== 'string') return template;
+  return template.replace(/\{(\w+)\}/g, (match, name) => (
+    Object.prototype.hasOwnProperty.call(values, name) ? String(values[name]) : match
+  ));
 }
 
 export function currentLocale() {
@@ -42,4 +48,8 @@ export function setLocale(locale) {
 
 export function availableLocales() {
   return Object.keys(dictionaries);
+}
+
+function isPlainObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value);
 }

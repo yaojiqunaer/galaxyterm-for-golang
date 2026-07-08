@@ -94,6 +94,7 @@ import {
   ungroupedKey,
 } from './connectionManager.js';
 import {
+  buildSessionCloseConfirm,
   buildSessionStatusFacts,
   profileActionModel,
   sessionTabDisplay,
@@ -723,12 +724,39 @@ function App() {
     });
   };
 
+  const confirmRemoveSession = (targetKey) => {
+    const session = sessions.find((item) => item.id === targetKey);
+    const confirm = buildSessionCloseConfirm(session);
+    if (!confirm) return;
+    Modal.confirm({
+      title: t(confirm.titleKey),
+      content: t(confirm.contentKey, confirm.contentValues),
+      okButtonProps: { danger: true },
+      okText: t(confirm.okActionKey),
+      cancelText: t('action.cancel'),
+      onOk: () => removeSession(targetKey),
+    });
+  };
+
   const closeAllSessions = () => {
     sessions.forEach((session) => saveAuditRecord(session.id));
     setSessions([]);
     setActiveKey('');
     setFocusMode(false);
     terminalRefs.current = {};
+  };
+
+  const confirmCloseAllSessions = () => {
+    const confirm = buildSessionCloseConfirm(sessions);
+    if (!confirm) return;
+    Modal.confirm({
+      title: t(confirm.titleKey),
+      content: t(confirm.contentKey, confirm.contentValues),
+      okButtonProps: { danger: true },
+      okText: t(confirm.okActionKey),
+      cancelText: t('action.cancel'),
+      onOk: closeAllSessions,
+    });
   };
 
   const openRenameSession = (session = sessions.find((item) => item.id === activeKey)) => {
@@ -1286,7 +1314,7 @@ function App() {
                     <Button size="small" icon={<EditOutlined />} onClick={() => openRenameSession(session)} />
                     <Button size="small" icon={<ReloadOutlined />} onClick={() => reconnectSession(session.id)} />
                     <Button size="small" onClick={() => duplicateSession(session)}>{t('action.duplicate')}</Button>
-                    <Button size="small" danger onClick={() => removeSession(session.id)}>{t('action.delete')}</Button>
+                    <Button size="small" danger onClick={() => confirmRemoveSession(session.id)}>{t('action.delete')}</Button>
                   </Space>
                 </div>
                 <TerminalPane
@@ -1319,7 +1347,7 @@ function App() {
             <Button size="small" onClick={() => setSessionView('grid')}>{t('action.grid')}</Button>
             <Button size="small" icon={<ReloadOutlined />} onClick={() => reconnectSession()} disabled={!activeKey}>{t('action.reconnect')}</Button>
             <Button size="small" icon={<EditOutlined />} onClick={() => openRenameSession()} disabled={!activeKey}>{t('action.renameSession')}</Button>
-            <Button size="small" danger onClick={() => removeSession(activeKey)} disabled={!activeKey}>{t('action.delete')}</Button>
+            <Button size="small" danger onClick={() => confirmRemoveSession(activeKey)} disabled={!activeKey}>{t('action.delete')}</Button>
           </Space>
         </div>
         <Tabs
@@ -1330,7 +1358,7 @@ function App() {
           onChange={setActiveKey}
           onEdit={(targetKey, action) => {
             if (action === 'add') openDrawer();
-            if (action === 'remove') removeSession(targetKey);
+            if (action === 'remove') confirmRemoveSession(targetKey);
           }}
           items={items}
         />
@@ -2778,7 +2806,7 @@ function App() {
     zoomReset: resetTerminalFont,
     rename: () => openRenameSession(),
     reconnect: () => reconnectSession(),
-    closeAll: closeAllSessions,
+    closeAll: confirmCloseAllSessions,
   };
   const sessionMenuItems = [
     {

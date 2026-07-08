@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  buildSessionCloseConfirm,
   buildSessionStatusFacts,
   profileActionModel,
   sessionTabDisplay,
@@ -49,6 +50,32 @@ assert.deepEqual(buildSessionStatusFacts({
   connecting: 0,
   total: 0,
 }), []);
+
+assert.deepEqual(buildSessionCloseConfirm({
+  label: 'Prod Shell',
+  providerType: 'ssh',
+  status: 'connected',
+}), {
+  contentKey: 'confirm.closeSessionContent',
+  contentValues: {
+    name: 'Prod Shell',
+    provider: 'ssh',
+    status: 'connected',
+  },
+  okActionKey: 'action.closeSession',
+  titleKey: 'confirm.closeSessionTitle',
+});
+
+assert.deepEqual(buildSessionCloseConfirm(null), null);
+
+assert.deepEqual(buildSessionCloseConfirm([{ id: 's1' }, { id: 's2' }]), {
+  contentKey: 'confirm.closeAllSessionsContent',
+  contentValues: {
+    count: 2,
+  },
+  okActionKey: 'action.closeAll',
+  titleKey: 'confirm.closeAllSessionsTitle',
+});
 
 assert.deepEqual(sessionTabDisplay({
   label: 'Local Terminal',

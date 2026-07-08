@@ -22,3 +22,4 @@ assert.equal(t('nav.sessions'), '会话');
 setLocale('en-US');
 assert.equal(currentLocale(), 'en-US');
 assert.equal(t('nav.sessions'), 'Sessions');
+assert.equal(t('confirm.closeAllSessionsContent', { count: 2 }), '2 sessions will be closed after saving their audit records.');
