@@ -61,18 +61,23 @@ export function buildConnectionGroupNav(profiles = []) {
 export function selectBatchProfiles(
   profiles = [],
   {
+    availableProviders,
     favoritesOnly = false,
     group = 'all',
     providerType = 'all',
     sortBy = 'favorites',
   } = {},
 ) {
+  const availableProviderTypes = Array.isArray(availableProviders)
+    ? new Set(availableProviders.map((provider) => provider.type).filter(Boolean))
+    : null;
   return sortConnectionProfiles(profiles.filter((profile) => {
     const matchesFavorite = !favoritesOnly || profile.favorite;
     const matchesProvider = providerType === 'all' || profile.providerType === providerType;
+    const matchesAvailableProvider = !availableProviderTypes || availableProviderTypes.has(profile.providerType);
     const profileGroup = profile.group || ungroupedKey;
     const matchesGroup = group === 'all' || profileGroup === group;
-    return matchesFavorite && matchesProvider && matchesGroup;
+    return matchesFavorite && matchesProvider && matchesAvailableProvider && matchesGroup;
   }), sortBy);
 }
 

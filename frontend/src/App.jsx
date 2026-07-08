@@ -1171,17 +1171,26 @@ function App() {
   };
 
   const openBatchProfiles = async (options) => {
-    const selectedProfiles = selectBatchProfiles(profiles, {
+    const allSelectedProfiles = selectBatchProfiles(profiles, {
       sortBy: profileSort,
       ...options,
     });
+    const selectedProfiles = selectBatchProfiles(profiles, {
+      availableProviders: providers,
+      sortBy: profileSort,
+      ...options,
+    });
+    const skipped = allSelectedProfiles.length - selectedProfiles.length;
     if (selectedProfiles.length === 0) {
-      message.info(t('message.noBatchConnections'));
+      message.info(skipped > 0 ? t('message.noAvailableBatchConnections') : t('message.noBatchConnections'));
       return;
     }
     try {
       await startProfileRequests(selectedProfiles.map(profileToRequest));
       markProfilesUsed(selectedProfiles.map((profile) => profile.id));
+      if (skipped > 0) {
+        message.warning(`${t('message.batchConnectionsSkipped')}: ${skipped}`);
+      }
     } catch (error) {
       message.error(`${t('message.credentialFailed')}: ${error}`);
     }

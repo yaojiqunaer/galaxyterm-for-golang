@@ -400,6 +400,8 @@
   "message.credentialFailed": "系统凭据操作失败",
   "message.batchSessionsStarted": "批量会话已启动",
   "message.noBatchConnections": "没有可打开的连接",
+  "message.noAvailableBatchConnections": "没有可打开的连接，可用终端类型已被过滤或停用",
+  "message.batchConnectionsSkipped": "已跳过停用终端类型的连接",
   "message.desktopBridgeUnavailable": "当前运行在 Web 预览模式，终端、文件、隧道、扩展安装等桌面后端能力不可用；请用 Wails 桌面应用启动以体验完整功能。",
   "message.localTestSkipped": "本地终端无需连接测试",
   "message.noTerminalSelection": "终端没有选中文本",

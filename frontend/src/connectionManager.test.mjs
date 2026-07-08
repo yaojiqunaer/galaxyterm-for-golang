@@ -87,6 +87,13 @@ assert.deepEqual(
   selectBatchProfiles(profiles, { favoritesOnly: true, providerType: 'ssh' }).map((profile) => profile.id),
   ['prod-db'],
 );
+assert.deepEqual(
+  selectBatchProfiles(profiles, {
+    availableProviders: [{ type: 'ssh' }],
+    favoritesOnly: true,
+  }).map((profile) => profile.id),
+  ['prod-db'],
+);
 
 assert.deepEqual(
   filterConnectionProfiles(profiles, { query: 'prod deploy' }).map((profile) => profile.id),
