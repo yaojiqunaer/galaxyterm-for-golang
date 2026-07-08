@@ -26,6 +26,33 @@ export function buildPaletteSummary(items = []) {
   };
 }
 
+export function buildProfilePaletteItems({
+  groupLabel = 'Connections',
+  iconForProfile = () => null,
+  profiles = [],
+  providers = [],
+  runProfile = () => {},
+  subtitleForProfile = () => '',
+} = {}) {
+  const providerTypes = new Set(providers.map((provider) => provider.type).filter(Boolean));
+  return profiles.map((profile) => {
+    const providerAvailable = providerTypes.has(profile.providerType);
+    const description = subtitleForProfile(profile);
+    return {
+      disabled: !providerAvailable,
+      group: groupLabel,
+      id: `profile:${profile.id}`,
+      icon: iconForProfile(profile),
+      keywords: `${profile.displayName || ''} ${profile.group || ''} ${description}`,
+      profile,
+      reasonKey: providerAvailable ? '' : 'palette.reason.providerUnavailable',
+      title: profile.displayName || profile.providerType || '',
+      description,
+      run: () => runProfile(profile),
+    };
+  });
+}
+
 function scorePaletteItem(item, keywords) {
   const title = item.title?.toLowerCase() || '';
   const description = item.description?.toLowerCase() || '';

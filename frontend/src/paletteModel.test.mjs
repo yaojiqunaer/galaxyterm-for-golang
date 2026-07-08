@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  buildProfilePaletteItems,
   buildPaletteSummary,
   filterPaletteItems,
   resolvePaletteIndex,
@@ -44,6 +45,24 @@ assert.deepEqual(buildPaletteSummary([]), {
   total: 0,
   groups: [],
 });
+
+const profilePaletteItems = buildProfilePaletteItems({
+  groupLabel: 'Connections',
+  profiles: [
+    { id: 'ssh-prod', providerType: 'ssh', displayName: 'Prod SSH', group: 'Production', config: { host: '10.0.0.2', port: 22 } },
+    { id: 'mysql-prod', providerType: 'mysql', displayName: 'Prod MySQL', group: 'Production', config: { host: '10.0.0.3', port: 3306 } },
+  ],
+  providers: [{ type: 'ssh' }],
+  subtitleForProfile: (profile) => profile.config.host,
+});
+assert.deepEqual(profilePaletteItems.map((item) => ({
+  disabled: item.disabled,
+  id: item.id,
+  reasonKey: item.reasonKey,
+})), [
+  { disabled: false, id: 'profile:ssh-prod', reasonKey: '' },
+  { disabled: true, id: 'profile:mysql-prod', reasonKey: 'palette.reason.providerUnavailable' },
+]);
 
 assert.deepEqual(filterPaletteItems([
   {

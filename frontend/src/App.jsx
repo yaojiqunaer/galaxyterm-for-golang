@@ -123,6 +123,7 @@ import TerminalPane from './components/TerminalPane.jsx';
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
 import { hasWailsMethod } from './desktopBridge.js';
 import {
+  buildProfilePaletteItems,
   buildPaletteSummary,
   filterPaletteItems,
   resolvePaletteIndex,
@@ -1288,6 +1289,10 @@ function App() {
   };
 
   const runPaletteAction = (item) => {
+    if (item.disabled) {
+      message.warning(item.reasonKey ? t(item.reasonKey) : t('message.providerUnavailable'));
+      return;
+    }
     item.run();
     setPaletteOpen(false);
     setPaletteQuery('');
@@ -3292,7 +3297,11 @@ function App() {
           }}
           renderItem={(item, index) => (
             <List.Item
-              className={index === paletteActiveIndex ? 'command-palette-row active' : 'command-palette-row'}
+              className={[
+                'command-palette-row',
+                index === paletteActiveIndex ? 'active' : '',
+                item.disabled ? 'disabled' : '',
+              ].filter(Boolean).join(' ')}
               onClick={() => runPaletteAction(item)}
               onMouseEnter={() => setPaletteActiveIndex(index)}
             >
@@ -3304,7 +3313,12 @@ function App() {
                     <small>{item.group}</small>
                   </span>
                 )}
-                description={item.description}
+                description={(
+                  <span className="command-palette-description">
+                    <span>{item.description}</span>
+                    {item.disabled && item.reasonKey && <small>{t(item.reasonKey)}</small>}
+                  </span>
+                )}
               />
             </List.Item>
           )}
@@ -4305,15 +4319,14 @@ function buildPaletteItems(actions) {
     run: () => actions.openDrawer(provider.type),
   }));
 
-  const profileItems = actions.profiles.map((profile) => ({
-    id: `profile:${profile.id}`,
-    group: t('palette.group.connections'),
-    title: profile.displayName,
-    description: buildConnectionProfileSubtitle(profile),
-    icon: providerIcons[profile.providerType] || <CodeOutlined />,
-    keywords: `${profile.displayName} ${profile.group || ''} ${buildConnectionProfileSubtitle(profile)}`,
-    run: () => actions.openProfile(profile),
-  }));
+  const profileItems = buildProfilePaletteItems({
+    groupLabel: t('palette.group.connections'),
+    iconForProfile: (profile) => providerIcons[profile.providerType] || <CodeOutlined />,
+    profiles: actions.profiles,
+    providers: actions.providers,
+    runProfile: actions.openProfile,
+    subtitleForProfile: buildConnectionProfileSubtitle,
+  });
 
   const sessionItems = actions.sessions.map((session, index) => ({
     id: `session:${session.id}`,

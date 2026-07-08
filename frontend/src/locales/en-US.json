@@ -356,6 +356,7 @@
   "palette.group.workspace": "Workspace",
   "palette.group.settings": "Settings",
   "palette.description.navigation": "Switch workspace page",
+  "palette.reason.providerUnavailable": "Terminal type disabled. Enable the matching extension first.",
   "palette.empty.title": "No matching commands",
   "palette.empty.description": "Create a terminal or return to connection management.",
   "message.profileSaved": "Connection saved",

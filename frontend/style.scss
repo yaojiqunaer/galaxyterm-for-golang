@@ -1807,6 +1807,16 @@ select {
   box-shadow: inset 3px 0 0 var(--accent);
 }
 
+.command-palette-row.disabled {
+  cursor: not-allowed;
+  opacity: 0.62;
+}
+
+.command-palette-row.disabled:hover,
+.command-palette-row.disabled.active {
+  background: transparent;
+}
+
 .command-palette-row .ant-list-item-meta {
   align-items: center;
 }
@@ -1817,6 +1827,16 @@ select {
   justify-content: space-between;
   gap: 10px;
   min-width: 0;
+}
+
+.command-palette-description {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.command-palette-description small {
+  color: var(--warning);
 }
 
 .command-palette-title strong {
