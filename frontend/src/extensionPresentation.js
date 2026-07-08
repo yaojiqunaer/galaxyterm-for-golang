@@ -1,6 +1,13 @@
-export function buildExtensionSummary({ providers = [], installedExtensions = [] } = {}) {
+export function buildExtensionSummary({
+  providers = [],
+  installedExtensions = [],
+  disabledExtensionIds = [],
+} = {}) {
+  const disabledIds = new Set(disabledExtensionIds);
   return {
     builtinProviders: providers.filter((provider) => provider.category !== 'extension').length,
+    disabledExtensions: installedExtensions.filter((extension) => disabledIds.has(extension.id)).length,
+    enabledExtensions: installedExtensions.filter((extension) => !disabledIds.has(extension.id)).length,
     extensionProviders: providers.filter((provider) => provider.category === 'extension').length,
     installedExtensions: installedExtensions.length,
     installedProviderTypes: installedExtensions.flatMap((extension) => (
@@ -30,8 +37,10 @@ export function buildExtensionCardFacts(extension = {}) {
   ];
 }
 
-export function buildInstalledExtensionRows(installedExtensions = []) {
+export function buildInstalledExtensionRows(installedExtensions = [], disabledExtensionIds = []) {
+  const disabledIds = new Set(disabledExtensionIds);
   return installedExtensions.map((extension) => ({
+    enabled: !disabledIds.has(extension.id),
     id: extension.id,
     name: extension.name,
     version: extension.version,
@@ -40,4 +49,21 @@ export function buildInstalledExtensionRows(installedExtensions = []) {
       .flatMap((provider) => provider.capabilities || [])
       .filter(Boolean),
   }));
+}
+
+export function filterProvidersByDisabledExtensions(
+  providers = [],
+  installedExtensions = [],
+  disabledExtensionIds = [],
+) {
+  const disabledIds = new Set(disabledExtensionIds);
+  const disabledProviderTypes = new Set(installedExtensions
+    .filter((extension) => disabledIds.has(extension.id))
+    .flatMap((extension) => extension.providers || [])
+    .map((provider) => provider.type)
+    .filter(Boolean));
+
+  return providers.filter((provider) => (
+    provider.category !== 'extension' || !disabledProviderTypes.has(provider.type)
+  ));
 }

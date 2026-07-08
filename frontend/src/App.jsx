@@ -138,6 +138,7 @@ import {
   buildExtensionCardFacts,
   buildExtensionSummary,
   buildInstalledExtensionRows,
+  filterProvidersByDisabledExtensions,
 } from './extensionPresentation.js';
 import {
   defaultExtensionSources,
@@ -185,6 +186,7 @@ const defaultSettings = {
   confirmDangerousActions: true,
   defaultProviderType: 'local',
   defaultWorkingDirectory: '',
+  disabledExtensionIds: [],
 };
 
 const fallbackProviders = [
@@ -219,7 +221,7 @@ function providerTypeLabel(type, providers = []) {
 }
 
 function App() {
-  const [providers, setProviders] = useState(fallbackProviders);
+  const [allProviders, setAllProviders] = useState(fallbackProviders);
   const [sessions, setSessions] = useState([]);
   const [profiles, setProfiles] = useState(() => loadProfiles());
   const [settings, setSettings] = useState(() => loadSettings());
@@ -299,12 +301,12 @@ function App() {
       .then(() => SessionAPI.ListProviders())
       .then((loadedProviders) => {
         if (Array.isArray(loadedProviders) && loadedProviders.length > 0) {
-          setProviders(loadedProviders);
+          setAllProviders(loadedProviders);
           setNewType(loadedProviders[0].type);
         }
       })
       .catch(() => {
-        setProviders(fallbackProviders);
+        setAllProviders(fallbackProviders);
       });
   }, []);
 
@@ -431,6 +433,11 @@ function App() {
     }
   }, [activeKey, focusMode, selectedNav, sessionView]);
 
+  const providers = useMemo(() => filterProvidersByDisabledExtensions(
+    allProviders,
+    installedExtensions,
+    settings.disabledExtensionIds,
+  ), [allProviders, installedExtensions, settings.disabledExtensionIds]);
   const providerOptions = useMemo(() => providers.map((provider) => ({
     value: provider.type,
     label: (
@@ -513,11 +520,15 @@ function App() {
     providers,
   }), [installedExtensions, providers]);
   const extensionSummary = useMemo(() => (
-    buildExtensionSummary({ providers, installedExtensions })
-  ), [installedExtensions, providers]);
+    buildExtensionSummary({
+      disabledExtensionIds: settings.disabledExtensionIds,
+      installedExtensions,
+      providers,
+    })
+  ), [installedExtensions, providers, settings.disabledExtensionIds]);
   const installedExtensionRows = useMemo(() => (
-    buildInstalledExtensionRows(installedExtensions)
-  ), [installedExtensions]);
+    buildInstalledExtensionRows(installedExtensions, settings.disabledExtensionIds)
+  ), [installedExtensions, settings.disabledExtensionIds]);
   const auditProviderOptions = useMemo(() => [
     { value: 'all', label: t('filter.allProviders') },
     ...Array.from(new Set(auditRecords.map((record) => record.providerType || 'terminal')))
@@ -543,6 +554,12 @@ function App() {
     [providers, settings],
   );
   const desktopBridgeReady = hasWailsMethod(['session', 'API', 'CreateSession']);
+
+  useEffect(() => {
+    if (providers.length > 0 && !providers.some((provider) => provider.type === newType)) {
+      setNewType(providers[0].type);
+    }
+  }, [newType, providers]);
 
   const openDrawer = (type = terminalDefaults.defaultProviderType, profile = null) => {
     const providerType = profile?.providerType || type;
@@ -1711,6 +1728,7 @@ function App() {
         <MetricCard label={t('metric.builtinProviders')} value={extensionSummary.builtinProviders} />
         <MetricCard label={t('metric.extensionProviders')} value={extensionSummary.extensionProviders} />
         <MetricCard label={t('metric.installedExtensions')} value={extensionSummary.installedExtensions} />
+        <MetricCard label={t('metric.disabledExtensions')} value={extensionSummary.disabledExtensions} />
       </div>
       <div className="extension-core-banner">
         <div>
@@ -1771,6 +1789,13 @@ function App() {
           renderItem={(extension) => (
             <List.Item
               actions={[
+                <Switch
+                  key="enabled"
+                  checked={extension.enabled}
+                  checkedChildren={t('label.enabled')}
+                  unCheckedChildren={t('label.disabled')}
+                  onChange={(checked) => toggleExtensionEnabled(extension.id, checked)}
+                />,
                 <Button key="uninstall" size="small" danger loading={extensionBusy} onClick={() => uninstallExtension(extension.id)}>{t('action.uninstall')}</Button>,
               ]}
             >
@@ -1780,6 +1805,9 @@ function App() {
                   <span className="installed-extension-title">
                     <strong>{extension.name}</strong>
                     <span className="connection-profile-badge tone-success">{extension.version}</span>
+                    <span className={`connection-profile-badge ${extension.enabled ? 'tone-info' : 'tone-warning'}`}>
+                      {extension.enabled ? t('extension.state.enabled') : t('extension.state.disabled')}
+                    </span>
                   </span>
                 )}
                 description={(
@@ -1864,6 +1892,22 @@ function App() {
     persistExtensionSources(nextSources);
     setExtensionSources(nextSources);
     message.success(t('message.extensionSourceDeleted'));
+  };
+
+  const toggleExtensionEnabled = (extensionId, enabled) => {
+    setSettings((current) => {
+      const disabledIds = new Set(current.disabledExtensionIds || []);
+      if (enabled) {
+        disabledIds.delete(extensionId);
+      } else {
+        disabledIds.add(extensionId);
+      }
+      return {
+        ...current,
+        disabledExtensionIds: [...disabledIds],
+      };
+    });
+    message.success(enabled ? t('message.extensionEnabled') : t('message.extensionDisabled'));
   };
 
   const installOfflineExtension = async () => {
@@ -4488,6 +4532,9 @@ function normalizeSettings(settings) {
     interfaceDensity,
     defaultProviderType: String(settings.defaultProviderType || defaultSettings.defaultProviderType).trim() || defaultSettings.defaultProviderType,
     defaultWorkingDirectory: String(settings.defaultWorkingDirectory || '').trim(),
+    disabledExtensionIds: Array.isArray(settings.disabledExtensionIds)
+      ? [...new Set(settings.disabledExtensionIds.map((item) => String(item)).filter(Boolean))]
+      : [],
     fontSize: clampNumber(settings.fontSize, 10, 24, defaultSettings.fontSize),
     scrollback: clampNumber(settings.scrollback, 500, 100000, defaultSettings.scrollback),
   };

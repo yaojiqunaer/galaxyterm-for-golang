@@ -4,6 +4,7 @@ import {
   buildExtensionCardFacts,
   buildExtensionSummary,
   buildInstalledExtensionRows,
+  filterProvidersByDisabledExtensions,
 } from './extensionPresentation.js';
 
 const providers = [
@@ -29,6 +30,21 @@ const installedExtensions = [
 
 assert.deepEqual(buildExtensionSummary({ providers, installedExtensions }), {
   builtinProviders: 2,
+  disabledExtensions: 0,
+  enabledExtensions: 2,
+  extensionProviders: 1,
+  installedExtensions: 2,
+  installedProviderTypes: ['mysql', 'kubernetes'],
+});
+
+assert.deepEqual(buildExtensionSummary({
+  providers,
+  installedExtensions,
+  disabledExtensionIds: ['galaxyterm-extension-kubernetes'],
+}), {
+  builtinProviders: 2,
+  disabledExtensions: 1,
+  enabledExtensions: 1,
   extensionProviders: 1,
   installedExtensions: 2,
   installedProviderTypes: ['mysql', 'kubernetes'],
@@ -60,8 +76,9 @@ assert.deepEqual(buildExtensionCardFacts({
   { key: 'capabilities', value: 'stream' },
 ]);
 
-assert.deepEqual(buildInstalledExtensionRows(installedExtensions), [
+assert.deepEqual(buildInstalledExtensionRows(installedExtensions, ['galaxyterm-extension-mysql']), [
   {
+    enabled: false,
     id: 'galaxyterm-extension-mysql',
     name: 'MySQL',
     version: '0.1.0',
@@ -69,6 +86,7 @@ assert.deepEqual(buildInstalledExtensionRows(installedExtensions), [
     capabilities: ['stream', 'query'],
   },
   {
+    enabled: true,
     id: 'galaxyterm-extension-kubernetes',
     name: 'Kubernetes',
     version: '0.2.0',
@@ -76,3 +94,7 @@ assert.deepEqual(buildInstalledExtensionRows(installedExtensions), [
     capabilities: ['stream'],
   },
 ]);
+
+assert.deepEqual(filterProvidersByDisabledExtensions(providers, installedExtensions, [
+  'galaxyterm-extension-mysql',
+]).map((provider) => provider.type), ['local', 'ssh']);
