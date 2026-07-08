@@ -470,7 +470,10 @@ function App() {
     visibleCount: visibleProfiles.length,
     hasFilters: !!hasProfileFilters,
   }), [hasProfileFilters, profiles.length, visibleProfiles.length]);
-  const sidebarQuickProfiles = useMemo(() => sortSidebarProfiles(profiles, 5), [profiles]);
+  const sidebarQuickProfiles = useMemo(
+    () => sortSidebarProfiles(profiles, 5, { availableProviders: providers }),
+    [profiles, providers],
+  );
 
   useEffect(() => {
     const nextSelectedProfileId = resolveSelectedProfileId(visibleProfiles, selectedProfileId);
@@ -1355,6 +1358,7 @@ function App() {
           openProfile={openProfile}
           openRecentConnection={openRecentConnection}
           profiles={profiles}
+          providers={providers}
           recentConnections={recentConnections}
           restoreWorkspace={restoreWorkspace}
         />
@@ -3729,10 +3733,11 @@ function SessionEmptyPanel({
   openProfile,
   openRecentConnection,
   profiles,
+  providers,
   recentConnections,
   restoreWorkspace,
 }) {
-  const suggestedProfiles = sortConnectionProfiles(profiles, 'recent').slice(0, 4);
+  const suggestedProfiles = sortSidebarProfiles(profiles, 4, { availableProviders: providers });
   return (
     <div className="session-empty-panel">
       <div className="session-empty-primary">

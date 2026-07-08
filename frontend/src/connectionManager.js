@@ -185,8 +185,12 @@ export function sortConnectionProfiles(profiles = [], sortBy = 'favorites') {
   });
 }
 
-export function sortSidebarProfiles(profiles = [], limit = 5) {
-  return [...profiles]
+export function sortSidebarProfiles(profiles = [], limit = 5, { availableProviders } = {}) {
+  const availableProviderTypes = Array.isArray(availableProviders)
+    ? new Set(availableProviders.map((provider) => provider.type).filter(Boolean))
+    : null;
+  return profiles
+    .filter((profile) => !availableProviderTypes || availableProviderTypes.has(profile.providerType))
     .sort((left, right) => {
       const favoriteDelta = Number(!!right.favorite) - Number(!!left.favorite);
       return favoriteDelta

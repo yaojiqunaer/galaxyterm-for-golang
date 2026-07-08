@@ -152,6 +152,10 @@ assert.deepEqual(sortConnectionProfiles(profiles, 'group').map((profile) => prof
 assert.deepEqual(sortConnectionProfiles(profiles, 'recent').map((profile) => profile.id), ['prod-web', 'prod-db', 'dev-shell']);
 assert.deepEqual(sortSidebarProfiles(profiles).map((profile) => profile.id), ['prod-db', 'dev-shell', 'prod-web']);
 assert.deepEqual(sortSidebarProfiles(profiles, 2).map((profile) => profile.id), ['prod-db', 'dev-shell']);
+assert.deepEqual(
+  sortSidebarProfiles(profiles, 5, { availableProviders: [{ type: 'ssh' }] }).map((profile) => profile.id),
+  ['prod-db', 'prod-web'],
+);
 
 assert.deepEqual(buildConnectionProfileBadges(profiles[0], { activeCount: 2 }), [
   { key: 'group', tone: 'default', value: 'Production' },
