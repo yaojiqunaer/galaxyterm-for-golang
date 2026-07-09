@@ -107,9 +107,14 @@ const sessionActionItems = buildSessionActionPaletteItems({
   labels: {
     clearTerminal: 'Clear Terminal',
     commandHistory: 'Command History',
+    copyTranscript: 'Copy Terminal Output',
+    exportTranscript: 'Export Terminal Output',
     nextSession: 'Next Session',
     previousSession: 'Previous Session',
     quickCommands: 'Quick Commands',
+    reconnect: 'Reconnect',
+    renameSession: 'Rename Session',
+    saveAudit: 'Save Audit Record',
   },
   runAction: () => {},
 });
@@ -120,7 +125,12 @@ assert.deepEqual(sessionActionItems.map((item) => ({
 })), [
   { disabled: false, id: 'session-action:previousSession', title: 'Previous Session' },
   { disabled: false, id: 'session-action:nextSession', title: 'Next Session' },
+  { disabled: false, id: 'session-action:reconnect', title: 'Reconnect' },
+  { disabled: false, id: 'session-action:renameSession', title: 'Rename Session' },
   { disabled: false, id: 'session-action:clearTerminal', title: 'Clear Terminal' },
+  { disabled: false, id: 'session-action:copyTranscript', title: 'Copy Terminal Output' },
+  { disabled: false, id: 'session-action:exportTranscript', title: 'Export Terminal Output' },
+  { disabled: false, id: 'session-action:saveAudit', title: 'Save Audit Record' },
   { disabled: false, id: 'session-action:commandHistory', title: 'Command History' },
   { disabled: false, id: 'session-action:quickCommands', title: 'Quick Commands' },
 ]);
@@ -132,9 +142,14 @@ assert.deepEqual(buildSessionActionPaletteItems({
   labels: {
     clearTerminal: 'Clear Terminal',
     commandHistory: 'Command History',
+    copyTranscript: 'Copy Terminal Output',
+    exportTranscript: 'Export Terminal Output',
     nextSession: 'Next Session',
     previousSession: 'Previous Session',
     quickCommands: 'Quick Commands',
+    reconnect: 'Reconnect',
+    renameSession: 'Rename Session',
+    saveAudit: 'Save Audit Record',
   },
   runAction: () => {},
 }).map((item) => ({
@@ -144,12 +159,18 @@ assert.deepEqual(buildSessionActionPaletteItems({
 })), [
   { disabled: true, id: 'session-action:previousSession', reasonKey: 'palette.reason.noAdjacentSession' },
   { disabled: true, id: 'session-action:nextSession', reasonKey: 'palette.reason.noAdjacentSession' },
+  { disabled: true, id: 'session-action:reconnect', reasonKey: 'palette.reason.noActiveSession' },
+  { disabled: true, id: 'session-action:renameSession', reasonKey: 'palette.reason.noActiveSession' },
   { disabled: true, id: 'session-action:clearTerminal', reasonKey: 'palette.reason.noActiveSession' },
+  { disabled: true, id: 'session-action:copyTranscript', reasonKey: 'palette.reason.noActiveSession' },
+  { disabled: true, id: 'session-action:exportTranscript', reasonKey: 'palette.reason.noActiveSession' },
+  { disabled: true, id: 'session-action:saveAudit', reasonKey: 'palette.reason.noActiveSession' },
   { disabled: false, id: 'session-action:commandHistory', reasonKey: '' },
   { disabled: false, id: 'session-action:quickCommands', reasonKey: '' },
 ]);
 
 assert.deepEqual(filterPaletteItems(sessionActionItems, 'history').map((item) => item.id), ['session-action:commandHistory']);
+assert.deepEqual(filterPaletteItems(sessionActionItems, 'audit').map((item) => item.id), ['session-action:saveAudit']);
 
 assert.equal(resolvePaletteIndex(0, 0, 'next'), -1);
 assert.equal(resolvePaletteIndex(3, -1, 'next'), 0);

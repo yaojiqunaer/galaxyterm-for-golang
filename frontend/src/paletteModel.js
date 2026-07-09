@@ -77,6 +77,20 @@ export function buildSessionActionPaletteItems({
       reasonKey: canNavigate ? '' : 'palette.reason.noAdjacentSession',
       runAction,
     }),
+    sessionActionItem('reconnect', activeSessionActionOptions({
+      activeSessionId,
+      groupLabel,
+      keywords: 'reconnect retry recover session terminal',
+      labels,
+      runAction,
+    })),
+    sessionActionItem('renameSession', activeSessionActionOptions({
+      activeSessionId,
+      groupLabel,
+      keywords: 'rename session tab title',
+      labels,
+      runAction,
+    })),
     sessionActionItem('clearTerminal', {
       disabled: !activeSessionId,
       groupLabel,
@@ -85,6 +99,27 @@ export function buildSessionActionPaletteItems({
       reasonKey: activeSessionId ? '' : 'palette.reason.noActiveSession',
       runAction,
     }),
+    sessionActionItem('copyTranscript', activeSessionActionOptions({
+      activeSessionId,
+      groupLabel,
+      keywords: 'copy transcript terminal output',
+      labels,
+      runAction,
+    })),
+    sessionActionItem('exportTranscript', activeSessionActionOptions({
+      activeSessionId,
+      groupLabel,
+      keywords: 'export transcript terminal output download',
+      labels,
+      runAction,
+    })),
+    sessionActionItem('saveAudit', activeSessionActionOptions({
+      activeSessionId,
+      groupLabel,
+      keywords: 'save audit record recording log',
+      labels,
+      runAction,
+    })),
     sessionActionItem('commandHistory', {
       groupLabel,
       keywords: 'history command commands recent',
@@ -121,6 +156,23 @@ function scorePaletteKeyword(fields, keyword) {
   if (fields.group.includes(keyword)) return 3;
   if (fields.keywords.includes(keyword)) return 4;
   return Number.POSITIVE_INFINITY;
+}
+
+function activeSessionActionOptions({
+  activeSessionId = '',
+  groupLabel,
+  keywords,
+  labels,
+  runAction,
+}) {
+  return {
+    disabled: !activeSessionId,
+    groupLabel,
+    keywords,
+    labels,
+    reasonKey: activeSessionId ? '' : 'palette.reason.noActiveSession',
+    runAction,
+  };
 }
 
 function sessionActionItem(key, {

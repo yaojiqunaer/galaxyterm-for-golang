@@ -1282,7 +1282,16 @@ function App() {
   const runSessionPaletteAction = (action) => {
     if (action === 'previousSession') switchSession('previous');
     if (action === 'nextSession') switchSession('next');
+    if (action === 'reconnect') reconnectSession();
+    if (action === 'renameSession') openRenameSession();
     if (action === 'clearTerminal') clearActiveTerminal();
+    if (action === 'copyTranscript') copyTerminalTranscript();
+    if (action === 'exportTranscript') exportTerminalTranscript();
+    if (action === 'saveAudit') {
+      const record = saveAuditRecord(activeKey);
+      if (record) message.success(t('message.auditRecordSaved'));
+      if (!record) message.info(t('message.terminalOutputEmpty'));
+    }
     if (action === 'commandHistory') setHistoryOpen(true);
     if (action === 'quickCommands') setCommandsOpen(true);
   };
@@ -4832,9 +4841,14 @@ function buildPaletteItems(actions) {
     labels: {
       clearTerminal: t('action.clearTerminal'),
       commandHistory: t('action.commandHistory'),
+      copyTranscript: t('action.copyTranscript'),
+      exportTranscript: t('action.exportTranscript'),
       nextSession: t('action.nextSession'),
       previousSession: t('action.previousSession'),
       quickCommands: t('action.commands'),
+      reconnect: t('action.reconnect'),
+      renameSession: t('action.renameSession'),
+      saveAudit: t('action.saveAuditRecord'),
     },
     runAction: actions.runSessionAction,
   });
