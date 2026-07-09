@@ -7,6 +7,7 @@ import {
   buildConnectionProfileFacts,
   buildConnectionProfileHints,
   buildConnectionProfilePrimaryAction,
+  buildConnectionProfileStatusSummary,
   buildConnectionProfileSubtitle,
   filterConnectionProfiles,
   filterRecentConnectionsByProviders,
@@ -240,6 +241,33 @@ assert.deepEqual(buildConnectionProfilePrimaryAction({
   disabled: true,
   labelKey: 'action.connect',
   reasonKey: 'palette.reason.providerUnavailable',
+});
+assert.deepEqual(buildConnectionProfileStatusSummary({
+  providerAvailable: true,
+  sessionInfo: { activeCount: 2, focusSessionId: 's1' },
+}), {
+  descriptionKey: 'connection.status.active.description',
+  titleKey: 'connection.status.active.title',
+  tone: 'success',
+  values: { count: 2 },
+});
+assert.deepEqual(buildConnectionProfileStatusSummary({
+  providerAvailable: true,
+  sessionInfo: { activeCount: 0, focusSessionId: '' },
+}), {
+  descriptionKey: 'connection.status.ready.description',
+  titleKey: 'connection.status.ready.title',
+  tone: 'info',
+  values: {},
+});
+assert.deepEqual(buildConnectionProfileStatusSummary({
+  providerAvailable: false,
+  sessionInfo: { activeCount: 0, focusSessionId: '' },
+}), {
+  descriptionKey: 'connection.status.unavailable.description',
+  titleKey: 'connection.status.unavailable.title',
+  tone: 'warning',
+  values: {},
 });
 
 const profileSessions = summarizeProfileSessions(profiles, [

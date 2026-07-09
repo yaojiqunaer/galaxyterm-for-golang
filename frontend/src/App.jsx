@@ -85,6 +85,7 @@ import {
   buildConnectionProfileFacts,
   buildConnectionProfileHints,
   buildConnectionProfilePrimaryAction,
+  buildConnectionProfileStatusSummary,
   buildConnectionProfileSubtitle,
   filterConnectionProfiles,
   filterRecentConnectionsByProviders,
@@ -4356,6 +4357,7 @@ function ConnectionProfilePreview({
   const facts = buildConnectionProfileFacts(profile);
   const hints = buildConnectionProfileHints(sessionInfo);
   const primaryAction = buildConnectionProfilePrimaryAction({ providerAvailable, sessionInfo });
+  const statusSummary = buildConnectionProfileStatusSummary({ providerAvailable, sessionInfo });
   return (
     <div className="connection-profile-preview">
       <div className="connection-profile-hero">
@@ -4383,6 +4385,12 @@ function ConnectionProfilePreview({
         </Button>
         <Button size="small" icon={<EditOutlined />} onClick={() => openProfileEditor(profile)}>{t('action.edit')}</Button>
       </div>
+      <Alert
+        showIcon
+        type={statusSummary.tone}
+        message={t(statusSummary.titleKey, statusSummary.values)}
+        description={t(statusSummary.descriptionKey, statusSummary.values)}
+      />
       <div className="connection-profile-tags">
         {badges.map((badge) => (
           <span key={badge.key} className={`connection-profile-badge tone-${badge.tone}`}>

@@ -297,6 +297,34 @@ export function buildConnectionProfilePrimaryAction({
   };
 }
 
+export function buildConnectionProfileStatusSummary({
+  providerAvailable = true,
+  sessionInfo = {},
+} = {}) {
+  if (!providerAvailable) {
+    return {
+      descriptionKey: 'connection.status.unavailable.description',
+      titleKey: 'connection.status.unavailable.title',
+      tone: 'warning',
+      values: {},
+    };
+  }
+  if (sessionInfo.activeCount > 0 && sessionInfo.focusSessionId) {
+    return {
+      descriptionKey: 'connection.status.active.description',
+      titleKey: 'connection.status.active.title',
+      tone: 'success',
+      values: { count: sessionInfo.activeCount },
+    };
+  }
+  return {
+    descriptionKey: 'connection.status.ready.description',
+    titleKey: 'connection.status.ready.title',
+    tone: 'info',
+    values: {},
+  };
+}
+
 function compareText(left = '', right = '') {
   return String(left || '').localeCompare(String(right || ''));
 }
