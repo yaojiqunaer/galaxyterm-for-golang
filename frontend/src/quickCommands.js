@@ -3,6 +3,7 @@ export function buildQuickCommandSummary(commands = [], { activeSession = null }
   return {
     total: commands.length,
     available: filterQuickCommands(commands, '', { providerType }).length,
+    favorites: commands.filter((item) => item.favorite).length,
     multiLine: commands.filter((item) => String(item.command || '').includes('\n')).length,
     target: activeSession?.label || '',
     canRun: !!activeSession?.id,
@@ -12,12 +13,14 @@ export function buildQuickCommandSummary(commands = [], { activeSession = null }
 export function filterQuickCommands(commands = [], query = '', options = {}) {
   const keywords = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const providerType = normalizeCommandProviderType(options.providerType || 'all');
-  return commands.filter((item) => {
-    if (!matchesProviderType(item, providerType)) return false;
-    if (keywords.length === 0) return true;
-    const haystack = `${item.name || ''} ${item.command || ''} ${item.providerType || 'all'}`.toLowerCase();
-    return keywords.every((keyword) => haystack.includes(keyword));
-  });
+  return commands
+    .filter((item) => {
+      if (!matchesProviderType(item, providerType)) return false;
+      if (keywords.length === 0) return true;
+      const haystack = `${item.name || ''} ${item.command || ''} ${item.providerType || 'all'}`.toLowerCase();
+      return keywords.every((keyword) => haystack.includes(keyword));
+    })
+    .sort((left, right) => Number(!!right.favorite) - Number(!!left.favorite));
 }
 
 export function normalizeQuickCommand(command = {}) {
@@ -25,6 +28,7 @@ export function normalizeQuickCommand(command = {}) {
     id: command.id || '',
     name: command.name || '',
     command: command.command || '',
+    favorite: command.favorite === true,
     providerType: normalizeCommandProviderType(command.providerType || 'all'),
   };
 }

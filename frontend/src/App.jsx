@@ -1363,6 +1363,7 @@ function App() {
       id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`,
       name: values.name,
       command: values.command,
+      favorite: false,
       providerType: values.providerType || 'all',
     }];
     persistQuickCommands(nextCommands);
@@ -1376,6 +1377,14 @@ function App() {
     persistQuickCommands(nextCommands);
     setQuickCommands(nextCommands);
     message.success(t('message.commandDeleted'));
+  };
+
+  const toggleQuickCommandFavorite = (id) => {
+    const nextCommands = quickCommands.map((item) => (
+      item.id === id ? { ...item, favorite: !item.favorite } : item
+    ));
+    persistQuickCommands(nextCommands);
+    setQuickCommands(nextCommands);
   };
 
   const updateTerminalStatus = (sessionId, status) => {
@@ -3618,6 +3627,10 @@ function App() {
             <strong>{quickCommandSummary.available}</strong>
           </span>
           <span>
+            <small>{t('label.favorite')}</small>
+            <strong>{quickCommandSummary.favorites}</strong>
+          </span>
+          <span>
             <small>{t('metric.multiLineCommands')}</small>
             <strong>{quickCommandSummary.multiLine}</strong>
           </span>
@@ -3663,6 +3676,12 @@ function App() {
             <List.Item
               className="quick-command-row"
               actions={[
+                <Button
+                  key="favorite"
+                  size="small"
+                  icon={item.favorite ? <StarFilled /> : <StarOutlined />}
+                  onClick={() => toggleQuickCommandFavorite(item.id)}
+                />,
                 <Button
                   key="run"
                   size="small"
