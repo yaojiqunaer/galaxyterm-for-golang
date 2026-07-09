@@ -73,6 +73,48 @@ export function buildSessionContextFacts(session, options = {}) {
   return facts;
 }
 
+export function buildSessionAuditSummary(session, options = {}) {
+  if (!session) {
+    return {
+      descriptionKey: 'session.audit.noSession.description',
+      titleKey: 'session.audit.noSession.title',
+      tone: 'info',
+      values: {},
+    };
+  }
+  const count = (session.auditEvents || []).length;
+  if (session.auditRecordSaved) {
+    return {
+      descriptionKey: 'session.audit.saved.description',
+      titleKey: 'session.audit.saved.title',
+      tone: 'success',
+      values: { count },
+    };
+  }
+  if (options.recordingActive && session.status !== 'closed') {
+    return {
+      descriptionKey: 'session.audit.recording.description',
+      titleKey: 'session.audit.recording.title',
+      tone: 'success',
+      values: { count },
+    };
+  }
+  if (session.status === 'closed') {
+    return {
+      descriptionKey: 'session.audit.closedPending.description',
+      titleKey: 'session.audit.closedPending.title',
+      tone: 'warning',
+      values: { count },
+    };
+  }
+  return {
+    descriptionKey: 'session.audit.pending.description',
+    titleKey: 'session.audit.pending.title',
+    tone: 'warning',
+    values: { count },
+  };
+}
+
 export function filterSessions(sessions = [], options = {}) {
   const queryTokens = String(options.query || '')
     .trim()

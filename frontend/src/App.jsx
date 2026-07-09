@@ -98,6 +98,7 @@ import {
   ungroupedKey,
 } from './connectionManager.js';
 import {
+  buildSessionAuditSummary,
   buildSessionCloseConfirm,
   buildSessionContextFacts,
   buildSessionNavigationState,
@@ -603,8 +604,12 @@ function App() {
   ), [activeKey, sessions]);
   const activeSession = sessions.find((session) => session.id === activeKey);
   const activeSessionRecording = activeKey ? terminalRefs.current[activeKey]?.recording?.() : null;
+  const activeSessionRecordingActive = !!activeSessionRecording?.startedAt && activeSession?.status !== 'closed';
   const activeSessionContextFacts = buildSessionContextFacts(activeSession, {
-    recordingActive: !!activeSessionRecording?.startedAt && activeSession?.status !== 'closed',
+    recordingActive: activeSessionRecordingActive,
+  });
+  const activeSessionAuditSummary = buildSessionAuditSummary(activeSession, {
+    recordingActive: activeSessionRecordingActive,
   });
   const visibleSessions = useMemo(() => filterSessions(sessions, {
     activeKey,
@@ -1724,6 +1729,7 @@ function App() {
           <div className="session-grid-toolbar">
             <SessionStrip
               activeSession={activeSession}
+              auditSummary={activeSessionAuditSummary}
               contextFacts={activeSessionContextFacts}
               providers={providers}
               summary={currentSessionSummary}
@@ -1760,6 +1766,7 @@ function App() {
         <div className="terminal-session-toolbar">
           <SessionStrip
             activeSession={activeSession}
+            auditSummary={activeSessionAuditSummary}
             contextFacts={activeSessionContextFacts}
             providers={providers}
             summary={currentSessionSummary}
@@ -4452,6 +4459,7 @@ function SessionSidebarLabel({ session }) {
 
 function SessionStrip({
   activeSession,
+  auditSummary,
   contextFacts = [],
   providers = [],
   summary,
@@ -4484,6 +4492,14 @@ function SessionStrip({
           <strong>{`${summary.active}/${summary.total}`}</strong>
         </span>
       </div>
+      {auditSummary && (
+        <Alert
+          showIcon
+          type={auditSummary.tone}
+          message={t(auditSummary.titleKey, auditSummary.values)}
+          description={t(auditSummary.descriptionKey, auditSummary.values)}
+        />
+      )}
     </div>
   );
 }

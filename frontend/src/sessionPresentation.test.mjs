@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  buildSessionAuditSummary,
   buildSessionContextFacts,
   buildSessionCloseConfirm,
   buildSessionNavigationState,
@@ -102,6 +103,54 @@ assert.deepEqual(buildSessionContextFacts({
 ]);
 
 assert.deepEqual(buildSessionContextFacts(null), []);
+
+assert.deepEqual(buildSessionAuditSummary(null), {
+  descriptionKey: 'session.audit.noSession.description',
+  titleKey: 'session.audit.noSession.title',
+  tone: 'info',
+  values: {},
+});
+
+assert.deepEqual(buildSessionAuditSummary({
+  auditEvents: [{ type: 'terminal.open' }, { type: 'terminal.copy' }],
+  status: 'connected',
+}, { recordingActive: true }), {
+  descriptionKey: 'session.audit.recording.description',
+  titleKey: 'session.audit.recording.title',
+  tone: 'success',
+  values: { count: 2 },
+});
+
+assert.deepEqual(buildSessionAuditSummary({
+  auditEvents: [{ type: 'terminal.open' }],
+  status: 'connected',
+}, { recordingActive: false }), {
+  descriptionKey: 'session.audit.pending.description',
+  titleKey: 'session.audit.pending.title',
+  tone: 'warning',
+  values: { count: 1 },
+});
+
+assert.deepEqual(buildSessionAuditSummary({
+  auditEvents: [{ type: 'terminal.open' }],
+  auditRecordSaved: true,
+  status: 'closed',
+}, { recordingActive: false }), {
+  descriptionKey: 'session.audit.saved.description',
+  titleKey: 'session.audit.saved.title',
+  tone: 'success',
+  values: { count: 1 },
+});
+
+assert.deepEqual(buildSessionAuditSummary({
+  auditEvents: [],
+  status: 'closed',
+}, { recordingActive: false }), {
+  descriptionKey: 'session.audit.closedPending.description',
+  titleKey: 'session.audit.closedPending.title',
+  tone: 'warning',
+  values: { count: 0 },
+});
 
 const sessionFilterFixture = [
   { id: '1', label: 'Prod SSH', providerType: 'ssh', status: 'connected', config: { host: 'prod.example.com', username: 'root' } },
