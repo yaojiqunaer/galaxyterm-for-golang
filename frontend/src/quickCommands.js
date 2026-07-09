@@ -1,3 +1,5 @@
+import { isSensitiveCommand } from './commandHistory.js';
+
 export function buildQuickCommandSummary(commands = [], { activeSession = null } = {}) {
   const providerType = activeSession?.providerType || 'all';
   return {
@@ -44,6 +46,29 @@ export function buildQuickCommandFromHistory(item = {}, options = {}) {
     command,
     favorite: options.favorite === true,
     providerType: normalizeCommandProviderType(item.providerType || options.providerType || 'all'),
+  };
+}
+
+export function buildQuickCommandSaveResult(command = {}) {
+  const normalized = normalizeQuickCommand({
+    ...command,
+    command: String(command.command || '').trim(),
+  });
+  if (!normalized.command) {
+    return {
+      command: null,
+      skippedReason: 'empty',
+    };
+  }
+  if (isSensitiveCommand(normalized.command)) {
+    return {
+      command: null,
+      skippedReason: 'sensitive',
+    };
+  }
+  return {
+    command: normalized,
+    skippedReason: '',
   };
 }
 

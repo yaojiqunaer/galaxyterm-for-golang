@@ -150,6 +150,7 @@ import {
 } from './commandHistory.js';
 import {
   buildQuickCommandFromHistory,
+  buildQuickCommandSaveResult,
   buildQuickCommandSummary,
   filterQuickCommands,
   normalizeQuickCommand,
@@ -1565,7 +1566,13 @@ function App() {
       favorite: currentCommand?.favorite === true,
       providerType: values.providerType || 'all',
     };
-    const nextCommands = upsertQuickCommand(quickCommands, nextCommand);
+    const saveResult = buildQuickCommandSaveResult(nextCommand);
+    if (saveResult.skippedReason === 'sensitive') {
+      message.warning(t('message.quickCommandSensitiveSkipped'));
+      return;
+    }
+    if (!saveResult.command) return;
+    const nextCommands = upsertQuickCommand(quickCommands, saveResult.command);
     persistQuickCommands(nextCommands);
     setQuickCommands(nextCommands);
     commandForm.resetFields();
@@ -3893,7 +3900,12 @@ function App() {
             <strong>{quickCommandSummary.target || t('command.noTarget')}</strong>
           </span>
         </div>
-        <Alert type={quickCommandSummary.canRun ? 'info' : 'warning'} showIcon message={t('command.drawerHint')} />
+        <Alert
+          type={quickCommandSummary.canRun ? 'info' : 'warning'}
+          showIcon
+          message={t('command.drawerHint')}
+          description={t('command.sensitiveHint')}
+        />
         <div className="quick-command-panel">
           <Form form={commandForm} layout="vertical" className="quick-command-form">
             <Form.Item name="name" label={t('field.name')} rules={[{ required: true, message: t('validation.required') }]}>

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   buildQuickCommandFromHistory,
+  buildQuickCommandSaveResult,
   buildQuickCommandSummary,
   filterQuickCommands,
   normalizeQuickCommand,
@@ -77,6 +78,39 @@ assert.deepEqual(buildQuickCommandFromHistory({
 });
 
 assert.equal(buildQuickCommandFromHistory({ command: '   ' }), null);
+
+assert.deepEqual(buildQuickCommandSaveResult({
+  id: 'safe',
+  name: 'List pods',
+  command: 'kubectl get pods',
+  providerType: 'k8s',
+}), {
+  command: {
+    id: 'safe',
+    name: 'List pods',
+    command: 'kubectl get pods',
+    favorite: false,
+    providerType: 'k8s',
+  },
+  skippedReason: '',
+});
+assert.deepEqual(buildQuickCommandSaveResult({
+  id: 'secret',
+  name: 'Login',
+  command: 'mysql --password secret',
+  providerType: 'ssh',
+}), {
+  command: null,
+  skippedReason: 'sensitive',
+});
+assert.deepEqual(buildQuickCommandSaveResult({
+  id: 'blank',
+  name: 'Blank',
+  command: '   ',
+}), {
+  command: null,
+  skippedReason: 'empty',
+});
 
 assert.deepEqual(upsertQuickCommand(commands, {
   id: 'logs',
