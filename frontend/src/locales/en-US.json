@@ -64,6 +64,8 @@
   "action.closeAll": "Close All Sessions",
   "action.renameSession": "Rename Session",
   "action.reconnect": "Reconnect",
+  "action.previousSession": "Previous Session",
+  "action.nextSession": "Next Session",
   "action.import": "Import",
   "action.importSshConfig": "Import SSH Config",
   "action.export": "Export",

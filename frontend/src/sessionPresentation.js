@@ -39,6 +39,20 @@ export function buildSessionStatusFacts(summary = {}) {
   ].filter((item) => item.value > 0);
 }
 
+export function buildSessionNavigationState(sessions = [], activeKey = '') {
+  const sessionIds = sessions.map((session) => session.id).filter(Boolean);
+  if (sessionIds.length <= 1) {
+    return { canNavigate: false, nextId: '', previousId: '' };
+  }
+  const currentIndex = sessionIds.indexOf(activeKey);
+  const resolvedIndex = currentIndex >= 0 ? currentIndex : 0;
+  return {
+    canNavigate: true,
+    nextId: sessionIds[(resolvedIndex + 1) % sessionIds.length],
+    previousId: sessionIds[(resolvedIndex - 1 + sessionIds.length) % sessionIds.length],
+  };
+}
+
 export function buildSessionContextFacts(session, options = {}) {
   if (!session) return [];
   const facts = [

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   buildSessionContextFacts,
   buildSessionCloseConfirm,
+  buildSessionNavigationState,
   buildSessionStatusFacts,
   filterSessions,
   profileActionModel,
@@ -52,6 +53,28 @@ assert.deepEqual(buildSessionStatusFacts({
   connecting: 0,
   total: 0,
 }), []);
+
+assert.deepEqual(buildSessionNavigationState([
+  { id: 's1' },
+  { id: 's2' },
+  { id: 's3' },
+], 's2'), {
+  canNavigate: true,
+  nextId: 's3',
+  previousId: 's1',
+});
+
+assert.deepEqual(buildSessionNavigationState([{ id: 'solo' }], 'solo'), {
+  canNavigate: false,
+  nextId: '',
+  previousId: '',
+});
+
+assert.deepEqual(buildSessionNavigationState([], ''), {
+  canNavigate: false,
+  nextId: '',
+  previousId: '',
+});
 
 assert.deepEqual(buildSessionContextFacts({
   label: 'Prod SSH',

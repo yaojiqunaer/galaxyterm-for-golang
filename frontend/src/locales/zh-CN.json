@@ -64,6 +64,8 @@
   "action.closeAll": "关闭全部会话",
   "action.renameSession": "重命名会话",
   "action.reconnect": "重连",
+  "action.previousSession": "上一个会话",
+  "action.nextSession": "下一个会话",
   "action.import": "导入",
   "action.importSshConfig": "导入 SSH Config",
   "action.export": "导出",

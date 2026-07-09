@@ -98,6 +98,7 @@ import {
 import {
   buildSessionCloseConfirm,
   buildSessionContextFacts,
+  buildSessionNavigationState,
   buildSessionStatusFacts,
   filterSessions,
   profileActionModel,
@@ -593,6 +594,9 @@ function App() {
     query: auditQuery,
   }), [auditProviderFilter, auditQuery, auditRecords]);
   const currentSessionSummary = useMemo(() => sessionSummary(sessions), [sessions]);
+  const sessionNavigationState = useMemo(() => (
+    buildSessionNavigationState(sessions, activeKey)
+  ), [activeKey, sessions]);
   const activeSession = sessions.find((session) => session.id === activeKey);
   const activeSessionRecording = activeKey ? terminalRefs.current[activeKey]?.recording?.() : null;
   const activeSessionContextFacts = buildSessionContextFacts(activeSession, {
@@ -1265,6 +1269,15 @@ function App() {
     setSelectedNav('sessions');
   };
 
+  const switchSession = (direction) => {
+    const nextId = direction === 'previous'
+      ? sessionNavigationState.previousId
+      : sessionNavigationState.nextId;
+    if (!nextId) return;
+    setActiveKey(nextId);
+    setSelectedNav('sessions');
+  };
+
   const confirmDeleteProfile = (profile) => {
     if (settings.confirmDangerousActions === false) {
       deleteProfile(profile.id);
@@ -1702,6 +1715,8 @@ function App() {
           />
           <Space size={6} wrap>
             <Button size="small" onClick={() => setSessionView('grid')}>{t('action.grid')}</Button>
+            <Button size="small" onClick={() => switchSession('previous')} disabled={!sessionNavigationState.canNavigate}>{t('action.previousSession')}</Button>
+            <Button size="small" onClick={() => switchSession('next')} disabled={!sessionNavigationState.canNavigate}>{t('action.nextSession')}</Button>
             <Button size="small" icon={<ReloadOutlined />} onClick={() => reconnectSession()} disabled={!activeKey}>{t('action.reconnect')}</Button>
             <Button size="small" icon={<EditOutlined />} onClick={() => openRenameSession()} disabled={!activeKey}>{t('action.renameSession')}</Button>
             <Button size="small" onClick={confirmCloseClosedSessions} disabled={currentSessionSummary.closed === 0}>{t('action.closeClosed')}</Button>
@@ -3268,6 +3283,8 @@ function App() {
     zoomIn: () => zoomTerminalFont(1),
     zoomOut: () => zoomTerminalFont(-1),
     zoomReset: resetTerminalFont,
+    previousSession: () => switchSession('previous'),
+    nextSession: () => switchSession('next'),
     rename: () => openRenameSession(),
     reconnect: () => reconnectSession(),
     closeClosed: confirmCloseClosedSessions,
@@ -3339,6 +3356,17 @@ function App() {
     activeKey && {
       key: 'zoomReset',
       label: t('action.zoomReset'),
+    },
+    activeKey && { type: 'divider' },
+    activeKey && {
+      key: 'previousSession',
+      label: t('action.previousSession'),
+      disabled: !sessionNavigationState.canNavigate,
+    },
+    activeKey && {
+      key: 'nextSession',
+      label: t('action.nextSession'),
+      disabled: !sessionNavigationState.canNavigate,
     },
     activeKey && { type: 'divider' },
     activeKey && {
