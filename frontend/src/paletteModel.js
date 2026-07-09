@@ -53,6 +53,53 @@ export function buildProfilePaletteItems({
   });
 }
 
+export function buildSessionActionPaletteItems({
+  activeSessionId = '',
+  canNavigate = false,
+  groupLabel = 'Session Actions',
+  labels = {},
+  runAction = () => {},
+} = {}) {
+  return [
+    sessionActionItem('previousSession', {
+      disabled: !canNavigate,
+      groupLabel,
+      keywords: 'previous session tab switch',
+      labels,
+      reasonKey: canNavigate ? '' : 'palette.reason.noAdjacentSession',
+      runAction,
+    }),
+    sessionActionItem('nextSession', {
+      disabled: !canNavigate,
+      groupLabel,
+      keywords: 'next session tab switch',
+      labels,
+      reasonKey: canNavigate ? '' : 'palette.reason.noAdjacentSession',
+      runAction,
+    }),
+    sessionActionItem('clearTerminal', {
+      disabled: !activeSessionId,
+      groupLabel,
+      keywords: 'clear terminal screen output',
+      labels,
+      reasonKey: activeSessionId ? '' : 'palette.reason.noActiveSession',
+      runAction,
+    }),
+    sessionActionItem('commandHistory', {
+      groupLabel,
+      keywords: 'history command commands recent',
+      labels,
+      runAction,
+    }),
+    sessionActionItem('quickCommands', {
+      groupLabel,
+      keywords: 'quick commands snippets saved',
+      labels,
+      runAction,
+    }),
+  ];
+}
+
 function scorePaletteItem(item, keywords) {
   const title = item.title?.toLowerCase() || '';
   const description = item.description?.toLowerCase() || '';
@@ -74,6 +121,26 @@ function scorePaletteKeyword(fields, keyword) {
   if (fields.group.includes(keyword)) return 3;
   if (fields.keywords.includes(keyword)) return 4;
   return Number.POSITIVE_INFINITY;
+}
+
+function sessionActionItem(key, {
+  disabled = false,
+  groupLabel,
+  keywords,
+  labels,
+  reasonKey = '',
+  runAction,
+}) {
+  return {
+    disabled,
+    group: groupLabel,
+    id: `session-action:${key}`,
+    keywords,
+    reasonKey,
+    title: labels[key] || key,
+    description: labels[`${key}Description`] || '',
+    run: () => runAction(key),
+  };
 }
 
 export function resolvePaletteIndex(itemCount = 0, currentIndex = 0, action = 'next') {

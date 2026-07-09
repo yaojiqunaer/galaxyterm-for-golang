@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   buildProfilePaletteItems,
   buildPaletteSummary,
+  buildSessionActionPaletteItems,
   filterPaletteItems,
   resolvePaletteIndex,
 } from './paletteModel.js';
@@ -98,6 +99,57 @@ assert.deepEqual(filterPaletteItems([
     keywords: 'production',
   },
 ], 'prod ssh').map((item) => item.title), ['Production SSH', 'Audit Logs']);
+
+const sessionActionItems = buildSessionActionPaletteItems({
+  activeSessionId: 's1',
+  canNavigate: true,
+  groupLabel: 'Session Actions',
+  labels: {
+    clearTerminal: 'Clear Terminal',
+    commandHistory: 'Command History',
+    nextSession: 'Next Session',
+    previousSession: 'Previous Session',
+    quickCommands: 'Quick Commands',
+  },
+  runAction: () => {},
+});
+assert.deepEqual(sessionActionItems.map((item) => ({
+  disabled: item.disabled,
+  id: item.id,
+  title: item.title,
+})), [
+  { disabled: false, id: 'session-action:previousSession', title: 'Previous Session' },
+  { disabled: false, id: 'session-action:nextSession', title: 'Next Session' },
+  { disabled: false, id: 'session-action:clearTerminal', title: 'Clear Terminal' },
+  { disabled: false, id: 'session-action:commandHistory', title: 'Command History' },
+  { disabled: false, id: 'session-action:quickCommands', title: 'Quick Commands' },
+]);
+
+assert.deepEqual(buildSessionActionPaletteItems({
+  activeSessionId: '',
+  canNavigate: false,
+  groupLabel: 'Session Actions',
+  labels: {
+    clearTerminal: 'Clear Terminal',
+    commandHistory: 'Command History',
+    nextSession: 'Next Session',
+    previousSession: 'Previous Session',
+    quickCommands: 'Quick Commands',
+  },
+  runAction: () => {},
+}).map((item) => ({
+  disabled: item.disabled,
+  id: item.id,
+  reasonKey: item.reasonKey,
+})), [
+  { disabled: true, id: 'session-action:previousSession', reasonKey: 'palette.reason.noAdjacentSession' },
+  { disabled: true, id: 'session-action:nextSession', reasonKey: 'palette.reason.noAdjacentSession' },
+  { disabled: true, id: 'session-action:clearTerminal', reasonKey: 'palette.reason.noActiveSession' },
+  { disabled: false, id: 'session-action:commandHistory', reasonKey: '' },
+  { disabled: false, id: 'session-action:quickCommands', reasonKey: '' },
+]);
+
+assert.deepEqual(filterPaletteItems(sessionActionItems, 'history').map((item) => item.id), ['session-action:commandHistory']);
 
 assert.equal(resolvePaletteIndex(0, 0, 'next'), -1);
 assert.equal(resolvePaletteIndex(3, -1, 'next'), 0);

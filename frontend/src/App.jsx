@@ -133,6 +133,7 @@ import { hasWailsMethod } from './desktopBridge.js';
 import {
   buildProfilePaletteItems,
   buildPaletteSummary,
+  buildSessionActionPaletteItems,
   filterPaletteItems,
   resolvePaletteIndex,
 } from './paletteModel.js';
@@ -1276,6 +1277,14 @@ function App() {
     if (!nextId) return;
     setActiveKey(nextId);
     setSelectedNav('sessions');
+  };
+
+  const runSessionPaletteAction = (action) => {
+    if (action === 'previousSession') switchSession('previous');
+    if (action === 'nextSession') switchSession('next');
+    if (action === 'clearTerminal') clearActiveTerminal();
+    if (action === 'commandHistory') setHistoryOpen(true);
+    if (action === 'quickCommands') setCommandsOpen(true);
   };
 
   const confirmDeleteProfile = (profile) => {
@@ -3173,6 +3182,8 @@ function App() {
 
   const isDarkTheme = resolveAppTheme(settings.appTheme) === 'dark';
   const paletteItems = buildPaletteItems({
+    activeSessionId: activeKey,
+    canNavigateSessions: sessionNavigationState.canNavigate,
     profiles,
     quickCommands,
     quickCommandProviderType: activeSession?.providerType || 'all',
@@ -3183,6 +3194,7 @@ function App() {
     openDrawer,
     openProfile,
     runQuickCommand,
+    runSessionAction: runSessionPaletteAction,
     setCommandsOpen,
     setSettingsOpen,
     setHelpOpen,
@@ -4813,6 +4825,20 @@ function buildPaletteItems(actions) {
     },
   }));
 
+  const sessionActionItems = buildSessionActionPaletteItems({
+    activeSessionId: actions.activeSessionId,
+    canNavigate: actions.canNavigateSessions,
+    groupLabel: t('palette.group.sessionActions'),
+    labels: {
+      clearTerminal: t('action.clearTerminal'),
+      commandHistory: t('action.commandHistory'),
+      nextSession: t('action.nextSession'),
+      previousSession: t('action.previousSession'),
+      quickCommands: t('action.commands'),
+    },
+    runAction: actions.runSessionAction,
+  });
+
   const quickCommandItems = filterQuickCommands(actions.quickCommands, '', {
     providerType: actions.quickCommandProviderType || 'all',
   }).map((command) => ({
@@ -4873,7 +4899,7 @@ function buildPaletteItems(actions) {
     },
   ];
 
-  return [...navigation, ...sessionItems, ...providerItems, ...profileItems, ...quickCommandItems, ...workspaceItems];
+  return [...navigation, ...sessionActionItems, ...sessionItems, ...providerItems, ...profileItems, ...quickCommandItems, ...workspaceItems];
 }
 
 function downloadJson(fileName, payload) {
