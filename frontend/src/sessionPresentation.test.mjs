@@ -150,6 +150,20 @@ assert.deepEqual(buildSessionCloseConfirm({
 
 assert.deepEqual(buildSessionCloseConfirm({ mode: 'others', sessions: [] }), null);
 
+assert.deepEqual(buildSessionCloseConfirm({
+  mode: 'closed',
+  sessions: [{ id: 's1', status: 'closed' }, { id: 's2', status: 'closed' }],
+}), {
+  contentKey: 'confirm.closeClosedSessionsContent',
+  contentValues: {
+    count: 2,
+  },
+  okActionKey: 'action.closeClosed',
+  titleKey: 'confirm.closeClosedSessionsTitle',
+});
+
+assert.deepEqual(buildSessionCloseConfirm({ mode: 'closed', sessions: [] }), null);
+
 assert.deepEqual(sessionTabDisplay({
   label: 'Local Terminal',
   providerType: 'local',

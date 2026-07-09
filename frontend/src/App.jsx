@@ -857,6 +857,38 @@ function App() {
     );
   };
 
+  const closeClosedSessions = () => {
+    const closingSessions = sessions.filter((session) => sessionStatusLabel(session) === 'closed');
+    closingSessions.forEach((session) => saveAuditRecord(session.id));
+    const closingSessionIds = new Set(closingSessions.map((session) => session.id));
+    setSessions((current) => current.filter((session) => !closingSessionIds.has(session.id)));
+    if (closingSessionIds.has(activeKey)) {
+      const nextActive = sessions.find((session) => !closingSessionIds.has(session.id));
+      setActiveKey(nextActive?.id || '');
+    }
+    terminalRefs.current = Object.fromEntries(
+      Object.entries(terminalRefs.current).filter(([sessionId]) => !closingSessionIds.has(sessionId)),
+    );
+  };
+
+  const confirmCloseClosedSessions = () => {
+    const closingSessions = sessions.filter((session) => sessionStatusLabel(session) === 'closed');
+    if (settings.confirmDangerousActions === false) {
+      closeClosedSessions();
+      return;
+    }
+    const confirm = buildSessionCloseConfirm({ mode: 'closed', sessions: closingSessions });
+    if (!confirm) return;
+    Modal.confirm({
+      title: t(confirm.titleKey),
+      content: t(confirm.contentKey, confirm.contentValues),
+      okButtonProps: { danger: true },
+      okText: t(confirm.okActionKey),
+      cancelText: t('action.cancel'),
+      onOk: closeClosedSessions,
+    });
+  };
+
   const confirmCloseOtherSessions = () => {
     const closingSessions = sessions.filter((session) => session.id !== activeKey);
     if (settings.confirmDangerousActions === false) {
@@ -1672,6 +1704,7 @@ function App() {
             <Button size="small" onClick={() => setSessionView('grid')}>{t('action.grid')}</Button>
             <Button size="small" icon={<ReloadOutlined />} onClick={() => reconnectSession()} disabled={!activeKey}>{t('action.reconnect')}</Button>
             <Button size="small" icon={<EditOutlined />} onClick={() => openRenameSession()} disabled={!activeKey}>{t('action.renameSession')}</Button>
+            <Button size="small" onClick={confirmCloseClosedSessions} disabled={currentSessionSummary.closed === 0}>{t('action.closeClosed')}</Button>
             <Button size="small" danger onClick={confirmCloseOtherSessions} disabled={!activeKey || sessions.length <= 1}>{t('action.closeOthers')}</Button>
             <Button size="small" danger onClick={() => confirmRemoveSession(activeKey)} disabled={!activeKey}>{t('action.delete')}</Button>
           </Space>
@@ -3237,6 +3270,7 @@ function App() {
     zoomReset: resetTerminalFont,
     rename: () => openRenameSession(),
     reconnect: () => reconnectSession(),
+    closeClosed: confirmCloseClosedSessions,
     closeOthers: confirmCloseOtherSessions,
     closeAll: confirmCloseAllSessions,
   };
@@ -3316,6 +3350,11 @@ function App() {
       key: 'reconnect',
       icon: <ReloadOutlined />,
       label: t('action.reconnect'),
+    },
+    currentSessionSummary.closed > 0 && {
+      key: 'closeClosed',
+      icon: <DeleteOutlined />,
+      label: t('action.closeClosed'),
     },
     activeKey && sessions.length > 1 && {
       key: 'closeOthers',
