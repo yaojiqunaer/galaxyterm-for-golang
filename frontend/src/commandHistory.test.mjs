@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   buildCommandHistoryEntry,
+  buildCommandHistoryEntryResult,
   clearCommandHistory,
   filterCommandHistory,
   isSensitiveCommand,
@@ -15,6 +16,9 @@ const baseContext = {
 };
 
 assert.equal(isSensitiveCommand('mysql -uroot -psecret'), true);
+assert.equal(isSensitiveCommand('mysql --password secret'), true);
+assert.equal(isSensitiveCommand('curl -H "Authorization: Bearer abc123" https://example.com'), true);
+assert.equal(isSensitiveCommand('deploy --token=abc123'), true);
 assert.equal(isSensitiveCommand('export TOKEN=abc123'), true);
 assert.equal(isSensitiveCommand('cat ~/.ssh/id_rsa'), true);
 assert.equal(isSensitiveCommand('kubectl get pods -n prod'), false);
@@ -27,6 +31,23 @@ assert.deepEqual(buildCommandHistoryEntry('  kubectl get pods  ', baseContext), 
 });
 assert.equal(buildCommandHistoryEntry('   ', baseContext), null);
 assert.equal(buildCommandHistoryEntry('export TOKEN=abc123', baseContext), null);
+assert.deepEqual(buildCommandHistoryEntryResult('kubectl get pods', baseContext), {
+  entry: {
+    command: 'kubectl get pods',
+    providerType: 'ssh',
+    sessionId: 'session-1',
+    sessionLabel: 'Prod Shell',
+  },
+  skippedReason: '',
+});
+assert.deepEqual(buildCommandHistoryEntryResult('export TOKEN=abc123', baseContext), {
+  entry: null,
+  skippedReason: 'sensitive',
+});
+assert.deepEqual(buildCommandHistoryEntryResult('   ', baseContext), {
+  entry: null,
+  skippedReason: 'empty',
+});
 
 const history = upsertCommandHistory([
   { command: 'pwd', providerType: 'local', sessionId: 'local-1', sessionLabel: 'Local', updatedAt: '2026-07-01T00:00:00.000Z' },

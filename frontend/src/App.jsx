@@ -142,7 +142,7 @@ import {
   resolvePaletteIndex,
 } from './paletteModel.js';
 import {
-  buildCommandHistoryEntry,
+  buildCommandHistoryEntryResult,
   clearCommandHistory,
   filterCommandHistory,
   normalizeCommandHistoryItem,
@@ -1463,11 +1463,15 @@ function App() {
   };
 
   const recordCommandHistory = (command, session = activeSession) => {
-    const entry = buildCommandHistoryEntry(command, {
+    const result = buildCommandHistoryEntryResult(command, {
       providerType: session?.providerType,
       sessionId: session?.id || activeKey,
       sessionLabel: session?.label || '',
     });
+    const { entry, skippedReason } = result;
+    if (skippedReason === 'sensitive') {
+      message.warning(t('message.commandHistorySensitiveSkipped'));
+    }
     if (!entry) return;
     setCommandHistory((current) => {
       const nextHistory = upsertCommandHistory(current, entry);

@@ -474,6 +474,7 @@
   "message.commandUpdated": "快捷命令已更新",
   "message.commandDeleted": "快捷命令已删除",
   "message.commandHistoryCleared": "命令历史已清理",
+  "message.commandHistorySensitiveSkipped": "命令已执行；为保护敏感信息，未保存到历史记录。",
   "message.sessionRenamed": "会话已重命名",
   "message.recentCleared": "最近连接已清空",
   "message.providerUnavailable": "该连接所属终端类型已停用，请先到扩展页启用对应插件。",

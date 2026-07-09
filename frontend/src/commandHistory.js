@@ -1,6 +1,8 @@
 const sensitivePatterns = [
   /\b(pass(word)?|pwd)\s*=\s*\S+/i,
   /\b(token|secret|api[_-]?key)\s*=\s*\S+/i,
+  /\bauthorization\s*:\s*bearer\s+\S+/i,
+  /--?(pass(word)?|token|secret|api[_-]?key)(=|\s+)\S+/i,
   /(^|\s)-p\S+/i,
   /private\s+key/i,
   /id_rsa|id_ed25519/i,
@@ -13,13 +15,31 @@ export function isSensitiveCommand(command = '') {
 }
 
 export function buildCommandHistoryEntry(command = '', context = {}) {
+  return buildCommandHistoryEntryResult(command, context).entry;
+}
+
+export function buildCommandHistoryEntryResult(command = '', context = {}) {
   const normalizedCommand = String(command || '').trim();
-  if (!normalizedCommand || isSensitiveCommand(normalizedCommand)) return null;
+  if (!normalizedCommand) {
+    return {
+      entry: null,
+      skippedReason: 'empty',
+    };
+  }
+  if (isSensitiveCommand(normalizedCommand)) {
+    return {
+      entry: null,
+      skippedReason: 'sensitive',
+    };
+  }
   return {
-    command: normalizedCommand,
-    providerType: context.providerType || 'terminal',
-    sessionId: context.sessionId || '',
-    sessionLabel: context.sessionLabel || '',
+    entry: {
+      command: normalizedCommand,
+      providerType: context.providerType || 'terminal',
+      sessionId: context.sessionId || '',
+      sessionLabel: context.sessionLabel || '',
+    },
+    skippedReason: '',
   };
 }
 

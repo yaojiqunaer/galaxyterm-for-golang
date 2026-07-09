@@ -474,6 +474,7 @@
   "message.commandUpdated": "Quick command updated",
   "message.commandDeleted": "Quick command deleted",
   "message.commandHistoryCleared": "Command history cleared",
+  "message.commandHistorySensitiveSkipped": "Command executed. It was not saved to history to protect sensitive information.",
   "message.sessionRenamed": "Session renamed",
   "message.recentCleared": "Recent connections cleared",
   "message.providerUnavailable": "This connection's terminal type is disabled. Enable the matching extension first.",
