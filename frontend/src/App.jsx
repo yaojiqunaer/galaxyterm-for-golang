@@ -126,6 +126,7 @@ import {
   buildTunnelSummary,
 } from './remoteWorkspace.js';
 import TerminalPane from './components/TerminalPane.jsx';
+import { buildTerminalStatusFacts } from './terminalStatus.js';
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
 import { hasWailsMethod } from './desktopBridge.js';
 import {
@@ -258,6 +259,7 @@ function App() {
   const [renamingSessionId, setRenamingSessionId] = useState('');
   const [renamingSessionName, setRenamingSessionName] = useState('');
   const [terminalSearch, setTerminalSearch] = useState('');
+  const [terminalStatuses, setTerminalStatuses] = useState({});
   const [focusMode, setFocusMode] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteQuery, setPaletteQuery] = useState('');
@@ -1356,6 +1358,35 @@ function App() {
     message.success(t('message.commandDeleted'));
   };
 
+  const updateTerminalStatus = (sessionId, status) => {
+    setTerminalStatuses((current) => ({
+      ...current,
+      [sessionId]: status,
+    }));
+  };
+
+  const renderTerminalPane = (session) => (
+    <TerminalFrame status={terminalStatuses[session.id]}>
+      <TerminalPane
+        key={`${session.id}-${session.revision || 0}`}
+        ref={(el) => {
+          terminalRefs.current[session.id] = el;
+        }}
+        request={session.request}
+        settings={settings}
+        onAuditEvent={(event) => appendAuditEvent(session.id, event.type, event.detail)}
+        onCommandSubmitted={(command) => recordCommandHistory(command, session)}
+        onSessionCreated={(backendSessionId) => {
+          setSessions((current) => current.map((item) => (
+            item.id === session.id ? { ...item, backendSessionId, status: 'connected' } : item
+          )));
+        }}
+        onSessionClosed={(backendSessionId) => updateSessionStatus(backendSessionId, 'closed')}
+        onStatusChange={(status) => updateTerminalStatus(session.id, status)}
+      />
+    </TerminalFrame>
+  );
+
   const items = sessions.map((session) => ({
     key: session.id,
     label: (
@@ -1363,22 +1394,7 @@ function App() {
     ),
     children: (
       <div className="terminal-workspace">
-        <TerminalPane
-          key={`${session.id}-${session.revision || 0}`}
-          ref={(el) => {
-            terminalRefs.current[session.id] = el;
-          }}
-          request={session.request}
-          settings={settings}
-          onAuditEvent={(event) => appendAuditEvent(session.id, event.type, event.detail)}
-          onCommandSubmitted={(command) => recordCommandHistory(command, session)}
-          onSessionCreated={(backendSessionId) => {
-            setSessions((current) => current.map((item) => (
-              item.id === session.id ? { ...item, backendSessionId, status: 'connected' } : item
-            )));
-          }}
-          onSessionClosed={(backendSessionId) => updateSessionStatus(backendSessionId, 'closed')}
-        />
+        {renderTerminalPane(session)}
       </div>
     ),
     closable: true,
@@ -1469,22 +1485,7 @@ function App() {
                     <Button size="small" danger onClick={() => confirmRemoveSession(session.id)}>{t('action.delete')}</Button>
                   </Space>
                 </div>
-                <TerminalPane
-                  key={`${session.id}-${session.revision || 0}`}
-                  ref={(el) => {
-                    terminalRefs.current[session.id] = el;
-                  }}
-                  request={session.request}
-                  settings={settings}
-                  onAuditEvent={(event) => appendAuditEvent(session.id, event.type, event.detail)}
-                  onCommandSubmitted={(command) => recordCommandHistory(command, session)}
-                  onSessionCreated={(backendSessionId) => {
-                    setSessions((current) => current.map((item) => (
-                      item.id === session.id ? { ...item, backendSessionId, status: 'connected' } : item
-                    )));
-                  }}
-                  onSessionClosed={(backendSessionId) => updateSessionStatus(backendSessionId, 'closed')}
-                />
+                {renderTerminalPane(session)}
               </div>
             ))}
           </div>
@@ -4111,6 +4112,23 @@ function SessionStrip({
   );
 }
 
+function TerminalFrame({ children, status }) {
+  const facts = buildTerminalStatusFacts(status || {});
+  return (
+    <div className="terminal-frame">
+      <div className="terminal-frame-body">{children}</div>
+      <div className="terminal-status-bar">
+        {facts.map((fact) => (
+          <span key={fact.key} className={`terminal-status-fact tone-${fact.tone}`}>
+            <small>{terminalStatusFactLabel(fact)}</small>
+            <strong>{terminalStatusFactValue(fact)}</strong>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function MetricCard({
   accent = 'default',
   label,
@@ -4649,6 +4667,20 @@ function sessionContextFactLabel(fact) {
 
 function sessionContextFactValue(fact) {
   if (fact.key === 'recording') return t(`recording.state.${fact.value}`);
+  return fact.value || '-';
+}
+
+function terminalStatusFactLabel(fact) {
+  if (fact.key === 'status') return t('terminal.fact.status');
+  if (fact.key === 'lastCommand') return t('terminal.fact.lastCommand');
+  if (fact.key === 'duration') return t('label.duration');
+  if (fact.key === 'size') return t('terminal.fact.size');
+  if (fact.key === 'error') return t('terminal.fact.error');
+  return fact.key;
+}
+
+function terminalStatusFactValue(fact) {
+  if (fact.key === 'status') return t(`terminal.runStatus.${fact.value}`);
   return fact.value || '-';
 }
 

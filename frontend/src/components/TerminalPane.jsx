@@ -15,6 +15,7 @@ function TerminalPane({
   onCommandSubmitted,
   onSessionCreated,
   onSessionClosed,
+  onStatusChange,
 }, ref) {
   const containerRef = useRef(null);
   const term = useRef(null);
@@ -25,6 +26,16 @@ function TerminalPane({
   const transcript = useRef([]);
   const outputEvents = useRef([]);
   const inputLine = useRef('');
+  const lastCommand = useRef('');
+  const lastCommandStartedAt = useRef(null);
+  const terminalStatus = useRef({
+    cols: 80,
+    durationMs: 0,
+    lastCommand: '',
+    rows: 24,
+    status: 'connecting',
+    updatedAt: new Date().toISOString(),
+  });
 
   useImperativeHandle(ref, () => ({
     fit: () => {
@@ -111,6 +122,7 @@ function TerminalPane({
       term.current.loadAddon(fitAddon.current);
       term.current.loadAddon(searchAddon.current);
       term.current.open(containerRef.current);
+      emitTerminalStatus(onStatusChange, terminalStatus, { status: 'connecting' });
       const connectingText = `${t('terminal.status.connecting')}\r\n`;
       transcript.current.push(connectingText);
       outputEvents.current.push({ time: 0, data: connectingText });
@@ -123,6 +135,11 @@ function TerminalPane({
       }
 
       sessionId.current = createdSessionId;
+      emitTerminalStatus(onStatusChange, terminalStatus, {
+        cols: term.current?.cols || 80,
+        rows: term.current?.rows || 24,
+        status: 'connected',
+      });
       onSessionCreated?.(createdSessionId);
       onAuditEvent?.({
         detail: request.displayName || request.providerType,
@@ -133,18 +150,33 @@ function TerminalPane({
         const data = event?.Data || event?.data || '';
         if (data) transcript.current.push(data);
         if (data) outputEvents.current.push({ time: elapsedSeconds(startedAt.current), data });
+        if (data && shouldMarkOutputIdle(terminalStatus.current, lastCommand.current)) {
+          emitTerminalStatus(onStatusChange, terminalStatus, {
+            durationMs: commandDurationMs(lastCommandStartedAt.current),
+            status: lastCommand.current ? 'idle' : 'connected',
+          });
+        }
         term.current?.write(data);
       });
       cleanupError = runtime.EventsOn(`terminal:error:${createdSessionId}`, (event) => {
         const message = event?.Error?.defaultMessage || event?.error?.defaultMessage || t('terminal.error.disconnected');
         transcript.current.push(`\r\n${message}`);
         outputEvents.current.push({ time: elapsedSeconds(startedAt.current), data: `\r\n${message}` });
+        emitTerminalStatus(onStatusChange, terminalStatus, {
+          durationMs: commandDurationMs(lastCommandStartedAt.current),
+          error: message,
+          status: 'error',
+        });
         onAuditEvent?.({ detail: message, type: 'session.error' });
         term.current?.writeln(`\r\n${message}`);
       });
       cleanupExit = runtime.EventsOn(`terminal:exit:${createdSessionId}`, () => {
         transcript.current.push(`\r\n${t('terminal.status.closed')}`);
         outputEvents.current.push({ time: elapsedSeconds(startedAt.current), data: `\r\n${t('terminal.status.closed')}` });
+        emitTerminalStatus(onStatusChange, terminalStatus, {
+          durationMs: commandDurationMs(lastCommandStartedAt.current),
+          status: 'closed',
+        });
         onAuditEvent?.({ type: 'session.closed' });
         term.current?.writeln(`\r\n${t('terminal.status.closed')}`);
         onSessionClosed?.(createdSessionId);
@@ -152,6 +184,10 @@ function TerminalPane({
 
       term.current.onResize((size) => {
         onAuditEvent?.({ detail: `${size.cols}x${size.rows}`, type: 'terminal.resize' });
+        emitTerminalStatus(onStatusChange, terminalStatus, {
+          cols: size.cols,
+          rows: size.rows,
+        });
         SessionAPI.Resize(createdSessionId, size.cols, size.rows);
       });
       term.current.onData((data) => {
@@ -164,7 +200,17 @@ function TerminalPane({
         } else if (data.includes('\r') || data.includes('\n')) {
           onAuditEvent?.({ type: 'input.enter' });
         }
-        trackSubmittedCommands(data, inputLine, onCommandSubmitted);
+        trackSubmittedCommands(data, inputLine, (command) => {
+          lastCommand.current = command;
+          lastCommandStartedAt.current = new Date();
+          emitTerminalStatus(onStatusChange, terminalStatus, {
+            durationMs: 0,
+            error: '',
+            lastCommand: command,
+            status: 'busy',
+          });
+          onCommandSubmitted?.(command);
+        });
         SessionAPI.Send(createdSessionId, data);
       });
 
@@ -192,11 +238,19 @@ function TerminalPane({
         cleanupWindow = cleanup;
       })
       .catch((error) => {
+        emitTerminalStatus(onStatusChange, terminalStatus, {
+          error: String(error),
+          status: 'error',
+        });
         term.current?.writeln(`\r\n${t('terminal.error.createFailed')}: ${error}`);
       });
 
     return () => {
       disposed = true;
+      emitTerminalStatus(onStatusChange, terminalStatus, {
+        durationMs: commandDurationMs(lastCommandStartedAt.current),
+        status: 'closed',
+      });
       cleanupData?.();
       cleanupError?.();
       cleanupExit?.();
@@ -267,6 +321,25 @@ function isRiskyPaste(data) {
 
 function elapsedSeconds(startedAt) {
   return Math.max(0, Number(((Date.now() - startedAt.getTime()) / 1000).toFixed(6)));
+}
+
+function commandDurationMs(startedAt) {
+  if (!startedAt) return 0;
+  return Math.max(0, Date.now() - startedAt.getTime());
+}
+
+function emitTerminalStatus(onStatusChange, statusRef, patch = {}) {
+  statusRef.current = {
+    ...statusRef.current,
+    ...patch,
+    updatedAt: new Date().toISOString(),
+  };
+  onStatusChange?.(statusRef.current);
+}
+
+function shouldMarkOutputIdle(status, lastCommand) {
+  const nextStatus = lastCommand ? 'idle' : 'connected';
+  return status.status !== nextStatus;
 }
 
 function trackSubmittedCommands(data, inputLineRef, onCommandSubmitted) {
