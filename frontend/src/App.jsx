@@ -287,6 +287,7 @@ function App() {
   const [quickCommands, setQuickCommands] = useState(() => loadQuickCommands());
   const [commandHistory, setCommandHistory] = useState(() => loadCommandHistory());
   const [commandQuery, setCommandQuery] = useState('');
+  const [commandScope, setCommandScope] = useState('current');
   const [editingQuickCommandId, setEditingQuickCommandId] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyQuery, setHistoryQuery] = useState('');
@@ -606,8 +607,9 @@ function App() {
     status: 'active',
   }), [activeKey, sessions]);
   const visibleQuickCommands = useMemo(() => filterQuickCommands(quickCommands, commandQuery, {
-    providerType: activeSession?.providerType || 'all',
-  }), [activeSession?.providerType, commandQuery, quickCommands]);
+    favoriteOnly: commandScope === 'favorites',
+    providerType: commandScope === 'current' ? activeSession?.providerType || 'all' : 'all',
+  }), [activeSession?.providerType, commandQuery, commandScope, quickCommands]);
   const visibleCommandHistory = useMemo(() => filterCommandHistory(commandHistory, {
     providerType: historyScope === 'all' ? 'all' : activeSession?.providerType || 'all',
     query: historyQuery,
@@ -3721,6 +3723,17 @@ function App() {
           value={commandQuery}
           onChange={(event) => setCommandQuery(event.target.value)}
           placeholder={t('placeholder.searchCommands')}
+        />
+        <Segmented
+          block
+          className="quick-command-scope"
+          value={commandScope}
+          onChange={setCommandScope}
+          options={[
+            { value: 'current', label: t('command.scope.current') },
+            { value: 'all', label: t('command.scope.all') },
+            { value: 'favorites', label: t('command.scope.favorites') },
+          ]}
         />
         <List
           className="quick-command-list"

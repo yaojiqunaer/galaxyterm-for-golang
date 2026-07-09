@@ -13,8 +13,10 @@ export function buildQuickCommandSummary(commands = [], { activeSession = null }
 export function filterQuickCommands(commands = [], query = '', options = {}) {
   const keywords = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   const providerType = normalizeCommandProviderType(options.providerType || 'all');
+  const favoriteOnly = options.favoriteOnly === true;
   return commands
     .filter((item) => {
+      if (favoriteOnly && item.favorite !== true) return false;
       if (!matchesProviderType(item, providerType)) return false;
       if (keywords.length === 0) return true;
       const haystack = `${item.name || ''} ${item.command || ''} ${item.providerType || 'all'}`.toLowerCase();

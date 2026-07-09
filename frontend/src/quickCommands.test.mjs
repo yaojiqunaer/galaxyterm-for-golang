@@ -38,6 +38,8 @@ assert.deepEqual(filterQuickCommands(commands, 'dock', { providerType: 'all' }).
 assert.deepEqual(filterQuickCommands(commands, 'nginx logs', { providerType: 'ssh' }).map((item) => item.id), ['logs']);
 assert.deepEqual(filterQuickCommands(commands, 'ssh', { providerType: 'ssh' }).map((item) => item.id), ['logs']);
 assert.deepEqual(filterQuickCommands(commands, 'missing'), []);
+assert.deepEqual(filterQuickCommands(commands, '', { providerType: 'all', favoriteOnly: true }).map((item) => item.id), ['docker']);
+assert.deepEqual(filterQuickCommands(commands, 'docker', { providerType: 'ssh', favoriteOnly: true }).map((item) => item.id), []);
 
 assert.deepEqual(normalizeQuickCommand({
   id: 'top',
