@@ -91,6 +91,18 @@ export function buildSessionCloseConfirm(target) {
       titleKey: 'confirm.closeAllSessionsTitle',
     };
   }
+  if (target?.mode === 'others') {
+    const sessions = target.sessions || [];
+    if (sessions.length === 0) return null;
+    return {
+      contentKey: 'confirm.closeOtherSessionsContent',
+      contentValues: {
+        count: sessions.length,
+      },
+      okActionKey: 'action.closeOthers',
+      titleKey: 'confirm.closeOtherSessionsTitle',
+    };
+  }
   if (!target) return null;
   return {
     contentKey: 'confirm.closeSessionContent',

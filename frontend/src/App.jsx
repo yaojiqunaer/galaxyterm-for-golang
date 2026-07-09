@@ -847,6 +847,34 @@ function App() {
     terminalRefs.current = {};
   };
 
+  const closeOtherSessions = () => {
+    if (!activeKey) return;
+    const closingSessions = sessions.filter((session) => session.id !== activeKey);
+    closingSessions.forEach((session) => saveAuditRecord(session.id));
+    setSessions((current) => current.filter((session) => session.id === activeKey));
+    terminalRefs.current = Object.fromEntries(
+      Object.entries(terminalRefs.current).filter(([sessionId]) => sessionId === activeKey),
+    );
+  };
+
+  const confirmCloseOtherSessions = () => {
+    const closingSessions = sessions.filter((session) => session.id !== activeKey);
+    if (settings.confirmDangerousActions === false) {
+      closeOtherSessions();
+      return;
+    }
+    const confirm = buildSessionCloseConfirm({ mode: 'others', sessions: closingSessions });
+    if (!confirm) return;
+    Modal.confirm({
+      title: t(confirm.titleKey),
+      content: t(confirm.contentKey, confirm.contentValues),
+      okButtonProps: { danger: true },
+      okText: t(confirm.okActionKey),
+      cancelText: t('action.cancel'),
+      onOk: closeOtherSessions,
+    });
+  };
+
   const confirmCloseAllSessions = () => {
     if (settings.confirmDangerousActions === false) {
       closeAllSessions();
@@ -1644,6 +1672,7 @@ function App() {
             <Button size="small" onClick={() => setSessionView('grid')}>{t('action.grid')}</Button>
             <Button size="small" icon={<ReloadOutlined />} onClick={() => reconnectSession()} disabled={!activeKey}>{t('action.reconnect')}</Button>
             <Button size="small" icon={<EditOutlined />} onClick={() => openRenameSession()} disabled={!activeKey}>{t('action.renameSession')}</Button>
+            <Button size="small" danger onClick={confirmCloseOtherSessions} disabled={!activeKey || sessions.length <= 1}>{t('action.closeOthers')}</Button>
             <Button size="small" danger onClick={() => confirmRemoveSession(activeKey)} disabled={!activeKey}>{t('action.delete')}</Button>
           </Space>
         </div>
@@ -3208,6 +3237,7 @@ function App() {
     zoomReset: resetTerminalFont,
     rename: () => openRenameSession(),
     reconnect: () => reconnectSession(),
+    closeOthers: confirmCloseOtherSessions,
     closeAll: confirmCloseAllSessions,
   };
   const sessionMenuItems = [
@@ -3286,6 +3316,12 @@ function App() {
       key: 'reconnect',
       icon: <ReloadOutlined />,
       label: t('action.reconnect'),
+    },
+    activeKey && sessions.length > 1 && {
+      key: 'closeOthers',
+      icon: <DeleteOutlined />,
+      label: t('action.closeOthers'),
+      danger: true,
     },
     {
       key: 'closeAll',

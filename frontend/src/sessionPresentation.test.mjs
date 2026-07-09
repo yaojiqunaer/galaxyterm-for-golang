@@ -136,6 +136,20 @@ assert.deepEqual(buildSessionCloseConfirm([{ id: 's1' }, { id: 's2' }]), {
   titleKey: 'confirm.closeAllSessionsTitle',
 });
 
+assert.deepEqual(buildSessionCloseConfirm({
+  mode: 'others',
+  sessions: [{ id: 's1' }, { id: 's2' }],
+}), {
+  contentKey: 'confirm.closeOtherSessionsContent',
+  contentValues: {
+    count: 2,
+  },
+  okActionKey: 'action.closeOthers',
+  titleKey: 'confirm.closeOtherSessionsTitle',
+});
+
+assert.deepEqual(buildSessionCloseConfirm({ mode: 'others', sessions: [] }), null);
+
 assert.deepEqual(sessionTabDisplay({
   label: 'Local Terminal',
   providerType: 'local',
