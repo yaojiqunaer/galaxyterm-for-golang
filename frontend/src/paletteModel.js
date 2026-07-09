@@ -56,9 +56,11 @@ export function buildProfilePaletteItems({
 export function buildSessionActionPaletteItems({
   activeSessionId = '',
   canNavigate = false,
+  closedSessionCount = 0,
   groupLabel = 'Session Actions',
   labels = {},
   runAction = () => {},
+  sessionCount = 0,
 } = {}) {
   return [
     sessionActionItem('previousSession', {
@@ -120,6 +122,30 @@ export function buildSessionActionPaletteItems({
       labels,
       runAction,
     })),
+    sessionActionItem('closeClosed', {
+      disabled: closedSessionCount <= 0,
+      groupLabel,
+      keywords: 'close closed sessions cleanup clear tabs',
+      labels,
+      reasonKey: closedSessionCount > 0 ? '' : 'palette.reason.noClosedSession',
+      runAction,
+    }),
+    sessionActionItem('closeOthers', {
+      disabled: !activeSessionId || sessionCount <= 1,
+      groupLabel,
+      keywords: 'close other sessions tabs cleanup',
+      labels,
+      reasonKey: !activeSessionId ? 'palette.reason.noActiveSession' : 'palette.reason.noOtherSession',
+      runAction,
+    }),
+    sessionActionItem('closeAll', {
+      disabled: sessionCount <= 0,
+      groupLabel,
+      keywords: 'close all sessions tabs cleanup',
+      labels,
+      reasonKey: sessionCount > 0 ? '' : 'palette.reason.noSession',
+      runAction,
+    }),
     sessionActionItem('commandHistory', {
       groupLabel,
       keywords: 'history command commands recent',

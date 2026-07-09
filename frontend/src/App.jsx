@@ -1292,6 +1292,9 @@ function App() {
       if (record) message.success(t('message.auditRecordSaved'));
       if (!record) message.info(t('message.terminalOutputEmpty'));
     }
+    if (action === 'closeClosed') confirmCloseClosedSessions();
+    if (action === 'closeOthers') confirmCloseOtherSessions();
+    if (action === 'closeAll') confirmCloseAllSessions();
     if (action === 'commandHistory') setHistoryOpen(true);
     if (action === 'quickCommands') setCommandsOpen(true);
   };
@@ -3193,11 +3196,13 @@ function App() {
   const paletteItems = buildPaletteItems({
     activeSessionId: activeKey,
     canNavigateSessions: sessionNavigationState.canNavigate,
+    closedSessionCount: currentSessionSummary.closed,
     profiles,
     quickCommands,
     quickCommandProviderType: activeSession?.providerType || 'all',
     providers,
     sessions,
+    sessionCount: sessions.length,
     setSelectedNav,
     setActiveKey,
     openDrawer,
@@ -4837,9 +4842,13 @@ function buildPaletteItems(actions) {
   const sessionActionItems = buildSessionActionPaletteItems({
     activeSessionId: actions.activeSessionId,
     canNavigate: actions.canNavigateSessions,
+    closedSessionCount: actions.closedSessionCount,
     groupLabel: t('palette.group.sessionActions'),
     labels: {
       clearTerminal: t('action.clearTerminal'),
+      closeAll: t('action.closeAll'),
+      closeClosed: t('action.closeClosed'),
+      closeOthers: t('action.closeOthers'),
       commandHistory: t('action.commandHistory'),
       copyTranscript: t('action.copyTranscript'),
       exportTranscript: t('action.exportTranscript'),
@@ -4851,6 +4860,7 @@ function buildPaletteItems(actions) {
       saveAudit: t('action.saveAuditRecord'),
     },
     runAction: actions.runSessionAction,
+    sessionCount: actions.sessionCount,
   });
 
   const quickCommandItems = filterQuickCommands(actions.quickCommands, '', {

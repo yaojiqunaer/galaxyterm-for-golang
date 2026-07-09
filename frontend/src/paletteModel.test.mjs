@@ -106,6 +106,9 @@ const sessionActionItems = buildSessionActionPaletteItems({
   groupLabel: 'Session Actions',
   labels: {
     clearTerminal: 'Clear Terminal',
+    closeAll: 'Close All Sessions',
+    closeClosed: 'Close Closed Sessions',
+    closeOthers: 'Close Other Sessions',
     commandHistory: 'Command History',
     copyTranscript: 'Copy Terminal Output',
     exportTranscript: 'Export Terminal Output',
@@ -117,6 +120,8 @@ const sessionActionItems = buildSessionActionPaletteItems({
     saveAudit: 'Save Audit Record',
   },
   runAction: () => {},
+  sessionCount: 3,
+  closedSessionCount: 1,
 });
 assert.deepEqual(sessionActionItems.map((item) => ({
   disabled: item.disabled,
@@ -131,6 +136,9 @@ assert.deepEqual(sessionActionItems.map((item) => ({
   { disabled: false, id: 'session-action:copyTranscript', title: 'Copy Terminal Output' },
   { disabled: false, id: 'session-action:exportTranscript', title: 'Export Terminal Output' },
   { disabled: false, id: 'session-action:saveAudit', title: 'Save Audit Record' },
+  { disabled: false, id: 'session-action:closeClosed', title: 'Close Closed Sessions' },
+  { disabled: false, id: 'session-action:closeOthers', title: 'Close Other Sessions' },
+  { disabled: false, id: 'session-action:closeAll', title: 'Close All Sessions' },
   { disabled: false, id: 'session-action:commandHistory', title: 'Command History' },
   { disabled: false, id: 'session-action:quickCommands', title: 'Quick Commands' },
 ]);
@@ -141,6 +149,9 @@ assert.deepEqual(buildSessionActionPaletteItems({
   groupLabel: 'Session Actions',
   labels: {
     clearTerminal: 'Clear Terminal',
+    closeAll: 'Close All Sessions',
+    closeClosed: 'Close Closed Sessions',
+    closeOthers: 'Close Other Sessions',
     commandHistory: 'Command History',
     copyTranscript: 'Copy Terminal Output',
     exportTranscript: 'Export Terminal Output',
@@ -152,6 +163,8 @@ assert.deepEqual(buildSessionActionPaletteItems({
     saveAudit: 'Save Audit Record',
   },
   runAction: () => {},
+  sessionCount: 0,
+  closedSessionCount: 0,
 }).map((item) => ({
   disabled: item.disabled,
   id: item.id,
@@ -165,12 +178,16 @@ assert.deepEqual(buildSessionActionPaletteItems({
   { disabled: true, id: 'session-action:copyTranscript', reasonKey: 'palette.reason.noActiveSession' },
   { disabled: true, id: 'session-action:exportTranscript', reasonKey: 'palette.reason.noActiveSession' },
   { disabled: true, id: 'session-action:saveAudit', reasonKey: 'palette.reason.noActiveSession' },
+  { disabled: true, id: 'session-action:closeClosed', reasonKey: 'palette.reason.noClosedSession' },
+  { disabled: true, id: 'session-action:closeOthers', reasonKey: 'palette.reason.noActiveSession' },
+  { disabled: true, id: 'session-action:closeAll', reasonKey: 'palette.reason.noSession' },
   { disabled: false, id: 'session-action:commandHistory', reasonKey: '' },
   { disabled: false, id: 'session-action:quickCommands', reasonKey: '' },
 ]);
 
 assert.deepEqual(filterPaletteItems(sessionActionItems, 'history').map((item) => item.id), ['session-action:commandHistory']);
 assert.deepEqual(filterPaletteItems(sessionActionItems, 'audit').map((item) => item.id), ['session-action:saveAudit']);
+assert.deepEqual(filterPaletteItems(sessionActionItems, 'close closed').map((item) => item.id), ['session-action:closeClosed']);
 
 assert.equal(resolvePaletteIndex(0, 0, 'next'), -1);
 assert.equal(resolvePaletteIndex(3, -1, 'next'), 0);
