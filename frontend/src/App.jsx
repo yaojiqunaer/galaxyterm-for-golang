@@ -1292,6 +1292,7 @@ function App() {
       if (record) message.success(t('message.auditRecordSaved'));
       if (!record) message.info(t('message.terminalOutputEmpty'));
     }
+    if (action === 'closeSession') confirmRemoveSession(activeKey);
     if (action === 'closeClosed') confirmCloseClosedSessions();
     if (action === 'closeOthers') confirmCloseOtherSessions();
     if (action === 'closeAll') confirmCloseAllSessions();
@@ -4848,6 +4849,7 @@ function buildPaletteItems(actions) {
       clearTerminal: t('action.clearTerminal'),
       closeAll: t('action.closeAll'),
       closeClosed: t('action.closeClosed'),
+      closeSession: t('action.closeSession'),
       closeOthers: t('action.closeOthers'),
       commandHistory: t('action.commandHistory'),
       copyTranscript: t('action.copyTranscript'),

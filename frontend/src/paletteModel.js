@@ -122,6 +122,13 @@ export function buildSessionActionPaletteItems({
       labels,
       runAction,
     })),
+    sessionActionItem('closeSession', activeSessionActionOptions({
+      activeSessionId,
+      groupLabel,
+      keywords: 'close current session tab',
+      labels,
+      runAction,
+    })),
     sessionActionItem('closeClosed', {
       disabled: closedSessionCount <= 0,
       groupLabel,
