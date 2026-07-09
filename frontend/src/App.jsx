@@ -131,6 +131,7 @@ import { buildTerminalRecoveryActions, buildTerminalStatusFacts } from './termin
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
 import { hasWailsMethod } from './desktopBridge.js';
 import {
+  buildConnectionActionPaletteItems,
   buildProfilePaletteItems,
   buildPaletteSummary,
   buildSessionActionPaletteItems,
@@ -1298,6 +1299,17 @@ function App() {
     if (action === 'closeAll') confirmCloseAllSessions();
     if (action === 'commandHistory') setHistoryOpen(true);
     if (action === 'quickCommands') setCommandsOpen(true);
+  };
+
+  const runConnectionPaletteAction = (action) => {
+    if (action === 'newLocalTerminal') openDrawer('local');
+    if (action === 'quickSsh') openDrawer('ssh');
+    if (action === 'newConnection') openDrawer();
+    if (action === 'importSshConfig') setSshConfigOpen(true);
+    if (action === 'importProfiles') profileImportRef.current?.click();
+    if (action === 'exportProfiles') exportProfiles();
+    if (action === 'openFavorites') openBatchProfiles({ favoritesOnly: true });
+    if (action === 'openAllConnections') openBatchProfiles({});
   };
 
   const confirmDeleteProfile = (profile) => {
@@ -3198,6 +3210,7 @@ function App() {
     activeSessionId: activeKey,
     canNavigateSessions: sessionNavigationState.canNavigate,
     closedSessionCount: currentSessionSummary.closed,
+    favoriteConnectionCount: profiles.filter((profile) => profile.favorite).length,
     profiles,
     quickCommands,
     quickCommandProviderType: activeSession?.providerType || 'all',
@@ -3209,7 +3222,9 @@ function App() {
     openDrawer,
     openProfile,
     runQuickCommand,
+    runConnectionAction: runConnectionPaletteAction,
     runSessionAction: runSessionPaletteAction,
+    savedConnectionCount: profiles.length,
     setCommandsOpen,
     setSettingsOpen,
     setHelpOpen,
@@ -4827,6 +4842,31 @@ function buildPaletteItems(actions) {
     subtitleForProfile: buildConnectionProfileSubtitle,
   });
 
+  const connectionActionItems = buildConnectionActionPaletteItems({
+    favoriteCount: actions.favoriteConnectionCount,
+    groupLabel: t('palette.group.connectionActions'),
+    labels: {
+      importSshConfig: t('action.importSshConfig'),
+      importSshConfigDescription: t('palette.description.importSshConfig'),
+      importProfiles: t('action.importConnections'),
+      importProfilesDescription: t('palette.description.importProfiles'),
+      exportProfiles: t('action.exportConnections'),
+      exportProfilesDescription: t('palette.description.exportProfiles'),
+      newConnection: t('action.newConnection'),
+      newConnectionDescription: t('palette.description.newConnection'),
+      newLocalTerminal: t('action.newTerminal'),
+      newLocalTerminalDescription: t('palette.description.newLocalTerminal'),
+      openAllConnections: t('action.openAll'),
+      openAllConnectionsDescription: t('palette.description.openAllConnections'),
+      openFavorites: t('action.openFavorites'),
+      openFavoritesDescription: t('palette.description.openFavorites'),
+      quickSsh: t('action.quickSsh'),
+      quickSshDescription: t('palette.description.quickSsh'),
+    },
+    runAction: actions.runConnectionAction,
+    savedConnectionCount: actions.savedConnectionCount,
+  });
+
   const sessionItems = actions.sessions.map((session, index) => ({
     id: `session:${session.id}`,
     group: t('palette.group.sessions'),
@@ -4925,7 +4965,7 @@ function buildPaletteItems(actions) {
     },
   ];
 
-  return [...navigation, ...sessionActionItems, ...sessionItems, ...providerItems, ...profileItems, ...quickCommandItems, ...workspaceItems];
+  return [...navigation, ...connectionActionItems, ...sessionActionItems, ...sessionItems, ...providerItems, ...profileItems, ...quickCommandItems, ...workspaceItems];
 }
 
 function downloadJson(fileName, payload) {

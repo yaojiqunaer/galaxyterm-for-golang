@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  buildConnectionActionPaletteItems,
   buildProfilePaletteItems,
   buildPaletteSummary,
   buildSessionActionPaletteItems,
@@ -192,6 +193,63 @@ assert.deepEqual(buildSessionActionPaletteItems({
 assert.deepEqual(filterPaletteItems(sessionActionItems, 'history').map((item) => item.id), ['session-action:commandHistory']);
 assert.deepEqual(filterPaletteItems(sessionActionItems, 'audit').map((item) => item.id), ['session-action:saveAudit']);
 assert.deepEqual(filterPaletteItems(sessionActionItems, 'close closed').map((item) => item.id), ['session-action:closeClosed']);
+
+const connectionActionItems = buildConnectionActionPaletteItems({
+  favoriteCount: 2,
+  groupLabel: 'Connection Actions',
+  labels: {
+    exportProfiles: 'Export Connections',
+    importSshConfig: 'Import SSH Config',
+    importProfiles: 'Import Connections',
+    newConnection: 'New Connection',
+    newLocalTerminal: 'New Local Terminal',
+    openAllConnections: 'Open All Connections',
+    openFavorites: 'Open Favorites',
+    quickSsh: 'Quick SSH',
+  },
+  runAction: () => {},
+  savedConnectionCount: 5,
+});
+assert.deepEqual(connectionActionItems.map((item) => ({
+  disabled: item.disabled,
+  id: item.id,
+  title: item.title,
+})), [
+  { disabled: false, id: 'connection-action:newLocalTerminal', title: 'New Local Terminal' },
+  { disabled: false, id: 'connection-action:quickSsh', title: 'Quick SSH' },
+  { disabled: false, id: 'connection-action:newConnection', title: 'New Connection' },
+  { disabled: false, id: 'connection-action:importSshConfig', title: 'Import SSH Config' },
+  { disabled: false, id: 'connection-action:importProfiles', title: 'Import Connections' },
+  { disabled: false, id: 'connection-action:exportProfiles', title: 'Export Connections' },
+  { disabled: false, id: 'connection-action:openFavorites', title: 'Open Favorites' },
+  { disabled: false, id: 'connection-action:openAllConnections', title: 'Open All Connections' },
+]);
+assert.deepEqual(filterPaletteItems(connectionActionItems, 'ssh import').map((item) => item.id), ['connection-action:importSshConfig']);
+assert.deepEqual(filterPaletteItems(connectionActionItems, 'json import').map((item) => item.id), ['connection-action:importProfiles']);
+
+const emptyConnectionActionItems = buildConnectionActionPaletteItems({
+  favoriteCount: 0,
+  groupLabel: 'Connection Actions',
+  labels: {
+    exportProfiles: 'Export Connections',
+    openAllConnections: 'Open All Connections',
+    openFavorites: 'Open Favorites',
+  },
+  runAction: () => {},
+  savedConnectionCount: 0,
+});
+assert.deepEqual(['exportProfiles', 'openFavorites', 'openAllConnections'].map((key) => {
+  const item = emptyConnectionActionItems.find((entry) => entry.id === `connection-action:${key}`);
+  return {
+    disabled: item.disabled,
+    id: item.id,
+    reasonKey: item.reasonKey,
+  };
+}), [
+  { disabled: true, id: 'connection-action:exportProfiles', reasonKey: 'palette.reason.noSavedConnection' },
+  { disabled: true, id: 'connection-action:openFavorites', reasonKey: 'palette.reason.noFavoriteConnection' },
+  { disabled: true, id: 'connection-action:openAllConnections', reasonKey: 'palette.reason.noSavedConnection' },
+]);
 
 assert.equal(resolvePaletteIndex(0, 0, 'next'), -1);
 assert.equal(resolvePaletteIndex(3, -1, 'next'), 0);

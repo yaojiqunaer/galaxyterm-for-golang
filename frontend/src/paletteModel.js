@@ -168,6 +168,71 @@ export function buildSessionActionPaletteItems({
   ];
 }
 
+export function buildConnectionActionPaletteItems({
+  favoriteCount = 0,
+  groupLabel = 'Connection Actions',
+  labels = {},
+  runAction = () => {},
+  savedConnectionCount = 0,
+} = {}) {
+  return [
+    connectionActionItem('newLocalTerminal', {
+      groupLabel,
+      keywords: 'new local terminal shell',
+      labels,
+      runAction,
+    }),
+    connectionActionItem('quickSsh', {
+      groupLabel,
+      keywords: 'quick ssh terminal server host',
+      labels,
+      runAction,
+    }),
+    connectionActionItem('newConnection', {
+      groupLabel,
+      keywords: 'new connection profile save',
+      labels,
+      runAction,
+    }),
+    connectionActionItem('importSshConfig', {
+      groupLabel,
+      keywords: 'import ssh config openssh profile',
+      labels,
+      runAction,
+    }),
+    connectionActionItem('importProfiles', {
+      groupLabel,
+      keywords: 'import connections profiles json file backup',
+      labels,
+      runAction,
+    }),
+    connectionActionItem('exportProfiles', {
+      disabled: savedConnectionCount <= 0,
+      groupLabel,
+      keywords: 'export connections profiles json backup',
+      labels,
+      reasonKey: savedConnectionCount > 0 ? '' : 'palette.reason.noSavedConnection',
+      runAction,
+    }),
+    connectionActionItem('openFavorites', {
+      disabled: favoriteCount <= 0,
+      groupLabel,
+      keywords: 'open favorite connections profiles',
+      labels,
+      reasonKey: favoriteCount > 0 ? '' : 'palette.reason.noFavoriteConnection',
+      runAction,
+    }),
+    connectionActionItem('openAllConnections', {
+      disabled: savedConnectionCount <= 0,
+      groupLabel,
+      keywords: 'open all connections profiles batch',
+      labels,
+      reasonKey: savedConnectionCount > 0 ? '' : 'palette.reason.noSavedConnection',
+      runAction,
+    }),
+  ];
+}
+
 function scorePaletteItem(item, keywords) {
   const title = item.title?.toLowerCase() || '';
   const description = item.description?.toLowerCase() || '';
@@ -205,6 +270,26 @@ function activeSessionActionOptions({
     labels,
     reasonKey: activeSessionId ? '' : 'palette.reason.noActiveSession',
     runAction,
+  };
+}
+
+function connectionActionItem(key, {
+  disabled = false,
+  groupLabel,
+  keywords,
+  labels,
+  reasonKey = '',
+  runAction,
+}) {
+  return {
+    disabled,
+    group: groupLabel,
+    id: `connection-action:${key}`,
+    keywords,
+    reasonKey,
+    title: labels[key] || key,
+    description: labels[`${key}Description`] || '',
+    run: () => runAction(key),
   };
 }
 
