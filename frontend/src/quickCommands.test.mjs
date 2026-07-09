@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  buildQuickCommandFromHistory,
   buildQuickCommandSummary,
   filterQuickCommands,
   normalizeQuickCommand,
@@ -49,3 +50,27 @@ assert.deepEqual(normalizeQuickCommand({
   favorite: true,
   providerType: 'all',
 });
+
+assert.deepEqual(buildQuickCommandFromHistory({
+  command: '  kubectl get pods -n default  ',
+  providerType: 'k8s',
+}, { id: 'history-1' }), {
+  id: 'history-1',
+  name: 'kubectl get pods -n default',
+  command: 'kubectl get pods -n default',
+  favorite: false,
+  providerType: 'k8s',
+});
+
+assert.deepEqual(buildQuickCommandFromHistory({
+  command: 'docker ps\n docker logs api',
+  providerType: 'docker',
+}, { id: 'history-2', favorite: true }), {
+  id: 'history-2',
+  name: 'docker ps',
+  command: 'docker ps\n docker logs api',
+  favorite: true,
+  providerType: 'docker',
+});
+
+assert.equal(buildQuickCommandFromHistory({ command: '   ' }), null);

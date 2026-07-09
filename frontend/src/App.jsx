@@ -142,6 +142,7 @@ import {
   upsertCommandHistory,
 } from './commandHistory.js';
 import {
+  buildQuickCommandFromHistory,
   buildQuickCommandSummary,
   filterQuickCommands,
   normalizeQuickCommand,
@@ -1355,6 +1356,25 @@ function App() {
     ));
     persistCommandHistory(nextHistory);
     setCommandHistory(nextHistory);
+  };
+
+  const saveHistoryAsQuickCommand = (item) => {
+    const quickCommand = buildQuickCommandFromHistory(item, {
+      id: globalThis.crypto?.randomUUID?.() || `${Date.now()}`,
+    });
+    if (!quickCommand) return;
+    const alreadySaved = quickCommands.some((command) => (
+      command.command === quickCommand.command
+      && (command.providerType || 'all') === quickCommand.providerType
+    ));
+    if (alreadySaved) {
+      message.info(t('message.commandAlreadySaved'));
+      return;
+    }
+    const nextCommands = [...quickCommands, quickCommand];
+    persistQuickCommands(nextCommands);
+    setQuickCommands(nextCommands);
+    message.success(t('message.commandSaved'));
   };
 
   const runPaletteAction = (item) => {
@@ -3782,6 +3802,13 @@ function App() {
                   onClick={() => runHistoryCommand(item)}
                 >
                   {t('action.run')}
+                </Button>,
+                <Button
+                  key="saveQuickCommand"
+                  size="small"
+                  onClick={() => saveHistoryAsQuickCommand(item)}
+                >
+                  {t('action.saveQuickCommand')}
                 </Button>,
                 <Button
                   key="copy"

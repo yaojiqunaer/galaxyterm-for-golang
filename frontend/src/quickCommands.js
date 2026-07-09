@@ -33,6 +33,18 @@ export function normalizeQuickCommand(command = {}) {
   };
 }
 
+export function buildQuickCommandFromHistory(item = {}, options = {}) {
+  const command = String(item.command || '').trim();
+  if (!command) return null;
+  return {
+    id: options.id || '',
+    name: options.name || deriveQuickCommandName(command),
+    command,
+    favorite: options.favorite === true,
+    providerType: normalizeCommandProviderType(item.providerType || options.providerType || 'all'),
+  };
+}
+
 function matchesProviderType(command = {}, providerType) {
   const commandProvider = normalizeCommandProviderType(command.providerType || 'all');
   return providerType === 'all' || commandProvider === 'all' || commandProvider === providerType;
@@ -41,4 +53,10 @@ function matchesProviderType(command = {}, providerType) {
 function normalizeCommandProviderType(value) {
   const normalized = String(value || '').trim();
   return normalized || 'all';
+}
+
+function deriveQuickCommandName(command) {
+  const firstLine = command.split('\n').find((line) => line.trim()) || command;
+  const compact = firstLine.trim().replace(/\s+/g, ' ');
+  return compact.length > 48 ? `${compact.slice(0, 45)}...` : compact;
 }
