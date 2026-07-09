@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   buildQuickCommandFromHistory,
+  buildQuickCommandSafetyState,
   buildQuickCommandSaveResult,
   buildQuickCommandSummary,
   filterQuickCommands,
@@ -110,6 +111,26 @@ assert.deepEqual(buildQuickCommandSaveResult({
 }), {
   command: null,
   skippedReason: 'empty',
+});
+assert.deepEqual(buildQuickCommandSafetyState({
+  command: 'kubectl get pods',
+}), {
+  canCopy: true,
+  canEdit: true,
+  canRun: true,
+  displayCommand: 'kubectl get pods',
+  sensitive: false,
+  warningKey: '',
+});
+assert.deepEqual(buildQuickCommandSafetyState({
+  command: 'mysql --password secret',
+}), {
+  canCopy: false,
+  canEdit: false,
+  canRun: false,
+  displayCommand: 'command.sensitiveHidden',
+  sensitive: true,
+  warningKey: 'command.sensitiveStoredWarning',
 });
 
 assert.deepEqual(upsertQuickCommand(commands, {

@@ -72,6 +72,29 @@ export function buildQuickCommandSaveResult(command = {}) {
   };
 }
 
+export function buildQuickCommandSafetyState(command = {}) {
+  const rawCommand = String(command.command || '').trim();
+  const sensitive = isSensitiveCommand(rawCommand);
+  if (sensitive) {
+    return {
+      canCopy: false,
+      canEdit: false,
+      canRun: false,
+      displayCommand: 'command.sensitiveHidden',
+      sensitive: true,
+      warningKey: 'command.sensitiveStoredWarning',
+    };
+  }
+  return {
+    canCopy: true,
+    canEdit: true,
+    canRun: true,
+    displayCommand: rawCommand,
+    sensitive: false,
+    warningKey: '',
+  };
+}
+
 export function upsertQuickCommand(commands = [], command = {}) {
   const nextCommand = normalizeQuickCommand(command);
   const index = commands.findIndex((item) => item.id === nextCommand.id);

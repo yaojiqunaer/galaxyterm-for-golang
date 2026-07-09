@@ -150,6 +150,7 @@ import {
 } from './commandHistory.js';
 import {
   buildQuickCommandFromHistory,
+  buildQuickCommandSafetyState,
   buildQuickCommandSaveResult,
   buildQuickCommandSummary,
   filterQuickCommands,
@@ -3956,50 +3957,56 @@ function App() {
               />
             ),
           }}
-          renderItem={(item) => (
-            <List.Item
-              className="quick-command-row"
-              actions={[
-                <Button
-                  key="favorite"
-                  size="small"
-                  icon={item.favorite ? <StarFilled /> : <StarOutlined />}
-                  onClick={() => toggleQuickCommandFavorite(item.id)}
-                />,
-                <Button
-                  key="run"
-                  size="small"
-                  type="primary"
-                  disabled={!quickCommandSummary.canRun}
-                  onClick={() => runQuickCommand(item.command)}
-                >
-                  {t('action.run')}
-                </Button>,
-                <Button key="edit" size="small" onClick={() => editQuickCommand(item)}>{t('action.edit')}</Button>,
-                <Button
-                  key="copy"
-                  size="small"
-                  onClick={async () => {
-                    await navigator.clipboard?.writeText(item.command);
-                    message.success(t('message.copied'));
-                  }}
-                >
-                  {t('action.copy')}
-                </Button>,
-                <Button key="delete" size="small" danger onClick={() => deleteQuickCommand(item.id)}>{t('action.delete')}</Button>,
-              ]}
-            >
-              <List.Item.Meta
-                title={(
-                  <span className="quick-command-title">
-                    <span>{item.name}</span>
-                    <Tag>{quickCommandProviderLabel(item.providerType, providers)}</Tag>
-                  </span>
-                )}
-                description={<pre className="quick-command-code">{item.command}</pre>}
-              />
-            </List.Item>
-          )}
+          renderItem={(item) => {
+            const safety = buildQuickCommandSafetyState(item);
+            return (
+              <List.Item
+                className="quick-command-row"
+                actions={[
+                  <Button
+                    key="favorite"
+                    size="small"
+                    icon={item.favorite ? <StarFilled /> : <StarOutlined />}
+                    onClick={() => toggleQuickCommandFavorite(item.id)}
+                  />,
+                  <Tooltip key="run" title={safety.warningKey ? t(safety.warningKey) : ''}>
+                    <Button
+                      size="small"
+                      type="primary"
+                      disabled={!quickCommandSummary.canRun || !safety.canRun}
+                      onClick={() => runQuickCommand(item.command)}
+                    >
+                      {t('action.run')}
+                    </Button>
+                  </Tooltip>,
+                  <Button key="edit" size="small" disabled={!safety.canEdit} onClick={() => editQuickCommand(item)}>{t('action.edit')}</Button>,
+                  <Button
+                    key="copy"
+                    size="small"
+                    disabled={!safety.canCopy}
+                    onClick={async () => {
+                      await navigator.clipboard?.writeText(item.command);
+                      message.success(t('message.copied'));
+                    }}
+                  >
+                    {t('action.copy')}
+                  </Button>,
+                  <Button key="delete" size="small" danger onClick={() => deleteQuickCommand(item.id)}>{t('action.delete')}</Button>,
+                ]}
+              >
+                <List.Item.Meta
+                  title={(
+                    <span className="quick-command-title">
+                      <span>{item.name}</span>
+                      <Tag>{quickCommandProviderLabel(item.providerType, providers)}</Tag>
+                      {safety.sensitive && <Tag color="warning">{t('command.sensitiveTag')}</Tag>}
+                    </span>
+                  )}
+                  description={<pre className="quick-command-code">{safety.sensitive ? t(safety.displayCommand) : safety.displayCommand}</pre>}
+                />
+              </List.Item>
+            );
+          }}
         />
       </Drawer>
       <Drawer
