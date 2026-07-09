@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   buildCommandHistoryEntry,
+  clearCommandHistory,
   filterCommandHistory,
   isSensitiveCommand,
   normalizeCommandHistoryItem,
@@ -79,6 +80,19 @@ assert.deepEqual(
   filterCommandHistory(mixedHistory, { providerType: 'all' }).map((item) => item.command),
   ['docker ps', 'kubectl get pods', 'pwd'],
 );
+assert.deepEqual(
+  clearCommandHistory(mixedHistory, { providerType: 'ssh' }).map((item) => item.command),
+  ['docker ps', 'pwd'],
+);
+assert.deepEqual(
+  clearCommandHistory(mixedHistory, { sessionId: 'session-2' }).map((item) => item.command),
+  ['kubectl get pods', 'pwd'],
+);
+assert.deepEqual(
+  clearCommandHistory(mixedHistory, { providerType: 'all', query: 'docker' }).map((item) => item.command),
+  ['kubectl get pods', 'pwd'],
+);
+assert.deepEqual(clearCommandHistory(mixedHistory, { providerType: 'all' }), []);
 assert.deepEqual(normalizeCommandHistoryItem({
   command: 'pwd',
   providerType: 'local',

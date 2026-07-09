@@ -137,6 +137,7 @@ import {
 } from './paletteModel.js';
 import {
   buildCommandHistoryEntry,
+  clearCommandHistory,
   filterCommandHistory,
   normalizeCommandHistoryItem,
   upsertCommandHistory,
@@ -1360,6 +1361,35 @@ function App() {
     ));
     persistCommandHistory(nextHistory);
     setCommandHistory(nextHistory);
+  };
+
+  const clearVisibleCommandHistory = () => {
+    const scopeKey = historyScope === 'session' ? 'history.scope.session' : historyScope === 'all' ? 'history.scope.all' : 'history.scope.provider';
+    const runClear = () => {
+      const nextHistory = clearCommandHistory(commandHistory, {
+        providerType: historyScope === 'all' ? 'all' : activeSession?.providerType || 'all',
+        query: historyQuery,
+        sessionId: historyScope === 'session' ? activeKey : '',
+      });
+      persistCommandHistory(nextHistory);
+      setCommandHistory(nextHistory);
+      message.success(t('message.commandHistoryCleared'));
+    };
+    if (settings.confirmDangerousActions === false) {
+      runClear();
+      return;
+    }
+    Modal.confirm({
+      title: t('confirm.clearCommandHistoryTitle'),
+      content: t('confirm.clearCommandHistoryContent', {
+        count: visibleCommandHistory.length,
+        scope: t(scopeKey),
+      }),
+      okButtonProps: { danger: true },
+      okText: t('action.clear'),
+      cancelText: t('action.cancel'),
+      onOk: runClear,
+    });
   };
 
   const saveHistoryAsQuickCommand = (item) => {
@@ -3815,6 +3845,13 @@ function App() {
             onChange={(event) => setHistoryQuery(event.target.value)}
             placeholder={t('placeholder.searchHistory')}
           />
+          <Button
+            danger
+            disabled={visibleCommandHistory.length === 0}
+            onClick={clearVisibleCommandHistory}
+          >
+            {t('action.clear')}
+          </Button>
         </div>
         <Alert type="info" showIcon message={t('history.drawerHint')} />
         <List

@@ -59,6 +59,17 @@ export function filterCommandHistory(history = [], {
     .sort((left, right) => Number(!!right.favorite) - Number(!!left.favorite));
 }
 
+export function clearCommandHistory(history = [], {
+  providerType = 'all',
+  query = '',
+  sessionId = '',
+} = {}) {
+  const targets = filterCommandHistory(history, { providerType, query, sessionId });
+  if (targets.length === 0) return history;
+  const targetKeys = new Set(targets.map(commandHistoryKey));
+  return history.filter((item) => !targetKeys.has(commandHistoryKey(item)));
+}
+
 export function normalizeCommandHistoryItem(item = {}) {
   return {
     command: String(item.command || '').trim(),
@@ -72,4 +83,8 @@ export function normalizeCommandHistoryItem(item = {}) {
 
 function sameCommandScope(left = {}, right = {}) {
   return left.command === right.command && left.providerType === right.providerType;
+}
+
+function commandHistoryKey(item = {}) {
+  return `${item.providerType || 'terminal'}\u0000${item.sessionId || ''}\u0000${item.command || ''}`;
 }
