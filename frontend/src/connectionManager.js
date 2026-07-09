@@ -277,6 +277,26 @@ export function buildConnectionProfileHints(sessionInfo = {}) {
   ].filter(Boolean);
 }
 
+export function buildConnectionProfilePrimaryAction({
+  providerAvailable = true,
+  sessionInfo = {},
+} = {}) {
+  if (sessionInfo.activeCount > 0 && sessionInfo.focusSessionId) {
+    return {
+      action: 'focus',
+      disabled: false,
+      labelKey: 'action.focusSession',
+      reasonKey: '',
+    };
+  }
+  return {
+    action: 'connect',
+    disabled: !providerAvailable,
+    labelKey: 'action.connect',
+    reasonKey: providerAvailable ? '' : 'palette.reason.providerUnavailable',
+  };
+}
+
 function compareText(left = '', right = '') {
   return String(left || '').localeCompare(String(right || ''));
 }

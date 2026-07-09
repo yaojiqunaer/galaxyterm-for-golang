@@ -6,6 +6,7 @@ import {
   buildConnectionProfileBadges,
   buildConnectionProfileFacts,
   buildConnectionProfileHints,
+  buildConnectionProfilePrimaryAction,
   buildConnectionProfileSubtitle,
   filterConnectionProfiles,
   filterRecentConnectionsByProviders,
@@ -213,6 +214,33 @@ assert.equal(buildConnectionProfileSubtitle(profiles[1]), 'deploy@10.0.0.20:22')
 assert.equal(buildConnectionProfileSubtitle(profiles[2]), '/bin/zsh');
 assert.deepEqual(buildConnectionProfileHints({ activeCount: 0 }), ['enterOpen', 'doubleClickOpen']);
 assert.deepEqual(buildConnectionProfileHints({ activeCount: 2 }), ['focusOpenSession', 'enterOpen', 'doubleClickOpen']);
+assert.deepEqual(buildConnectionProfilePrimaryAction({
+  providerAvailable: true,
+  sessionInfo: { activeCount: 2, focusSessionId: 's1' },
+}), {
+  action: 'focus',
+  disabled: false,
+  labelKey: 'action.focusSession',
+  reasonKey: '',
+});
+assert.deepEqual(buildConnectionProfilePrimaryAction({
+  providerAvailable: true,
+  sessionInfo: { activeCount: 0, focusSessionId: '' },
+}), {
+  action: 'connect',
+  disabled: false,
+  labelKey: 'action.connect',
+  reasonKey: '',
+});
+assert.deepEqual(buildConnectionProfilePrimaryAction({
+  providerAvailable: false,
+  sessionInfo: { activeCount: 0, focusSessionId: '' },
+}), {
+  action: 'connect',
+  disabled: true,
+  labelKey: 'action.connect',
+  reasonKey: 'palette.reason.providerUnavailable',
+});
 
 const profileSessions = summarizeProfileSessions(profiles, [
   { id: 's1', status: 'connected', request: { profileId: 'prod-db' } },

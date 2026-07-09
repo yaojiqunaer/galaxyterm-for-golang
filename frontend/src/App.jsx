@@ -84,6 +84,7 @@ import {
   buildConnectionProfileBadges,
   buildConnectionProfileFacts,
   buildConnectionProfileHints,
+  buildConnectionProfilePrimaryAction,
   buildConnectionProfileSubtitle,
   filterConnectionProfiles,
   filterRecentConnectionsByProviders,
@@ -557,7 +558,7 @@ function App() {
     }
     if (event.key === 'Enter' && selectedProfile) {
       event.preventDefault();
-      openProfile(selectedProfile);
+      runConnectionProfilePrimaryAction(selectedProfile);
     }
   };
 
@@ -1271,6 +1272,21 @@ function App() {
     setSelectedNav('sessions');
   };
 
+  const runConnectionProfilePrimaryAction = (profile) => {
+    const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
+    const providerAvailable = isProfileProviderAvailable(profile, providers);
+    const primaryAction = buildConnectionProfilePrimaryAction({ providerAvailable, sessionInfo });
+    if (primaryAction.disabled) {
+      message.warning(primaryAction.reasonKey ? t(primaryAction.reasonKey) : t('message.providerUnavailable'));
+      return;
+    }
+    if (primaryAction.action === 'focus') {
+      focusProfileSession(profile);
+      return;
+    }
+    openProfile(profile);
+  };
+
   const switchSession = (direction) => {
     const nextId = direction === 'previous'
       ? sessionNavigationState.previousId
@@ -1970,17 +1986,12 @@ function App() {
               renderItem={(profile) => {
                 const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
                 const providerAvailable = isProfileProviderAvailable(profile, providers);
+                const primaryAction = buildConnectionProfilePrimaryAction({ providerAvailable, sessionInfo });
                 const actions = [
-                  ...(sessionInfo.activeCount > 0
-                    ? [<Button key="focus" size="small" onClick={(event) => {
-                      event.stopPropagation();
-                      focusProfileSession(profile);
-                    }}>{t('action.focusSession')}</Button>]
-                    : []),
-                  <Button key="open" size="small" type="primary" onClick={(event) => {
+                  <Button key="primary" size="small" type="primary" onClick={(event) => {
                     event.stopPropagation();
-                    openProfile(profile);
-                  }} disabled={!providerAvailable}>{t('action.connect')}</Button>,
+                    runConnectionProfilePrimaryAction(profile);
+                  }} disabled={primaryAction.disabled}>{t(primaryAction.labelKey)}</Button>,
                   <Dropdown
                     key="manage"
                     trigger={['click']}
@@ -2021,7 +2032,7 @@ function App() {
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') {
                       event.preventDefault();
-                      openProfile(profile);
+                      runConnectionProfilePrimaryAction(profile);
                     }
                     if (event.key === ' ') {
                       event.preventDefault();
@@ -4344,6 +4355,7 @@ function ConnectionProfilePreview({
   const badges = buildConnectionProfileBadges(profile, sessionInfo, { providerAvailable });
   const facts = buildConnectionProfileFacts(profile);
   const hints = buildConnectionProfileHints(sessionInfo);
+  const primaryAction = buildConnectionProfilePrimaryAction({ providerAvailable, sessionInfo });
   return (
     <div className="connection-profile-preview">
       <div className="connection-profile-hero">
@@ -4355,10 +4367,20 @@ function ConnectionProfilePreview({
         </div>
       </div>
       <div className="connection-profile-actions">
-        {sessionInfo.activeCount > 0 && (
-          <Button size="small" onClick={() => focusProfileSession(profile)}>{t('action.focusSession')}</Button>
-        )}
-        <Button size="small" type="primary" disabled={!providerAvailable} onClick={() => openProfile(profile)}>{t('action.connect')}</Button>
+        <Button
+          size="small"
+          type="primary"
+          disabled={primaryAction.disabled}
+          onClick={() => {
+            if (primaryAction.action === 'focus') {
+              focusProfileSession(profile);
+              return;
+            }
+            openProfile(profile);
+          }}
+        >
+          {t(primaryAction.labelKey)}
+        </Button>
         <Button size="small" icon={<EditOutlined />} onClick={() => openProfileEditor(profile)}>{t('action.edit')}</Button>
       </div>
       <div className="connection-profile-tags">
