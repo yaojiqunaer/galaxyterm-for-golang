@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   buildAsciinemaCast,
+  buildAuditRecord,
   buildAuditRecordSummary,
   resolveReplayEventTime,
   createAuditEvent,
@@ -54,6 +55,16 @@ assert.equal(lines[0].title, 'prod');
 assert.deepEqual(lines[1], [0, 'o', 'hello']);
 assert.deepEqual(lines[2], [1.5, 'o', '\nworld']);
 
+const sensitiveHeaderCast = buildAsciinemaCast({
+  command: 'mysql --password secret',
+  env: { TERM: 'xterm-256color', API_TOKEN: 'token=secret-value' },
+  title: 'token=secret-value',
+});
+const sensitiveHeader = JSON.parse(sensitiveHeaderCast.split('\n')[0]);
+assert.ok(!sensitiveHeader.command.includes('secret'));
+assert.ok(!sensitiveHeader.title.includes('secret-value'));
+assert.ok(!sensitiveHeader.env.API_TOKEN.includes('secret-value'));
+
 const parsed = parseAsciinemaCast(cast);
 assert.equal(parsed.header.width, 80);
 assert.equal(parsed.duration, 1.5);
@@ -91,6 +102,21 @@ assert.deepEqual(buildAuditRecordSummary({ title: '' }), {
   providerType: 'terminal',
   title: 'Untitled',
 });
+
+const auditRecord = buildAuditRecord({
+  auditEvents: [
+    { id: 'e1', type: 'paste', detail: 'Authorization: Bearer abc.def' },
+    { id: 'e2', type: 'command', detail: 'kubectl get pods' },
+  ],
+  cast: sensitiveHeaderCast,
+  screen: 'password=hunter2',
+  title: 'token=secret-value',
+});
+assert.equal(auditRecord.auditEvents[0].detail, 'Authorization: Bearer [REDACTED]');
+assert.equal(auditRecord.auditEvents[1].detail, 'kubectl get pods');
+assert.ok(!auditRecord.screen.includes('hunter2'));
+assert.ok(!auditRecord.title.includes('secret-value'));
+assert.ok(!JSON.parse(auditRecord.cast.split('\n')[0]).command.includes('secret'));
 
 assert.equal(resolveReplayEventTime(parsed.events, 0.2, 'next'), 1.5);
 assert.equal(resolveReplayEventTime(parsed.events, 1.5, 'previous'), 0);

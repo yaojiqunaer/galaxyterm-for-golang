@@ -2,11 +2,17 @@ const secretPatterns = [
   /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g,
   /(authorization:\s*(?:bearer|basic)\s+)[^\s]+/gi,
   /((?:password|passwd|pwd|token|secret|access[_-]?key|api[_-]?key)\s*[:=]\s*)[^\s'";&]+/gi,
+  /(--?(?:password|passwd|pwd|token|secret|access[_-]?key|api[_-]?key)(?:=|\s+))[^\s'";&]+/gi,
   /(-p)(?!\s)([^\s]+)/gi,
 ];
 
 export function redactSensitive(value = '') {
-  return String(value).replace(secretPatterns[0], '[REDACTED]').replace(secretPatterns[1], '$1[REDACTED]').replace(secretPatterns[2], '$1[REDACTED]').replace(secretPatterns[3], '$1[REDACTED]');
+  return String(value)
+    .replace(secretPatterns[0], '[REDACTED]')
+    .replace(secretPatterns[1], '$1[REDACTED]')
+    .replace(secretPatterns[2], '$1[REDACTED]')
+    .replace(secretPatterns[3], '$1[REDACTED]')
+    .replace(secretPatterns[4], '$1[REDACTED]');
 }
 
 export function createAuditEvent({
@@ -40,9 +46,9 @@ export function buildAsciinemaCast({
     width,
     height,
     timestamp,
-    env,
-    title,
-    command,
+    env: redactObject(env),
+    title: redactSensitive(title),
+    command: redactSensitive(command),
   };
   return [
     JSON.stringify(header),
@@ -94,14 +100,14 @@ export function buildAuditRecord({
 }) {
   return {
     id,
-    auditEvents,
-    cast,
+    auditEvents: redactAuditEvents(auditEvents),
+    cast: redactAsciinemaHeader(cast),
     endedAt,
     providerType,
     screen: redactSensitive(screen),
     sessionId,
     startedAt,
-    title,
+    title: redactSensitive(title),
   };
 }
 
@@ -133,6 +139,34 @@ function safeJsonParse(value) {
   } catch {
     return null;
   }
+}
+
+function redactObject(value = {}) {
+  return Object.fromEntries(Object.entries(value || {}).map(([key, item]) => [
+    key,
+    typeof item === 'string' ? redactSensitive(item) : item,
+  ]));
+}
+
+function redactAuditEvents(events = []) {
+  return events.map((event) => ({
+    ...event,
+    detail: redactSensitive(event?.detail || ''),
+  }));
+}
+
+function redactAsciinemaHeader(cast = '') {
+  const lines = String(cast || '').split(/\r?\n/);
+  if (lines.length === 0 || !lines[0]) return cast;
+  const header = safeJsonParse(lines[0]);
+  if (!header) return cast;
+  const redactedHeader = {
+    ...header,
+    command: redactSensitive(header.command || ''),
+    env: redactObject(header.env || {}),
+    title: redactSensitive(header.title || ''),
+  };
+  return [JSON.stringify(redactedHeader), ...lines.slice(1)].join('\n');
 }
 
 function randomId(prefix) {
