@@ -143,6 +143,7 @@ import {
 import {
   buildQuickCommandSummary,
   filterQuickCommands,
+  normalizeQuickCommand,
 } from './quickCommands.js';
 import {
   buildExtensionAction,
@@ -231,6 +232,10 @@ function providerLabel(provider) {
 function providerTypeLabel(type, providers = []) {
   const provider = providers.find((item) => item.type === type);
   return provider ? providerLabel(provider) : type;
+}
+
+function quickCommandProviderLabel(type, providers = []) {
+  return !type || type === 'all' ? t('filter.allProviders') : providerTypeLabel(type, providers);
 }
 
 function App() {
@@ -362,6 +367,11 @@ function App() {
   }, [activeKey, sessionView, sessions, settings.autoSaveWorkspace]);
 
   useEffect(() => {
+    if (!commandsOpen) return;
+    commandForm.setFieldValue('providerType', activeSession?.providerType || 'all');
+  }, [activeSession?.providerType, commandForm, commandsOpen]);
+
+  useEffect(() => {
     const handleKeydown = (event) => {
       if (event.key === '?' && !isEditableTarget(event.target)) {
         event.preventDefault();
@@ -463,6 +473,13 @@ function App() {
       </span>
     ),
   })), [providers, locale]);
+  const quickCommandProviderOptions = useMemo(() => [
+    { value: 'all', label: t('filter.allProviders') },
+    ...providers.map((provider) => ({
+      value: provider.type,
+      label: providerTypeLabel(provider.type, providers),
+    })),
+  ], [providers, locale]);
   const shortcutModifier = normalizeShortcutModifier(settings.shortcutModifier);
   const shortcutLabel = shortcutModifierLabel(shortcutModifier);
   const shortcutGroups = useMemo(
@@ -584,7 +601,9 @@ function App() {
     activeKey,
     status: 'active',
   }), [activeKey, sessions]);
-  const visibleQuickCommands = useMemo(() => filterQuickCommands(quickCommands, commandQuery), [commandQuery, quickCommands]);
+  const visibleQuickCommands = useMemo(() => filterQuickCommands(quickCommands, commandQuery, {
+    providerType: activeSession?.providerType || 'all',
+  }), [activeSession?.providerType, commandQuery, quickCommands]);
   const visibleCommandHistory = useMemo(() => filterCommandHistory(commandHistory, {
     providerType: historyScope === 'all' ? 'all' : activeSession?.providerType || 'all',
     query: historyQuery,
@@ -1344,6 +1363,7 @@ function App() {
       id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`,
       name: values.name,
       command: values.command,
+      providerType: values.providerType || 'all',
     }];
     persistQuickCommands(nextCommands);
     setQuickCommands(nextCommands);
@@ -2983,6 +3003,7 @@ function App() {
   const paletteItems = buildPaletteItems({
     profiles,
     quickCommands,
+    quickCommandProviderType: activeSession?.providerType || 'all',
     providers,
     sessions,
     setSelectedNav,
@@ -3593,6 +3614,10 @@ function App() {
             <strong>{quickCommandSummary.total}</strong>
           </span>
           <span>
+            <small>{t('metric.availableCommands')}</small>
+            <strong>{quickCommandSummary.available}</strong>
+          </span>
+          <span>
             <small>{t('metric.multiLineCommands')}</small>
             <strong>{quickCommandSummary.multiLine}</strong>
           </span>
@@ -3606,6 +3631,9 @@ function App() {
           <Form form={commandForm} layout="vertical" className="quick-command-form">
             <Form.Item name="name" label={t('field.name')} rules={[{ required: true, message: t('validation.required') }]}>
               <Input />
+            </Form.Item>
+            <Form.Item name="providerType" label={t('field.providerScope')} initialValue={activeSession?.providerType || 'all'}>
+              <Select options={quickCommandProviderOptions} />
             </Form.Item>
             <Form.Item name="command" label={t('field.command')} rules={[{ required: true, message: t('validation.required') }]}>
               <Input.TextArea rows={3} />
@@ -3658,7 +3686,12 @@ function App() {
               ]}
             >
               <List.Item.Meta
-                title={<span className="quick-command-title">{item.name}</span>}
+                title={(
+                  <span className="quick-command-title">
+                    <span>{item.name}</span>
+                    <Tag>{quickCommandProviderLabel(item.providerType, providers)}</Tag>
+                  </span>
+                )}
                 description={<pre className="quick-command-code">{item.command}</pre>}
               />
             </List.Item>
@@ -3829,7 +3862,7 @@ function defaultQuickCommands() {
     { id: 'memory-usage', name: 'Memory usage', command: 'free -m' },
     { id: 'current-directory', name: 'Current directory', command: 'pwd' },
     { id: 'network-ports', name: 'Network ports', command: 'netstat -tunlp' },
-  ];
+  ].map(normalizeQuickCommand);
 }
 
 function WelcomePanel({ providers, openDrawer }) {
@@ -4352,10 +4385,9 @@ function loadQuickCommands() {
     const raw = localStorage.getItem(commandStorageKey);
     const parsed = JSON.parse(raw || '[]');
     if (!Array.isArray(parsed) || parsed.length === 0) return defaultQuickCommands();
-    return parsed.filter((item) => item?.name && item?.command).map((item) => ({
+    return parsed.filter((item) => item?.name && item?.command).map((item) => normalizeQuickCommand({
+      ...item,
       id: item.id || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`),
-      name: item.name,
-      command: item.command,
     }));
   } catch {
     return defaultQuickCommands();
@@ -4531,7 +4563,9 @@ function buildPaletteItems(actions) {
     },
   }));
 
-  const quickCommandItems = actions.quickCommands.map((command) => ({
+  const quickCommandItems = filterQuickCommands(actions.quickCommands, '', {
+    providerType: actions.quickCommandProviderType || 'all',
+  }).map((command) => ({
     id: `command:${command.id}`,
     group: t('palette.group.commands'),
     title: command.name,

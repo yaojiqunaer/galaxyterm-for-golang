@@ -2468,7 +2468,7 @@ code {
 
 .quick-command-summary {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -2538,10 +2538,16 @@ code {
 }
 
 .quick-command-title {
-  display: block;
-  overflow: hidden;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
   color: var(--text);
   font-weight: 700;
+}
+
+.quick-command-title > :first-child {
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
