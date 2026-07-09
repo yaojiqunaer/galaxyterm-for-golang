@@ -45,6 +45,13 @@ export function buildQuickCommandFromHistory(item = {}, options = {}) {
   };
 }
 
+export function upsertQuickCommand(commands = [], command = {}) {
+  const nextCommand = normalizeQuickCommand(command);
+  const index = commands.findIndex((item) => item.id === nextCommand.id);
+  if (index < 0) return [...commands, nextCommand];
+  return commands.map((item, itemIndex) => (itemIndex === index ? nextCommand : item));
+}
+
 function matchesProviderType(command = {}, providerType) {
   const commandProvider = normalizeCommandProviderType(command.providerType || 'all');
   return providerType === 'all' || commandProvider === 'all' || commandProvider === providerType;

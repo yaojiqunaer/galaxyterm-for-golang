@@ -423,6 +423,7 @@
   "message.profileImportFailed": "导入连接失败",
   "message.commandSaved": "快捷命令已保存",
   "message.commandAlreadySaved": "快捷命令已存在",
+  "message.commandUpdated": "快捷命令已更新",
   "message.commandDeleted": "快捷命令已删除",
   "message.sessionRenamed": "会话已重命名",
   "message.recentCleared": "最近连接已清空",

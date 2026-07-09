@@ -4,6 +4,7 @@ import {
   buildQuickCommandSummary,
   filterQuickCommands,
   normalizeQuickCommand,
+  upsertQuickCommand,
 } from './quickCommands.js';
 
 const commands = [
@@ -74,3 +75,23 @@ assert.deepEqual(buildQuickCommandFromHistory({
 });
 
 assert.equal(buildQuickCommandFromHistory({ command: '   ' }), null);
+
+assert.deepEqual(upsertQuickCommand(commands, {
+  id: 'logs',
+  name: 'Tail app logs',
+  command: 'journalctl -u app -f',
+  favorite: true,
+  providerType: 'ssh',
+}).find((item) => item.id === 'logs'), {
+  id: 'logs',
+  name: 'Tail app logs',
+  command: 'journalctl -u app -f',
+  favorite: true,
+  providerType: 'ssh',
+});
+
+assert.deepEqual(upsertQuickCommand(commands, {
+  id: 'new',
+  name: 'Disk usage',
+  command: 'df -h',
+}).map((item) => item.id), ['ls', 'docker', 'logs', 'new']);

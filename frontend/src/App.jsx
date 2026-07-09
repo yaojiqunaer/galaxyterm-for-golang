@@ -146,6 +146,7 @@ import {
   buildQuickCommandSummary,
   filterQuickCommands,
   normalizeQuickCommand,
+  upsertQuickCommand,
 } from './quickCommands.js';
 import {
   buildExtensionAction,
@@ -286,6 +287,7 @@ function App() {
   const [quickCommands, setQuickCommands] = useState(() => loadQuickCommands());
   const [commandHistory, setCommandHistory] = useState(() => loadCommandHistory());
   const [commandQuery, setCommandQuery] = useState('');
+  const [editingQuickCommandId, setEditingQuickCommandId] = useState('');
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyQuery, setHistoryQuery] = useState('');
   const [historyScope, setHistoryScope] = useState('provider');
@@ -1390,24 +1392,45 @@ function App() {
 
   const addQuickCommand = async () => {
     const values = await commandForm.validateFields();
-    const nextCommands = [...quickCommands, {
-      id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`,
+    const currentCommand = quickCommands.find((item) => item.id === editingQuickCommandId);
+    const nextCommand = {
+      id: editingQuickCommandId || globalThis.crypto?.randomUUID?.() || `${Date.now()}`,
       name: values.name,
       command: values.command,
-      favorite: false,
+      favorite: currentCommand?.favorite === true,
       providerType: values.providerType || 'all',
-    }];
+    };
+    const nextCommands = upsertQuickCommand(quickCommands, nextCommand);
     persistQuickCommands(nextCommands);
     setQuickCommands(nextCommands);
     commandForm.resetFields();
-    message.success(t('message.commandSaved'));
+    setEditingQuickCommandId('');
+    message.success(t(editingQuickCommandId ? 'message.commandUpdated' : 'message.commandSaved'));
   };
 
   const deleteQuickCommand = (id) => {
     const nextCommands = quickCommands.filter((item) => item.id !== id);
     persistQuickCommands(nextCommands);
     setQuickCommands(nextCommands);
+    if (editingQuickCommandId === id) {
+      commandForm.resetFields();
+      setEditingQuickCommandId('');
+    }
     message.success(t('message.commandDeleted'));
+  };
+
+  const editQuickCommand = (item) => {
+    setEditingQuickCommandId(item.id);
+    commandForm.setFieldsValue({
+      name: item.name,
+      providerType: item.providerType || 'all',
+      command: item.command,
+    });
+  };
+
+  const cancelQuickCommandEdit = () => {
+    commandForm.resetFields();
+    setEditingQuickCommandId('');
   };
 
   const toggleQuickCommandFavorite = (id) => {
@@ -3682,7 +3705,14 @@ function App() {
             <Form.Item name="command" label={t('field.command')} rules={[{ required: true, message: t('validation.required') }]}>
               <Input.TextArea rows={3} />
             </Form.Item>
-            <Button type="primary" onClick={addQuickCommand}>{t('action.addCommand')}</Button>
+            <Space>
+              <Button type="primary" onClick={addQuickCommand}>
+                {editingQuickCommandId ? t('action.save') : t('action.addCommand')}
+              </Button>
+              {editingQuickCommandId && (
+                <Button onClick={cancelQuickCommandEdit}>{t('action.cancel')}</Button>
+              )}
+            </Space>
           </Form>
         </div>
         <Input.Search
@@ -3722,6 +3752,7 @@ function App() {
                 >
                   {t('action.run')}
                 </Button>,
+                <Button key="edit" size="small" onClick={() => editQuickCommand(item)}>{t('action.edit')}</Button>,
                 <Button
                   key="copy"
                   size="small"

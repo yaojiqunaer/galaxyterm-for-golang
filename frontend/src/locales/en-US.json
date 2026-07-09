@@ -423,6 +423,7 @@
   "message.profileImportFailed": "Failed to import connections",
   "message.commandSaved": "Quick command saved",
   "message.commandAlreadySaved": "Quick command already exists",
+  "message.commandUpdated": "Quick command updated",
   "message.commandDeleted": "Quick command deleted",
   "message.sessionRenamed": "Session renamed",
   "message.recentCleared": "Recent connections cleared",
