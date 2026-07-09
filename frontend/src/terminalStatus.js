@@ -35,6 +35,24 @@ export function buildTerminalStatusFacts(state = {}) {
   return facts;
 }
 
+export function buildTerminalRecoveryActions(state = {}) {
+  const status = normalizeTerminalStatus(state.status);
+  if (status === 'error') {
+    return [
+      { key: 'reconnect', tone: 'primary' },
+      { key: 'copyError', tone: 'default', disabled: !String(state.error || '').trim() },
+      { key: 'audit', tone: 'default' },
+    ];
+  }
+  if (status === 'closed') {
+    return [
+      { key: 'reconnect', tone: 'primary' },
+      { key: 'audit', tone: 'default' },
+    ];
+  }
+  return [];
+}
+
 function formatDuration(ms) {
   const seconds = Math.max(0, ms / 1000);
   if (seconds < 60) return `${seconds.toFixed(seconds < 10 ? 1 : 0)}s`;

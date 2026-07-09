@@ -126,7 +126,7 @@ import {
   buildTunnelSummary,
 } from './remoteWorkspace.js';
 import TerminalPane from './components/TerminalPane.jsx';
-import { buildTerminalStatusFacts } from './terminalStatus.js';
+import { buildTerminalRecoveryActions, buildTerminalStatusFacts } from './terminalStatus.js';
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
 import { hasWailsMethod } from './desktopBridge.js';
 import {
@@ -1365,8 +1365,32 @@ function App() {
     }));
   };
 
+  const copyTerminalError = async (sessionId) => {
+    const error = terminalStatuses[sessionId]?.error || '';
+    if (!error) {
+      message.info(t('message.noTerminalError'));
+      return;
+    }
+    try {
+      await navigator.clipboard?.writeText(error);
+      message.success(t('message.copied'));
+    } catch (error_) {
+      message.error(`${t('message.clipboardFailed')}: ${error_}`);
+    }
+  };
+
+  const openSessionAudit = (sessionId) => {
+    setActiveKey(sessionId);
+    setSelectedNav('audit');
+  };
+
   const renderTerminalPane = (session) => (
-    <TerminalFrame status={terminalStatuses[session.id]}>
+    <TerminalFrame
+      onCopyError={() => copyTerminalError(session.id)}
+      onOpenAudit={() => openSessionAudit(session.id)}
+      onReconnect={() => reconnectSession(session.id)}
+      status={terminalStatuses[session.id]}
+    >
       <TerminalPane
         key={`${session.id}-${session.revision || 0}`}
         ref={(el) => {
@@ -4112,18 +4136,46 @@ function SessionStrip({
   );
 }
 
-function TerminalFrame({ children, status }) {
+function TerminalFrame({
+  children,
+  onCopyError,
+  onOpenAudit,
+  onReconnect,
+  status,
+}) {
   const facts = buildTerminalStatusFacts(status || {});
+  const recoveryActions = buildTerminalRecoveryActions(status || {});
   return (
     <div className="terminal-frame">
       <div className="terminal-frame-body">{children}</div>
       <div className="terminal-status-bar">
-        {facts.map((fact) => (
-          <span key={fact.key} className={`terminal-status-fact tone-${fact.tone}`}>
-            <small>{terminalStatusFactLabel(fact)}</small>
-            <strong>{terminalStatusFactValue(fact)}</strong>
-          </span>
-        ))}
+        <div className="terminal-status-facts">
+          {facts.map((fact) => (
+            <span key={fact.key} className={`terminal-status-fact tone-${fact.tone}`}>
+              <small>{terminalStatusFactLabel(fact)}</small>
+              <strong>{terminalStatusFactValue(fact)}</strong>
+            </span>
+          ))}
+        </div>
+        {recoveryActions.length > 0 && (
+          <div className="terminal-recovery-actions">
+            {recoveryActions.map((action) => (
+              <Button
+                key={action.key}
+                size="small"
+                type={action.tone === 'primary' ? 'primary' : 'default'}
+                disabled={action.disabled}
+                onClick={() => runTerminalRecoveryAction(action.key, {
+                  onCopyError,
+                  onOpenAudit,
+                  onReconnect,
+                })}
+              >
+                {terminalRecoveryActionLabel(action)}
+              </Button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -4682,6 +4734,19 @@ function terminalStatusFactLabel(fact) {
 function terminalStatusFactValue(fact) {
   if (fact.key === 'status') return t(`terminal.runStatus.${fact.value}`);
   return fact.value || '-';
+}
+
+function terminalRecoveryActionLabel(action) {
+  if (action.key === 'reconnect') return t('action.reconnect');
+  if (action.key === 'copyError') return t('action.copyError');
+  if (action.key === 'audit') return t('nav.audit');
+  return action.key;
+}
+
+function runTerminalRecoveryAction(key, actions) {
+  if (key === 'reconnect') actions.onReconnect?.();
+  if (key === 'copyError') actions.onCopyError?.();
+  if (key === 'audit') actions.onOpenAudit?.();
 }
 
 function connectionGroupLabel(item) {

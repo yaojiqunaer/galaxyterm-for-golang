@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  buildTerminalRecoveryActions,
   buildTerminalStatusFacts,
   normalizeTerminalStatus,
   terminalStatusTone,
@@ -38,3 +39,16 @@ assert.deepEqual(buildTerminalStatusFacts({
   { key: 'duration', value: '1m 5s', tone: 'neutral' },
   { key: 'size', value: '80x24', tone: 'neutral' },
 ]);
+
+assert.deepEqual(buildTerminalRecoveryActions({
+  error: 'connection reset',
+  status: 'error',
+}).map((action) => action.key), ['reconnect', 'copyError', 'audit']);
+
+assert.deepEqual(buildTerminalRecoveryActions({
+  status: 'closed',
+}).map((action) => action.key), ['reconnect', 'audit']);
+
+assert.deepEqual(buildTerminalRecoveryActions({
+  status: 'idle',
+}), []);

@@ -934,11 +934,28 @@ select {
   display: flex;
   align-items: center;
   gap: 6px;
+  justify-content: space-between;
   min-height: 28px;
   padding: 3px 8px;
   overflow-x: auto;
   border-top: 1px solid var(--terminal-border);
   background: var(--terminal-chrome);
+}
+
+.terminal-status-facts,
+.terminal-recovery-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.terminal-status-facts {
+  overflow-x: auto;
+}
+
+.terminal-recovery-actions {
+  flex: 0 0 auto;
 }
 
 .terminal-status-fact {
