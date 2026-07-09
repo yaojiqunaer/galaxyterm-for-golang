@@ -3,6 +3,7 @@ import {
   buildCommandHistoryEntry,
   filterCommandHistory,
   isSensitiveCommand,
+  normalizeCommandHistoryItem,
   upsertCommandHistory,
 } from './commandHistory.js';
 
@@ -28,7 +29,7 @@ assert.equal(buildCommandHistoryEntry('export TOKEN=abc123', baseContext), null)
 
 const history = upsertCommandHistory([
   { command: 'pwd', providerType: 'local', sessionId: 'local-1', sessionLabel: 'Local', updatedAt: '2026-07-01T00:00:00.000Z' },
-  { command: 'kubectl get pods', providerType: 'ssh', sessionId: 'old', sessionLabel: 'Old', updatedAt: '2026-07-01T00:00:01.000Z' },
+  { command: 'kubectl get pods', favorite: true, providerType: 'ssh', sessionId: 'old', sessionLabel: 'Old', updatedAt: '2026-07-01T00:00:01.000Z' },
 ], buildCommandHistoryEntry('kubectl get pods', baseContext), {
   limit: 3,
   now: () => '2026-07-08T10:00:00.000Z',
@@ -37,6 +38,7 @@ const history = upsertCommandHistory([
 assert.deepEqual(history, [
   {
     command: 'kubectl get pods',
+    favorite: true,
     providerType: 'ssh',
     sessionId: 'session-1',
     sessionLabel: 'Prod Shell',
@@ -61,7 +63,7 @@ assert.deepEqual(upsertCommandHistory([
 
 const mixedHistory = [
   { command: 'kubectl get pods', providerType: 'ssh', sessionId: 'session-1', sessionLabel: 'Prod Shell', updatedAt: '3' },
-  { command: 'docker ps', providerType: 'docker', sessionId: 'session-2', sessionLabel: 'Docker', updatedAt: '2' },
+  { command: 'docker ps', favorite: true, providerType: 'docker', sessionId: 'session-2', sessionLabel: 'Docker', updatedAt: '2' },
   { command: 'pwd', providerType: 'local', sessionId: 'session-3', sessionLabel: 'Local', updatedAt: '1' },
 ];
 
@@ -73,3 +75,18 @@ assert.deepEqual(
   filterCommandHistory(mixedHistory, { sessionId: 'session-2' }).map((item) => item.command),
   ['docker ps'],
 );
+assert.deepEqual(
+  filterCommandHistory(mixedHistory, { providerType: 'all' }).map((item) => item.command),
+  ['docker ps', 'kubectl get pods', 'pwd'],
+);
+assert.deepEqual(normalizeCommandHistoryItem({
+  command: 'pwd',
+  providerType: 'local',
+}), {
+  command: 'pwd',
+  favorite: false,
+  providerType: 'local',
+  sessionId: '',
+  sessionLabel: '',
+  updatedAt: '',
+});

@@ -138,6 +138,7 @@ import {
 import {
   buildCommandHistoryEntry,
   filterCommandHistory,
+  normalizeCommandHistoryItem,
   upsertCommandHistory,
 } from './commandHistory.js';
 import {
@@ -1344,6 +1345,16 @@ function App() {
     if (!item?.command) return;
     runQuickCommand(item.command);
     setHistoryOpen(false);
+  };
+
+  const toggleCommandHistoryFavorite = (item) => {
+    const nextHistory = commandHistory.map((historyItem) => (
+      historyItem.command === item.command && historyItem.providerType === item.providerType
+        ? { ...historyItem, favorite: !historyItem.favorite }
+        : historyItem
+    ));
+    persistCommandHistory(nextHistory);
+    setCommandHistory(nextHistory);
   };
 
   const runPaletteAction = (item) => {
@@ -3758,6 +3769,12 @@ function App() {
               className="command-history-row"
               actions={[
                 <Button
+                  key="favorite"
+                  size="small"
+                  icon={item.favorite ? <StarFilled /> : <StarOutlined />}
+                  onClick={() => toggleCommandHistoryFavorite(item)}
+                />,
+                <Button
                   key="run"
                   size="small"
                   type="primary"
@@ -4421,7 +4438,10 @@ function loadCommandHistory() {
   try {
     const parsed = JSON.parse(localStorage.getItem(commandHistoryStorageKey) || '[]');
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((item) => item?.command && item?.providerType).slice(0, 80);
+    return parsed
+      .filter((item) => item?.command && item?.providerType)
+      .map(normalizeCommandHistoryItem)
+      .slice(0, 80);
   } catch {
     return [];
   }

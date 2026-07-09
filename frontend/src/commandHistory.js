@@ -28,8 +28,10 @@ export function upsertCommandHistory(history = [], entry = null, {
   now = () => new Date().toISOString(),
 } = {}) {
   if (!entry?.command) return history;
+  const previous = history.find((item) => sameCommandScope(item, entry));
   const updated = {
     ...entry,
+    favorite: previous?.favorite === true,
     updatedAt: now(),
   };
   const deduped = history.filter((item) => !sameCommandScope(item, updated));
@@ -42,17 +44,30 @@ export function filterCommandHistory(history = [], {
   sessionId = '',
 } = {}) {
   const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  return history.filter((item) => {
-    if (providerType !== 'all' && item.providerType !== providerType) return false;
-    if (sessionId && item.sessionId !== sessionId) return false;
-    if (tokens.length === 0) return true;
-    const searchable = [
-      item.command,
-      item.providerType,
-      item.sessionLabel,
-    ].filter(Boolean).join(' ').toLowerCase();
-    return tokens.every((token) => searchable.includes(token));
-  });
+  return history
+    .filter((item) => {
+      if (providerType !== 'all' && item.providerType !== providerType) return false;
+      if (sessionId && item.sessionId !== sessionId) return false;
+      if (tokens.length === 0) return true;
+      const searchable = [
+        item.command,
+        item.providerType,
+        item.sessionLabel,
+      ].filter(Boolean).join(' ').toLowerCase();
+      return tokens.every((token) => searchable.includes(token));
+    })
+    .sort((left, right) => Number(!!right.favorite) - Number(!!left.favorite));
+}
+
+export function normalizeCommandHistoryItem(item = {}) {
+  return {
+    command: String(item.command || '').trim(),
+    favorite: item.favorite === true,
+    providerType: item.providerType || 'terminal',
+    sessionId: item.sessionId || '',
+    sessionLabel: item.sessionLabel || '',
+    updatedAt: item.updatedAt || '',
+  };
 }
 
 function sameCommandScope(left = {}, right = {}) {
