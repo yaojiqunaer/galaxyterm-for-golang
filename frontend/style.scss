@@ -63,6 +63,94 @@ html {
   scroll-behavior: smooth;
 }
 
+.app-error-boundary {
+  display: grid;
+  min-height: 100%;
+  padding: 32px;
+  place-items: center;
+  background: var(--bg);
+}
+
+.app-error-panel {
+  width: min(680px, 100%);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.app-error-content {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  padding: 40px 32px 24px;
+  text-align: center;
+}
+
+.app-error-symbol {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 18px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, #ef4444 58%, var(--border));
+  border-radius: 50%;
+  color: #ef4444;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.app-error-content h1 {
+  margin: 0;
+  color: var(--text);
+  font-size: 22px;
+}
+
+.app-error-content p {
+  max-width: 520px;
+  margin: 12px 0 20px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.app-error-reload {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 6px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: var(--accent);
+  color: var(--terminal-bg);
+  cursor: pointer;
+}
+
+.app-error-reload:hover {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+}
+
+.app-error-details {
+  margin: 0 24px 24px;
+  color: var(--muted);
+}
+
+.app-error-details summary {
+  cursor: pointer;
+}
+
+.app-error-details pre {
+  max-height: 180px;
+  padding: 12px;
+  overflow: auto;
+  border-radius: 6px;
+  background: var(--panel-muted);
+  color: var(--text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 button,
 input,
 textarea,

@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const source = await readFile(new URL('./App.jsx', import.meta.url), 'utf8');
+const mainSource = await readFile(new URL('./main.jsx', import.meta.url), 'utf8');
 const styles = await readFile(new URL('../style.scss', import.meta.url), 'utf8');
 const activeSessionDeclaration = source.indexOf('const activeSession =');
 const firstActiveSessionUsage = source.indexOf('activeSession?.providerType');
@@ -36,6 +37,10 @@ assert.ok(!styles.includes('min-width: 900px'), 'the app shell must not force a 
 assert.ok(
   styles.includes('.workspace-sidebar:not(.ant-layout-sider-collapsed)'),
   'legacy narrow sidebar sizing must not override the collapsed rail width',
+);
+assert.ok(
+  /<AppErrorBoundary>\s*<App\s*\/>\s*<\/AppErrorBoundary>/.test(mainSource),
+  'the application root must recover from render failures instead of showing a blank window',
 );
 
 console.log('app structure tests passed');
