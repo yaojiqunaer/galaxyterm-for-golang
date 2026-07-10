@@ -3643,23 +3643,38 @@ function App() {
       <Layout className="main-layout">
         <div className="topbar">
           <Space className="topbar-command-group">
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => openDrawer()}>
-              {t('action.newTerminal')}
-            </Button>
+            <Tooltip title={t('action.newTerminal')}>
+              <Button
+                aria-label={t('action.newTerminal')}
+                className="topbar-new-terminal"
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => openDrawer()}
+              >
+                <span className="topbar-button-label">{t('action.newTerminal')}</span>
+              </Button>
+            </Tooltip>
             <Button className="topbar-secondary-action" icon={<CloudServerOutlined />} onClick={() => openDrawer('ssh')}>
               {t('action.quickSsh')}
             </Button>
-            <Button className="command-palette-trigger" icon={<ThunderboltOutlined />} onClick={() => setPaletteOpen(true)}>
-              {t('placeholder.commandPalette')}
-              <Text code>{commandPaletteShortcut}</Text>
-            </Button>
+            <Tooltip title={t('placeholder.commandPalette')}>
+              <Button
+                aria-label={t('placeholder.commandPalette')}
+                className="command-palette-trigger"
+                icon={<ThunderboltOutlined />}
+                onClick={() => setPaletteOpen(true)}
+              >
+                <span className="command-palette-label">{t('placeholder.commandPalette')}</span>
+                <Text className="command-palette-shortcut" code>{commandPaletteShortcut}</Text>
+              </Button>
+            </Tooltip>
             {sessions.length > 0 && (
               <Dropdown menu={{ items: sessionMenuItems, onClick: ({ key }) => sessionMenuActions[key]?.() }} trigger={['click']}>
-                <Button icon={<MoreOutlined />} aria-label={t('action.sessionActions')} />
+                <Button icon={<CodeOutlined />} aria-label={t('action.sessionActions')} title={t('action.sessionActions')} />
               </Dropdown>
             )}
             <Dropdown menu={{ items: workspaceMenuItems, onClick: ({ key }) => workspaceMenuActions[key]?.() }} trigger={['click']}>
-              <Button icon={<MoreOutlined />} aria-label={t('action.workspaceActions')} />
+              <Button icon={<MoreOutlined />} aria-label={t('action.workspaceActions')} title={t('action.workspaceActions')} />
             </Dropdown>
           </Space>
           <Space className="topbar-actions">

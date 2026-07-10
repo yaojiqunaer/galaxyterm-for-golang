@@ -50,5 +50,15 @@ assert.ok(
   source.includes('<SessionToolbarActions model={sessionToolbarModel}'),
   'session management must use the compact toolbar action model',
 );
+assert.ok(
+  source.includes('className="topbar-new-terminal"')
+    && source.includes('className="command-palette-label"')
+    && source.includes('className="command-palette-shortcut"'),
+  'topbar primary commands must expose responsive label hooks',
+);
+assert.ok(
+  /@media \(max-width: 860px\)[\s\S]*?\.topbar-new-terminal[\s\S]*?\.command-palette-label/.test(styles),
+  'narrow workspaces must collapse primary topbar labels without hiding their commands',
+);
 
 console.log('app structure tests passed');
