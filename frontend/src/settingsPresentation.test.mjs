@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   buildAppearanceSummary,
   buildOperationalSummary,
+  buildSettingsSectionNav,
   buildSecuritySummary,
   buildShortcutGroups,
   buildTerminalDefaults,
@@ -9,8 +10,23 @@ import {
   buildWorkspaceSnapshotSummary,
   isCommandShortcut,
   normalizeShortcutModifier,
+  resolveSettingsSectionNavigation,
   shortcutModifierLabel,
 } from './settingsPresentation.js';
+
+assert.deepEqual(buildSettingsSectionNav('terminal'), [
+  { active: false, key: 'interface', labelKey: 'settings.interface' },
+  { active: true, key: 'terminal', labelKey: 'settings.terminal' },
+  { active: false, key: 'workspace', labelKey: 'settings.workspace' },
+  { active: false, key: 'security', labelKey: 'settings.security' },
+  { active: false, key: 'shortcuts', labelKey: 'settings.shortcuts' },
+]);
+assert.equal(buildSettingsSectionNav('missing')[0].active, true);
+assert.equal(resolveSettingsSectionNavigation('interface', 'ArrowRight'), 'terminal');
+assert.equal(resolveSettingsSectionNavigation('interface', 'ArrowLeft'), 'shortcuts');
+assert.equal(resolveSettingsSectionNavigation('workspace', 'Home'), 'interface');
+assert.equal(resolveSettingsSectionNavigation('workspace', 'End'), 'shortcuts');
+assert.equal(resolveSettingsSectionNavigation('workspace', 'Enter'), '');
 
 assert.deepEqual(buildAppearanceSummary({
   appTheme: 'system',

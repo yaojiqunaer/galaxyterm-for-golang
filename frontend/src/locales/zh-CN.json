@@ -370,6 +370,7 @@
   "settings.workspace": "工作区",
   "settings.security": "安全",
   "settings.shortcuts": "快捷键",
+  "settings.sectionNavigation": "设置分类",
   "settings.autoSaveHint": "会保存标签、分屏和非敏感连接信息。",
   "settings.autoRestoreHint": "仅自动恢复无需密码的本地会话，远程会话不会保存密码或私钥。",
   "settings.workspaceSnapshot": "已保存快照",

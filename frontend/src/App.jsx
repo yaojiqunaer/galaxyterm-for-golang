@@ -115,6 +115,7 @@ import {
 import {
   buildAppearanceSummary,
   buildOperationalSummary,
+  buildSettingsSectionNav,
   buildSecuritySummary,
   buildShortcutGroups,
   buildTerminalDefaults,
@@ -123,6 +124,7 @@ import {
   normalizeShortcutModifier,
   buildWorkspaceSnapshotSummary,
   normalizeLogLevel,
+  resolveSettingsSectionNavigation,
   shortcutModifierLabel,
 } from './settingsPresentation.js';
 import {
@@ -287,6 +289,7 @@ function App() {
   const [paletteQuery, setPaletteQuery] = useState('');
   const [paletteActiveIndex, setPaletteActiveIndex] = useState(-1);
   const [selectedNav, setSelectedNav] = useState('connections');
+  const [settingsSection, setSettingsSection] = useState('interface');
   const [sessionView, setSessionView] = useState('tabs');
   const [sessionQuery, setSessionQuery] = useState('');
   const [sessionStatusFilter, setSessionStatusFilter] = useState('active');
@@ -2712,8 +2715,19 @@ function App() {
     );
   };
 
+  const settingsSectionNav = buildSettingsSectionNav(settingsSection);
+  const handleSettingsSectionKeyDown = (event) => {
+    const nextSection = resolveSettingsSectionNavigation(settingsSection, event.key);
+    if (!nextSection) return;
+    event.preventDefault();
+    setSettingsSection(nextSection);
+    globalThis.requestAnimationFrame?.(() => {
+      document.getElementById(`settings-tab-${nextSection}`)?.focus();
+    });
+  };
+
   const renderSettings = () => (
-    <div className="workspace-page narrow">
+    <div className="workspace-page settings-page">
       <div className="page-header">
         <div>
           <Text type="secondary">{t('nav.settings')}</Text>
@@ -2728,8 +2742,31 @@ function App() {
           </span>
         ))}
       </div>
-      <Space direction="vertical" size={14} className="settings-stack">
-        <Card title={t('settings.interface')}>
+      <div className="settings-workbench">
+        <nav
+          aria-label={t('settings.sectionNavigation')}
+          className="settings-section-nav"
+          onKeyDown={handleSettingsSectionKeyDown}
+          role="tablist"
+        >
+          {settingsSectionNav.map((item) => (
+            <button
+              aria-controls={`settings-panel-${item.key}`}
+              aria-selected={item.active}
+              className={item.active ? 'active' : ''}
+              id={`settings-tab-${item.key}`}
+              key={item.key}
+              onClick={() => setSettingsSection(item.key)}
+              role="tab"
+              tabIndex={item.active ? 0 : -1}
+              type="button"
+            >
+              {t(item.labelKey)}
+            </button>
+          ))}
+        </nav>
+        <div className="settings-panel-stack">
+          <SettingsPanel activeSection={settingsSection} section="interface" title={t('settings.interface')}>
           <Form layout="vertical">
             <Form.Item label={t('field.locale')}>
               <Select
@@ -2766,9 +2803,9 @@ function App() {
             </Form.Item>
             <Text type="secondary">{t('settings.languageHint')}</Text>
           </Form>
-        </Card>
+          </SettingsPanel>
 
-        <Card title={t('settings.terminal')}>
+          <SettingsPanel activeSection={settingsSection} section="terminal" title={t('settings.terminal')}>
           <TerminalSettingsPreview preview={buildTerminalPreview(settings)} />
           <Form layout="vertical">
             <Form.Item label={t('field.terminalTheme')}>
@@ -2825,9 +2862,9 @@ function App() {
               </Form.Item>
             </Space>
           </Form>
-        </Card>
+          </SettingsPanel>
 
-        <Card title={t('settings.workspace')}>
+          <SettingsPanel activeSection={settingsSection} section="workspace" title={t('settings.workspace')}>
           <Space direction="vertical" className="settings-stack">
             <Space align="center" className="settings-row">
               <div>
@@ -2856,9 +2893,9 @@ function App() {
               <Button danger icon={<DeleteOutlined />} onClick={clearWorkspaceSnapshot}>{t('action.clearWorkspace')}</Button>
             </Space>
           </Space>
-        </Card>
+          </SettingsPanel>
 
-        <Card title={t('settings.security')}>
+          <SettingsPanel activeSection={settingsSection} section="security" title={t('settings.security')}>
           <Space direction="vertical" className="settings-stack">
             <Alert type="success" showIcon message={t('settings.secretsHint')} />
             <div className="settings-mini-summary">
@@ -2901,9 +2938,9 @@ function App() {
               <Text type="secondary">{t('settings.logLevelHint')}</Text>
             </Form>
           </Space>
-        </Card>
+          </SettingsPanel>
 
-        <Card title={t('settings.shortcuts')}>
+          <SettingsPanel activeSection={settingsSection} section="shortcuts" title={t('settings.shortcuts')}>
           <Form layout="vertical" className="settings-shortcut-form">
             <Form.Item label={t('field.shortcutModifier')}>
               <Select
@@ -2935,8 +2972,9 @@ function App() {
               </div>
             ))}
           </div>
-        </Card>
-      </Space>
+          </SettingsPanel>
+        </div>
+      </div>
     </div>
   );
 
@@ -4339,6 +4377,19 @@ function ProviderCard({ provider, openDrawer }) {
       <strong>{providerLabel(provider)}</strong>
       <small>{provider.category === 'builtin' ? t('provider.category.builtin') : t('provider.category.extension')}</small>
     </button>
+  );
+}
+
+function SettingsPanel({ activeSection, children, section, title }) {
+  return (
+    <section
+      aria-labelledby={`settings-tab-${section}`}
+      hidden={activeSection !== section}
+      id={`settings-panel-${section}`}
+      role="tabpanel"
+    >
+      <Card title={title}>{children}</Card>
+    </section>
   );
 }
 

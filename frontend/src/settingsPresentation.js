@@ -1,3 +1,28 @@
+const settingsSectionKeys = ['interface', 'terminal', 'workspace', 'security', 'shortcuts'];
+
+export function buildSettingsSectionNav(activeSection = 'interface') {
+  const active = normalizeSettingsSection(activeSection);
+  return settingsSectionKeys.map((key) => ({
+    active: key === active,
+    key,
+    labelKey: `settings.${key}`,
+  }));
+}
+
+export function resolveSettingsSectionNavigation(activeSection = 'interface', key = '') {
+  const active = normalizeSettingsSection(activeSection);
+  const currentIndex = settingsSectionKeys.indexOf(active);
+  if (key === 'Home') return settingsSectionKeys[0];
+  if (key === 'End') return settingsSectionKeys[settingsSectionKeys.length - 1];
+  if (key === 'ArrowRight' || key === 'ArrowDown') {
+    return settingsSectionKeys[(currentIndex + 1) % settingsSectionKeys.length];
+  }
+  if (key === 'ArrowLeft' || key === 'ArrowUp') {
+    return settingsSectionKeys[(currentIndex - 1 + settingsSectionKeys.length) % settingsSectionKeys.length];
+  }
+  return '';
+}
+
 export function buildAppearanceSummary(settings = {}) {
   return [
     { key: 'appTheme', value: settings.appTheme || 'system' },
@@ -131,4 +156,8 @@ function clampNumber(value, min, max, fallback) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(min, Math.min(max, parsed));
+}
+
+function normalizeSettingsSection(value) {
+  return settingsSectionKeys.includes(value) ? value : settingsSectionKeys[0];
 }

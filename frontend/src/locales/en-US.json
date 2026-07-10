@@ -370,6 +370,7 @@
   "settings.workspace": "Workspace",
   "settings.security": "Security",
   "settings.shortcuts": "Shortcuts",
+  "settings.sectionNavigation": "Settings categories",
   "settings.autoSaveHint": "Saves tabs, split view, and non-sensitive connection metadata.",
   "settings.autoRestoreHint": "Only local sessions are auto-restored. Remote passwords and private keys are never saved.",
   "settings.workspaceSnapshot": "Saved snapshot",
