@@ -31,6 +31,7 @@ import {
 } from 'antd';
 import {
   ApiOutlined,
+  AppstoreOutlined,
   AuditOutlined,
   AppstoreAddOutlined,
   CaretRightOutlined,
@@ -52,11 +53,13 @@ import {
   ImportOutlined,
   QuestionCircleOutlined,
   LaptopOutlined,
+  LeftOutlined,
   MinusOutlined,
   MoreOutlined,
   PauseOutlined,
   PlusOutlined,
   ReloadOutlined,
+  RightOutlined,
   SaveOutlined,
   SettingOutlined,
   StarFilled,
@@ -105,6 +108,7 @@ import {
   buildSessionContextFacts,
   buildSessionNavigationState,
   buildSessionStatusFacts,
+  buildSessionToolbarModel,
   filterSessions,
   profileActionModel,
   sessionTabDisplay,
@@ -291,8 +295,6 @@ function App() {
   const [selectedNav, setSelectedNav] = useState('connections');
   const [settingsSection, setSettingsSection] = useState('interface');
   const [sessionView, setSessionView] = useState('tabs');
-  const [sessionQuery, setSessionQuery] = useState('');
-  const [sessionStatusFilter, setSessionStatusFilter] = useState('active');
   const [profileQuery, setProfileQuery] = useState('');
   const [groupQuery, setGroupQuery] = useState('all');
   const [providerFilter, setProviderFilter] = useState('all');
@@ -621,11 +623,6 @@ function App() {
   const activeSessionAuditSummary = buildSessionAuditSummary(activeSession, {
     recordingActive: activeSessionRecordingActive,
   });
-  const visibleSessions = useMemo(() => filterSessions(sessions, {
-    activeKey,
-    query: sessionQuery,
-    status: sessionStatusFilter,
-  }), [activeKey, sessionQuery, sessionStatusFilter, sessions]);
   const sidebarSessions = useMemo(() => filterSessions(sessions, {
     activeKey,
     status: 'active',
@@ -1698,6 +1695,7 @@ function App() {
     if (sessions.length === 0) {
       return (
         <SessionEmptyPanel
+          openConnections={() => setSelectedNav('connections')}
           openDrawer={openDrawer}
           openProfile={openProfile}
           openRecentConnection={openRecentConnection}
@@ -1708,46 +1706,26 @@ function App() {
         />
       );
     }
-    const sessionFilterControls = (
-      <div className="session-filter-bar">
-        <Input
-          allowClear
-          className="session-filter-search"
-          placeholder={t('placeholder.searchSessions')}
-          value={sessionQuery}
-          onChange={(event) => setSessionQuery(event.target.value)}
-        />
-        <Segmented
-          size="small"
-          value={sessionStatusFilter}
-          options={[
-            { value: 'active', label: t('filter.activeSessions') },
-            { value: 'all', label: t('filter.allSessions') },
-            { value: 'connected', label: t('session.status.connected') },
-            { value: 'connecting', label: t('session.status.connecting') },
-            { value: 'closed', label: t('session.status.closed') },
-          ]}
-          onChange={setSessionStatusFilter}
-        />
-        <Text type="secondary">{t('session.filterSummary', { count: visibleSessions.length, total: sessions.length })}</Text>
-      </div>
-    );
-    const sessionSwitcher = (
-      <div className="session-switcher-list">
-        {visibleSessions.length === 0 ? (
-          <Empty className="session-filter-empty" image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noSessionMatches')} />
-        ) : visibleSessions.map((session, index) => (
-          <button
-            key={session.id}
-            type="button"
-            className={session.id === activeKey ? 'session-switcher-item active' : 'session-switcher-item'}
-            onClick={() => setActiveKey(session.id)}
-          >
-            <SessionTabLabel active={session.id === activeKey} session={session} />
-            {index < 9 && <Text code>{index + 1}</Text>}
-          </button>
-        ))}
-      </div>
+    const sessionToolbarModel = buildSessionToolbarModel({
+      activeKey,
+      canNavigate: sessionNavigationState.canNavigate,
+      closedCount: currentSessionSummary.closed,
+      sessionCount: sessions.length,
+      view: sessionView,
+    });
+    const runSessionToolbarAction = (action) => {
+      if (action === 'grid') setSessionView('grid');
+      if (action === 'tabs') setSessionView('tabs');
+      if (action === 'previous') switchSession('previous');
+      if (action === 'next') switchSession('next');
+      if (action === 'reconnect') reconnectSession();
+      if (action === 'rename') openRenameSession();
+      if (action === 'closeClosed') confirmCloseClosedSessions();
+      if (action === 'closeOthers') confirmCloseOtherSessions();
+      if (action === 'closeCurrent') confirmRemoveSession(activeKey);
+    };
+    const sessionToolbarActions = (
+      <SessionToolbarActions model={sessionToolbarModel} onAction={runSessionToolbarAction} />
     );
     if (sessionView === 'grid') {
       return (
@@ -1760,10 +1738,8 @@ function App() {
               providers={providers}
               summary={currentSessionSummary}
             />
-            <Button size="small" onClick={() => setSessionView('tabs')}>{t('action.tabs')}</Button>
+            {sessionToolbarActions}
           </div>
-          {sessionFilterControls}
-          {sessionSwitcher}
           <div className="session-grid">
             {sessions.map((session) => (
               <div
@@ -1797,19 +1773,8 @@ function App() {
             providers={providers}
             summary={currentSessionSummary}
           />
-          <Space size={6} wrap>
-            <Button size="small" onClick={() => setSessionView('grid')}>{t('action.grid')}</Button>
-            <Button size="small" onClick={() => switchSession('previous')} disabled={!sessionNavigationState.canNavigate}>{t('action.previousSession')}</Button>
-            <Button size="small" onClick={() => switchSession('next')} disabled={!sessionNavigationState.canNavigate}>{t('action.nextSession')}</Button>
-            <Button size="small" icon={<ReloadOutlined />} onClick={() => reconnectSession()} disabled={!activeKey}>{t('action.reconnect')}</Button>
-            <Button size="small" icon={<EditOutlined />} onClick={() => openRenameSession()} disabled={!activeKey}>{t('action.renameSession')}</Button>
-            <Button size="small" onClick={confirmCloseClosedSessions} disabled={currentSessionSummary.closed === 0}>{t('action.closeClosed')}</Button>
-            <Button size="small" danger onClick={confirmCloseOtherSessions} disabled={!activeKey || sessions.length <= 1}>{t('action.closeOthers')}</Button>
-            <Button size="small" danger onClick={() => confirmRemoveSession(activeKey)} disabled={!activeKey}>{t('action.delete')}</Button>
-          </Space>
+          {sessionToolbarActions}
         </div>
-        {sessionFilterControls}
-        {sessionSwitcher}
         <Tabs
           className="terminal-tabs"
           type="editable-card"
@@ -4304,6 +4269,7 @@ function WelcomePanel({ providers, openDrawer }) {
 }
 
 function SessionEmptyPanel({
+  openConnections,
   openDrawer,
   openProfile,
   openRecentConnection,
@@ -4313,12 +4279,15 @@ function SessionEmptyPanel({
   restoreWorkspace,
 }) {
   const suggestedProfiles = sortSidebarProfiles(profiles, 4, { availableProviders: providers });
+  const hasSuggestions = suggestedProfiles.length > 0 || recentConnections.length > 0;
   return (
-    <div className="session-empty-panel">
+    <div className={`session-empty-panel${hasSuggestions ? ' has-suggestions' : ''}`}>
       <div className="session-empty-primary">
-        <Text type="secondary">{t('nav.sessions')}</Text>
-        <Title level={2}>{t('session.empty.title')}</Title>
-        <Text>{t('session.empty.description')}</Text>
+        <span className="session-empty-icon"><CodeOutlined /></span>
+        <div className="session-empty-copy">
+          <Title level={2}>{t('session.empty.title')}</Title>
+          <Text>{t('session.empty.description')}</Text>
+        </div>
         <Space className="session-empty-actions" wrap>
           <Button type="primary" icon={<LaptopOutlined />} onClick={() => openDrawer('local')}>
             {t('provider.local.name')}
@@ -4330,42 +4299,46 @@ function SessionEmptyPanel({
             {t('action.restoreWorkspace')}
           </Button>
         </Space>
+        <Button className="session-empty-connection-link" type="link" icon={<FolderOpenOutlined />} onClick={openConnections}>
+          {t('section.connectionManager')}
+        </Button>
       </div>
-      <div className="session-empty-side">
-        <Text strong>{t('section.savedConnections')}</Text>
-        {suggestedProfiles.length === 0 ? (
-          <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noConnections')} />
-        ) : (
-          <div className="session-empty-profile-list">
-            {suggestedProfiles.map((profile) => (
-              <button key={profile.id} type="button" onClick={() => openProfile(profile)}>
-                <span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>
-                <span>
-                  <strong>{profile.displayName}</strong>
-                  <small>{buildConnectionProfileSubtitle(profile)}</small>
-                </span>
-              </button>
-            ))}
-          </div>
-        )}
-        {recentConnections.length > 0 && (
-          <>
-            <Divider />
-            <Text strong>{t('section.recentConnections')}</Text>
-            <div className="session-empty-profile-list compact">
-              {recentConnections.slice(0, 3).map((connection) => (
-                <button key={connection.id} type="button" onClick={() => openRecentConnection(connection)}>
-                  <span className="provider-icon">{providerIcons[connection.providerType] || <CodeOutlined />}</span>
-                  <span>
-                    <strong>{connection.displayName}</strong>
-                    <small>{connection.description}</small>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
+      {hasSuggestions && (
+        <div className="session-empty-side">
+          {suggestedProfiles.length > 0 && (
+            <section>
+              <Text strong>{t('section.savedConnections')}</Text>
+              <div className="session-empty-profile-list">
+                {suggestedProfiles.map((profile) => (
+                  <button key={profile.id} type="button" onClick={() => openProfile(profile)}>
+                    <span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>
+                    <span>
+                      <strong>{profile.displayName}</strong>
+                      <small>{buildConnectionProfileSubtitle(profile)}</small>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+          {recentConnections.length > 0 && (
+            <section>
+              <Text strong>{t('section.recentConnections')}</Text>
+              <div className="session-empty-profile-list compact">
+                {recentConnections.slice(0, 3).map((connection) => (
+                  <button key={connection.id} type="button" onClick={() => openRecentConnection(connection)}>
+                    <span className="provider-icon">{providerIcons[connection.providerType] || <CodeOutlined />}</span>
+                    <span>
+                      <strong>{connection.displayName}</strong>
+                      <small>{connection.description}</small>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -4575,6 +4548,61 @@ function SessionSidebarLabel({ session }) {
   );
 }
 
+function SessionToolbarActions({ model, onAction }) {
+  const icons = {
+    grid: <AppstoreOutlined />,
+    next: <RightOutlined />,
+    previous: <LeftOutlined />,
+    reconnect: <ReloadOutlined />,
+    tabs: <CodeOutlined />,
+  };
+  const overflowItems = model.overflow.flatMap((action, index) => [
+    ...(index === 2 ? [{ key: 'danger-divider', type: 'divider' }] : []),
+    {
+      key: action.key,
+      danger: action.danger,
+      disabled: action.disabled,
+      icon: action.key === 'rename' ? <EditOutlined /> : <DeleteOutlined />,
+      label: t(action.labelKey),
+    },
+  ]);
+
+  return (
+    <div className="session-toolbar-actions">
+      <div className="session-toolbar-primary">
+        {model.primary.map((action) => (
+          <Tooltip key={action.key} title={t(action.labelKey)}>
+            <Button
+              aria-label={t(action.labelKey)}
+              className="session-toolbar-button"
+              disabled={action.disabled}
+              icon={icons[action.key]}
+              size="small"
+              type={action.key === 'reconnect' ? 'primary' : 'text'}
+              onClick={() => onAction(action.key)}
+            />
+          </Tooltip>
+        ))}
+      </div>
+      <Tooltip title={t('action.sessionActions')}>
+        <Dropdown
+          menu={{ items: overflowItems, onClick: ({ key }) => onAction(key) }}
+          placement="bottomRight"
+          trigger={['click']}
+        >
+          <Button
+            aria-label={t('action.sessionActions')}
+            className="session-toolbar-button"
+            icon={<MoreOutlined />}
+            size="small"
+            type="text"
+          />
+        </Dropdown>
+      </Tooltip>
+    </div>
+  );
+}
+
 function SessionStrip({
   activeSession,
   auditSummary,
@@ -4589,7 +4617,11 @@ function SessionStrip({
         <span className="session-status-dot" />
         <span className="session-strip-title">
           <strong>{activeSession?.label || '-'}</strong>
-          <small>{activeSession ? providerTypeLabel(activeSession.providerType, providers) : t('empty.noSessions')}</small>
+          <small>
+            {activeSession
+              ? `${providerTypeLabel(activeSession.providerType, providers)} · ${t(`session.status.${sessionStatusLabel(activeSession)}`)}`
+              : t('empty.noSessions')}
+          </small>
         </span>
       </div>
       <div className="session-strip-facts">
@@ -4611,12 +4643,15 @@ function SessionStrip({
         </span>
       </div>
       {auditSummary && (
-        <Alert
-          showIcon
-          type={auditSummary.tone}
-          message={t(auditSummary.titleKey, auditSummary.values)}
-          description={t(auditSummary.descriptionKey, auditSummary.values)}
-        />
+        <Tooltip title={t(auditSummary.descriptionKey, auditSummary.values)}>
+          <span
+            aria-label={t(auditSummary.titleKey, auditSummary.values)}
+            className={`session-audit-indicator tone-${auditSummary.tone}`}
+            role="status"
+          >
+            <AuditOutlined />
+          </span>
+        </Tooltip>
       )}
     </div>
   );

@@ -5,6 +5,7 @@ import {
   buildSessionCloseConfirm,
   buildSessionNavigationState,
   buildSessionStatusFacts,
+  buildSessionToolbarModel,
   filterSessions,
   profileActionModel,
   sessionTabDisplay,
@@ -75,6 +76,48 @@ assert.deepEqual(buildSessionNavigationState([], ''), {
   canNavigate: false,
   nextId: '',
   previousId: '',
+});
+
+assert.deepEqual(buildSessionToolbarModel({
+  activeKey: 's1',
+  canNavigate: true,
+  closedCount: 2,
+  sessionCount: 3,
+  view: 'tabs',
+}), {
+  primary: [
+    { key: 'grid', labelKey: 'action.grid', disabled: false },
+    { key: 'previous', labelKey: 'action.previousSession', disabled: false },
+    { key: 'next', labelKey: 'action.nextSession', disabled: false },
+    { key: 'reconnect', labelKey: 'action.reconnect', disabled: false },
+  ],
+  overflow: [
+    { key: 'rename', labelKey: 'action.renameSession', disabled: false },
+    { key: 'closeClosed', labelKey: 'action.closeClosed', disabled: false },
+    { key: 'closeOthers', labelKey: 'action.closeOthers', disabled: false, danger: true },
+    { key: 'closeCurrent', labelKey: 'action.closeSession', disabled: false, danger: true },
+  ],
+});
+
+assert.deepEqual(buildSessionToolbarModel({
+  activeKey: '',
+  canNavigate: false,
+  closedCount: 0,
+  sessionCount: 0,
+  view: 'grid',
+}), {
+  primary: [
+    { key: 'tabs', labelKey: 'action.tabs', disabled: false },
+    { key: 'previous', labelKey: 'action.previousSession', disabled: true },
+    { key: 'next', labelKey: 'action.nextSession', disabled: true },
+    { key: 'reconnect', labelKey: 'action.reconnect', disabled: true },
+  ],
+  overflow: [
+    { key: 'rename', labelKey: 'action.renameSession', disabled: true },
+    { key: 'closeClosed', labelKey: 'action.closeClosed', disabled: true },
+    { key: 'closeOthers', labelKey: 'action.closeOthers', disabled: true, danger: true },
+    { key: 'closeCurrent', labelKey: 'action.closeSession', disabled: true, danger: true },
+  ],
 });
 
 assert.deepEqual(buildSessionContextFacts({

@@ -42,5 +42,13 @@ assert.ok(
   /<AppErrorBoundary>\s*<App\s*\/>\s*<\/AppErrorBoundary>/.test(mainSource),
   'the application root must recover from render failures instead of showing a blank window',
 );
+assert.ok(
+  !source.includes('session-switcher-list') && !source.includes('session-filter-bar'),
+  'the workspace must not duplicate persistent session tabs with a second filter and switcher stack',
+);
+assert.ok(
+  source.includes('<SessionToolbarActions model={sessionToolbarModel}'),
+  'session management must use the compact toolbar action model',
+);
 
 console.log('app structure tests passed');

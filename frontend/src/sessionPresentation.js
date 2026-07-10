@@ -53,6 +53,41 @@ export function buildSessionNavigationState(sessions = [], activeKey = '') {
   };
 }
 
+export function buildSessionToolbarModel(options = {}) {
+  const hasActiveSession = Boolean(options.activeKey);
+  const canNavigate = Boolean(options.canNavigate);
+  const sessionCount = Number(options.sessionCount) || 0;
+  const closedCount = Number(options.closedCount) || 0;
+  const viewAction = options.view === 'grid'
+    ? { key: 'tabs', labelKey: 'action.tabs', disabled: false }
+    : { key: 'grid', labelKey: 'action.grid', disabled: false };
+
+  return {
+    primary: [
+      viewAction,
+      { key: 'previous', labelKey: 'action.previousSession', disabled: !canNavigate },
+      { key: 'next', labelKey: 'action.nextSession', disabled: !canNavigate },
+      { key: 'reconnect', labelKey: 'action.reconnect', disabled: !hasActiveSession },
+    ],
+    overflow: [
+      { key: 'rename', labelKey: 'action.renameSession', disabled: !hasActiveSession },
+      { key: 'closeClosed', labelKey: 'action.closeClosed', disabled: closedCount === 0 },
+      {
+        key: 'closeOthers',
+        labelKey: 'action.closeOthers',
+        disabled: !hasActiveSession || sessionCount <= 1,
+        danger: true,
+      },
+      {
+        key: 'closeCurrent',
+        labelKey: 'action.closeSession',
+        disabled: !hasActiveSession,
+        danger: true,
+      },
+    ],
+  };
+}
+
 export function buildSessionContextFacts(session, options = {}) {
   if (!session) return [];
   const facts = [
