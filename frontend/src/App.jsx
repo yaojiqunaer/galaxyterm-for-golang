@@ -88,6 +88,7 @@ import {
   buildConnectionProfilePrimaryAction,
   buildConnectionProfileStatusSummary,
   buildConnectionProfileSubtitle,
+  buildConnectionTransferActions,
   filterConnectionProfiles,
   filterRecentConnectionsByProviders,
   isProfileProviderAvailable,
@@ -279,6 +280,9 @@ function App() {
   const [terminalSearch, setTerminalSearch] = useState('');
   const [terminalStatuses, setTerminalStatuses] = useState({});
   const [focusMode, setFocusMode] = useState(false);
+  const [sidebarCompact, setSidebarCompact] = useState(() => (
+    typeof window !== 'undefined' && window.matchMedia('(max-width: 991px)').matches
+  ));
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteQuery, setPaletteQuery] = useState('');
   const [paletteActiveIndex, setPaletteActiveIndex] = useState(-1);
@@ -1438,6 +1442,12 @@ function App() {
     }
   };
 
+  const runConnectionTransferAction = (action) => {
+    if (action === 'importSshConfig') setSshConfigOpen(true);
+    if (action === 'importProfiles') profileImportRef.current?.click();
+    if (action === 'exportProfiles') exportProfiles();
+  };
+
   const importSshConfigProfiles = () => {
     const importedProfiles = parseSshConfigProfiles(sshConfigContent);
     if (importedProfiles.length === 0) {
@@ -1895,9 +1905,26 @@ function App() {
               >
                 {groupQuery === 'all' ? t('action.openAll') : t('action.openGroup')}
               </Button>
-              <Button size="small" onClick={() => setSshConfigOpen(true)}>{t('action.importSshConfig')}</Button>
-              <Button size="small" onClick={() => profileImportRef.current?.click()}>{t('action.import')}</Button>
-              <Button size="small" onClick={exportProfiles} disabled={profiles.length === 0}>{t('action.export')}</Button>
+              <Tooltip title={t('action.connectionTransfer')}>
+                <Dropdown
+                  trigger={['click']}
+                  menu={{
+                    items: buildConnectionTransferActions({ profileCount: profiles.length }).map((action) => ({
+                      key: action.key,
+                      disabled: action.disabled,
+                      icon: action.key === 'exportProfiles' ? <ExportOutlined /> : <ImportOutlined />,
+                      label: t(action.labelKey),
+                    })),
+                    onClick: ({ key }) => runConnectionTransferAction(key),
+                  }}
+                >
+                  <Button
+                    aria-label={t('action.connectionTransfer')}
+                    icon={<MoreOutlined />}
+                    size="small"
+                  />
+                </Dropdown>
+              </Tooltip>
               <input
                 ref={profileImportRef}
                 type="file"
@@ -3483,17 +3510,29 @@ function App() {
       },
     }}>
     <Layout className={`app-shell theme-${isDarkTheme ? 'dark' : 'light'}${focusMode ? ' focus-mode' : ''}`}>
-      <Sider width={248} className="workspace-sidebar">
+      <Sider
+        breakpoint="lg"
+        collapsed={sidebarCompact}
+        collapsedWidth={68}
+        collapsible
+        className="workspace-sidebar"
+        onBreakpoint={setSidebarCompact}
+        trigger={null}
+        width={248}
+      >
         <div className="brand-block">
           <div className="brand-mark"><ThunderboltOutlined /></div>
-          <div>
-            <Title level={4}>{t('app.title')}</Title>
-            <Text type="secondary">{t('app.subtitle')}</Text>
-          </div>
+          {!sidebarCompact && (
+            <div>
+              <Title level={4}>{t('app.title')}</Title>
+              <Text type="secondary">{t('app.subtitle')}</Text>
+            </div>
+          )}
         </div>
 
         <Menu
           className="workspace-nav"
+          inlineCollapsed={sidebarCompact}
           mode="inline"
           selectedKeys={[selectedNav]}
           onSelect={({ key }) => setSelectedNav(key)}
@@ -3508,90 +3547,94 @@ function App() {
           ]}
         />
 
-        <div className="sidebar-section">
-          <div className="section-title">
-            <span>{t('section.quickConnect')}</span>
-            <Tooltip title={t('action.newTerminal')}>
-              <Button type="text" size="small" icon={<PlusOutlined />} onClick={() => openDrawer()} />
-            </Tooltip>
-          </div>
-          <List
-            size="small"
-            dataSource={providers}
-            renderItem={(provider) => (
-              <List.Item className="provider-row" onClick={() => openDrawer(provider.type)}>
-                <Space>
-                  <span className="provider-icon">{providerIcons[provider.type] || <CodeOutlined />}</span>
-                  <span>{providerLabel(provider)}</span>
-                </Space>
-                <Badge status={provider.category === 'builtin' ? 'success' : 'processing'} />
-              </List.Item>
-            )}
-          />
-          {sidebarQuickProfiles.length > 0 && (
-            <div className="sidebar-quick-profiles">
-              <div className="section-title compact">{t('section.savedConnections')}</div>
+        {!sidebarCompact && (
+          <>
+            <div className="sidebar-section">
+              <div className="section-title">
+                <span>{t('section.quickConnect')}</span>
+                <Tooltip title={t('action.newTerminal')}>
+                  <Button type="text" size="small" icon={<PlusOutlined />} onClick={() => openDrawer()} />
+                </Tooltip>
+              </div>
               <List
                 size="small"
-                dataSource={sidebarQuickProfiles}
-                renderItem={(profile) => {
-                  const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
-                  const badges = buildConnectionProfileBadges(profile, sessionInfo).filter((badge) => badge.key !== 'group').slice(0, 2);
-                  return (
-                    <List.Item
-                      className={sessionInfo.activeCount > 0 ? 'quick-profile-row active' : 'quick-profile-row'}
-                      onClick={() => focusProfileSession(profile)}
-                      title={`${profile.displayName} · ${buildConnectionProfileSubtitle(profile)}`}
-                    >
-                      <span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>
-                      <span className="quick-profile-main">
-                        <span>{profile.displayName}</span>
-                        <small>{buildConnectionProfileSubtitle(profile)}</small>
-                        {badges.length > 0 && (
-                          <span className="quick-profile-badges">
-                            {badges.map((badge) => (
-                              <span key={badge.key} className={`connection-profile-badge tone-${badge.tone}`}>
-                                {connectionProfileBadgeLabel(badge)}
-                              </span>
-                            ))}
-                          </span>
-                        )}
-                      </span>
-                      {profile.favorite && <StarFilled className="quick-profile-star" />}
-                    </List.Item>
-                  );
-                }}
+                dataSource={providers}
+                renderItem={(provider) => (
+                  <List.Item className="provider-row" onClick={() => openDrawer(provider.type)}>
+                    <Space>
+                      <span className="provider-icon">{providerIcons[provider.type] || <CodeOutlined />}</span>
+                      <span>{providerLabel(provider)}</span>
+                    </Space>
+                    <Badge status={provider.category === 'builtin' ? 'success' : 'processing'} />
+                  </List.Item>
+                )}
               />
-            </div>
-          )}
-        </div>
-
-        <div className="sidebar-section sidebar-fill">
-          <div className="section-title with-hint">
-            <span>{t('section.activeSessions')}</span>
-            {sessions.length > 0 && <Text code>{numberedSessionShortcut}</Text>}
-          </div>
-          {sidebarSessions.length === 0 ? (
-            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noSessions')} />
-          ) : (
-            <List
-              size="small"
-              dataSource={sidebarSessions}
-              renderItem={(session, index) => (
-                <List.Item
-                  className={session.id === activeKey ? 'session-row active' : 'session-row'}
-                  onClick={() => {
-                    setSelectedNav('sessions');
-                    setActiveKey(session.id);
-                  }}
-                >
-                  <SessionSidebarLabel session={session} />
-                  {index < 9 && <Text code>{index + 1}</Text>}
-                </List.Item>
+              {sidebarQuickProfiles.length > 0 && (
+                <div className="sidebar-quick-profiles">
+                  <div className="section-title compact">{t('section.savedConnections')}</div>
+                  <List
+                    size="small"
+                    dataSource={sidebarQuickProfiles}
+                    renderItem={(profile) => {
+                      const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
+                      const badges = buildConnectionProfileBadges(profile, sessionInfo).filter((badge) => badge.key !== 'group').slice(0, 2);
+                      return (
+                        <List.Item
+                          className={sessionInfo.activeCount > 0 ? 'quick-profile-row active' : 'quick-profile-row'}
+                          onClick={() => focusProfileSession(profile)}
+                          title={`${profile.displayName} · ${buildConnectionProfileSubtitle(profile)}`}
+                        >
+                          <span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>
+                          <span className="quick-profile-main">
+                            <span>{profile.displayName}</span>
+                            <small>{buildConnectionProfileSubtitle(profile)}</small>
+                            {badges.length > 0 && (
+                              <span className="quick-profile-badges">
+                                {badges.map((badge) => (
+                                  <span key={badge.key} className={`connection-profile-badge tone-${badge.tone}`}>
+                                    {connectionProfileBadgeLabel(badge)}
+                                  </span>
+                                ))}
+                              </span>
+                            )}
+                          </span>
+                          {profile.favorite && <StarFilled className="quick-profile-star" />}
+                        </List.Item>
+                      );
+                    }}
+                  />
+                </div>
               )}
-            />
-          )}
-        </div>
+            </div>
+
+            <div className="sidebar-section sidebar-fill">
+              <div className="section-title with-hint">
+                <span>{t('section.activeSessions')}</span>
+                {sessions.length > 0 && <Text code>{numberedSessionShortcut}</Text>}
+              </div>
+              {sidebarSessions.length === 0 ? (
+                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noSessions')} />
+              ) : (
+                <List
+                  size="small"
+                  dataSource={sidebarSessions}
+                  renderItem={(session, index) => (
+                    <List.Item
+                      className={session.id === activeKey ? 'session-row active' : 'session-row'}
+                      onClick={() => {
+                        setSelectedNav('sessions');
+                        setActiveKey(session.id);
+                      }}
+                    >
+                      <SessionSidebarLabel session={session} />
+                      {index < 9 && <Text code>{index + 1}</Text>}
+                    </List.Item>
+                  )}
+                />
+              )}
+            </div>
+          </>
+        )}
       </Sider>
 
       <Layout className="main-layout">

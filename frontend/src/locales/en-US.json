@@ -71,6 +71,7 @@
   "action.importConnections": "Import Connections",
   "action.export": "Export",
   "action.exportConnections": "Export Connections",
+  "action.connectionTransfer": "Import and export",
   "action.addCommand": "Add Command",
   "action.saveQuickCommand": "Save as Quick Command",
   "action.uninstall": "Uninstall",

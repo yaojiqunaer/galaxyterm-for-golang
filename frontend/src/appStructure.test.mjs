@@ -28,4 +28,14 @@ assert.ok(
   'content and session layers must share the remaining content grid row',
 );
 
+assert.ok(
+  /<Sider[\s\S]*?breakpoint="lg"[\s\S]*?collapsed=\{sidebarCompact\}[\s\S]*?collapsedWidth=\{68\}/.test(source),
+  'the workspace sidebar must collapse before narrow desktop layouts become crowded',
+);
+assert.ok(!styles.includes('min-width: 900px'), 'the app shell must not force a viewport wider than the desktop window');
+assert.ok(
+  styles.includes('.workspace-sidebar:not(.ant-layout-sider-collapsed)'),
+  'legacy narrow sidebar sizing must not override the collapsed rail width',
+);
+
 console.log('app structure tests passed');

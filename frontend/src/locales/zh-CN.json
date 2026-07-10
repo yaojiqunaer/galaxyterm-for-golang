@@ -71,6 +71,7 @@
   "action.importConnections": "导入连接",
   "action.export": "导出",
   "action.exportConnections": "导出连接",
+  "action.connectionTransfer": "导入与导出",
   "action.addCommand": "添加命令",
   "action.saveQuickCommand": "存为快捷命令",
   "action.uninstall": "卸载",

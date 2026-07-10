@@ -1,5 +1,13 @@
 export const ungroupedKey = '__ungrouped__';
 
+export function buildConnectionTransferActions({ profileCount = 0 } = {}) {
+  return [
+    { key: 'importSshConfig', labelKey: 'action.importSshConfig', disabled: false },
+    { key: 'importProfiles', labelKey: 'action.importConnections', disabled: false },
+    { key: 'exportProfiles', labelKey: 'action.exportConnections', disabled: profileCount === 0 },
+  ];
+}
+
 export function buildConnectionGroups(profiles = []) {
   const groups = new Map();
   profiles.forEach((profile) => {

@@ -37,15 +37,15 @@ func main() {
 
 	// Create application with options
 	var err = wails.Run(&options.App{
-		Title: "Wails Terminal",
-		//Width:            1024,
-		//Height:           768,
+		Title:  "GalaxyTerm",
+		Width:  1280,
+		Height: 800,
 		//DisableResize:    false,
 		//WindowStartState: options.Normal,
 		// 无边框
 		Frameless: false,
-		MinWidth:  512,
-		MinHeight: 384,
+		MinWidth:  720,
+		MinHeight: 480,
 		//StartHidden: false,
 		//HideWindowOnClose: false,
 		BackgroundColour: &options.RGBA{R: 0, G: 0, B: 0, A: 1},

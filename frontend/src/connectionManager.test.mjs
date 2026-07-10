@@ -9,6 +9,7 @@ import {
   buildConnectionProfilePrimaryAction,
   buildConnectionProfileStatusSummary,
   buildConnectionProfileSubtitle,
+  buildConnectionTransferActions,
   filterConnectionProfiles,
   filterRecentConnectionsByProviders,
   isProfileProviderAvailable,
@@ -18,6 +19,13 @@ import {
   sortConnectionProfiles,
   sortSidebarProfiles,
 } from './connectionManager.js';
+
+assert.deepEqual(buildConnectionTransferActions({ profileCount: 0 }), [
+  { key: 'importSshConfig', labelKey: 'action.importSshConfig', disabled: false },
+  { key: 'importProfiles', labelKey: 'action.importConnections', disabled: false },
+  { key: 'exportProfiles', labelKey: 'action.exportConnections', disabled: true },
+]);
+assert.equal(buildConnectionTransferActions({ profileCount: 3 })[2].disabled, false);
 
 const profiles = [
   {
