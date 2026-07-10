@@ -98,16 +98,26 @@ export function buildAuditRecord({
   startedAt = '',
   title = '',
 }) {
-  return {
+  return sanitizeAuditRecord({
     id,
-    auditEvents: redactAuditEvents(auditEvents),
-    cast: redactAsciinemaHeader(cast),
+    auditEvents,
+    cast,
     endedAt,
     providerType,
-    screen: redactSensitive(screen),
+    screen,
     sessionId,
     startedAt,
-    title: redactSensitive(title),
+    title,
+  });
+}
+
+export function sanitizeAuditRecord(record = {}) {
+  return {
+    ...record,
+    auditEvents: redactAuditEvents(Array.isArray(record.auditEvents) ? record.auditEvents : []),
+    cast: redactAsciinemaCast(record.cast || ''),
+    screen: redactSensitive(record.screen || ''),
+    title: redactSensitive(record.title || ''),
   };
 }
 
@@ -155,18 +165,29 @@ function redactAuditEvents(events = []) {
   }));
 }
 
-function redactAsciinemaHeader(cast = '') {
+function redactAsciinemaCast(cast = '') {
   const lines = String(cast || '').split(/\r?\n/);
   if (lines.length === 0 || !lines[0]) return cast;
-  const header = safeJsonParse(lines[0]);
-  if (!header) return cast;
-  const redactedHeader = {
-    ...header,
-    command: redactSensitive(header.command || ''),
-    env: redactObject(header.env || {}),
-    title: redactSensitive(header.title || ''),
-  };
-  return [JSON.stringify(redactedHeader), ...lines.slice(1)].join('\n');
+  return lines.map((line, index) => {
+    const item = safeJsonParse(line);
+    if (index === 0 && item && !Array.isArray(item)) {
+      return JSON.stringify({
+        ...item,
+        command: redactSensitive(item.command || ''),
+        env: redactObject(item.env || {}),
+        title: redactSensitive(item.title || ''),
+      });
+    }
+    if (Array.isArray(item) && item.length >= 3) {
+      return JSON.stringify([
+        item[0],
+        item[1],
+        typeof item[2] === 'string' ? redactSensitive(item[2]) : item[2],
+        ...item.slice(3),
+      ]);
+    }
+    return line;
+  }).join('\n');
 }
 
 function randomId(prefix) {

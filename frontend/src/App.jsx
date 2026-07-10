@@ -72,6 +72,7 @@ import {
   parseAsciinemaCast,
   renderReplayFrame,
   resolveReplayEventTime,
+  sanitizeAuditRecord,
 } from './auditLog.js';
 import {
   buildExtensionCatalog,
@@ -330,6 +331,7 @@ function App() {
   const watchedFilePath = Form.useWatch('path', fileForm);
   const terminalRefs = useRef({});
   const profileImportRef = useRef(null);
+  const activeSession = sessions.find((session) => session.id === activeKey);
 
   useEffect(() => {
     Promise.resolve()
@@ -604,7 +606,6 @@ function App() {
   const sessionNavigationState = useMemo(() => (
     buildSessionNavigationState(sessions, activeKey)
   ), [activeKey, sessions]);
-  const activeSession = sessions.find((session) => session.id === activeKey);
   const activeSessionRecording = activeKey ? terminalRefs.current[activeKey]?.recording?.() : null;
   const activeSessionRecordingActive = !!activeSessionRecording?.startedAt && activeSession?.status !== 'closed';
   const activeSessionContextFacts = buildSessionContextFacts(activeSession, {
@@ -4804,16 +4805,25 @@ function persistRecentConnections(items) {
 
 function loadAuditRecords() {
   try {
-    const parsed = JSON.parse(localStorage.getItem(auditRecordStorageKey) || '[]');
+    const stored = localStorage.getItem(auditRecordStorageKey);
+    const parsed = JSON.parse(stored || '[]');
     if (!Array.isArray(parsed)) return [];
-    return parsed.filter((record) => record?.id && record?.title).slice(0, 100);
+    const nextRecords = parsed
+      .filter((record) => record?.id && record?.title)
+      .map(sanitizeAuditRecord)
+      .slice(0, 100);
+    const serialized = JSON.stringify(nextRecords);
+    if (stored && stored !== serialized) {
+      localStorage.setItem(auditRecordStorageKey, serialized);
+    }
+    return nextRecords;
   } catch {
     return [];
   }
 }
 
 function persistAuditRecords(records) {
-  const nextRecords = records.filter(Boolean).slice(0, 100);
+  const nextRecords = records.filter(Boolean).map(sanitizeAuditRecord).slice(0, 100);
   localStorage.setItem(auditRecordStorageKey, JSON.stringify(nextRecords));
   return nextRecords;
 }

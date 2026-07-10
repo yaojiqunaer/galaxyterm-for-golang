@@ -568,6 +568,9 @@ select {
 
 .content-area {
   position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
   flex: 1;
   overflow: hidden;
@@ -577,8 +580,10 @@ select {
 
 .content-page-layer,
 .session-page-layer {
-  position: absolute;
-  inset: 0;
+  position: relative;
+  grid-column: 1;
+  grid-row: 2;
+  min-width: 0;
   min-height: 0;
 }
 
@@ -598,9 +603,10 @@ select {
 }
 
 .bridge-alert {
-  position: sticky;
+  position: relative;
   z-index: 10;
-  top: 0;
+  grid-column: 1;
+  grid-row: 1;
   margin: 10px 12px 0;
   border-color: rgba(245, 197, 66, 0.38);
 }
@@ -1760,8 +1766,9 @@ select {
 }
 
 @media (max-width: 1280px) {
-  .connection-manager-layout {
-    grid-template-columns: 1fr;
+  .connection-manager-layout,
+  .connection-manager-layout.no-detail {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .connection-group-nav {

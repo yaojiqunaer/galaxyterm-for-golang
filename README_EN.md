@@ -37,7 +37,7 @@ Records session open, reconnect, close, error, clear, quick command, and large p
 
 <details>
 <summary><b>🔐 Sensitive data redaction</b></summary>
-Audit and recording exports redact common passwords, tokens, Authorization headers, and private key blocks. GalaxyTerm does not record every raw keystroke by default; it records operation summaries and terminal output recordings.
+Saved and exported audit records and recordings redact common passwords, tokens, Authorization headers, and private key blocks. Legacy records are also sanitized on load, including recording metadata and event payloads. GalaxyTerm does not record every raw keystroke by default; it records operation summaries and terminal output recordings.
 </details>
 
 ## Architecture

@@ -9,6 +9,7 @@ import {
   renderCastFrame,
   renderReplayFrame,
   redactSensitive,
+  sanitizeAuditRecord,
 } from './auditLog.js';
 
 const sensitive = [
@@ -117,6 +118,31 @@ assert.equal(auditRecord.auditEvents[1].detail, 'kubectl get pods');
 assert.ok(!auditRecord.screen.includes('hunter2'));
 assert.ok(!auditRecord.title.includes('secret-value'));
 assert.ok(!JSON.parse(auditRecord.cast.split('\n')[0]).command.includes('secret'));
+
+const legacyCast = [
+  JSON.stringify({
+    version: 2,
+    width: 80,
+    height: 24,
+    command: 'mysql --password legacy-password',
+    title: 'token=legacy-token',
+    env: { API_TOKEN: 'token=legacy-token' },
+  }),
+  JSON.stringify([0, 'o', 'password=legacy-password\r\n']),
+  JSON.stringify([0.5, 'i', 'Authorization: Bearer legacy-bearer']),
+].join('\n');
+const sanitizedLegacyRecord = sanitizeAuditRecord({
+  id: 'legacy-record',
+  auditEvents: [{ id: 'e1', detail: 'Authorization: Bearer legacy-bearer' }],
+  cast: legacyCast,
+  screen: 'token=legacy-token',
+  title: 'password=legacy-password',
+});
+const serializedLegacyRecord = JSON.stringify(sanitizedLegacyRecord);
+assert.ok(!serializedLegacyRecord.includes('legacy-password'));
+assert.ok(!serializedLegacyRecord.includes('legacy-token'));
+assert.ok(!serializedLegacyRecord.includes('legacy-bearer'));
+assert.equal(parseAsciinemaCast(sanitizedLegacyRecord.cast).events[0].data, 'password=[REDACTED]\r\n');
 
 assert.equal(resolveReplayEventTime(parsed.events, 0.2, 'next'), 1.5);
 assert.equal(resolveReplayEventTime(parsed.events, 1.5, 'previous'), 0);

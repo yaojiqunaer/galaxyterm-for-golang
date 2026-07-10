@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "test:app-structure": "node src/appStructure.test.mjs",
     "test:audit": "node src/auditLog.test.mjs",
     "test:command-history": "node src/commandHistory.test.mjs",
     "test:connections": "node src/connectionManager.test.mjs",
