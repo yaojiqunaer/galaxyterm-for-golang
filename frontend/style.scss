@@ -2973,6 +2973,10 @@ code {
   margin: 0 auto;
 }
 
+.settings-drawer .ant-drawer-body {
+  padding: 0;
+}
+
 .settings-workbench {
   display: grid;
   grid-template-columns: 190px minmax(0, 1fr);

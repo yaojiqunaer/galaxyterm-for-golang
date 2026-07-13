@@ -172,5 +172,14 @@ assert.ok(
     && source.includes('updateTerminalStatus(session.id, status, session.revision || 0)'),
   'terminal lifecycle changes must update the matching current session without accepting stale reconnect events',
 );
+assert.ok(
+  source.includes('className="settings-drawer"')
+    && source.includes("width={screens.sm === false ? '100%' : 560}"),
+  'settings must use a readable drawer width and fill very narrow windows',
+);
+assert.ok(
+  /\.settings-drawer \.ant-drawer-body\s*\{\s*padding:\s*0;/.test(styles),
+  'settings drawer content must avoid nesting page and drawer padding',
+);
 
 console.log('app structure tests passed');

@@ -4077,8 +4077,9 @@ function App() {
       </Drawer>
 
       <Drawer
+        className="settings-drawer"
         title={t('drawer.settings')}
-        width={360}
+        width={screens.sm === false ? '100%' : 560}
         open={settingsOpen}
         destroyOnHidden
         onClose={() => setSettingsOpen(false)}
