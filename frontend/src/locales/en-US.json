@@ -136,6 +136,7 @@
   "profile.action.delete": "Delete Connection",
   "session.status.connected": "Connected",
   "session.status.connecting": "Connecting",
+  "session.status.error": "Error",
   "session.status.closed": "Closed",
   "session.audit.noSession.title": "No active session",
   "session.audit.noSession.description": "Open a terminal to start capturing session events and terminal output for audit replay.",

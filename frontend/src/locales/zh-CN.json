@@ -136,6 +136,7 @@
   "profile.action.delete": "删除连接",
   "session.status.connected": "已连接",
   "session.status.connecting": "连接中",
+  "session.status.error": "异常",
   "session.status.closed": "已关闭",
   "session.audit.noSession.title": "暂无活动会话",
   "session.audit.noSession.description": "打开终端后会自动记录会话事件和终端输出，用于审计与回放。",

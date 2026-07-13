@@ -1,6 +1,7 @@
 export function sessionStatusTone(session = {}) {
-  const status = session?.status;
+  const status = sessionStatusLabel(session);
   if (status === 'connected') return 'success';
+  if (status === 'error') return 'danger';
   if (status === 'closed') return 'closed';
   return 'connecting';
 }
@@ -8,8 +9,31 @@ export function sessionStatusTone(session = {}) {
 export function sessionStatusLabel(session = {}) {
   const status = session?.status;
   if (status === 'connected') return 'connected';
+  if (status === 'error') return 'error';
   if (status === 'closed') return 'closed';
   return 'connecting';
+}
+
+export function resolveSessionLifecycleStatus(terminalStatus) {
+  const status = typeof terminalStatus === 'string' ? terminalStatus : terminalStatus?.status;
+  if (status === 'connected' || status === 'busy' || status === 'idle') return 'connected';
+  if (status === 'error') return 'error';
+  if (status === 'closed') return 'closed';
+  return 'connecting';
+}
+
+export function synchronizeSessionTerminalStatus(
+  sessions = [],
+  sessionId = '',
+  terminalStatus = {},
+  revision,
+) {
+  const session = sessions.find((item) => item.id === sessionId);
+  if (!session) return sessions;
+  if (revision !== undefined && (session.revision || 0) !== revision) return sessions;
+  const status = resolveSessionLifecycleStatus(terminalStatus);
+  if (session.status === status) return sessions;
+  return sessions.map((item) => (item.id === sessionId ? { ...item, status } : item));
 }
 
 export function appendClosedSessions(stack = [], sessions = [], limit = 10) {
@@ -41,6 +65,7 @@ export function sessionSummary(sessions = []) {
       closed: tone === 'closed' ? summary.closed + 1 : summary.closed,
       connected: tone === 'success' ? summary.connected + 1 : summary.connected,
       connecting: tone === 'connecting' ? summary.connecting + 1 : summary.connecting,
+      error: tone === 'danger' ? summary.error + 1 : summary.error,
       total: summary.total + 1,
     };
   }, {
@@ -48,6 +73,7 @@ export function sessionSummary(sessions = []) {
     closed: 0,
     connected: 0,
     connecting: 0,
+    error: 0,
     total: 0,
   });
 }
@@ -56,6 +82,7 @@ export function buildSessionStatusFacts(summary = {}) {
   return [
     { key: 'connected', value: summary.connected || 0, tone: 'success' },
     { key: 'connecting', value: summary.connecting || 0, tone: 'warning' },
+    { key: 'error', value: summary.error || 0, tone: 'danger' },
     { key: 'closed', value: summary.closed || 0, tone: 'closed' },
   ].filter((item) => item.value > 0);
 }

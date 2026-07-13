@@ -165,5 +165,12 @@ assert.ok(
     && source.includes("terminalDrawerIntent === 'edit'"),
   'connection entry points must save profiles by default while transient terminal entry points remain optional',
 );
+assert.ok(
+  source.includes('synchronizeSessionTerminalStatus')
+    && source.includes('const updateTerminalStatus = (sessionId, status, revision) =>')
+    && source.includes('synchronizeSessionTerminalStatus(current, sessionId, status, revision)')
+    && source.includes('updateTerminalStatus(session.id, status, session.revision || 0)'),
+  'terminal lifecycle changes must update the matching current session without accepting stale reconnect events',
+);
 
 console.log('app structure tests passed');

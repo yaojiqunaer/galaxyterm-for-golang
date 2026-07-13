@@ -21,6 +21,7 @@ assert.equal(t('terminal.error.details'), 'Error details');
 assert.equal(t('terminal.error.recoveryHint'), 'Check the connection and retry. Copy the error or open the audit record when more detail is needed.');
 assert.equal(t('terminal.status.preparing'), 'Preparing terminal');
 assert.equal(t('action.restoreClosedSession'), 'Reopen closed session');
+assert.equal(t('session.status.error'), 'Error');
 assert.equal(t('locale.en-US'), 'English');
 assert.equal(t('locale.zh-CN'), 'Simplified Chinese');
 
@@ -34,6 +35,7 @@ assert.equal(t('terminal.error.details'), '错误详情');
 assert.equal(t('terminal.error.recoveryHint'), '检查连接配置和网络后重试；需要进一步排查时，可复制错误或打开审计记录。');
 assert.equal(t('terminal.status.preparing'), '正在准备终端');
 assert.equal(t('action.restoreClosedSession'), '恢复最近关闭的会话');
+assert.equal(t('session.status.error'), '异常');
 assert.equal(t('locale.en-US'), 'English');
 assert.equal(t('locale.zh-CN'), '简体中文');
 

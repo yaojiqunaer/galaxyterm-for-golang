@@ -19,12 +19,23 @@ import {
 
 assert.equal(sessionStatusTone({ status: 'connected' }), 'success');
 assert.equal(sessionStatusTone({ status: 'closed' }), 'closed');
+assert.equal(sessionStatusTone({ status: 'error' }), 'danger');
 assert.equal(sessionStatusTone({ status: 'connecting' }), 'connecting');
 assert.equal(sessionStatusTone({}), 'connecting');
 
 assert.equal(sessionStatusLabel({ status: 'connected' }), 'connected');
 assert.equal(sessionStatusLabel({ status: 'closed' }), 'closed');
+assert.equal(sessionStatusLabel({ status: 'error' }), 'error');
 assert.equal(sessionStatusLabel({ status: 'connecting' }), 'connecting');
+
+const sessionPresentation = await import('./sessionPresentation.js');
+assert.equal(typeof sessionPresentation.resolveSessionLifecycleStatus, 'function');
+assert.equal(sessionPresentation.resolveSessionLifecycleStatus('connecting'), 'connecting');
+assert.equal(sessionPresentation.resolveSessionLifecycleStatus('connected'), 'connected');
+assert.equal(sessionPresentation.resolveSessionLifecycleStatus('busy'), 'connected');
+assert.equal(sessionPresentation.resolveSessionLifecycleStatus('idle'), 'connected');
+assert.equal(sessionPresentation.resolveSessionLifecycleStatus('error'), 'error');
+assert.equal(sessionPresentation.resolveSessionLifecycleStatus('closed'), 'closed');
 
 const closedSource = {
   id: 'session-1',
@@ -65,14 +76,16 @@ assert.equal(appendClosedSessions(closedStack, Array.from({ length: 12 }, (_, in
 assert.deepEqual(sessionSummary([
   { status: 'connected' },
   { status: 'connecting' },
+  { status: 'error' },
   { status: 'closed' },
   {},
 ]), {
-  active: 3,
+  active: 4,
   closed: 1,
   connected: 1,
   connecting: 2,
-  total: 4,
+  error: 1,
+  total: 5,
 });
 
 assert.deepEqual(buildSessionStatusFacts({
@@ -80,10 +93,12 @@ assert.deepEqual(buildSessionStatusFacts({
   closed: 1,
   connected: 2,
   connecting: 1,
-  total: 4,
+  error: 1,
+  total: 5,
 }), [
   { key: 'connected', value: 2, tone: 'success' },
   { key: 'connecting', value: 1, tone: 'warning' },
+  { key: 'error', value: 1, tone: 'danger' },
   { key: 'closed', value: 1, tone: 'closed' },
 ]);
 
@@ -92,8 +107,35 @@ assert.deepEqual(buildSessionStatusFacts({
   closed: 0,
   connected: 0,
   connecting: 0,
+  error: 0,
   total: 0,
 }), []);
+
+const synchronizingSessions = [
+  { id: 'current', revision: 2, status: 'connecting' },
+  { id: 'other', revision: 0, status: 'connected' },
+];
+assert.deepEqual(
+  sessionPresentation.synchronizeSessionTerminalStatus(
+    synchronizingSessions,
+    'current',
+    { status: 'error' },
+    2,
+  ),
+  [
+    { id: 'current', revision: 2, status: 'error' },
+    synchronizingSessions[1],
+  ],
+);
+assert.equal(
+  sessionPresentation.synchronizeSessionTerminalStatus(
+    synchronizingSessions,
+    'current',
+    { status: 'closed' },
+    1,
+  ),
+  synchronizingSessions,
+);
 
 assert.deepEqual(buildSessionNavigationState([
   { id: 's1' },

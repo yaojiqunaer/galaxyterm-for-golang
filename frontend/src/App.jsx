@@ -122,6 +122,7 @@ import {
   sessionStatusLabel,
   sessionStatusTone,
   sessionSummary,
+  synchronizeSessionTerminalStatus,
   takeClosedSession,
 } from './sessionPresentation.js';
 import {
@@ -1697,11 +1698,12 @@ function App() {
     setQuickCommands(nextCommands);
   };
 
-  const updateTerminalStatus = (sessionId, status) => {
+  const updateTerminalStatus = (sessionId, status, revision) => {
     setTerminalStatuses((current) => ({
       ...current,
       [sessionId]: status,
     }));
+    setSessions((current) => synchronizeSessionTerminalStatus(current, sessionId, status, revision));
   };
 
   const copyTerminalError = async (sessionId) => {
@@ -1746,7 +1748,7 @@ function App() {
             )));
           }}
           onSessionClosed={(backendSessionId) => updateSessionStatus(backendSessionId, 'closed')}
-          onStatusChange={(status) => updateTerminalStatus(session.id, status)}
+          onStatusChange={(status) => updateTerminalStatus(session.id, status, session.revision || 0)}
         />
       </Suspense>
     </TerminalFrame>
