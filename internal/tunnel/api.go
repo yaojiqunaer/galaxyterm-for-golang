@@ -21,15 +21,18 @@ func NewAPI() *API {
 }
 
 type StartRequest struct {
-	Name        string `json:"name"`
-	SSHHost     string `json:"sshHost"`
-	SSHPort     int    `json:"sshPort"`
-	SSHUser     string `json:"sshUser"`
-	SSHPassword string `json:"sshPassword"`
-	LocalHost   string `json:"localHost"`
-	LocalPort   int    `json:"localPort"`
-	RemoteHost  string `json:"remoteHost"`
-	RemotePort  int    `json:"remotePort"`
+	Name          string `json:"name"`
+	SSHHost       string `json:"sshHost"`
+	SSHPort       int    `json:"sshPort"`
+	SSHUser       string `json:"sshUser"`
+	SSHAuthType   string `json:"sshAuthType"`
+	SSHPassword   string `json:"sshPassword"`
+	SSHPrivateKey string `json:"sshPrivateKey"`
+	SSHPassphrase string `json:"sshPassphrase"`
+	LocalHost     string `json:"localHost"`
+	LocalPort     int    `json:"localPort"`
+	RemoteHost    string `json:"remoteHost"`
+	RemotePort    int    `json:"remotePort"`
 }
 
 type Info struct {
@@ -52,11 +55,13 @@ func (api *API) Start(req StartRequest) (Info, error) {
 		return Info{}, err
 	}
 
+	authMethods, err := tunnelAuthMethods(normalized)
+	if err != nil {
+		return Info{}, err
+	}
 	config := &ssh.ClientConfig{
-		User: normalized.SSHUser,
-		Auth: []ssh.AuthMethod{
-			ssh.Password(normalized.SSHPassword),
-		},
+		User:            normalized.SSHUser,
+		Auth:            authMethods,
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 	sshAddr := fmt.Sprintf("%s:%d", normalized.SSHHost, normalized.SSHPort)
@@ -180,6 +185,7 @@ func validateStartRequest(req StartRequest) (StartRequest, error) {
 	req.Name = strings.TrimSpace(req.Name)
 	req.SSHHost = strings.TrimSpace(req.SSHHost)
 	req.SSHUser = strings.TrimSpace(req.SSHUser)
+	req.SSHAuthType = strings.TrimSpace(req.SSHAuthType)
 	req.LocalHost = strings.TrimSpace(req.LocalHost)
 	req.RemoteHost = strings.TrimSpace(req.RemoteHost)
 
@@ -191,6 +197,9 @@ func validateStartRequest(req StartRequest) (StartRequest, error) {
 	}
 	if req.SSHUser == "" {
 		return req, fmt.Errorf("missing ssh user")
+	}
+	if req.SSHAuthType == "" {
+		req.SSHAuthType = "password"
 	}
 	if req.LocalHost == "" {
 		req.LocalHost = "127.0.0.1"
@@ -208,4 +217,26 @@ func validateStartRequest(req StartRequest) (StartRequest, error) {
 		req.SSHPort = 22
 	}
 	return req, nil
+}
+
+func tunnelAuthMethods(req StartRequest) ([]ssh.AuthMethod, error) {
+	if strings.EqualFold(req.SSHAuthType, "privateKey") {
+		if strings.TrimSpace(req.SSHPrivateKey) == "" {
+			return nil, fmt.Errorf("missing ssh private key")
+		}
+		var (
+			signer ssh.Signer
+			err    error
+		)
+		if req.SSHPassphrase != "" {
+			signer, err = ssh.ParsePrivateKeyWithPassphrase([]byte(req.SSHPrivateKey), []byte(req.SSHPassphrase))
+		} else {
+			signer, err = ssh.ParsePrivateKey([]byte(req.SSHPrivateKey))
+		}
+		if err != nil {
+			return nil, fmt.Errorf("parse ssh private key: %w", err)
+		}
+		return []ssh.AuthMethod{ssh.PublicKeys(signer)}, nil
+	}
+	return []ssh.AuthMethod{ssh.Password(req.SSHPassword)}, nil
 }

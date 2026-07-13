@@ -15,6 +15,7 @@ import {
   isProfileProviderAvailable,
   resolveSelectedProfileId,
   selectBatchProfiles,
+  shouldPersistConnection,
   summarizeProfileSessions,
   sortConnectionProfiles,
   sortSidebarProfiles,
@@ -26,6 +27,10 @@ assert.equal(connectionManager.resolveProfileSaveDefault(), false);
 assert.equal(connectionManager.resolveProfileSaveDefault({ intent: 'session' }), false);
 assert.equal(connectionManager.resolveProfileSaveDefault({ intent: 'connection' }), true);
 assert.equal(connectionManager.resolveProfileSaveDefault({ intent: 'session', profile: { id: 'prod' } }), true);
+assert.equal(shouldPersistConnection(), false);
+assert.equal(shouldPersistConnection({ intent: 'session', saveProfile: true }), true);
+assert.equal(shouldPersistConnection({ intent: 'connection' }), true);
+assert.equal(shouldPersistConnection({ intent: 'edit' }), true);
 
 assert.deepEqual(buildConnectionTransferActions({ profileCount: 0 }), [
   { key: 'importSshConfig', labelKey: 'action.importSshConfig', disabled: false },

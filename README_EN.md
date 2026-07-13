@@ -22,7 +22,12 @@ Provides secure and reliable remote ssh access
 
 <details>
 <summary><b>🔗 Remote file access </b></summary>
-Provide secure and reliable remote file access
+Select a saved SSH connection to browse, edit, upload, and download remote files without re-entering the host, port, or username. System credentials are resolved only when an operation runs.
+</details>
+
+<details>
+<summary><b>🔀 SSH port forwarding</b></summary>
+Reuse saved SSH connections for local port forwarding with password, private-key, and passphrase authentication. When no credential is stored, enter a password or private key for the current operation only.
 </details>
 
 <details>

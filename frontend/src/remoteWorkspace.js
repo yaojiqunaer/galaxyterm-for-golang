@@ -1,5 +1,62 @@
 const units = ['B', 'KB', 'MB', 'GB', 'TB'];
 
+export function buildSavedSshConnections(profiles = []) {
+  return profiles
+    .filter((profile) => profile?.providerType === 'ssh')
+    .sort((left, right) => {
+      const favoriteDelta = Number(!!right.favorite) - Number(!!left.favorite);
+      if (favoriteDelta) return favoriteDelta;
+      const recentDelta = Date.parse(right.lastUsedAt || 0) - Date.parse(left.lastUsedAt || 0);
+      if (Number.isFinite(recentDelta) && recentDelta) return recentDelta;
+      return String(left.displayName || '').localeCompare(String(right.displayName || ''));
+    })
+    .map((profile) => {
+      const authType = profile.auth?.authType || 'password';
+      const credentialRef = profile.auth?.credentialRef;
+      return {
+        authType,
+        credentialSaved: !!credentialRef,
+        description: `${profile.auth?.username ? `${profile.auth.username}@` : ''}${profile.config?.host || '-'}:${profile.config?.port || 22}`,
+        displayName: profile.displayName,
+        favorite: !!profile.favorite,
+        group: profile.group || '',
+        hasSavedSecret: authType === 'privateKey'
+          ? !!credentialRef?.hasPrivateKey
+          : !!credentialRef?.hasPassword,
+        id: profile.id,
+      };
+    });
+}
+
+export function buildSshProfileFields(profile = {}) {
+  if (profile.providerType !== 'ssh') return null;
+  return {
+    authType: profile.auth?.authType || 'password',
+    displayName: profile.displayName || '',
+    host: profile.config?.host || '',
+    port: profile.config?.port || 22,
+    profileId: profile.id || '',
+    username: profile.auth?.username || '',
+  };
+}
+
+export function buildSshConnectionAuth(fields = {}, resolvedProfileRequest = null) {
+  const resolvedAuth = resolvedProfileRequest?.auth || {};
+  const authType = fields.authType || resolvedAuth.authType || 'password';
+  return {
+    authType,
+    passphrase: authType === 'privateKey'
+      ? fields.passphrase || resolvedAuth.passphrase || ''
+      : '',
+    password: authType === 'password'
+      ? fields.password || resolvedAuth.password || ''
+      : '',
+    privateKey: authType === 'privateKey'
+      ? fields.privateKey || resolvedAuth.privateKey || ''
+      : '',
+  };
+}
+
 function readableBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
   let value = bytes;

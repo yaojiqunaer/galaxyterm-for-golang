@@ -97,6 +97,7 @@ import {
   resolveProfileSaveDefault,
   resolveSelectedProfileId,
   selectBatchProfiles,
+  shouldPersistConnection,
   summarizeProfileSessions,
   sortConnectionProfiles,
   sortSidebarProfiles,
@@ -139,6 +140,9 @@ import {
 import {
   buildRemoteFileBreadcrumbs,
   buildRemoteFileSummary,
+  buildSavedSshConnections,
+  buildSshConnectionAuth,
+  buildSshProfileFields,
   buildTunnelDisplay,
   buildTunnelSummary,
 } from './remoteWorkspace.js';
@@ -202,6 +206,7 @@ import * as SessionAPI from '../wailsjs/go/session/API.js';
 import * as TerminalAPI from '../wailsjs/go/terminal/API.js';
 import * as TunnelAPI from '../wailsjs/go/tunnel/API.js';
 import { availableLocales, currentLocale, setLocale, t } from './i18n.js';
+import SavedSSHProfileSelect from './components/SavedSSHProfileSelect.jsx';
 
 const TerminalPane = lazy(() => import('./components/TerminalPane.jsx'));
 const AuditReplayPlayer = lazy(() => import('./components/AuditReplayPlayer.jsx'));
@@ -336,11 +341,14 @@ function App() {
   const [newType, setNewType] = useState('local');
   const [fileEntries, setFileEntries] = useState([]);
   const [fileLoading, setFileLoading] = useState(false);
+  const [fileProfileId, setFileProfileId] = useState('');
   const [testingConnection, setTestingConnection] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
   const [extensionBusy, setExtensionBusy] = useState(false);
   const [tunnelBusy, setTunnelBusy] = useState(false);
   const [fileAuthType, setFileAuthType] = useState('password');
+  const [tunnelAuthType, setTunnelAuthType] = useState('password');
+  const [tunnelProfileId, setTunnelProfileId] = useState('');
   const [fileEditorOpen, setFileEditorOpen] = useState(false);
   const [fileEditorLoading, setFileEditorLoading] = useState(false);
   const [editingRemoteFile, setEditingRemoteFile] = useState(null);
@@ -737,7 +745,7 @@ function App() {
 
     setCreatingSession(true);
     try {
-      if (values.saveProfile) {
+      if (shouldPersistConnection({ intent: terminalDrawerIntent, saveProfile: values.saveProfile })) {
         const hasNewCredentialSecret = !!(
           values.password
           || values.privateKey
@@ -2537,18 +2545,62 @@ function App() {
     }
   };
 
+  const resolveSelectedSshProfile = async (profileId) => {
+    if (!profileId) return null;
+    const profile = profiles.find((item) => item.id === profileId && item.providerType === 'ssh');
+    if (!profile) throw new Error(t('message.savedConnectionUnavailable'));
+    return resolveCredentialRequest(profileToRequest(profile));
+  };
+
+  const selectFileSshProfile = (profileId) => {
+    if (!profileId) {
+      setFileProfileId('');
+      fileForm.setFieldValue('profileId', '');
+      return;
+    }
+    const fields = buildSshProfileFields(profiles.find((item) => item.id === profileId));
+    if (!fields) return;
+    setFileProfileId(fields.profileId);
+    setFileAuthType(fields.authType);
+    fileForm.setFieldsValue({
+      authType: fields.authType,
+      host: fields.host,
+      passphrase: '',
+      password: '',
+      port: fields.port,
+      privateKey: '',
+      profileId: fields.profileId,
+      username: fields.username,
+    });
+    setFileEntries([]);
+  };
+
+  const selectTunnelSshProfile = (profileId) => {
+    if (!profileId) {
+      setTunnelProfileId('');
+      tunnelForm.setFieldValue('profileId', '');
+      return;
+    }
+    const fields = buildSshProfileFields(profiles.find((item) => item.id === profileId));
+    if (!fields) return;
+    setTunnelProfileId(fields.profileId);
+    setTunnelAuthType(fields.authType);
+    tunnelForm.setFieldsValue({
+      name: fields.displayName,
+      profileId: fields.profileId,
+      sshAuthType: fields.authType,
+      sshHost: fields.host,
+      sshPassphrase: '',
+      sshPassword: '',
+      sshPort: fields.port,
+      sshPrivateKey: '',
+      sshUser: fields.username,
+    });
+  };
+
   const loadFiles = async (overridePath = null) => {
-    const values = await fileForm.validateFields();
-    const req = {
-      host: values.host,
-      port: values.port || 22,
-      username: values.username,
-      password: values.password || '',
-      authType: values.authType || 'password',
-      privateKey: values.privateKey || '',
-      passphrase: values.passphrase || '',
-      path: overridePath || values.path || '.',
-    };
+    await fileForm.validateFields();
+    const req = await currentFileRequest(overridePath);
     setFileLoading(true);
     try {
       const entries = await FilesAPI.List(req);
@@ -2561,17 +2613,16 @@ function App() {
     }
   };
 
-  const currentFileRequest = () => {
-    const values = fileForm.getFieldsValue();
+  const currentFileRequest = async (overridePath = null) => {
+    const values = fileForm.getFieldsValue(true);
+    const resolvedProfile = await resolveSelectedSshProfile(fileProfileId);
+    const auth = buildSshConnectionAuth(values, resolvedProfile);
     return {
       host: values.host,
       port: values.port || 22,
       username: values.username,
-      password: values.password || '',
-      authType: values.authType || 'password',
-      privateKey: values.privateKey || '',
-      passphrase: values.passphrase || '',
-      path: values.path || '.',
+      ...auth,
+      path: overridePath || values.path || '.',
     };
   };
 
@@ -2584,7 +2635,7 @@ function App() {
   const createRemoteDirectory = async () => {
     const name = mkdirName.trim();
     if (!name) return;
-    const req = currentFileRequest();
+    const req = await currentFileRequest();
     const base = req.path || '.';
     req.path = joinRemotePath(base, name);
     setFileLoading(true);
@@ -2602,7 +2653,7 @@ function App() {
   };
 
   const deleteRemoteEntry = async (entry) => {
-    const req = currentFileRequest();
+    const req = await currentFileRequest();
     req.path = entry.path;
     setFileLoading(true);
     try {
@@ -2618,7 +2669,7 @@ function App() {
 
   const downloadRemoteFile = async (entry) => {
     if (entry.isDir) return;
-    const req = currentFileRequest();
+    const req = await currentFileRequest();
     req.path = entry.path;
     setFileLoading(true);
     try {
@@ -2644,7 +2695,7 @@ function App() {
       messageApi.warning(t('message.fileTooLarge'));
       return;
     }
-    const req = currentFileRequest();
+    const req = await currentFileRequest();
     req.path = entry.path;
     setFileEditorLoading(true);
     try {
@@ -2661,7 +2712,7 @@ function App() {
 
   const saveRemoteFile = async () => {
     if (!editingRemoteFile) return;
-    const req = currentFileRequest();
+    const req = await currentFileRequest();
     req.path = editingRemoteFile.path;
     setFileEditorLoading(true);
     try {
@@ -2682,7 +2733,7 @@ function App() {
       messageApi.warning(t('validation.required'));
       return;
     }
-    const req = currentFileRequest();
+    const req = await currentFileRequest();
     const base = req.path || '.';
     req.path = joinRemotePath(base, name);
     setFileLoading(true);
@@ -2704,6 +2755,8 @@ function App() {
     const currentPath = watchedFilePath || fileForm.getFieldValue('path') || '.';
     const fileSummary = buildRemoteFileSummary(fileEntries, { path: currentPath, loading: fileLoading });
     const breadcrumbs = buildRemoteFileBreadcrumbs(fileSummary.path);
+    const selectedFileConnection = buildSavedSshConnections(profiles)
+      .find((item) => item.id === fileProfileId);
     return (
       <div className="workspace-page remote-workspace-page">
         <div className="page-header">
@@ -2725,34 +2778,44 @@ function App() {
           <div className="remote-context-panel">
             <Text strong>{t('section.quickConnect')}</Text>
             <Text type="secondary">{t('file.browserHint')}</Text>
-            <Form form={fileForm} layout="vertical" className="remote-context-form" initialValues={{ port: 22, path: '.' }}>
-              <Form.Item name="host" label={t('field.host')} rules={[{ required: true, message: t('validation.required') }]}>
-                <Input placeholder={t('placeholder.host')} />
-              </Form.Item>
-              <Space size={8} className="remote-form-row">
-                <Form.Item name="port" label={t('field.port')}>
-                  <InputNumber min={1} max={65535} />
+            <Form form={fileForm} layout="vertical" className="remote-context-form" initialValues={{ port: 22, path: '.', profileId: '' }}>
+              <Form.Item name="profileId" hidden><Input /></Form.Item>
+              <SavedSSHProfileSelect
+                disabled={fileLoading}
+                onChange={selectFileSshProfile}
+                onManageConnections={() => setSelectedNav('connections')}
+                profiles={profiles}
+                value={fileProfileId}
+              />
+              <div className={selectedFileConnection ? 'remote-manual-fields is-hidden' : 'remote-manual-fields'}>
+                <Form.Item name="host" label={t('field.host')} rules={[{ required: true, message: t('validation.required') }]}>
+                  <Input placeholder={t('placeholder.host')} />
                 </Form.Item>
-                <Form.Item name="username" label={t('field.username')} rules={[{ required: true, message: t('validation.required') }]}>
-                  <Input />
+                <Space size={8} className="remote-form-row">
+                  <Form.Item name="port" label={t('field.port')}>
+                    <InputNumber min={1} max={65535} />
+                  </Form.Item>
+                  <Form.Item name="username" label={t('field.username')} rules={[{ required: true, message: t('validation.required') }]}>
+                    <Input />
+                  </Form.Item>
+                </Space>
+                <Form.Item name="authType" label={t('field.authType')} initialValue="password">
+                  <Segmented
+                    block
+                    onChange={setFileAuthType}
+                    options={[
+                      { value: 'password', label: t('auth.password') },
+                      { value: 'privateKey', label: t('auth.privateKey') },
+                    ]}
+                  />
                 </Form.Item>
-              </Space>
-              <Form.Item name="authType" label={t('field.authType')} initialValue="password">
-                <Segmented
-                  block
-                  onChange={setFileAuthType}
-                  options={[
-                    { value: 'password', label: t('auth.password') },
-                    { value: 'privateKey', label: t('auth.privateKey') },
-                  ]}
-                />
-              </Form.Item>
-              {fileAuthType === 'password' && (
+              </div>
+              {(!selectedFileConnection?.hasSavedSecret && fileAuthType === 'password') && (
                 <Form.Item name="password" label={t('field.password')}>
-                  <Input.Password />
+                  <Input.Password placeholder={selectedFileConnection ? t('placeholder.oneTimeCredential') : ''} />
                 </Form.Item>
               )}
-              {fileAuthType === 'privateKey' && (
+              {(!selectedFileConnection?.hasSavedSecret && fileAuthType === 'privateKey') && (
                 <>
                   <Form.Item name="privateKey" label={t('field.privateKey')} rules={[{ required: true, message: t('validation.required') }]}>
                     <Input.TextArea rows={4} />
@@ -3202,12 +3265,22 @@ function App() {
     const values = await tunnelForm.validateFields();
     setTunnelBusy(true);
     try {
+      const resolvedProfile = await resolveSelectedSshProfile(tunnelProfileId);
+      const auth = buildSshConnectionAuth({
+        authType: values.sshAuthType,
+        passphrase: values.sshPassphrase,
+        password: values.sshPassword,
+        privateKey: values.sshPrivateKey,
+      }, resolvedProfile);
       const info = await TunnelAPI.Start({
         name: values.name || 'Tunnel',
         sshHost: values.sshHost,
         sshPort: values.sshPort || 22,
         sshUser: values.sshUser,
-        sshPassword: values.sshPassword || '',
+        sshAuthType: auth.authType,
+        sshPassphrase: auth.passphrase,
+        sshPassword: auth.password,
+        sshPrivateKey: auth.privateKey,
         localHost: values.localHost || '127.0.0.1',
         localPort: values.localPort,
         remoteHost: values.remoteHost,
@@ -3237,6 +3310,8 @@ function App() {
 
   const renderTunnels = () => {
     const tunnelSummary = buildTunnelSummary(tunnels);
+    const selectedTunnelConnection = buildSavedSshConnections(profiles)
+      .find((item) => item.id === tunnelProfileId);
     return (
       <div className="workspace-page remote-workspace-page">
         <div className="page-header">
@@ -3255,24 +3330,56 @@ function App() {
           <div className="remote-context-panel">
             <Text strong>{t('section.quickConnect')}</Text>
             <Text type="secondary">{t('tunnel.formHint')}</Text>
-            <Form form={tunnelForm} layout="vertical" className="remote-context-form" initialValues={{ sshPort: 22, localHost: '127.0.0.1' }}>
+            <Form form={tunnelForm} layout="vertical" className="remote-context-form" initialValues={{ sshPort: 22, localHost: '127.0.0.1', profileId: '', sshAuthType: 'password' }}>
+              <Form.Item name="profileId" hidden><Input /></Form.Item>
+              <SavedSSHProfileSelect
+                disabled={tunnelBusy}
+                onChange={selectTunnelSshProfile}
+                onManageConnections={() => setSelectedNav('connections')}
+                profiles={profiles}
+                value={tunnelProfileId}
+              />
               <Form.Item name="name" label={t('field.name')}>
                 <Input />
               </Form.Item>
-              <Space size={8} className="remote-form-row">
-                <Form.Item name="sshHost" label={t('field.host')} rules={[{ required: true, message: t('validation.required') }]}>
-                  <Input placeholder={t('placeholder.host')} />
+              <div className={selectedTunnelConnection ? 'remote-manual-fields is-hidden' : 'remote-manual-fields'}>
+                <Space size={8} className="remote-form-row">
+                  <Form.Item name="sshHost" label={t('field.host')} rules={[{ required: true, message: t('validation.required') }]}>
+                    <Input placeholder={t('placeholder.host')} />
+                  </Form.Item>
+                  <Form.Item name="sshPort" label={t('field.port')} initialValue={22}>
+                    <InputNumber min={1} max={65535} />
+                  </Form.Item>
+                </Space>
+                <Form.Item name="sshUser" label={t('field.username')} rules={[{ required: true, message: t('validation.required') }]}>
+                  <Input />
                 </Form.Item>
-                <Form.Item name="sshPort" label={t('field.port')} initialValue={22}>
-                  <InputNumber min={1} max={65535} />
+                <Form.Item name="sshAuthType" label={t('field.authType')} initialValue="password">
+                  <Segmented
+                    block
+                    onChange={setTunnelAuthType}
+                    options={[
+                      { value: 'password', label: t('auth.password') },
+                      { value: 'privateKey', label: t('auth.privateKey') },
+                    ]}
+                  />
                 </Form.Item>
-              </Space>
-              <Form.Item name="sshUser" label={t('field.username')} rules={[{ required: true, message: t('validation.required') }]}>
-                <Input />
-              </Form.Item>
-              <Form.Item name="sshPassword" label={t('field.password')}>
-                <Input.Password />
-              </Form.Item>
+              </div>
+              {(!selectedTunnelConnection?.hasSavedSecret && tunnelAuthType === 'password') && (
+                <Form.Item name="sshPassword" label={t('field.password')}>
+                  <Input.Password placeholder={selectedTunnelConnection ? t('placeholder.oneTimeCredential') : ''} />
+                </Form.Item>
+              )}
+              {(!selectedTunnelConnection?.hasSavedSecret && tunnelAuthType === 'privateKey') && (
+                <>
+                  <Form.Item name="sshPrivateKey" label={t('field.privateKey')} rules={[{ required: true, message: t('validation.required') }]}>
+                    <Input.TextArea rows={4} />
+                  </Form.Item>
+                  <Form.Item name="sshPassphrase" label={t('field.passphrase')}>
+                    <Input.Password placeholder={selectedTunnelConnection ? t('placeholder.oneTimeCredential') : ''} />
+                  </Form.Item>
+                </>
+              )}
               <Space size={8} className="remote-form-row">
                 <Form.Item name="localHost" label={t('field.localHost')} initialValue="127.0.0.1">
                   <Input />

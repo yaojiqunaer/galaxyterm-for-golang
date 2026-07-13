@@ -8,6 +8,7 @@ const styles = await readFile(new URL('../style.scss', import.meta.url), 'utf8')
 const viteConfig = await readFile(new URL('../vite.config.js', import.meta.url), 'utf8');
 const replaySource = await readFile(new URL('./components/AuditReplayPlayer.jsx', import.meta.url), 'utf8');
 const terminalPaneSource = await readFile(new URL('./components/TerminalPane.jsx', import.meta.url), 'utf8');
+const savedSshProfileSource = await readFile(new URL('./components/SavedSSHProfileSelect.jsx', import.meta.url), 'utf8');
 const activeSessionDeclaration = source.indexOf('const activeSession =');
 const firstActiveSessionUsage = source.indexOf('activeSession?.providerType');
 
@@ -209,6 +210,33 @@ assert.ok(
 assert.ok(
   /\.settings-drawer \.ant-drawer-body\s*\{\s*padding:\s*0;/.test(styles),
   'settings drawer content must avoid nesting page and drawer padding',
+);
+assert.ok(
+  /\.bridge-alert\s*\{[\s\S]*?margin:\s*10px 12px 8px;/.test(styles),
+  'the web preview notice must leave space before scrollable page content',
+);
+assert.equal(
+  source.match(/<SavedSSHProfileSelect/g)?.length,
+  2,
+  'remote files and tunnels must reuse the same saved SSH connection selector',
+);
+assert.ok(
+  source.includes('resolveSelectedSshProfile')
+    && source.includes('shouldPersistConnection({ intent: terminalDrawerIntent, saveProfile: values.saveProfile })')
+    && source.includes('sshAuthType')
+    && source.includes('sshPrivateKey')
+    && source.includes("const [fileProfileId, setFileProfileId] = useState('');")
+    && source.includes("const [tunnelProfileId, setTunnelProfileId] = useState('');")
+    && source.includes('name: fields.displayName,')
+    && !source.includes("Form.useWatch('profileId'"),
+  'remote tools must resolve credentials on demand, support both auth modes, and refresh profile-derived names',
+);
+assert.ok(
+  savedSshProfileSource.includes('buildSavedSshConnections')
+    && savedSshProfileSource.includes('optionRender')
+    && savedSshProfileSource.includes('onManageConnections')
+    && savedSshProfileSource.includes('value={value || null}'),
+  'the shared SSH selector must expose searchable rich options and a connection management route',
 );
 
 console.log('app structure tests passed');

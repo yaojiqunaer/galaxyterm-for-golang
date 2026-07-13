@@ -4,6 +4,10 @@ export function resolveProfileSaveDefault({ intent = 'session', profile = null }
   return Boolean(profile || intent === 'connection');
 }
 
+export function shouldPersistConnection({ intent = 'session', saveProfile = false } = {}) {
+  return intent !== 'session' || Boolean(saveProfile);
+}
+
 export function buildConnectionTransferActions({ profileCount = 0 } = {}) {
   return [
     { key: 'importSshConfig', labelKey: 'action.importSshConfig', disabled: false },

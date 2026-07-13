@@ -32,6 +32,23 @@ func TestValidateStartRequestRequiresCoreFields(t *testing.T) {
 	}
 }
 
+func TestTunnelAuthMethodsSupportPassword(t *testing.T) {
+	methods, err := tunnelAuthMethods(StartRequest{SSHPassword: "secret"})
+	if err != nil {
+		t.Fatalf("tunnelAuthMethods returned error: %v", err)
+	}
+	if len(methods) != 1 {
+		t.Fatalf("len(methods) = %d, want 1", len(methods))
+	}
+}
+
+func TestTunnelAuthMethodsRequirePrivateKeyContent(t *testing.T) {
+	_, err := tunnelAuthMethods(StartRequest{SSHAuthType: "privateKey"})
+	if err == nil {
+		t.Fatal("expected private key validation error")
+	}
+}
+
 func TestStopAllClosesAndClearsTunnels(t *testing.T) {
 	api := NewAPI()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")

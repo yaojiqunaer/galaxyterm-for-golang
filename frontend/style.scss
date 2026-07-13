@@ -732,7 +732,7 @@ select {
   z-index: 10;
   grid-column: 1;
   grid-row: 1;
-  margin: 10px 12px 0;
+  margin: 10px 12px 8px;
   border-color: rgba(245, 197, 66, 0.38);
 }
 
@@ -2874,6 +2874,97 @@ code {
 .remote-context-form .ant-form-item {
   flex: 1;
   margin-bottom: 10px;
+}
+
+.saved-ssh-profile-select {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.saved-ssh-profile-heading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.saved-ssh-profile-heading .ant-btn {
+  padding-inline: 4px;
+  color: var(--muted);
+}
+
+.saved-ssh-profile-select > .ant-select {
+  width: 100%;
+}
+
+.saved-ssh-option {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.saved-ssh-option-copy,
+.saved-ssh-selection-copy {
+  display: grid;
+  min-width: 0;
+}
+
+.saved-ssh-option-copy strong,
+.saved-ssh-option-copy small,
+.saved-ssh-selection-copy strong,
+.saved-ssh-selection-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-ssh-option-copy small,
+.saved-ssh-selection-copy small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.saved-ssh-option-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+}
+
+.saved-ssh-selection {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  align-items: center;
+  gap: 3px 9px;
+  padding: 9px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 6px;
+  background: var(--panel-muted);
+}
+
+.saved-ssh-selection-icon {
+  display: inline-flex;
+  grid-row: 1 / span 2;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.saved-ssh-selection .ant-tag {
+  grid-column: 2;
+  justify-self: start;
+  margin: 3px 0 0;
+}
+
+.remote-manual-fields.is-hidden {
+  display: none;
 }
 
 .remote-form-row {
