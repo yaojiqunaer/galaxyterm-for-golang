@@ -1691,6 +1691,15 @@ select {
   overflow: hidden;
 }
 
+.connection-detail-drawer .ant-drawer-body {
+  padding: 0;
+  background: var(--panel);
+}
+
+.connection-detail-drawer .connection-profile-preview {
+  border: 0;
+}
+
 .connection-list-header {
   padding: 12px 14px;
   border-bottom: 1px solid var(--border-subtle);

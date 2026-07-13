@@ -69,5 +69,11 @@ assert.ok(
   /@media \(max-width: 860px\)[\s\S]*?\.session-strip-facts\s*\{[\s\S]*?display:\s*none[\s\S]*?\.session-strip-details(?:\.ant-btn)?\s*\{[\s\S]*?display:\s*inline-flex/.test(styles),
   'narrow session workspaces must replace clipped fact pills with the details control',
 );
+assert.ok(
+  source.includes('Grid.useBreakpoint()')
+    && source.includes('className="connection-detail-drawer"')
+    && source.includes("selectedNav === 'connections' && compactConnectionDetail"),
+  'compact connection workspaces must keep the list in place and open profile details in a drawer',
+);
 
 console.log('app structure tests passed');

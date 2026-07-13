@@ -203,6 +203,7 @@
   "nav.settings": "Settings",
   "section.quickConnect": "Quick Connect",
   "section.connectionManager": "Connection Manager",
+  "section.connectionDetails": "Connection details",
   "section.activeSessions": "Active Sessions",
   "section.savedConnections": "Saved Connections",
   "section.connectionGroups": "Connection Groups",

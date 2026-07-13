@@ -292,3 +292,5 @@ assert.deepEqual(profileSessions.get('dev-shell'), { activeCount: 0, focusSessio
 assert.equal(resolveSelectedProfileId(profiles, 'prod-web'), 'prod-web');
 assert.equal(resolveSelectedProfileId(profiles.filter((profile) => profile.id !== 'prod-web'), 'prod-web'), 'prod-db');
 assert.equal(resolveSelectedProfileId([], 'prod-web'), '');
+assert.equal(resolveSelectedProfileId(profiles, '', { fallbackToFirst: false }), '');
+assert.equal(resolveSelectedProfileId(profiles, 'missing', { fallbackToFirst: false }), '');

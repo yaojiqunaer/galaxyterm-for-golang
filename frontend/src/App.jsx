@@ -11,6 +11,7 @@ import {
   Dropdown,
   Empty,
   Form,
+  Grid,
   Input,
   InputNumber,
   Layout,
@@ -263,6 +264,8 @@ function quickCommandProviderLabel(type, providers = []) {
 }
 
 function App() {
+  const screens = Grid.useBreakpoint();
+  const compactConnectionDetail = screens.xl !== true;
   const [allProviders, setAllProviders] = useState(fallbackProviders);
   const [sessions, setSessions] = useState([]);
   const [profiles, setProfiles] = useState(() => loadProfiles());
@@ -528,7 +531,8 @@ function App() {
     }), profileSort),
     [profiles, profileQuery, groupQuery, providerFilter, profileSort],
   );
-  const selectedProfile = visibleProfiles.find((profile) => profile.id === selectedProfileId) || visibleProfiles[0] || null;
+  const explicitlySelectedProfile = visibleProfiles.find((profile) => profile.id === selectedProfileId) || null;
+  const selectedProfile = explicitlySelectedProfile || visibleProfiles[0] || null;
   const hasProfileFilters = profileQuery.trim() || groupQuery !== 'all' || providerFilter !== 'all' || profileSort !== 'favorites';
   const connectionEmptyState = useMemo(() => buildConnectionEmptyState({
     profileCount: profiles.length,
@@ -545,11 +549,13 @@ function App() {
   );
 
   useEffect(() => {
-    const nextSelectedProfileId = resolveSelectedProfileId(visibleProfiles, selectedProfileId);
+    const nextSelectedProfileId = resolveSelectedProfileId(visibleProfiles, selectedProfileId, {
+      fallbackToFirst: !compactConnectionDetail,
+    });
     if (nextSelectedProfileId !== selectedProfileId) {
       setSelectedProfileId(nextSelectedProfileId);
     }
-  }, [selectedProfileId, visibleProfiles]);
+  }, [compactConnectionDetail, selectedProfileId, visibleProfiles]);
 
   const moveSelectedProfile = (action) => {
     const currentIndex = visibleProfiles.findIndex((profile) => profile.id === selectedProfile?.id);
@@ -1835,6 +1841,20 @@ function App() {
     );
   };
 
+  const renderConnectionProfilePreview = (profile) => profile ? (
+    <ConnectionProfilePreview
+      profile={profile}
+      providers={providers}
+      openProfile={openProfile}
+      openProfileEditor={openProfileEditor}
+      duplicateProfile={duplicateProfile}
+      focusProfileSession={focusProfileSession}
+      profileSessionSummary={profileSessionSummary}
+      toggleProfileFavorite={toggleProfileFavorite}
+      confirmDeleteProfile={confirmDeleteProfile}
+    />
+  ) : null;
+
   const renderConnections = () => (
     <div className="workspace-page connections-page">
       <div className="page-header">
@@ -1859,7 +1879,7 @@ function App() {
         <span>{`${t('metric.providers')}: ${workspaceInsights.providers.total}`}</span>
       </div>
 
-      <div className={selectedProfile ? 'connection-manager-layout' : 'connection-manager-layout no-detail'}>
+      <div className={selectedProfile && !compactConnectionDetail ? 'connection-manager-layout' : 'connection-manager-layout no-detail'}>
         <aside className="connection-groups-panel">
           <div className="connection-panel-head">
             <Text strong>{t('section.connectionGroups')}</Text>
@@ -2083,9 +2103,9 @@ function App() {
                 const badges = buildConnectionProfileBadges(profile, sessionInfo, { providerAvailable });
                 return (
                 <List.Item
-                  className={selectedProfile?.id === profile.id ? 'connection-profile-row active' : 'connection-profile-row'}
+                  className={(compactConnectionDetail ? explicitlySelectedProfile?.id : selectedProfile?.id) === profile.id ? 'connection-profile-row active' : 'connection-profile-row'}
                   role="option"
-                  aria-selected={selectedProfile?.id === profile.id}
+                  aria-selected={(compactConnectionDetail ? explicitlySelectedProfile?.id : selectedProfile?.id) === profile.id}
                   tabIndex={-1}
                   onClick={() => setSelectedProfileId(profile.id)}
                   onDoubleClick={() => openProfile(profile)}
@@ -2136,22 +2156,21 @@ function App() {
             />
           )}
         </section>
-        {selectedProfile && (
+        {selectedProfile && !compactConnectionDetail && (
           <aside className="connection-detail-panel">
-            <ConnectionProfilePreview
-              profile={selectedProfile}
-              providers={providers}
-              openProfile={openProfile}
-              openProfileEditor={openProfileEditor}
-              duplicateProfile={duplicateProfile}
-              focusProfileSession={focusProfileSession}
-              profileSessionSummary={profileSessionSummary}
-              toggleProfileFavorite={toggleProfileFavorite}
-              confirmDeleteProfile={confirmDeleteProfile}
-            />
+            {renderConnectionProfilePreview(selectedProfile)}
           </aside>
         )}
       </div>
+      <Drawer
+        className="connection-detail-drawer"
+        open={selectedNav === 'connections' && compactConnectionDetail && Boolean(explicitlySelectedProfile)}
+        title={t('section.connectionDetails')}
+        width={380}
+        onClose={() => setSelectedProfileId('')}
+      >
+        {renderConnectionProfilePreview(explicitlySelectedProfile)}
+      </Drawer>
     </div>
   );
 

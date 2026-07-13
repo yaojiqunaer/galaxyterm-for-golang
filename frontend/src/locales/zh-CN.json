@@ -203,6 +203,7 @@
   "nav.settings": "设置",
   "section.quickConnect": "快速连接",
   "section.connectionManager": "连接管理",
+  "section.connectionDetails": "连接详情",
   "section.activeSessions": "活动会话",
   "section.savedConnections": "保存的连接",
   "section.connectionGroups": "连接分组",

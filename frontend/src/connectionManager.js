@@ -152,8 +152,9 @@ export function buildConnectionEmptyState({
   };
 }
 
-export function resolveSelectedProfileId(profiles = [], selectedProfileId = '') {
+export function resolveSelectedProfileId(profiles = [], selectedProfileId = '', options = {}) {
   if (profiles.some((profile) => profile.id === selectedProfileId)) return selectedProfileId;
+  if (options.fallbackToFirst === false) return '';
   return profiles[0]?.id || '';
 }
 
