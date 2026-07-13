@@ -4,6 +4,7 @@ import { readFile } from 'node:fs/promises';
 const source = await readFile(new URL('./App.jsx', import.meta.url), 'utf8');
 const mainSource = await readFile(new URL('./main.jsx', import.meta.url), 'utf8');
 const styles = await readFile(new URL('../style.scss', import.meta.url), 'utf8');
+const viteConfig = await readFile(new URL('../vite.config.js', import.meta.url), 'utf8');
 const activeSessionDeclaration = source.indexOf('const activeSession =');
 const firstActiveSessionUsage = source.indexOf('activeSession?.providerType');
 
@@ -111,6 +112,11 @@ assert.ok(
     && source.includes('<Suspense fallback={<TerminalLoadingState />}>')
     && !source.includes("import TerminalPane from './components/TerminalPane.jsx';"),
   'the xterm runtime must load only when a terminal session is first rendered',
+);
+assert.ok(
+  viteConfig.includes("return 'xterm-runtime';")
+    && viteConfig.indexOf("return 'xterm-runtime';") < viteConfig.indexOf("return 'vendor-runtime';"),
+  'production chunking must keep xterm out of the eagerly preloaded vendor runtime',
 );
 assert.ok(
   source.includes('const terminalSearchRef = useRef(null);')
