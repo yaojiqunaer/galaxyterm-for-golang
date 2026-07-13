@@ -274,6 +274,7 @@ function App() {
   const screens = Grid.useBreakpoint();
   const compactConnectionDetail = screens.xl !== true;
   const [messageApi, messageContextHolder] = message.useMessage();
+  const [modalApi, modalContextHolder] = Modal.useModal();
   const [allProviders, setAllProviders] = useState(fallbackProviders);
   const [sessions, setSessions] = useState([]);
   const [closedSessions, setClosedSessions] = useState([]);
@@ -904,7 +905,7 @@ function App() {
     const session = sessions.find((item) => item.id === targetKey);
     const confirm = buildSessionCloseConfirm(session);
     if (!confirm) return;
-    Modal.confirm({
+    modalApi.confirm({
       title: t(confirm.titleKey),
       content: t(confirm.contentKey, confirm.contentValues),
       okButtonProps: { danger: true },
@@ -958,7 +959,7 @@ function App() {
     }
     const confirm = buildSessionCloseConfirm({ mode: 'closed', sessions: closingSessions });
     if (!confirm) return;
-    Modal.confirm({
+    modalApi.confirm({
       title: t(confirm.titleKey),
       content: t(confirm.contentKey, confirm.contentValues),
       okButtonProps: { danger: true },
@@ -976,7 +977,7 @@ function App() {
     }
     const confirm = buildSessionCloseConfirm({ mode: 'others', sessions: closingSessions });
     if (!confirm) return;
-    Modal.confirm({
+    modalApi.confirm({
       title: t(confirm.titleKey),
       content: t(confirm.contentKey, confirm.contentValues),
       okButtonProps: { danger: true },
@@ -993,7 +994,7 @@ function App() {
     }
     const confirm = buildSessionCloseConfirm(sessions);
     if (!confirm) return;
-    Modal.confirm({
+    modalApi.confirm({
       title: t(confirm.titleKey),
       content: t(confirm.contentKey, confirm.contentValues),
       okButtonProps: { danger: true },
@@ -1406,7 +1407,7 @@ function App() {
       deleteProfile(profile.id);
       return;
     }
-    Modal.confirm({
+    modalApi.confirm({
       title: t('confirm.deleteProfileTitle'),
       content: `${profile.displayName} · ${profileDescription(profile)}`,
       okButtonProps: { danger: true },
@@ -1585,7 +1586,7 @@ function App() {
       runClear();
       return;
     }
-    Modal.confirm({
+    modalApi.confirm({
       title: t('confirm.clearCommandHistoryTitle'),
       content: t('confirm.clearCommandHistoryContent', {
         count: visibleCommandHistory.length,
@@ -1989,24 +1990,26 @@ function App() {
                 {groupQuery === 'all' ? t('action.openAll') : t('action.openGroup')}
               </Button>
               <Tooltip title={t('action.connectionTransfer')}>
-                <Dropdown
-                  trigger={['click']}
-                  menu={{
-                    items: buildConnectionTransferActions({ profileCount: profiles.length }).map((action) => ({
-                      key: action.key,
-                      disabled: action.disabled,
-                      icon: action.key === 'exportProfiles' ? <ExportOutlined /> : <ImportOutlined />,
-                      label: t(action.labelKey),
-                    })),
-                    onClick: ({ key }) => runConnectionTransferAction(key),
-                  }}
-                >
-                  <Button
-                    aria-label={t('action.connectionTransfer')}
-                    icon={<MoreOutlined />}
-                    size="small"
-                  />
-                </Dropdown>
+                <span className="tooltip-dropdown-trigger">
+                  <Dropdown
+                    trigger={['click']}
+                    menu={{
+                      items: buildConnectionTransferActions({ profileCount: profiles.length }).map((action) => ({
+                        key: action.key,
+                        disabled: action.disabled,
+                        icon: action.key === 'exportProfiles' ? <ExportOutlined /> : <ImportOutlined />,
+                        label: t(action.labelKey),
+                      })),
+                      onClick: ({ key }) => runConnectionTransferAction(key),
+                    }}
+                  >
+                    <Button
+                      aria-label={t('action.connectionTransfer')}
+                      icon={<MoreOutlined />}
+                      size="small"
+                    />
+                  </Dropdown>
+                </span>
               </Tooltip>
               <input
                 ref={profileImportRef}
@@ -3639,6 +3642,7 @@ function App() {
       },
     }}>
     {messageContextHolder}
+    {modalContextHolder}
     <Layout className={`app-shell theme-${isDarkTheme ? 'dark' : 'light'}${focusMode ? ' focus-mode' : ''}`}>
       <Sider
         breakpoint="lg"
@@ -4739,19 +4743,21 @@ function SessionToolbarActions({ model, onAction }) {
         ))}
       </div>
       <Tooltip title={t('action.sessionActions')}>
-        <Dropdown
-          menu={{ items: overflowItems, onClick: ({ key }) => onAction(key) }}
-          placement="bottomRight"
-          trigger={['click']}
-        >
-          <Button
-            aria-label={t('action.sessionActions')}
-            className="session-toolbar-button"
-            icon={<MoreOutlined />}
-            size="small"
-            type="text"
-          />
-        </Dropdown>
+        <span className="tooltip-dropdown-trigger">
+          <Dropdown
+            menu={{ items: overflowItems, onClick: ({ key }) => onAction(key) }}
+            placement="bottomRight"
+            trigger={['click']}
+          >
+            <Button
+              aria-label={t('action.sessionActions')}
+              className="session-toolbar-button"
+              icon={<MoreOutlined />}
+              size="small"
+              type="text"
+            />
+          </Dropdown>
+        </span>
       </Tooltip>
     </div>
   );

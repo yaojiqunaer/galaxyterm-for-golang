@@ -603,6 +603,10 @@ select {
   flex-wrap: nowrap !important;
 }
 
+.tooltip-dropdown-trigger {
+  display: inline-flex;
+}
+
 .topbar .ant-btn {
   border-color: var(--border);
   box-shadow: none;

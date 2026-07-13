@@ -92,6 +92,21 @@ assert.ok(
   'user feedback must use a theme-aware message context instead of the static API',
 );
 assert.ok(
+  source.includes('const [modalApi, modalContextHolder] = Modal.useModal();')
+    && source.includes('{modalContextHolder}')
+    && !source.includes('Modal.confirm({'),
+  'confirmation dialogs must use the theme-aware modal context instead of the static API',
+);
+assert.equal(
+  source.match(/className="tooltip-dropdown-trigger"/g)?.length,
+  2,
+  'tooltip-wrapped dropdowns must expose stable DOM triggers for focus and popup positioning',
+);
+assert.ok(
+  /\.tooltip-dropdown-trigger\s*\{[\s\S]*?display:\s*inline-flex/.test(styles),
+  'tooltip dropdown trigger wrappers must not alter toolbar layout',
+);
+assert.ok(
   source.includes("const TerminalPane = lazy(() => import('./components/TerminalPane.jsx'));")
     && source.includes('<Suspense fallback={<TerminalLoadingState />}>')
     && !source.includes("import TerminalPane from './components/TerminalPane.jsx';"),
