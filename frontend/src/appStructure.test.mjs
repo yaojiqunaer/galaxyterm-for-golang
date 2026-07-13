@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 
 const source = await readFile(new URL('./App.jsx', import.meta.url), 'utf8');
 const mainSource = await readFile(new URL('./main.jsx', import.meta.url), 'utf8');
+const indexSource = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const styles = await readFile(new URL('../style.scss', import.meta.url), 'utf8');
 const viteConfig = await readFile(new URL('../vite.config.js', import.meta.url), 'utf8');
 const activeSessionDeclaration = source.indexOf('const activeSession =');
@@ -42,6 +43,11 @@ assert.ok(
 assert.ok(
   /<AppErrorBoundary>\s*<App\s*\/>\s*<\/AppErrorBoundary>/.test(mainSource),
   'the application root must recover from render failures instead of showing a blank window',
+);
+assert.ok(
+  indexSource.includes('<link rel="icon" href="/favicon.svg" type="image/svg+xml">')
+    && indexSource.includes('<title>GalaxyTerm</title>'),
+  'the desktop webview must expose GalaxyTerm branding without a missing favicon request',
 );
 assert.ok(
   !source.includes('session-switcher-list') && !source.includes('session-filter-bar'),
