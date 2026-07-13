@@ -3695,6 +3695,17 @@ code {
   background: var(--panel-muted);
 }
 
+.terminal-drawer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.terminal-drawer-footer > .ant-space {
+  margin-left: auto;
+}
+
 .drawer-provider-head .ant-typography-secondary {
   display: block;
   font-size: 12px;

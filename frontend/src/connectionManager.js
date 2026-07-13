@@ -8,6 +8,13 @@ export function shouldPersistConnection({ intent = 'session', saveProfile = fals
   return intent !== 'session' || Boolean(saveProfile);
 }
 
+export function buildTerminalSubmitPlan({ action = 'create', intent = 'session', saveProfile = false } = {}) {
+  return {
+    openSession: intent === 'session' || action === 'saveAndOpen',
+    persistProfile: shouldPersistConnection({ intent, saveProfile }),
+  };
+}
+
 export function buildConnectionTransferActions({ profileCount = 0 } = {}) {
   return [
     { key: 'importSshConfig', labelKey: 'action.importSshConfig', disabled: false },

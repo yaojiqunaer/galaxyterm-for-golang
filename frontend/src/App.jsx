@@ -91,13 +91,13 @@ import {
   buildConnectionProfileStatusSummary,
   buildConnectionProfileSubtitle,
   buildConnectionTransferActions,
+  buildTerminalSubmitPlan,
   filterConnectionProfiles,
   filterRecentConnectionsByProviders,
   isProfileProviderAvailable,
   resolveProfileSaveDefault,
   resolveSelectedProfileId,
   selectBatchProfiles,
-  shouldPersistConnection,
   summarizeProfileSessions,
   sortConnectionProfiles,
   sortSidebarProfiles,
@@ -707,6 +707,7 @@ function App() {
   const openDrawer = (type = terminalDefaults.defaultProviderType, profile = null, intent = 'session') => {
     const providerType = profile?.providerType || type;
     const resolvedIntent = profile ? 'edit' : intent;
+    if (resolvedIntent !== 'session') setSelectedProfileId('');
     setNewType(providerType);
     setTerminalDrawerIntent(resolvedIntent);
     form.setFieldsValue({
@@ -736,16 +737,21 @@ function App() {
 
   const openConnectionDrawer = (type = terminalDefaults.defaultProviderType) => openDrawer(type, null, 'connection');
 
-  const createSession = async () => {
+  const createSession = async (action = 'create') => {
     const values = await form.validateFields();
     const provider = providers.find((item) => item.type === newType) || fallbackProviders[0];
     const label = values.displayName || providerLabel(provider);
     let request = buildRequest(newType, label, values);
     let profileId = editingProfileId;
+    const submitPlan = buildTerminalSubmitPlan({
+      action,
+      intent: terminalDrawerIntent,
+      saveProfile: values.saveProfile,
+    });
 
     setCreatingSession(true);
     try {
-      if (shouldPersistConnection({ intent: terminalDrawerIntent, saveProfile: values.saveProfile })) {
+      if (submitPlan.persistProfile) {
         const hasNewCredentialSecret = !!(
           values.password
           || values.privateKey
@@ -786,6 +792,7 @@ function App() {
         messageApi.success(t('message.profileSaved'));
       }
       setDrawerOpen(false);
+      if (!submitPlan.openSession) return;
       await startProfileRequests([request], { closeDrawer: true });
     } catch (error) {
       messageApi.error(`${t('message.credentialFailed')}: ${error}`);
@@ -4162,21 +4169,45 @@ function App() {
       </Modal>
 
       <Drawer
+        className="terminal-drawer"
         title={t(terminalDrawerIntent === 'edit'
           ? 'profile.action.edit'
           : terminalDrawerIntent === 'connection' ? 'action.newConnection' : 'drawer.newTerminal')}
-        width={420}
+        width={screens.sm === false ? '100%' : 420}
         open={drawerOpen}
         destroyOnHidden
         onClose={() => setDrawerOpen(false)}
-        extra={(
-          <Space>
-            <Button onClick={() => setDrawerOpen(false)}>{t('action.cancel')}</Button>
+        footer={(
+          <div className="terminal-drawer-footer">
             <Button onClick={testConnection} loading={testingConnection}>{t('action.testConnection')}</Button>
-            <Button type="primary" onClick={createSession} loading={creatingSession}>
-              {t(terminalDrawerIntent === 'session' ? 'action.create' : 'action.saveAndOpen')}
-            </Button>
-          </Space>
+            <Space>
+              <Button onClick={() => setDrawerOpen(false)}>{t('action.cancel')}</Button>
+              {terminalDrawerIntent === 'session' ? (
+                <Button type="primary" onClick={() => createSession('create')} loading={creatingSession}>
+                  {t('action.create')}
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    icon={<SaveOutlined />}
+                    loading={creatingSession}
+                    onClick={() => createSession('save')}
+                    type="primary"
+                  >
+                    {t('action.save')}
+                  </Button>
+                  <Tooltip title={t('action.saveAndOpen')}>
+                    <Button
+                      aria-label={t('action.saveAndOpen')}
+                      disabled={creatingSession}
+                      icon={<ThunderboltOutlined />}
+                      onClick={() => createSession('saveAndOpen')}
+                    />
+                  </Tooltip>
+                </>
+              )}
+            </Space>
+          </div>
         )}
       >
         <div className="drawer-provider-head">

@@ -222,7 +222,7 @@ assert.equal(
 );
 assert.ok(
   source.includes('resolveSelectedSshProfile')
-    && source.includes('shouldPersistConnection({ intent: terminalDrawerIntent, saveProfile: values.saveProfile })')
+    && source.includes('const submitPlan = buildTerminalSubmitPlan({')
     && source.includes('sshAuthType')
     && source.includes('sshPrivateKey')
     && source.includes("const [fileProfileId, setFileProfileId] = useState('');")
@@ -237,6 +237,23 @@ assert.ok(
     && savedSshProfileSource.includes('onManageConnections')
     && savedSshProfileSource.includes('value={value || null}'),
   'the shared SSH selector must expose searchable rich options and a connection management route',
+);
+assert.ok(
+  source.includes("const createSession = async (action = 'create')")
+    && source.includes("createSession('save')")
+    && source.includes("createSession('saveAndOpen')")
+    && source.includes('if (!submitPlan.openSession) return;'),
+  'connection management must support save-only without starting a terminal and retain save-and-open',
+);
+assert.ok(
+  source.includes('className="terminal-drawer"')
+    && source.includes('className="terminal-drawer-footer"')
+    && /\.terminal-drawer-footer\s*\{[\s\S]*?justify-content:\s*space-between;/.test(styles),
+  'terminal form actions must use a stable footer instead of crowding the drawer title',
+);
+assert.ok(
+  source.includes("if (resolvedIntent !== 'session') setSelectedProfileId('');"),
+  'opening a connection editor must dismiss the compact connection detail drawer',
 );
 
 console.log('app structure tests passed');

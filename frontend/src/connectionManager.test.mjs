@@ -10,6 +10,7 @@ import {
   buildConnectionProfileStatusSummary,
   buildConnectionProfileSubtitle,
   buildConnectionTransferActions,
+  buildTerminalSubmitPlan,
   filterConnectionProfiles,
   filterRecentConnectionsByProviders,
   isProfileProviderAvailable,
@@ -31,6 +32,22 @@ assert.equal(shouldPersistConnection(), false);
 assert.equal(shouldPersistConnection({ intent: 'session', saveProfile: true }), true);
 assert.equal(shouldPersistConnection({ intent: 'connection' }), true);
 assert.equal(shouldPersistConnection({ intent: 'edit' }), true);
+assert.deepEqual(buildTerminalSubmitPlan({ intent: 'session', saveProfile: false }), {
+  openSession: true,
+  persistProfile: false,
+});
+assert.deepEqual(buildTerminalSubmitPlan({ intent: 'session', saveProfile: true }), {
+  openSession: true,
+  persistProfile: true,
+});
+assert.deepEqual(buildTerminalSubmitPlan({ action: 'save', intent: 'connection' }), {
+  openSession: false,
+  persistProfile: true,
+});
+assert.deepEqual(buildTerminalSubmitPlan({ action: 'saveAndOpen', intent: 'edit' }), {
+  openSession: true,
+  persistProfile: true,
+});
 
 assert.deepEqual(buildConnectionTransferActions({ profileCount: 0 }), [
   { key: 'importSshConfig', labelKey: 'action.importSshConfig', disabled: false },
