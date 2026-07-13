@@ -115,5 +115,10 @@ assert.ok(
     && source.includes('restoreLastClosedSession'),
   'recently closed sessions must be restorable from the menu and Cmd/Ctrl+Shift+T',
 );
+assert.ok(
+  source.includes("key === 'w' && !event.shiftKey && activeKey && selectedNav === 'sessions'")
+    && source.includes('confirmRemoveSession(activeKey);'),
+  'Cmd/Ctrl+W must close the active terminal only inside the session workspace',
+);
 
 console.log('app structure tests passed');

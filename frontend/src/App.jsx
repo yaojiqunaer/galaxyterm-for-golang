@@ -439,6 +439,10 @@ function App() {
         event.preventDefault();
         restoreLastClosedSession();
       }
+      if (key === 'w' && !event.shiftKey && activeKey && selectedNav === 'sessions') {
+        event.preventDefault();
+        confirmRemoveSession(activeKey);
+      }
       if (key === 'f' && !event.shiftKey && activeKey && selectedNav === 'sessions') {
         event.preventDefault();
         terminalSearchRef.current?.focus();
@@ -501,7 +505,7 @@ function App() {
     };
     window.addEventListener('keydown', handleKeydown, true);
     return () => window.removeEventListener('keydown', handleKeydown, true);
-  }, [activeKey, closedSessions, selectedNav, sessions, settings.shortcutModifier]);
+  }, [activeKey, closedSessions, selectedNav, sessions, settings.confirmDangerousActions, settings.shortcutModifier]);
 
   useEffect(() => {
     if (activeKey && terminalRefs.current[activeKey]?.fit) {
