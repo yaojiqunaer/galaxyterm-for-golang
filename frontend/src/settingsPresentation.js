@@ -44,6 +44,7 @@ export function buildShortcutGroups(settings = {}) {
         [`${modifier} + Shift + C`, 'action.copySelection'],
         [`${modifier} + Shift + V`, 'action.pasteClipboard'],
         [`${modifier} + L`, 'action.clearTerminal'],
+        ['Ctrl + C', 'action.interruptCommand'],
         [`${modifier} + +/-/0`, 'action.zoomReset'],
         [`${modifier} + R`, 'action.reconnect'],
         ['?', 'action.help'],

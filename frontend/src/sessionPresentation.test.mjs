@@ -33,6 +33,7 @@ assert.equal(typeof sessionPresentation.resolveSessionLifecycleStatus, 'function
 assert.equal(sessionPresentation.resolveSessionLifecycleStatus('connecting'), 'connecting');
 assert.equal(sessionPresentation.resolveSessionLifecycleStatus('connected'), 'connected');
 assert.equal(sessionPresentation.resolveSessionLifecycleStatus('busy'), 'connected');
+assert.equal(sessionPresentation.resolveSessionLifecycleStatus('interrupting'), 'connected');
 assert.equal(sessionPresentation.resolveSessionLifecycleStatus('idle'), 'connected');
 assert.equal(sessionPresentation.resolveSessionLifecycleStatus('error'), 'error');
 assert.equal(sessionPresentation.resolveSessionLifecycleStatus('closed'), 'closed');
@@ -179,6 +180,18 @@ assert.deepEqual(buildSessionToolbarModel({
     { key: 'closeCurrent', labelKey: 'action.closeSession', disabled: false, danger: true },
   ],
 });
+
+assert.deepEqual(buildSessionToolbarModel({
+  activeKey: 'running',
+  canNavigate: false,
+  closedCount: 0,
+  sessionCount: 1,
+  terminalStatus: 'busy',
+  view: 'tabs',
+}).primary, [
+  { key: 'interrupt', labelKey: 'action.interruptCommand', disabled: false, danger: true },
+  { key: 'reconnect', labelKey: 'action.reconnect', disabled: true },
+]);
 
 assert.deepEqual(buildSessionTabMenuModel({ sessionCount: 3 }), [
   { key: 'rename', labelKey: 'action.renameSession' },

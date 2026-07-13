@@ -16,7 +16,7 @@ export function sessionStatusLabel(session = {}) {
 
 export function resolveSessionLifecycleStatus(terminalStatus) {
   const status = typeof terminalStatus === 'string' ? terminalStatus : terminalStatus?.status;
-  if (status === 'connected' || status === 'busy' || status === 'idle') return 'connected';
+  if (status === 'connected' || status === 'busy' || status === 'interrupting' || status === 'idle') return 'connected';
   if (status === 'error') return 'error';
   if (status === 'closed') return 'closed';
   return 'connecting';
@@ -106,6 +106,10 @@ export function buildSessionToolbarModel(options = {}) {
   const canNavigate = Boolean(options.canNavigate);
   const sessionCount = Number(options.sessionCount) || 0;
   const closedCount = Number(options.closedCount) || 0;
+  const terminalStatus = typeof options.terminalStatus === 'string'
+    ? options.terminalStatus
+    : options.terminalStatus?.status;
+  const canInterrupt = terminalStatus === 'busy' || terminalStatus === 'interrupting';
   const viewAction = options.view === 'grid'
     ? { key: 'tabs', labelKey: 'action.tabs', disabled: false }
     : { key: 'grid', labelKey: 'action.grid', disabled: false };
@@ -118,7 +122,19 @@ export function buildSessionToolbarModel(options = {}) {
       { key: 'next', labelKey: 'action.nextSession', disabled: false },
     );
   }
-  primary.push({ key: 'reconnect', labelKey: 'action.reconnect', disabled: !hasActiveSession });
+  if (canInterrupt) {
+    primary.push({
+      key: 'interrupt',
+      labelKey: 'action.interruptCommand',
+      disabled: false,
+      danger: true,
+    });
+  }
+  primary.push({
+    key: 'reconnect',
+    labelKey: 'action.reconnect',
+    disabled: !hasActiveSession || canInterrupt,
+  });
 
   return {
     primary,

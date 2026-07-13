@@ -24,6 +24,7 @@
     "test:settings": "node src/settingsPresentation.test.mjs",
     "test:sessions": "node src/sessionPresentation.test.mjs",
     "test:terminal-status": "node src/terminalStatus.test.mjs",
+    "test:terminal-execution": "node src/terminalExecution.test.mjs",
     "test:ssh-config": "node src/sshConfigProfiles.test.mjs"
   },
   "dependencies": {

@@ -7,6 +7,7 @@ const indexSource = await readFile(new URL('../index.html', import.meta.url), 'u
 const styles = await readFile(new URL('../style.scss', import.meta.url), 'utf8');
 const viteConfig = await readFile(new URL('../vite.config.js', import.meta.url), 'utf8');
 const replaySource = await readFile(new URL('./components/AuditReplayPlayer.jsx', import.meta.url), 'utf8');
+const terminalPaneSource = await readFile(new URL('./components/TerminalPane.jsx', import.meta.url), 'utf8');
 const activeSessionDeclaration = source.indexOf('const activeSession =');
 const firstActiveSessionUsage = source.indexOf('activeSession?.providerType');
 
@@ -185,6 +186,12 @@ assert.ok(
     && source.includes('synchronizeSessionTerminalStatus(current, sessionId, status, revision)')
     && source.includes('updateTerminalStatus(session.id, status, session.revision || 0)'),
   'terminal lifecycle changes must update the matching current session without accepting stale reconnect events',
+);
+assert.ok(
+  terminalPaneSource.includes('interrupt: () =>')
+    && terminalPaneSource.includes("SessionAPI.Send(sessionId.current, '\\u0003')")
+    && source.includes('onInterrupt={() => interruptSession(session.id)}'),
+  'running terminal commands must expose a provider-neutral PTY interrupt through each terminal frame',
 );
 assert.ok(
   source.includes('className="settings-drawer"')

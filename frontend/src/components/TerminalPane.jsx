@@ -7,6 +7,11 @@ import * as runtime from '../../wailsjs/runtime/runtime.js';
 import * as SessionAPI from '../../wailsjs/go/session/API.js';
 import * as Theme from '../../wailsjs/go/internal/Theme.js';
 import { t } from '../i18n.js';
+import {
+  appendTerminalOutputTail,
+  parseShellIntegrationExitCode,
+  terminalOutputIndicatesPrompt,
+} from '../terminalExecution.js';
 
 function TerminalPane({
   request,
@@ -28,6 +33,8 @@ function TerminalPane({
   const inputLine = useRef('');
   const lastCommand = useRef('');
   const lastCommandStartedAt = useRef(null);
+  const outputTail = useRef('');
+  const durationTimer = useRef(null);
   const terminalStatus = useRef({
     cols: 80,
     durationMs: 0,
@@ -37,13 +44,71 @@ function TerminalPane({
     updatedAt: new Date().toISOString(),
   });
 
+  const stopDurationTicker = () => {
+    if (durationTimer.current) window.clearInterval(durationTimer.current);
+    durationTimer.current = null;
+  };
+
+  const startDurationTicker = () => {
+    stopDurationTicker();
+    durationTimer.current = window.setInterval(() => {
+      if (!isCommandInFlight(terminalStatus.current.status)) {
+        stopDurationTicker();
+        return;
+      }
+      emitTerminalStatus(onStatusChange, terminalStatus, {
+        durationMs: commandDurationMs(lastCommandStartedAt.current),
+      });
+    }, 500);
+  };
+
+  const markCommandSubmitted = (command) => {
+    lastCommand.current = command;
+    lastCommandStartedAt.current = new Date();
+    outputTail.current = '';
+    emitTerminalStatus(onStatusChange, terminalStatus, {
+      durationMs: 0,
+      error: '',
+      exitCode: undefined,
+      lastCommand: command,
+      status: 'busy',
+    });
+    startDurationTicker();
+    onCommandSubmitted?.(command);
+  };
+
+  const markCommandInterrupted = () => {
+    if (!isCommandInFlight(terminalStatus.current.status)) return;
+    emitTerminalStatus(onStatusChange, terminalStatus, {
+      durationMs: commandDurationMs(lastCommandStartedAt.current),
+      status: 'interrupting',
+    });
+    onAuditEvent?.({
+      detail: lastCommand.current,
+      type: 'command.interrupt',
+    });
+  };
+
+  const trackOutgoingData = (data) => {
+    if (String(data || '').includes('\u0003')) markCommandInterrupted();
+    trackSubmittedCommands(data, inputLine, markCommandSubmitted);
+  };
+
   useImperativeHandle(ref, () => ({
     fit: () => {
       fitAddon.current?.fit();
     },
     send: (data) => {
       if (sessionId.current) {
+        trackOutgoingData(data);
         SessionAPI.Send(sessionId.current, data);
+        term.current?.focus();
+      }
+    },
+    interrupt: () => {
+      if (sessionId.current) {
+        markCommandInterrupted();
+        SessionAPI.Send(sessionId.current, '\u0003');
         term.current?.focus();
       }
     },
@@ -56,6 +121,7 @@ function TerminalPane({
     pasteClipboard: async () => {
       const text = await navigator.clipboard?.readText?.();
       if (text && sessionId.current) {
+        trackOutgoingData(text);
         SessionAPI.Send(sessionId.current, text);
         term.current?.focus();
       }
@@ -150,15 +216,24 @@ function TerminalPane({
         const data = event?.Data || event?.data || '';
         if (data) transcript.current.push(data);
         if (data) outputEvents.current.push({ time: elapsedSeconds(startedAt.current), data });
-        if (data && shouldMarkOutputIdle(terminalStatus.current, lastCommand.current)) {
+        if (data) outputTail.current = appendTerminalOutputTail(outputTail.current, data);
+        const exitCode = parseShellIntegrationExitCode(data);
+        if (
+          data
+          && isCommandInFlight(terminalStatus.current.status)
+          && (exitCode !== null || terminalOutputIndicatesPrompt(outputTail.current))
+        ) {
+          stopDurationTicker();
           emitTerminalStatus(onStatusChange, terminalStatus, {
             durationMs: commandDurationMs(lastCommandStartedAt.current),
+            ...(exitCode !== null ? { exitCode } : {}),
             status: lastCommand.current ? 'idle' : 'connected',
           });
         }
         term.current?.write(data);
       });
       cleanupError = runtime.EventsOn(`terminal:error:${createdSessionId}`, (event) => {
+        stopDurationTicker();
         const message = event?.Error?.defaultMessage || event?.error?.defaultMessage || t('terminal.error.disconnected');
         transcript.current.push(`\r\n${message}`);
         outputEvents.current.push({ time: elapsedSeconds(startedAt.current), data: `\r\n${message}` });
@@ -171,6 +246,7 @@ function TerminalPane({
         term.current?.writeln(`\r\n${message}`);
       });
       cleanupExit = runtime.EventsOn(`terminal:exit:${createdSessionId}`, () => {
+        stopDurationTicker();
         transcript.current.push(`\r\n${t('terminal.status.closed')}`);
         outputEvents.current.push({ time: elapsedSeconds(startedAt.current), data: `\r\n${t('terminal.status.closed')}` });
         emitTerminalStatus(onStatusChange, terminalStatus, {
@@ -200,17 +276,7 @@ function TerminalPane({
         } else if (data.includes('\r') || data.includes('\n')) {
           onAuditEvent?.({ type: 'input.enter' });
         }
-        trackSubmittedCommands(data, inputLine, (command) => {
-          lastCommand.current = command;
-          lastCommandStartedAt.current = new Date();
-          emitTerminalStatus(onStatusChange, terminalStatus, {
-            durationMs: 0,
-            error: '',
-            lastCommand: command,
-            status: 'busy',
-          });
-          onCommandSubmitted?.(command);
-        });
+        trackOutgoingData(data);
         SessionAPI.Send(createdSessionId, data);
       });
 
@@ -247,6 +313,7 @@ function TerminalPane({
 
     return () => {
       disposed = true;
+      stopDurationTicker();
       emitTerminalStatus(onStatusChange, terminalStatus, {
         durationMs: commandDurationMs(lastCommandStartedAt.current),
         status: 'closed',
@@ -337,9 +404,8 @@ function emitTerminalStatus(onStatusChange, statusRef, patch = {}) {
   onStatusChange?.(statusRef.current);
 }
 
-function shouldMarkOutputIdle(status, lastCommand) {
-  const nextStatus = lastCommand ? 'idle' : 'connected';
-  return status.status !== nextStatus;
+function isCommandInFlight(status) {
+  return status === 'busy' || status === 'interrupting';
 }
 
 function trackSubmittedCommands(data, inputLineRef, onCommandSubmitted) {

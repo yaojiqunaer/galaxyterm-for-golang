@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   buildTerminalErrorDetail,
+  buildTerminalControlActions,
   buildTerminalRecoveryActions,
   buildTerminalStatusFacts,
   normalizeTerminalStatus,
@@ -9,9 +10,11 @@ import {
 
 assert.equal(normalizeTerminalStatus('connected'), 'connected');
 assert.equal(normalizeTerminalStatus('busy'), 'busy');
+assert.equal(normalizeTerminalStatus('interrupting'), 'interrupting');
 assert.equal(normalizeTerminalStatus('unknown'), 'connecting');
 assert.equal(terminalStatusTone('connected'), 'success');
 assert.equal(terminalStatusTone('busy'), 'warning');
+assert.equal(terminalStatusTone('interrupting'), 'warning');
 assert.equal(terminalStatusTone('error'), 'danger');
 assert.equal(terminalStatusTone('closed'), 'closed');
 
@@ -26,6 +29,18 @@ assert.deepEqual(buildTerminalStatusFacts({
   { key: 'lastCommand', value: 'kubectl get pods', tone: 'neutral' },
   { key: 'duration', value: '1.5s', tone: 'neutral' },
   { key: 'size', value: '120x36', tone: 'neutral' },
+]);
+
+assert.deepEqual(buildTerminalStatusFacts({
+  durationMs: 920,
+  exitCode: 130,
+  lastCommand: 'sleep 30',
+  status: 'interrupting',
+}), [
+  { key: 'status', value: 'interrupting', tone: 'warning' },
+  { key: 'lastCommand', value: 'sleep 30', tone: 'neutral' },
+  { key: 'duration', value: '0.9s', tone: 'neutral' },
+  { key: 'exitCode', value: 130, tone: 'danger' },
 ]);
 
 assert.deepEqual(buildTerminalStatusFacts({
@@ -63,3 +78,11 @@ assert.deepEqual(buildTerminalRecoveryActions({
 assert.deepEqual(buildTerminalRecoveryActions({
   status: 'idle',
 }), []);
+
+assert.deepEqual(buildTerminalControlActions({ status: 'busy' }), [
+  { key: 'interrupt', tone: 'danger' },
+]);
+assert.deepEqual(buildTerminalControlActions({ status: 'interrupting' }), [
+  { key: 'interrupt', tone: 'danger' },
+]);
+assert.deepEqual(buildTerminalControlActions({ status: 'idle' }), []);

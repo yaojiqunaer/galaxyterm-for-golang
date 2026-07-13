@@ -40,6 +40,11 @@ Records session open, reconnect, close, error, clear, quick command, and large p
 Saved and exported audit records and recordings redact common passwords, tokens, Authorization headers, and private key blocks. Legacy records are also sanitized on load, including recording metadata and event payloads. GalaxyTerm does not record every raw keystroke by default; it records operation summaries and terminal output recordings.
 </details>
 
+<details>
+<summary><b>⏱ Command status and interruption</b></summary>
+Interactive terminals show the current command, live duration, and execution state. Running commands can receive a standard PTY interrupt from the toolbar, terminal status bar, or `Ctrl+C`. A real exit code is shown when the shell exposes OSC 133 integration, while common shell, PowerShell, MySQL, Redis, and PostgreSQL prompts are recognized as command completion.
+</details>
+
 ## Architecture
 
 ----

@@ -1,4 +1,4 @@
-const terminalStatuses = ['connecting', 'connected', 'busy', 'idle', 'error', 'closed'];
+const terminalStatuses = ['connecting', 'connected', 'busy', 'interrupting', 'idle', 'error', 'closed'];
 
 export function normalizeTerminalStatus(value) {
   const normalized = String(value || '').trim().toLowerCase();
@@ -8,7 +8,7 @@ export function normalizeTerminalStatus(value) {
 export function terminalStatusTone(value) {
   const status = normalizeTerminalStatus(value);
   if (status === 'connected' || status === 'idle') return 'success';
-  if (status === 'busy' || status === 'connecting') return 'warning';
+  if (status === 'busy' || status === 'interrupting' || status === 'connecting') return 'warning';
   if (status === 'error') return 'danger';
   return 'closed';
 }
@@ -24,6 +24,13 @@ export function buildTerminalStatusFacts(state = {}) {
   }
   if (Number.isFinite(Number(state.durationMs)) && Number(state.durationMs) >= 0) {
     facts.push({ key: 'duration', value: formatDuration(Number(state.durationMs)), tone: 'neutral' });
+  }
+  if (Number.isSafeInteger(state.exitCode)) {
+    facts.push({
+      key: 'exitCode',
+      value: state.exitCode,
+      tone: state.exitCode === 0 ? 'success' : 'danger',
+    });
   }
   if (state.cols && state.rows) {
     facts.push({ key: 'size', value: `${state.cols}x${state.rows}`, tone: 'neutral' });
@@ -55,6 +62,14 @@ export function buildTerminalRecoveryActions(state = {}) {
       { key: 'reconnect', tone: 'primary' },
       { key: 'audit', tone: 'default' },
     ];
+  }
+  return [];
+}
+
+export function buildTerminalControlActions(state = {}) {
+  const status = normalizeTerminalStatus(state.status);
+  if (status === 'busy' || status === 'interrupting') {
+    return [{ key: 'interrupt', tone: 'danger' }];
   }
   return [];
 }

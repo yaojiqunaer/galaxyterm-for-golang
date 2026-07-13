@@ -39,6 +39,11 @@
   保存和导出审计记录、录屏时会对常见密码、Token、Authorization 头、私钥块等内容做基础脱敏；升级后读取旧记录时也会自动清洗历史元数据和录屏事件。默认不记录每个按键原文，只记录输入摘要和输出录屏。
 </details>
 
+<details>
+  <summary><b>⏱ 命令执行状态与中断</b></summary>
+  交互式终端会展示当前命令、实时耗时和运行状态；运行期间可通过工具栏、中断按钮或 `Ctrl+C` 发送标准 PTY 中断。Shell 提供 OSC 133 集成时会同时展示真实退出码，常见 Shell、PowerShell、MySQL、Redis 和 PostgreSQL 提示符可用于识别命令完成。
+</details>
+
 ## 架构
 
 ----

@@ -64,6 +64,7 @@ import {
   SettingOutlined,
   StarFilled,
   StarOutlined,
+  StopOutlined,
   ThunderboltOutlined,
   UpOutlined,
   VideoCameraOutlined,
@@ -141,6 +142,7 @@ import {
   buildTunnelSummary,
 } from './remoteWorkspace.js';
 import {
+  buildTerminalControlActions,
   buildTerminalErrorDetail,
   buildTerminalRecoveryActions,
   buildTerminalStatusFacts,
@@ -357,6 +359,7 @@ function App() {
   const terminalSearchRef = useRef(null);
   const profileImportRef = useRef(null);
   const activeSession = sessions.find((session) => session.id === activeKey);
+  const activeTerminalStatus = terminalStatuses[activeKey] || {};
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -1537,7 +1540,6 @@ function App() {
       return;
     }
     activeTerminal.send(command.endsWith('\n') ? command : `${command}\n`);
-    recordCommandHistory(command);
     appendAuditEvent(activeKey, 'quick-command.run', command);
     setCommandsOpen(false);
     setPaletteOpen(false);
@@ -1701,6 +1703,15 @@ function App() {
     setSessions((current) => synchronizeSessionTerminalStatus(current, sessionId, status, revision));
   };
 
+  const interruptSession = (sessionId = activeKey) => {
+    const terminal = terminalRefs.current[sessionId];
+    if (!terminal?.interrupt) {
+      messageApi.warning(t('message.noActiveSession'));
+      return;
+    }
+    terminal.interrupt();
+  };
+
   const copyTerminalError = async (sessionId) => {
     const error = terminalStatuses[sessionId]?.error || '';
     if (!error) {
@@ -1723,6 +1734,7 @@ function App() {
   const renderTerminalPane = (session) => (
     <TerminalFrame
       onCopyError={() => copyTerminalError(session.id)}
+      onInterrupt={() => interruptSession(session.id)}
       onOpenAudit={() => openSessionAudit(session.id)}
       onReconnect={() => reconnectSession(session.id)}
       status={terminalStatuses[session.id]}
@@ -1821,6 +1833,7 @@ function App() {
       canNavigate: sessionNavigationState.canNavigate,
       closedCount: currentSessionSummary.closed,
       sessionCount: sessions.length,
+      terminalStatus: activeTerminalStatus,
       view: sessionView,
     });
     const runSessionToolbarAction = (action) => {
@@ -1828,6 +1841,7 @@ function App() {
       if (action === 'tabs') setSessionView('tabs');
       if (action === 'previous') switchSession('previous');
       if (action === 'next') switchSession('next');
+      if (action === 'interrupt') interruptSession();
       if (action === 'reconnect') reconnectSession();
       if (action === 'rename') openRenameSession();
       if (action === 'closeClosed') confirmCloseClosedSessions();
@@ -4757,6 +4771,7 @@ function SessionSidebarLabel({ session }) {
 function SessionToolbarActions({ model, onAction }) {
   const icons = {
     grid: <AppstoreOutlined />,
+    interrupt: <StopOutlined />,
     next: <RightOutlined />,
     previous: <LeftOutlined />,
     reconnect: <ReloadOutlined />,
@@ -4782,9 +4797,10 @@ function SessionToolbarActions({ model, onAction }) {
               aria-label={t(action.labelKey)}
               className="session-toolbar-button"
               disabled={action.disabled}
+              danger={action.danger}
               icon={icons[action.key]}
               size="small"
-              type={action.key === 'reconnect' ? 'primary' : 'text'}
+              type={action.key === 'interrupt' || action.key === 'reconnect' ? 'primary' : 'text'}
               onClick={() => onAction(action.key)}
             />
           </Tooltip>
@@ -4927,11 +4943,13 @@ function ReplayLoadingState() {
 function TerminalFrame({
   children,
   onCopyError,
+  onInterrupt,
   onOpenAudit,
   onReconnect,
   status,
 }) {
   const facts = buildTerminalStatusFacts(status || {});
+  const controlActions = buildTerminalControlActions(status || {});
   const errorDetail = buildTerminalErrorDetail(status || {});
   const recoveryActions = buildTerminalRecoveryActions(status || {});
   return (
@@ -4946,8 +4964,22 @@ function TerminalFrame({
             </span>
           ))}
         </div>
-        {(errorDetail || recoveryActions.length > 0) && (
+        {(controlActions.length > 0 || errorDetail || recoveryActions.length > 0) && (
           <div className="terminal-recovery-actions">
+            {controlActions.map((action) => (
+              <Tooltip key={action.key} title={terminalRecoveryActionLabel(action)}>
+                <Button
+                  aria-label={terminalRecoveryActionLabel(action)}
+                  danger={action.tone === 'danger'}
+                  icon={terminalRecoveryActionIcon(action)}
+                  onClick={() => runTerminalRecoveryAction(action.key, { onInterrupt })}
+                  size="small"
+                  type="primary"
+                >
+                  <span className="terminal-recovery-label">{terminalRecoveryActionLabel(action)}</span>
+                </Button>
+              </Tooltip>
+            ))}
             {errorDetail && (
               <Popover
                 content={(
@@ -5524,6 +5556,7 @@ function terminalStatusFactLabel(fact) {
   if (fact.key === 'status') return t('terminal.fact.status');
   if (fact.key === 'lastCommand') return t('terminal.fact.lastCommand');
   if (fact.key === 'duration') return t('label.duration');
+  if (fact.key === 'exitCode') return t('terminal.fact.exitCode');
   if (fact.key === 'size') return t('terminal.fact.size');
   if (fact.key === 'error') return t('terminal.fact.error');
   return fact.key;
@@ -5535,6 +5568,7 @@ function terminalStatusFactValue(fact) {
 }
 
 function terminalRecoveryActionLabel(action) {
+  if (action.key === 'interrupt') return t('action.interruptCommand');
   if (action.key === 'reconnect') return t('action.reconnect');
   if (action.key === 'copyError') return t('action.copyError');
   if (action.key === 'audit') return t('nav.audit');
@@ -5542,6 +5576,7 @@ function terminalRecoveryActionLabel(action) {
 }
 
 function terminalRecoveryActionIcon(action) {
+  if (action.key === 'interrupt') return <StopOutlined />;
   if (action.key === 'reconnect') return <ReloadOutlined />;
   if (action.key === 'copyError') return <CopyOutlined />;
   if (action.key === 'audit') return <AuditOutlined />;
@@ -5549,6 +5584,7 @@ function terminalRecoveryActionIcon(action) {
 }
 
 function runTerminalRecoveryAction(key, actions) {
+  if (key === 'interrupt') actions.onInterrupt?.();
   if (key === 'reconnect') actions.onReconnect?.();
   if (key === 'copyError') actions.onCopyError?.();
   if (key === 'audit') actions.onOpenAudit?.();
