@@ -22,10 +22,6 @@ export function buildTerminalStatusFacts(state = {}) {
   if (lastCommand) {
     facts.push({ key: 'lastCommand', value: lastCommand, tone: 'neutral' });
   }
-  const error = String(state.error || '').trim();
-  if (error) {
-    facts.push({ key: 'error', value: error, tone: 'danger' });
-  }
   if (Number.isFinite(Number(state.durationMs)) && Number(state.durationMs) >= 0) {
     facts.push({ key: 'duration', value: formatDuration(Number(state.durationMs)), tone: 'neutral' });
   }
@@ -33,6 +29,16 @@ export function buildTerminalStatusFacts(state = {}) {
     facts.push({ key: 'size', value: `${state.cols}x${state.rows}`, tone: 'neutral' });
   }
   return facts;
+}
+
+export function buildTerminalErrorDetail(state = {}) {
+  const message = String(state.error || '').trim();
+  if (normalizeTerminalStatus(state.status) !== 'error' || !message) return null;
+  return {
+    message,
+    suggestionKey: 'terminal.error.recoveryHint',
+    titleKey: 'terminal.error.details',
+  };
 }
 
 export function buildTerminalRecoveryActions(state = {}) {

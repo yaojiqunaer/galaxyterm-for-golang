@@ -1155,6 +1155,30 @@ select {
   flex: 0 0 auto;
 }
 
+.terminal-error-popover {
+  display: flex;
+  width: min(420px, calc(100vw - 48px));
+  flex-direction: column;
+  gap: 8px;
+}
+
+.terminal-error-popover strong {
+  overflow-wrap: anywhere;
+  color: var(--danger);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.terminal-error-popover small {
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.terminal-error-details.ant-btn {
+  border-color: rgb(248 113 113 / 42%);
+}
+
 .terminal-status-fact {
   display: inline-flex;
   align-items: baseline;
@@ -1197,6 +1221,27 @@ select {
 
 .terminal-status-fact.tone-closed {
   opacity: 0.72;
+}
+
+@media (max-width: 860px) {
+  .terminal-status-bar {
+    overflow: hidden;
+  }
+
+  .terminal-status-fact.fact-lastCommand,
+  .terminal-status-fact.fact-size {
+    display: none;
+  }
+
+  .terminal-recovery-actions .ant-btn {
+    width: 28px;
+    min-width: 28px;
+    padding-inline: 0;
+  }
+
+  .terminal-recovery-label {
+    display: none;
+  }
 }
 
 .session-grid-page {

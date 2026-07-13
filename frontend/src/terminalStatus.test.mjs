@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  buildTerminalErrorDetail,
   buildTerminalRecoveryActions,
   buildTerminalStatusFacts,
   normalizeTerminalStatus,
@@ -35,10 +36,20 @@ assert.deepEqual(buildTerminalStatusFacts({
   status: 'error',
 }), [
   { key: 'status', value: 'error', tone: 'danger' },
-  { key: 'error', value: 'connection reset', tone: 'danger' },
   { key: 'duration', value: '1m 5s', tone: 'neutral' },
   { key: 'size', value: '80x24', tone: 'neutral' },
 ]);
+
+assert.deepEqual(buildTerminalErrorDetail({
+  error: 'connection reset',
+  status: 'error',
+}), {
+  message: 'connection reset',
+  suggestionKey: 'terminal.error.recoveryHint',
+  titleKey: 'terminal.error.details',
+});
+
+assert.equal(buildTerminalErrorDetail({ status: 'connected' }), null);
 
 assert.deepEqual(buildTerminalRecoveryActions({
   error: 'connection reset',

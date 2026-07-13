@@ -337,6 +337,8 @@
   "terminal.fact.error": "Error",
   "terminal.error.createFailed": "Failed to create terminal",
   "terminal.error.disconnected": "Terminal connection error",
+  "terminal.error.details": "Error details",
+  "terminal.error.recoveryHint": "Check the connection and retry. Copy the error or open the audit record when more detail is needed.",
   "terminal.confirmPaste": "Large or multi-line paste detected. Send it to the terminal?",
   "validation.required": "Required",
   "status.sessions": "Sessions",

@@ -337,6 +337,8 @@
   "terminal.fact.error": "错误",
   "terminal.error.createFailed": "创建终端失败",
   "terminal.error.disconnected": "终端连接异常",
+  "terminal.error.details": "错误详情",
+  "terminal.error.recoveryHint": "检查连接配置和网络后重试；需要进一步排查时，可复制错误或打开审计记录。",
   "terminal.confirmPaste": "检测到多行或大量粘贴内容，确认发送到终端？",
   "validation.required": "必填",
   "status.sessions": "会话",

@@ -75,5 +75,21 @@ assert.ok(
     && source.includes("selectedNav === 'connections' && compactConnectionDetail"),
   'compact connection workspaces must keep the list in place and open profile details in a drawer',
 );
+assert.ok(
+  source.includes('buildTerminalErrorDetail')
+    && source.includes('className="terminal-error-details"')
+    && source.includes('className="terminal-recovery-label"'),
+  'terminal failures must use a structured detail disclosure and compact recovery labels',
+);
+assert.ok(
+  /\{terminalSearch\.trim\(\)\s*&&\s*\([\s\S]*?action\.findPrevious[\s\S]*?action\.findNext[\s\S]*?\)\}/.test(source),
+  'terminal result navigation must only appear while a search query is active',
+);
+assert.ok(
+  source.includes('const [messageApi, messageContextHolder] = message.useMessage();')
+    && source.includes('{messageContextHolder}')
+    && !/\bmessage\.(?:success|error|warning|info)\(/.test(source),
+  'user feedback must use a theme-aware message context instead of the static API',
+);
 
 console.log('app structure tests passed');

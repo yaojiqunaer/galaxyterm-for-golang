@@ -143,7 +143,11 @@ import {
   buildTunnelSummary,
 } from './remoteWorkspace.js';
 import TerminalPane from './components/TerminalPane.jsx';
-import { buildTerminalRecoveryActions, buildTerminalStatusFacts } from './terminalStatus.js';
+import {
+  buildTerminalErrorDetail,
+  buildTerminalRecoveryActions,
+  buildTerminalStatusFacts,
+} from './terminalStatus.js';
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
 import { hasWailsMethod } from './desktopBridge.js';
 import {
@@ -266,6 +270,7 @@ function quickCommandProviderLabel(type, providers = []) {
 function App() {
   const screens = Grid.useBreakpoint();
   const compactConnectionDetail = screens.xl !== true;
+  const [messageApi, messageContextHolder] = message.useMessage();
   const [allProviders, setAllProviders] = useState(fallbackProviders);
   const [sessions, setSessions] = useState([]);
   const [profiles, setProfiles] = useState(() => loadProfiles());
@@ -736,12 +741,12 @@ function App() {
         request = { ...request, profileId };
         const nextProfiles = saveProfile(profiles, request, editingProfileId, profileId);
         setProfiles(nextProfiles);
-        message.success(t('message.profileSaved'));
+        messageApi.success(t('message.profileSaved'));
       }
       setDrawerOpen(false);
       await startProfileRequests([request], { closeDrawer: true });
     } catch (error) {
-      message.error(`${t('message.credentialFailed')}: ${error}`);
+      messageApi.error(`${t('message.credentialFailed')}: ${error}`);
     } finally {
       setCreatingSession(false);
     }
@@ -775,14 +780,14 @@ function App() {
     setSessions((current) => [...current, ...createdSessions]);
     setActiveKey(createdSessions[createdSessions.length - 1].id);
     setSelectedNav('sessions');
-    message.success(createdSessions.length > 1
+    messageApi.success(createdSessions.length > 1
       ? `${t('message.batchSessionsStarted')}: ${createdSessions.length}`
       : t('terminal.status.connecting'));
   };
 
   const testConnection = async () => {
     if (newType !== 'ssh') {
-      message.info(t('message.localTestSkipped'));
+      messageApi.info(t('message.localTestSkipped'));
       return;
     }
     const values = await form.validateFields();
@@ -791,9 +796,9 @@ function App() {
     try {
       const request = await resolveCredentialRequest(buildRequest(newType, values.displayName || providerLabel(provider), values));
       await TerminalAPI.TestSSHConnection(request);
-      message.success(t('message.connectionTestSuccess'));
+      messageApi.success(t('message.connectionTestSuccess'));
     } catch (error) {
-      message.error(`${t('message.connectionTestFailed')}: ${error}`);
+      messageApi.error(`${t('message.connectionTestFailed')}: ${error}`);
     } finally {
       setTestingConnection(false);
     }
@@ -813,7 +818,7 @@ function App() {
     const nextProfiles = [...profiles, copy];
     persistProfiles(nextProfiles);
     setProfiles(nextProfiles);
-    message.success(t('message.profileSaved'));
+    messageApi.success(t('message.profileSaved'));
   };
 
   const toggleProfileFavorite = (profileId) => {
@@ -957,7 +962,7 @@ function App() {
 
   const openRenameSession = (session = sessions.find((item) => item.id === activeKey)) => {
     if (!session) {
-      message.warning(t('message.noActiveSession'));
+      messageApi.warning(t('message.noActiveSession'));
       return;
     }
     setRenamingSessionId(session.id);
@@ -968,7 +973,7 @@ function App() {
   const renameSession = () => {
     const name = renamingSessionName.trim();
     if (!name) {
-      message.warning(t('validation.required'));
+      messageApi.warning(t('validation.required'));
       return;
     }
     setSessions((current) => current.map((session) => (
@@ -979,12 +984,12 @@ function App() {
     setRenameOpen(false);
     setRenamingSessionId('');
     setRenamingSessionName('');
-    message.success(t('message.sessionRenamed'));
+    messageApi.success(t('message.sessionRenamed'));
   };
 
   const reconnectSession = (sessionId = activeKey) => {
     if (!sessionId) {
-      message.warning(t('message.noActiveSession'));
+      messageApi.warning(t('message.noActiveSession'));
       return;
     }
     setSessions((current) => current.map((session) => (
@@ -1007,7 +1012,7 @@ function App() {
     )));
     setActiveKey(sessionId);
     setSelectedNav('sessions');
-    message.success(t('terminal.status.connecting'));
+    messageApi.success(t('terminal.status.connecting'));
   };
 
   const findInTerminal = (direction = 'next') => {
@@ -1018,7 +1023,7 @@ function App() {
     }
     const activeTerminal = terminalRefs.current[activeKey];
     if (!activeTerminal) {
-      message.warning(t('message.noActiveSession'));
+      messageApi.warning(t('message.noActiveSession'));
       return;
     }
     if (direction === 'previous') {
@@ -1032,12 +1037,12 @@ function App() {
     try {
       const copied = await terminalRefs.current[activeKey]?.copySelection?.();
       if (!copied) {
-        message.info(t('message.noTerminalSelection'));
+        messageApi.info(t('message.noTerminalSelection'));
         return;
       }
-      message.success(t('message.copied'));
+      messageApi.success(t('message.copied'));
     } catch (error) {
-      message.error(`${t('message.clipboardFailed')}: ${error}`);
+      messageApi.error(`${t('message.clipboardFailed')}: ${error}`);
     }
   };
 
@@ -1045,12 +1050,12 @@ function App() {
     try {
       const pasted = await terminalRefs.current[activeKey]?.pasteClipboard?.();
       if (!pasted) {
-        message.info(t('message.clipboardEmpty'));
+        messageApi.info(t('message.clipboardEmpty'));
         return;
       }
-      message.success(t('message.pasted'));
+      messageApi.success(t('message.pasted'));
     } catch (error) {
-      message.error(`${t('message.clipboardFailed')}: ${error}`);
+      messageApi.error(`${t('message.clipboardFailed')}: ${error}`);
     }
   };
 
@@ -1058,13 +1063,13 @@ function App() {
     try {
       const copied = await terminalRefs.current[activeKey]?.copyTranscript?.();
       if (!copied) {
-        message.info(t('message.terminalOutputEmpty'));
+        messageApi.info(t('message.terminalOutputEmpty'));
         return;
       }
       appendAuditEvent(activeKey, 'transcript.copy');
-      message.success(t('message.copied'));
+      messageApi.success(t('message.copied'));
     } catch (error) {
-      message.error(`${t('message.clipboardFailed')}: ${error}`);
+      messageApi.error(`${t('message.clipboardFailed')}: ${error}`);
     }
   };
 
@@ -1073,18 +1078,18 @@ function App() {
     const output = terminalRefs.current[activeKey]?.transcript?.();
     const text = output?.raw || output?.screen || '';
     if (!session || !text.trim()) {
-      message.info(t('message.terminalOutputEmpty'));
+      messageApi.info(t('message.terminalOutputEmpty'));
       return;
     }
     downloadText(`${safeFileName(session.label)}-${timestampFilePart()}.log`, text);
     appendAuditEvent(activeKey, 'transcript.export');
     saveAuditRecord(activeKey);
-    message.success(t('message.transcriptExported'));
+    messageApi.success(t('message.transcriptExported'));
   };
 
   const clearActiveTerminal = () => {
     if (!terminalRefs.current[activeKey]?.clear) {
-      message.warning(t('message.noActiveSession'));
+      messageApi.warning(t('message.noActiveSession'));
       return;
     }
     terminalRefs.current[activeKey].clear();
@@ -1093,7 +1098,7 @@ function App() {
 
   const resetActiveTerminal = () => {
     if (!terminalRefs.current[activeKey]?.reset) {
-      message.warning(t('message.noActiveSession'));
+      messageApi.warning(t('message.noActiveSession'));
       return;
     }
     terminalRefs.current[activeKey].reset();
@@ -1167,14 +1172,14 @@ function App() {
     const nextRecords = persistAuditRecords(auditRecords.filter((record) => record.id !== recordId));
     setAuditRecords(nextRecords);
     if (replayRecord?.id === recordId) setReplayRecord(null);
-    message.success(t('message.auditRecordDeleted'));
+    messageApi.success(t('message.auditRecordDeleted'));
   };
 
   const clearAuditRecords = () => {
     persistAuditRecords([]);
     setAuditRecords([]);
     setReplayRecord(null);
-    message.success(t('message.auditRecordsCleared'));
+    messageApi.success(t('message.auditRecordsCleared'));
   };
 
   const exportAuditRecord = (record, format = 'cast') => {
@@ -1196,19 +1201,19 @@ function App() {
     const snapshot = buildWorkspaceSnapshot(sessions, activeKey, sessionView);
     persistWorkspaceSnapshot(snapshot);
     setWorkspaceSummary(loadWorkspaceSummary());
-    message.success(t('message.workspaceSaved'));
+    messageApi.success(t('message.workspaceSaved'));
   };
 
   const restoreWorkspace = ({ silent = false } = {}) => {
     const snapshot = loadWorkspaceSnapshot();
     if (!snapshot || snapshot.sessions.length === 0) {
-      if (!silent) message.info(t('message.noWorkspaceSnapshot'));
+      if (!silent) messageApi.info(t('message.noWorkspaceSnapshot'));
       return;
     }
     const restorableSessions = snapshot.sessions.filter((session) => canRestoreSession(session.request));
     const skipped = snapshot.sessions.length - restorableSessions.length;
     if (restorableSessions.length === 0) {
-      if (!silent) message.warning(t('message.workspaceRestoreSkipped'));
+      if (!silent) messageApi.warning(t('message.workspaceRestoreSkipped'));
       return;
     }
     let restoredActiveKey = '';
@@ -1234,14 +1239,14 @@ function App() {
     setSessionView(snapshot.sessionView || 'tabs');
     setSelectedNav('sessions');
     if (!silent) {
-      message.success(skipped > 0 ? t('message.workspaceRestoredPartial') : t('message.workspaceRestored'));
+      messageApi.success(skipped > 0 ? t('message.workspaceRestoredPartial') : t('message.workspaceRestored'));
     }
   };
 
   const clearWorkspaceSnapshot = () => {
     localStorage.removeItem(workspaceStorageKey);
     setWorkspaceSummary(loadWorkspaceSummary());
-    message.success(t('message.workspaceCleared'));
+    messageApi.success(t('message.workspaceCleared'));
   };
 
   const deleteProfile = async (profileId) => {
@@ -1253,32 +1258,32 @@ function App() {
     } catch {
       // Profiles remain removable even if the OS credential store is unavailable.
     }
-    message.success(t('message.profileDeleted'));
+    messageApi.success(t('message.profileDeleted'));
   };
 
   const openProfile = async (profile) => {
     if (!isProfileProviderAvailable(profile, providers)) {
-      message.warning(t('message.providerUnavailable'));
+      messageApi.warning(t('message.providerUnavailable'));
       return;
     }
     try {
       await startProfileRequests([profileToRequest(profile)]);
       markProfilesUsed([profile.id]);
     } catch (error) {
-      message.error(`${t('message.credentialFailed')}: ${error}`);
+      messageApi.error(`${t('message.credentialFailed')}: ${error}`);
     }
   };
 
   const openRecentConnection = async (connection) => {
     const providerType = connection.providerType || connection.request?.providerType;
     if (!providers.some((provider) => provider.type === providerType)) {
-      message.warning(t('message.providerUnavailable'));
+      messageApi.warning(t('message.providerUnavailable'));
       return;
     }
     try {
       await startProfileRequests([connection.request || profileToRequest(recentToProfile(connection))]);
     } catch (error) {
-      message.error(`${t('message.credentialFailed')}: ${error}`);
+      messageApi.error(`${t('message.credentialFailed')}: ${error}`);
     }
   };
 
@@ -1301,7 +1306,7 @@ function App() {
     const providerAvailable = isProfileProviderAvailable(profile, providers);
     const primaryAction = buildConnectionProfilePrimaryAction({ providerAvailable, sessionInfo });
     if (primaryAction.disabled) {
-      message.warning(primaryAction.reasonKey ? t(primaryAction.reasonKey) : t('message.providerUnavailable'));
+      messageApi.warning(primaryAction.reasonKey ? t(primaryAction.reasonKey) : t('message.providerUnavailable'));
       return;
     }
     if (primaryAction.action === 'focus') {
@@ -1330,8 +1335,8 @@ function App() {
     if (action === 'exportTranscript') exportTerminalTranscript();
     if (action === 'saveAudit') {
       const record = saveAuditRecord(activeKey);
-      if (record) message.success(t('message.auditRecordSaved'));
-      if (!record) message.info(t('message.terminalOutputEmpty'));
+      if (record) messageApi.success(t('message.auditRecordSaved'));
+      if (!record) messageApi.info(t('message.terminalOutputEmpty'));
     }
     if (action === 'closeSession') confirmRemoveSession(activeKey);
     if (action === 'closeClosed') confirmCloseClosedSessions();
@@ -1395,17 +1400,17 @@ function App() {
     });
     const skipped = allSelectedProfiles.length - selectedProfiles.length;
     if (selectedProfiles.length === 0) {
-      message.info(skipped > 0 ? t('message.noAvailableBatchConnections') : t('message.noBatchConnections'));
+      messageApi.info(skipped > 0 ? t('message.noAvailableBatchConnections') : t('message.noBatchConnections'));
       return;
     }
     try {
       await startProfileRequests(selectedProfiles.map(profileToRequest));
       markProfilesUsed(selectedProfiles.map((profile) => profile.id));
       if (skipped > 0) {
-        message.warning(`${t('message.batchConnectionsSkipped')}: ${skipped}`);
+        messageApi.warning(`${t('message.batchConnectionsSkipped')}: ${skipped}`);
       }
     } catch (error) {
-      message.error(`${t('message.credentialFailed')}: ${error}`);
+      messageApi.error(`${t('message.credentialFailed')}: ${error}`);
     }
   };
 
@@ -1423,7 +1428,7 @@ function App() {
   const clearRecentConnections = () => {
     persistRecentConnections([]);
     setRecentConnections([]);
-    message.success(t('message.recentCleared'));
+    messageApi.success(t('message.recentCleared'));
   };
 
   const exportProfiles = () => {
@@ -1447,9 +1452,9 @@ function App() {
       const nextProfiles = mergeProfiles(profiles, normalized);
       persistProfiles(nextProfiles);
       setProfiles(nextProfiles);
-      message.success(t('message.profileImported'));
+      messageApi.success(t('message.profileImported'));
     } catch (error) {
-      message.error(`${t('message.profileImportFailed')}: ${error}`);
+      messageApi.error(`${t('message.profileImportFailed')}: ${error}`);
     }
   };
 
@@ -1462,7 +1467,7 @@ function App() {
   const importSshConfigProfiles = () => {
     const importedProfiles = parseSshConfigProfiles(sshConfigContent);
     if (importedProfiles.length === 0) {
-      message.warning(t('message.sshConfigEmpty'));
+      messageApi.warning(t('message.sshConfigEmpty'));
       return;
     }
     const nextProfiles = mergeProfiles(profiles, importedProfiles);
@@ -1470,13 +1475,13 @@ function App() {
     setProfiles(nextProfiles);
     setSshConfigOpen(false);
     setSshConfigContent('');
-    message.success(t('message.sshConfigImported'));
+    messageApi.success(t('message.sshConfigImported'));
   };
 
   const runQuickCommand = (command) => {
     const activeTerminal = terminalRefs.current[activeKey];
     if (!activeTerminal?.send) {
-      message.warning(t('message.noActiveSession'));
+      messageApi.warning(t('message.noActiveSession'));
       return;
     }
     activeTerminal.send(command.endsWith('\n') ? command : `${command}\n`);
@@ -1494,7 +1499,7 @@ function App() {
     });
     const { entry, skippedReason } = result;
     if (skippedReason === 'sensitive') {
-      message.warning(t('message.commandHistorySensitiveSkipped'));
+      messageApi.warning(t('message.commandHistorySensitiveSkipped'));
     }
     if (!entry) return;
     setCommandHistory((current) => {
@@ -1530,7 +1535,7 @@ function App() {
       });
       persistCommandHistory(nextHistory);
       setCommandHistory(nextHistory);
-      message.success(t('message.commandHistoryCleared'));
+      messageApi.success(t('message.commandHistoryCleared'));
     };
     if (settings.confirmDangerousActions === false) {
       runClear();
@@ -1559,18 +1564,18 @@ function App() {
       && (command.providerType || 'all') === quickCommand.providerType
     ));
     if (alreadySaved) {
-      message.info(t('message.commandAlreadySaved'));
+      messageApi.info(t('message.commandAlreadySaved'));
       return;
     }
     const nextCommands = [...quickCommands, quickCommand];
     persistQuickCommands(nextCommands);
     setQuickCommands(nextCommands);
-    message.success(t('message.commandSaved'));
+    messageApi.success(t('message.commandSaved'));
   };
 
   const runPaletteAction = (item) => {
     if (item.disabled) {
-      message.warning(item.reasonKey ? t(item.reasonKey) : t('message.providerUnavailable'));
+      messageApi.warning(item.reasonKey ? t(item.reasonKey) : t('message.providerUnavailable'));
       return;
     }
     item.run();
@@ -1591,7 +1596,7 @@ function App() {
     };
     const saveResult = buildQuickCommandSaveResult(nextCommand);
     if (saveResult.skippedReason === 'sensitive') {
-      message.warning(t('message.quickCommandSensitiveSkipped'));
+      messageApi.warning(t('message.quickCommandSensitiveSkipped'));
       return;
     }
     if (!saveResult.command) return;
@@ -1600,7 +1605,7 @@ function App() {
     setQuickCommands(nextCommands);
     commandForm.resetFields();
     setEditingQuickCommandId('');
-    message.success(t(editingQuickCommandId ? 'message.commandUpdated' : 'message.commandSaved'));
+    messageApi.success(t(editingQuickCommandId ? 'message.commandUpdated' : 'message.commandSaved'));
   };
 
   const deleteQuickCommand = (id) => {
@@ -1611,7 +1616,7 @@ function App() {
       commandForm.resetFields();
       setEditingQuickCommandId('');
     }
-    message.success(t('message.commandDeleted'));
+    messageApi.success(t('message.commandDeleted'));
   };
 
   const editQuickCommand = (item) => {
@@ -1646,14 +1651,14 @@ function App() {
   const copyTerminalError = async (sessionId) => {
     const error = terminalStatuses[sessionId]?.error || '';
     if (!error) {
-      message.info(t('message.noTerminalError'));
+      messageApi.info(t('message.noTerminalError'));
       return;
     }
     try {
       await navigator.clipboard?.writeText(error);
-      message.success(t('message.copied'));
+      messageApi.success(t('message.copied'));
     } catch (error_) {
-      message.error(`${t('message.clipboardFailed')}: ${error_}`);
+      messageApi.error(`${t('message.clipboardFailed')}: ${error_}`);
     }
   };
 
@@ -2337,7 +2342,7 @@ function App() {
       type: 'github',
     });
     if (!source) {
-      message.warning(t('validation.required'));
+      messageApi.warning(t('validation.required'));
       return;
     }
     const nextSources = upsertExtensionSource(extensionSources, source);
@@ -2346,14 +2351,14 @@ function App() {
     setExtensionSourceName('');
     setExtensionSourceUrl('');
     setExtensionSourceOpen(false);
-    message.success(t('message.extensionSourceSaved'));
+    messageApi.success(t('message.extensionSourceSaved'));
   };
 
   const deleteExtensionSource = (sourceId) => {
     const nextSources = removeExtensionSource(extensionSources, sourceId);
     persistExtensionSources(nextSources);
     setExtensionSources(nextSources);
-    message.success(t('message.extensionSourceDeleted'));
+    messageApi.success(t('message.extensionSourceDeleted'));
   };
 
   const toggleExtensionEnabled = (extensionId, enabled) => {
@@ -2369,13 +2374,13 @@ function App() {
         disabledExtensionIds: [...disabledIds],
       };
     });
-    message.success(enabled ? t('message.extensionEnabled') : t('message.extensionDisabled'));
+    messageApi.success(enabled ? t('message.extensionEnabled') : t('message.extensionDisabled'));
   };
 
   const installOfflineExtension = async () => {
     const packagePath = extensionPackagePath.trim();
     if (!packagePath) {
-      message.warning(t('validation.required'));
+      messageApi.warning(t('validation.required'));
       return;
     }
     setExtensionBusy(true);
@@ -2385,9 +2390,9 @@ function App() {
       setInstalledExtensions(Array.isArray(items) ? items : []);
       setExtensionInstallOpen(false);
       setExtensionPackagePath('');
-      message.success(t('message.extensionInstalled'));
+      messageApi.success(t('message.extensionInstalled'));
     } catch (error) {
-      message.error(`${t('message.extensionInstallFailed')}: ${error}`);
+      messageApi.error(`${t('message.extensionInstallFailed')}: ${error}`);
     } finally {
       setExtensionBusy(false);
     }
@@ -2399,9 +2404,9 @@ function App() {
       await ExtensionsAPI.Uninstall(extensionID);
       const items = await ExtensionsAPI.ListInstalled();
       setInstalledExtensions(Array.isArray(items) ? items : []);
-      message.success(t('message.extensionUninstalled'));
+      messageApi.success(t('message.extensionUninstalled'));
     } catch (error) {
-      message.error(`${t('message.extensionInstallFailed')}: ${error}`);
+      messageApi.error(`${t('message.extensionInstallFailed')}: ${error}`);
     } finally {
       setExtensionBusy(false);
     }
@@ -2425,7 +2430,7 @@ function App() {
       fileForm.setFieldsValue({ path: req.path });
       setFileEntries(Array.isArray(entries) ? entries : []);
     } catch (error) {
-      message.error(`${t('message.fileListFailed')}: ${error}`);
+      messageApi.error(`${t('message.fileListFailed')}: ${error}`);
     } finally {
       setFileLoading(false);
     }
@@ -2460,12 +2465,12 @@ function App() {
     setFileLoading(true);
     try {
       await FilesAPI.Mkdir(req);
-      message.success(t('message.mkdirSuccess'));
+      messageApi.success(t('message.mkdirSuccess'));
       setMkdirOpen(false);
       setMkdirName('');
       await loadFiles(base);
     } catch (error) {
-      message.error(`${t('message.fileListFailed')}: ${error}`);
+      messageApi.error(`${t('message.fileListFailed')}: ${error}`);
     } finally {
       setFileLoading(false);
     }
@@ -2477,10 +2482,10 @@ function App() {
     setFileLoading(true);
     try {
       await FilesAPI.Delete(req);
-      message.success(t('message.deleteSuccess'));
+      messageApi.success(t('message.deleteSuccess'));
       await loadFiles(fileForm.getFieldValue('path') || '.');
     } catch (error) {
-      message.error(`${t('message.fileListFailed')}: ${error}`);
+      messageApi.error(`${t('message.fileListFailed')}: ${error}`);
     } finally {
       setFileLoading(false);
     }
@@ -2500,9 +2505,9 @@ function App() {
       anchor.download = entry.name;
       anchor.click();
       URL.revokeObjectURL(url);
-      message.success(t('message.downloadStarted'));
+      messageApi.success(t('message.downloadStarted'));
     } catch (error) {
-      message.error(`${t('message.fileListFailed')}: ${error}`);
+      messageApi.error(`${t('message.fileListFailed')}: ${error}`);
     } finally {
       setFileLoading(false);
     }
@@ -2511,7 +2516,7 @@ function App() {
   const openRemoteFileEditor = async (entry) => {
     if (entry.isDir) return;
     if (entry.size > 1024 * 1024) {
-      message.warning(t('message.fileTooLarge'));
+      messageApi.warning(t('message.fileTooLarge'));
       return;
     }
     const req = currentFileRequest();
@@ -2523,7 +2528,7 @@ function App() {
       setEditingRemoteContent(content);
       setFileEditorOpen(true);
     } catch (error) {
-      message.error(`${t('message.fileListFailed')}: ${error}`);
+      messageApi.error(`${t('message.fileListFailed')}: ${error}`);
     } finally {
       setFileEditorLoading(false);
     }
@@ -2536,11 +2541,11 @@ function App() {
     setFileEditorLoading(true);
     try {
       await FilesAPI.WriteFile({ ...req, content: editingRemoteContent });
-      message.success(t('message.fileSaved'));
+      messageApi.success(t('message.fileSaved'));
       setFileEditorOpen(false);
       await loadFiles(fileForm.getFieldValue('path') || '.');
     } catch (error) {
-      message.error(`${t('message.fileSaveFailed')}: ${error}`);
+      messageApi.error(`${t('message.fileSaveFailed')}: ${error}`);
     } finally {
       setFileEditorLoading(false);
     }
@@ -2549,7 +2554,7 @@ function App() {
   const uploadTextFile = async () => {
     const name = uploadRemoteName.trim();
     if (!name) {
-      message.warning(t('validation.required'));
+      messageApi.warning(t('validation.required'));
       return;
     }
     const req = currentFileRequest();
@@ -2558,13 +2563,13 @@ function App() {
     setFileLoading(true);
     try {
       await FilesAPI.WriteFile({ ...req, content: uploadLocalContent });
-      message.success(t('message.uploadSuccess'));
+      messageApi.success(t('message.uploadSuccess'));
       setUploadOpen(false);
       setUploadRemoteName('');
       setUploadLocalContent('');
       await loadFiles(base);
     } catch (error) {
-      message.error(`${t('message.uploadFailed')}: ${error}`);
+      messageApi.error(`${t('message.uploadFailed')}: ${error}`);
     } finally {
       setFileLoading(false);
     }
@@ -3081,9 +3086,9 @@ function App() {
         remotePort: values.remotePort,
       });
       setTunnels((current) => [...current, info]);
-      message.success(t('message.tunnelStarted'));
+      messageApi.success(t('message.tunnelStarted'));
     } catch (error) {
-      message.error(`${t('message.tunnelFailed')}: ${error}`);
+      messageApi.error(`${t('message.tunnelFailed')}: ${error}`);
     } finally {
       setTunnelBusy(false);
     }
@@ -3094,9 +3099,9 @@ function App() {
     try {
       await TunnelAPI.Stop(id);
       setTunnels((current) => current.filter((item) => item.id !== id));
-      message.success(t('message.tunnelStopped'));
+      messageApi.success(t('message.tunnelStopped'));
     } catch (error) {
-      message.error(`${t('message.tunnelFailed')}: ${error}`);
+      messageApi.error(`${t('message.tunnelFailed')}: ${error}`);
     } finally {
       setTunnelBusy(false);
     }
@@ -3444,8 +3449,8 @@ function App() {
     history: () => setHistoryOpen(true),
     saveAudit: () => {
       const record = saveAuditRecord(activeKey);
-      if (record) message.success(t('message.auditRecordSaved'));
-      if (!record) message.info(t('message.terminalOutputEmpty'));
+      if (record) messageApi.success(t('message.auditRecordSaved'));
+      if (!record) messageApi.info(t('message.terminalOutputEmpty'));
     },
     zoomIn: () => zoomTerminalFont(1),
     zoomOut: () => zoomTerminalFont(-1),
@@ -3575,6 +3580,7 @@ function App() {
         fontFamily: "Inter, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif",
       },
     }}>
+    {messageContextHolder}
     <Layout className={`app-shell theme-${isDarkTheme ? 'dark' : 'light'}${focusMode ? ' focus-mode' : ''}`}>
       <Sider
         breakpoint="lg"
@@ -3755,12 +3761,16 @@ function App() {
                   onSearch={() => findInTerminal('next')}
                   placeholder={t('placeholder.searchTerminal')}
                 />
-                <Tooltip title={t('action.findPrevious')}>
-                  <Button icon={<UpOutlined />} onClick={() => findInTerminal('previous')} disabled={!terminalSearch.trim()} />
-                </Tooltip>
-                <Tooltip title={t('action.findNext')}>
-                  <Button icon={<DownOutlined />} onClick={() => findInTerminal('next')} disabled={!terminalSearch.trim()} />
-                </Tooltip>
+                {terminalSearch.trim() && (
+                  <>
+                    <Tooltip title={t('action.findPrevious')}>
+                      <Button icon={<UpOutlined />} onClick={() => findInTerminal('previous')} />
+                    </Tooltip>
+                    <Tooltip title={t('action.findNext')}>
+                      <Button icon={<DownOutlined />} onClick={() => findInTerminal('next')} />
+                    </Tooltip>
+                  </>
+                )}
               </>
             )}
             <Tooltip title={t('action.language')}>
@@ -4111,7 +4121,7 @@ function App() {
                     disabled={!safety.canCopy}
                     onClick={async () => {
                       await navigator.clipboard?.writeText(item.command);
-                      message.success(t('message.copied'));
+                      messageApi.success(t('message.copied'));
                     }}
                   >
                     {t('action.copy')}
@@ -4208,7 +4218,7 @@ function App() {
                   size="small"
                   onClick={async () => {
                     await navigator.clipboard?.writeText(item.command);
-                    message.success(t('message.copied'));
+                    messageApi.success(t('message.copied'));
                   }}
                 >
                   {t('action.copy')}
@@ -4791,6 +4801,7 @@ function TerminalFrame({
   status,
 }) {
   const facts = buildTerminalStatusFacts(status || {});
+  const errorDetail = buildTerminalErrorDetail(status || {});
   const recoveryActions = buildTerminalRecoveryActions(status || {});
   return (
     <div className="terminal-frame">
@@ -4798,28 +4809,54 @@ function TerminalFrame({
       <div className="terminal-status-bar">
         <div className="terminal-status-facts">
           {facts.map((fact) => (
-            <span key={fact.key} className={`terminal-status-fact tone-${fact.tone}`}>
+            <span key={fact.key} className={`terminal-status-fact fact-${fact.key} tone-${fact.tone}`}>
               <small>{terminalStatusFactLabel(fact)}</small>
               <strong>{terminalStatusFactValue(fact)}</strong>
             </span>
           ))}
         </div>
-        {recoveryActions.length > 0 && (
+        {(errorDetail || recoveryActions.length > 0) && (
           <div className="terminal-recovery-actions">
-            {recoveryActions.map((action) => (
-              <Button
-                key={action.key}
-                size="small"
-                type={action.tone === 'primary' ? 'primary' : 'default'}
-                disabled={action.disabled}
-                onClick={() => runTerminalRecoveryAction(action.key, {
-                  onCopyError,
-                  onOpenAudit,
-                  onReconnect,
-                })}
+            {errorDetail && (
+              <Popover
+                content={(
+                  <div className="terminal-error-popover">
+                    <strong>{errorDetail.message}</strong>
+                    <small>{t(errorDetail.suggestionKey)}</small>
+                  </div>
+                )}
+                placement="topRight"
+                title={t(errorDetail.titleKey)}
+                trigger="click"
               >
-                {terminalRecoveryActionLabel(action)}
-              </Button>
+                <Button
+                  aria-label={t(errorDetail.titleKey)}
+                  className="terminal-error-details"
+                  danger
+                  icon={<InfoCircleOutlined />}
+                  size="small"
+                >
+                  <span className="terminal-recovery-label">{t(errorDetail.titleKey)}</span>
+                </Button>
+              </Popover>
+            )}
+            {recoveryActions.map((action) => (
+              <Tooltip key={action.key} title={terminalRecoveryActionLabel(action)}>
+                <Button
+                  aria-label={terminalRecoveryActionLabel(action)}
+                  size="small"
+                  type={action.tone === 'primary' ? 'primary' : 'default'}
+                  disabled={action.disabled}
+                  icon={terminalRecoveryActionIcon(action)}
+                  onClick={() => runTerminalRecoveryAction(action.key, {
+                    onCopyError,
+                    onOpenAudit,
+                    onReconnect,
+                  })}
+                >
+                  <span className="terminal-recovery-label">{terminalRecoveryActionLabel(action)}</span>
+                </Button>
+              </Tooltip>
             ))}
           </div>
         )}
@@ -5451,6 +5488,13 @@ function terminalRecoveryActionLabel(action) {
   if (action.key === 'copyError') return t('action.copyError');
   if (action.key === 'audit') return t('nav.audit');
   return action.key;
+}
+
+function terminalRecoveryActionIcon(action) {
+  if (action.key === 'reconnect') return <ReloadOutlined />;
+  if (action.key === 'copyError') return <CopyOutlined />;
+  if (action.key === 'audit') return <AuditOutlined />;
+  return null;
 }
 
 function runTerminalRecoveryAction(key, actions) {
