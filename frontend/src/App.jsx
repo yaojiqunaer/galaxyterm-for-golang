@@ -21,7 +21,6 @@ import {
   Popover,
   Segmented,
   Select,
-  Slider,
   Space,
   Switch,
   Tabs,
@@ -36,7 +35,6 @@ import {
   AppstoreOutlined,
   AuditOutlined,
   AppstoreAddOutlined,
-  CaretRightOutlined,
   CloudServerOutlined,
   CodeOutlined,
   ClearOutlined,
@@ -59,7 +57,6 @@ import {
   LeftOutlined,
   MinusOutlined,
   MoreOutlined,
-  PauseOutlined,
   PlusOutlined,
   ReloadOutlined,
   RightOutlined,
@@ -76,9 +73,6 @@ import {
   buildAuditRecord,
   buildAuditRecordSummary,
   createAuditEvent,
-  parseAsciinemaCast,
-  renderReplayFrame,
-  resolveReplayEventTime,
   sanitizeAuditRecord,
 } from './auditLog.js';
 import {
@@ -207,6 +201,7 @@ import * as TunnelAPI from '../wailsjs/go/tunnel/API.js';
 import { availableLocales, currentLocale, setLocale, t } from './i18n.js';
 
 const TerminalPane = lazy(() => import('./components/TerminalPane.jsx'));
+const AuditReplayPlayer = lazy(() => import('./components/AuditReplayPlayer.jsx'));
 const { Sider, Content } = Layout;
 const { Text, Title } = Typography;
 
@@ -3360,33 +3355,60 @@ function App() {
         }}
       />
       <Drawer
+        className="audit-replay-drawer"
         title={replayRecord ? `${t('action.replay')} · ${replayRecord.title}` : t('action.replay')}
-        width={760}
+        width={screens.md === false ? '100%' : 920}
         open={!!replayRecord}
         onClose={() => setReplayRecord(null)}
         extra={replayRecord && (
           <Space>
-            <Button onClick={() => exportAuditRecord(replayRecord, 'cast')}>{t('action.exportCast')}</Button>
-            <Button onClick={() => exportAuditRecord(replayRecord, 'log')}>{t('action.exportLog')}</Button>
+            <Button
+              aria-label={t('action.exportCast')}
+              className="audit-drawer-export"
+              icon={<VideoCameraOutlined />}
+              onClick={() => exportAuditRecord(replayRecord, 'cast')}
+            >
+              <span>{t('action.exportCast')}</span>
+            </Button>
+            <Button
+              aria-label={t('action.exportLog')}
+              className="audit-drawer-export"
+              icon={<FileTextOutlined />}
+              onClick={() => exportAuditRecord(replayRecord, 'log')}
+            >
+              <span>{t('action.exportLog')}</span>
+            </Button>
           </Space>
         )}
       >
         {replayRecord && (
-          <Space direction="vertical" className="settings-stack" size={12}>
-            <List
-              size="small"
-              header={<Text strong>{t('section.auditTimeline')}</Text>}
-              dataSource={replayRecord.auditEvents || []}
-              renderItem={(event) => (
-                <List.Item>
-                  <Text code>{event.type}</Text>
-                  <Text type="secondary">{event.at}</Text>
-                  <Text>{event.detail}</Text>
-                </List.Item>
-              )}
-            />
-            <AuditReplayPlayer record={replayRecord} />
-          </Space>
+          <div className="audit-replay-content">
+            <Suspense fallback={<ReplayLoadingState />}>
+              <AuditReplayPlayer record={replayRecord} />
+            </Suspense>
+            <div className="audit-timeline-section">
+              <div className="audit-timeline-heading">
+                <Text strong>{t('section.auditTimeline')}</Text>
+                <Text type="secondary">{replayRecord.auditEvents?.length || 0}</Text>
+              </div>
+              <List
+                className="audit-timeline-list"
+                size="small"
+                dataSource={replayRecord.auditEvents || []}
+                renderItem={(event) => (
+                  <List.Item>
+                    <span className="audit-timeline-event">
+                      <Text code>{event.type}</Text>
+                      <span>
+                        <Text>{event.detail || '-'}</Text>
+                        <Text type="secondary">{formatAuditTimestamp(event.at, locale)}</Text>
+                      </span>
+                    </span>
+                  </List.Item>
+                )}
+              />
+            </div>
+          </div>
         )}
       </Drawer>
     </div>
@@ -4893,6 +4915,15 @@ function TerminalLoadingState() {
   );
 }
 
+function ReplayLoadingState() {
+  return (
+    <div className="replay-loading-state" role="status">
+      <span aria-hidden="true" className="terminal-loading-spinner" />
+      <span>{t('message.preparingReplay')}</span>
+    </div>
+  );
+}
+
 function TerminalFrame({
   children,
   onCopyError,
@@ -4976,97 +5007,6 @@ function MetricCard({
       <Text type="secondary">{label}</Text>
       <strong>{value}</strong>
       {meta && <small>{meta}</small>}
-    </div>
-  );
-}
-
-function AuditReplayPlayer({ record }) {
-  const parsedCast = useMemo(() => parseAsciinemaCast(record?.cast || ''), [record?.cast]);
-  const [playing, setPlaying] = useState(false);
-  const [playhead, setPlayhead] = useState(0);
-  const [speed, setSpeed] = useState(1);
-
-  useEffect(() => {
-    setPlaying(false);
-    setPlayhead(0);
-    setSpeed(1);
-  }, [record?.id]);
-
-  useEffect(() => {
-    if (!playing) return undefined;
-    const interval = window.setInterval(() => {
-      setPlayhead((current) => {
-        const next = Math.min(parsedCast.duration, current + (0.1 * speed));
-        if (next >= parsedCast.duration) {
-          setPlaying(false);
-        }
-        return next;
-      });
-    }, 100);
-    return () => window.clearInterval(interval);
-  }, [parsedCast.duration, playing, speed]);
-
-  const replayText = parsedCast.events.length > 0
-    ? renderReplayFrame(parsedCast.events, playhead)
-    : record?.screen || t('message.terminalOutputEmpty');
-  return (
-    <div className="audit-player">
-      <div className="audit-player-toolbar">
-        <Space wrap>
-          <Button
-            icon={playing ? <PauseOutlined /> : <CaretRightOutlined />}
-            onClick={() => setPlaying((current) => !current)}
-            disabled={parsedCast.events.length === 0}
-          >
-            {playing ? t('action.pauseReplay') : t('action.playReplay')}
-          </Button>
-          <Button
-            onClick={() => {
-              setPlayhead(0);
-              setPlaying(true);
-            }}
-            disabled={parsedCast.events.length === 0}
-          >
-            {t('action.restartReplay')}
-          </Button>
-          <Button
-            onClick={() => setPlayhead(resolveReplayEventTime(parsedCast.events, playhead, 'previous'))}
-            disabled={parsedCast.events.length === 0}
-          >
-            {t('action.previousEvent')}
-          </Button>
-          <Button
-            onClick={() => setPlayhead(resolveReplayEventTime(parsedCast.events, playhead, 'next'))}
-            disabled={parsedCast.events.length === 0}
-          >
-            {t('action.nextEvent')}
-          </Button>
-          <Segmented
-            size="small"
-            value={speed}
-            onChange={setSpeed}
-            options={[
-              { value: 0.5, label: '0.5x' },
-              { value: 1, label: '1x' },
-              { value: 2, label: '2x' },
-              { value: 4, label: '4x' },
-            ]}
-          />
-        </Space>
-        <Text type="secondary">
-          {`${formatReplayTime(playhead)} / ${formatReplayTime(parsedCast.duration)} | ${t('label.auditEvents')}: ${parsedCast.events.length}`}
-        </Text>
-      </div>
-      <Slider
-        disabled={parsedCast.events.length === 0}
-        max={Math.max(parsedCast.duration, 0)}
-        min={0}
-        onChange={setPlayhead}
-        step={0.1}
-        tooltip={{ formatter: formatReplayTime }}
-        value={playhead}
-      />
-      <pre className="audit-replay">{replayText}</pre>
     </div>
   );
 }
@@ -5474,6 +5414,15 @@ function formatReplayTime(seconds = 0) {
   const minutes = Math.floor(safeSeconds / 60);
   const remainingSeconds = Math.floor(safeSeconds % 60);
   return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
+}
+
+function formatAuditTimestamp(value = '', locale = currentLocale()) {
+  const timestamp = Date.parse(value);
+  if (!timestamp) return value || '-';
+  return new Date(timestamp).toLocaleString(locale, {
+    dateStyle: 'medium',
+    timeStyle: 'medium',
+  });
 }
 
 function formatProfileLastUsed(value = '') {

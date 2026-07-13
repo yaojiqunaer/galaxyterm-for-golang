@@ -2445,35 +2445,200 @@ code {
 .audit-player {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
   width: 100%;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
 }
 
-.audit-player-toolbar {
+.audit-replay-content {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.audit-replay-drawer .ant-drawer-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audit-replay-stage {
+  position: relative;
+  min-height: 360px;
+  max-height: 58vh;
+  overflow: auto;
+  background: #0b1016;
+}
+
+.audit-replay-terminal {
+  min-width: 100%;
+  min-height: 360px;
+  padding: 14px 16px;
+}
+
+.audit-replay-terminal .xterm {
+  width: max-content;
+  min-width: 100%;
+}
+
+.audit-replay-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #7f8b99;
+  font-size: 13px;
+  pointer-events: none;
+}
+
+.audit-player-controls {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
+  padding: 10px 12px 5px;
+  border-top: 1px solid #25313d;
   background: var(--panel-muted);
 }
 
-.audit-replay {
-  min-height: 320px;
-  max-height: 52vh;
-  margin: 0;
-  padding: 12px;
-  overflow: auto;
+.audit-player-transport {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
+
+.audit-play-button.ant-btn {
+  margin-right: 4px;
+}
+
+.audit-player-time {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 94px;
+  margin-left: 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.audit-player-time span,
+.audit-player-meta {
+  color: var(--text-muted);
+}
+
+.audit-replay-slider.ant-slider {
+  margin: 3px 15px 6px;
+}
+
+.audit-player-meta {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 13px 9px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.audit-timeline-section {
+  overflow: hidden;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: var(--terminal-bg);
-  color: #dce7f2;
-  font-family: Consolas, 'Liberation Mono', Menlo, Courier, monospace;
-  font-size: 12px;
-  line-height: 1.55;
-  white-space: pre-wrap;
+  background: var(--panel);
+}
+
+.audit-timeline-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 13px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--panel-muted);
+}
+
+.audit-timeline-list {
+  max-height: 280px;
+  overflow: auto;
+}
+
+.audit-timeline-list .ant-list-item {
+  padding: 9px 13px;
+}
+
+.audit-timeline-event {
+  display: grid;
+  grid-template-columns: minmax(110px, auto) minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  width: 100%;
+}
+
+.audit-timeline-event > span {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.audit-timeline-event .ant-typography-secondary {
+  margin-top: 2px;
+  font-size: 11px;
+}
+
+.replay-loading-state {
+  display: grid;
+  min-height: 360px;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #0b1016;
+  color: #9aa8b8;
+}
+
+@media (max-width: 720px) {
+  .audit-replay-drawer .ant-drawer-body {
+    padding: 14px;
+  }
+
+  .audit-player-controls {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .audit-player-controls .ant-segmented {
+    align-self: stretch;
+  }
+
+  .audit-player-controls .ant-segmented-group {
+    width: 100%;
+  }
+
+  .audit-player-controls .ant-segmented-item {
+    flex: 1;
+    text-align: center;
+  }
+
+  .audit-drawer-export.ant-btn {
+    width: 32px;
+    padding-inline: 0;
+  }
+
+  .audit-drawer-export > span:not(.ant-btn-icon) {
+    display: none;
+  }
+
+  .audit-replay-stage,
+  .audit-replay-terminal,
+  .replay-loading-state {
+    min-height: 300px;
+  }
+
+  .audit-timeline-event {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
 }
 
 .extensions-page {

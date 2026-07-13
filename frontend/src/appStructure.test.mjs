@@ -6,6 +6,7 @@ const mainSource = await readFile(new URL('./main.jsx', import.meta.url), 'utf8'
 const indexSource = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const styles = await readFile(new URL('../style.scss', import.meta.url), 'utf8');
 const viteConfig = await readFile(new URL('../vite.config.js', import.meta.url), 'utf8');
+const replaySource = await readFile(new URL('./components/AuditReplayPlayer.jsx', import.meta.url), 'utf8');
 const activeSessionDeclaration = source.indexOf('const activeSession =');
 const firstActiveSessionUsage = source.indexOf('activeSession?.providerType');
 
@@ -124,6 +125,19 @@ assert.ok(
     && source.includes('<Suspense fallback={<TerminalLoadingState />}>')
     && !source.includes("import TerminalPane from './components/TerminalPane.jsx';"),
   'the xterm runtime must load only when a terminal session is first rendered',
+);
+assert.ok(
+  source.includes("const AuditReplayPlayer = lazy(() => import('./components/AuditReplayPlayer.jsx'));")
+    && source.includes('<Suspense fallback={<ReplayLoadingState />}>')
+    && !source.includes('function AuditReplayPlayer({ record })'),
+  'the recording player must be isolated and load its terminal runtime only when replay opens',
+);
+assert.ok(
+  replaySource.includes("import { Terminal } from '@xterm/xterm';")
+    && replaySource.includes('requestAnimationFrame')
+    && replaySource.includes('disableStdin: true')
+    && replaySource.includes('terminal.write(output)'),
+  'recordings must use a read-only xterm renderer and a frame-based playback clock',
 );
 assert.ok(
   viteConfig.includes("return 'xterm-runtime';")

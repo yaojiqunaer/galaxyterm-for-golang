@@ -19,6 +19,7 @@
     "test:list-navigation": "node src/listNavigation.test.mjs",
     "test:palette": "node src/paletteModel.test.mjs",
     "test:quick-commands": "node src/quickCommands.test.mjs",
+    "test:replay-timeline": "node src/replayTimeline.test.mjs",
     "test:remote-workspace": "node src/remoteWorkspace.test.mjs",
     "test:settings": "node src/settingsPresentation.test.mjs",
     "test:sessions": "node src/sessionPresentation.test.mjs",
