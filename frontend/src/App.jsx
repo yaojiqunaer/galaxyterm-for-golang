@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Badge,
@@ -142,7 +142,6 @@ import {
   buildTunnelDisplay,
   buildTunnelSummary,
 } from './remoteWorkspace.js';
-import TerminalPane from './components/TerminalPane.jsx';
 import {
   buildTerminalErrorDetail,
   buildTerminalRecoveryActions,
@@ -165,6 +164,7 @@ import {
   normalizeCommandHistoryItem,
   upsertCommandHistory,
 } from './commandHistory.js';
+
 import {
   buildQuickCommandFromHistory,
   buildQuickCommandSafetyState,
@@ -202,6 +202,7 @@ import * as TerminalAPI from '../wailsjs/go/terminal/API.js';
 import * as TunnelAPI from '../wailsjs/go/tunnel/API.js';
 import { availableLocales, currentLocale, setLocale, t } from './i18n.js';
 
+const TerminalPane = lazy(() => import('./components/TerminalPane.jsx'));
 const { Sider, Content } = Layout;
 const { Text, Title } = Typography;
 
@@ -1674,23 +1675,25 @@ function App() {
       onReconnect={() => reconnectSession(session.id)}
       status={terminalStatuses[session.id]}
     >
-      <TerminalPane
-        key={`${session.id}-${session.revision || 0}`}
-        ref={(el) => {
-          terminalRefs.current[session.id] = el;
-        }}
-        request={session.request}
-        settings={settings}
-        onAuditEvent={(event) => appendAuditEvent(session.id, event.type, event.detail)}
-        onCommandSubmitted={(command) => recordCommandHistory(command, session)}
-        onSessionCreated={(backendSessionId) => {
-          setSessions((current) => current.map((item) => (
-            item.id === session.id ? { ...item, backendSessionId, status: 'connected' } : item
-          )));
-        }}
-        onSessionClosed={(backendSessionId) => updateSessionStatus(backendSessionId, 'closed')}
-        onStatusChange={(status) => updateTerminalStatus(session.id, status)}
-      />
+      <Suspense fallback={<TerminalLoadingState />}>
+        <TerminalPane
+          key={`${session.id}-${session.revision || 0}`}
+          ref={(el) => {
+            terminalRefs.current[session.id] = el;
+          }}
+          request={session.request}
+          settings={settings}
+          onAuditEvent={(event) => appendAuditEvent(session.id, event.type, event.detail)}
+          onCommandSubmitted={(command) => recordCommandHistory(command, session)}
+          onSessionCreated={(backendSessionId) => {
+            setSessions((current) => current.map((item) => (
+              item.id === session.id ? { ...item, backendSessionId, status: 'connected' } : item
+            )));
+          }}
+          onSessionClosed={(backendSessionId) => updateSessionStatus(backendSessionId, 'closed')}
+          onStatusChange={(status) => updateTerminalStatus(session.id, status)}
+        />
+      </Suspense>
     </TerminalFrame>
   );
 
@@ -4789,6 +4792,15 @@ function SessionStrip({
           type="text"
         />
       </Popover>
+    </div>
+  );
+}
+
+function TerminalLoadingState() {
+  return (
+    <div className="terminal-loading-state" role="status">
+      <span aria-hidden="true" className="terminal-loading-spinner" />
+      <span>{t('terminal.status.preparing')}</span>
     </div>
   );
 }

@@ -323,6 +323,7 @@
   "extension.sourceHint": "Save GitHub Release or offline package index locations",
   "extension.sourceDrawerHint": "This saves extension source metadata for now. Future online installs can read .gtx packages from these GitHub Release or index URLs.",
   "terminal.status.connecting": "Connecting...",
+  "terminal.status.preparing": "Preparing terminal",
   "terminal.status.connected": "Connected",
   "terminal.status.closed": "Session closed",
   "terminal.runStatus.connecting": "Connecting",

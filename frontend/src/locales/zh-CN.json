@@ -323,6 +323,7 @@
   "extension.sourceHint": "保存 GitHub Release 或离线扩展包索引位置",
   "extension.sourceDrawerHint": "当前先保存扩展源元数据；后续在线安装会从这些 GitHub Release 或索引地址读取 .gtx 包。",
   "terminal.status.connecting": "正在连接...",
+  "terminal.status.preparing": "正在准备终端",
   "terminal.status.connected": "已连接",
   "terminal.status.closed": "会话已关闭",
   "terminal.runStatus.connecting": "连接中",

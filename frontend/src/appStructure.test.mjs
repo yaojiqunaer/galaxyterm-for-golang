@@ -91,5 +91,11 @@ assert.ok(
     && !/\bmessage\.(?:success|error|warning|info)\(/.test(source),
   'user feedback must use a theme-aware message context instead of the static API',
 );
+assert.ok(
+  source.includes("const TerminalPane = lazy(() => import('./components/TerminalPane.jsx'));")
+    && source.includes('<Suspense fallback={<TerminalLoadingState />}>')
+    && !source.includes("import TerminalPane from './components/TerminalPane.jsx';"),
+  'the xterm runtime must load only when a terminal session is first rendered',
+);
 
 console.log('app structure tests passed');
