@@ -2,6 +2,21 @@ const barePromptPattern = /^(?:[$#%>]|❯|➜|λ)[ \t]+$/;
 const promptSuffixPattern = /(?:[$#%>]|❯|➜|λ)[ \t]+$/;
 const promptContextPattern = /(?:@|[~/:\\]|\b(?:mysql|mariadb|redis|psql|postgres|powershell|PS)\b)/i;
 
+export function buildTerminalPasteRisk(data = '') {
+  const value = String(data || '');
+  if (!value) return null;
+  const lineBreakCount = (value.match(/\r\n|\r|\n/g) || []).length;
+  const reasons = [];
+  if (value.length > 120) reasons.push('large');
+  if (lineBreakCount > 0) reasons.push('multiline');
+  if (reasons.length === 0) return null;
+  return {
+    characterCount: value.length,
+    lineCount: lineBreakCount + 1,
+    reasons,
+  };
+}
+
 export function appendTerminalOutputTail(current = '', output = '', limit = 512) {
   const safeLimit = Math.max(1, Math.floor(Number(limit) || 512));
   return `${current || ''}${output || ''}`.slice(-safeLimit);

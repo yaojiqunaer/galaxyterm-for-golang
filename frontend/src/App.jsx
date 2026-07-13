@@ -129,6 +129,7 @@ import {
   buildTerminalDefaults,
   buildTerminalPreview,
   isCommandShortcut,
+  isTerminalInputTarget,
   normalizeShortcutModifier,
   buildWorkspaceSnapshotSummary,
   normalizeLogLevel,
@@ -148,7 +149,7 @@ import {
   buildTerminalStatusFacts,
 } from './terminalStatus.js';
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
-import { hasWailsMethod } from './desktopBridge.js';
+import { hasWailsMethod, writeClipboardText } from './desktopBridge.js';
 import {
   buildConnectionActionPaletteItems,
   buildProfilePaletteItems,
@@ -355,6 +356,7 @@ function App() {
   const [tunnelForm] = Form.useForm();
   const [commandForm] = Form.useForm();
   const watchedFilePath = Form.useWatch('path', fileForm);
+  const pasteConfirmationPending = useRef(false);
   const terminalRefs = useRef({});
   const terminalSearchRef = useRef(null);
   const profileImportRef = useRef(null);
@@ -482,7 +484,11 @@ function App() {
         event.preventDefault();
         reconnectSession();
       }
-      if (isEditableTarget(event.target) && ['c', 'v', 'l', '=', '+', '-', '0'].includes(key)) {
+      if (
+        isEditableTarget(event.target)
+        && !isTerminalInputTarget(event.target)
+        && ['c', 'v', 'l', '=', '+', '-', '0'].includes(key)
+      ) {
         return;
       }
       if (key === 'c' && event.shiftKey && activeKey) {
@@ -1100,9 +1106,54 @@ function App() {
     }
   };
 
+  const confirmTerminalPaste = (risk) => {
+    if (!risk || settings.confirmDangerousActions === false) return Promise.resolve(true);
+    if (pasteConfirmationPending.current) return Promise.resolve(false);
+    pasteConfirmationPending.current = true;
+    return new Promise((resolve) => {
+      let settled = false;
+      const settle = (allowed) => {
+        if (settled) return;
+        settled = true;
+        resolve(allowed);
+      };
+      let confirmation;
+      confirmation = modalApi.confirm({
+        afterClose: () => settle(false),
+        cancelText: t('action.cancel'),
+        content: (
+          <div className="terminal-paste-confirmation">
+            <p>{t('confirm.terminalPasteContent', {
+              characters: risk.characterCount,
+              lines: risk.lineCount,
+            })}</p>
+            <Alert message={t('confirm.terminalPasteWarning')} showIcon type="warning" />
+          </div>
+        ),
+        okButtonProps: { danger: true },
+        okText: t('action.pasteClipboard'),
+        onCancel: () => {
+          settle(false);
+          confirmation?.destroy();
+        },
+        onOk: () => {
+          settle(true);
+          confirmation?.destroy();
+        },
+        title: t('confirm.terminalPasteTitle'),
+      });
+    }).finally(() => {
+      pasteConfirmationPending.current = false;
+    });
+  };
+
   const pasteClipboardToTerminal = async () => {
     try {
       const pasted = await terminalRefs.current[activeKey]?.pasteClipboard?.();
+      if (pasted === null) {
+        messageApi.info(t('message.pasteCancelled'));
+        return;
+      }
       if (!pasted) {
         messageApi.info(t('message.clipboardEmpty'));
         return;
@@ -1719,7 +1770,7 @@ function App() {
       return;
     }
     try {
-      await navigator.clipboard?.writeText(error);
+      await writeClipboardText(error);
       messageApi.success(t('message.copied'));
     } catch (error_) {
       messageApi.error(`${t('message.clipboardFailed')}: ${error_}`);
@@ -1749,6 +1800,7 @@ function App() {
           settings={settings}
           onAuditEvent={(event) => appendAuditEvent(session.id, event.type, event.detail)}
           onCommandSubmitted={(command) => recordCommandHistory(command, session)}
+          onConfirmPaste={confirmTerminalPaste}
           onSessionCreated={(backendSessionId) => {
             setSessions((current) => current.map((item) => (
               item.id === session.id ? { ...item, backendSessionId, status: 'connected' } : item
@@ -4244,7 +4296,7 @@ function App() {
                     size="small"
                     disabled={!safety.canCopy}
                     onClick={async () => {
-                      await navigator.clipboard?.writeText(item.command);
+                      await writeClipboardText(item.command);
                       messageApi.success(t('message.copied'));
                     }}
                   >
@@ -4341,7 +4393,7 @@ function App() {
                   key="copy"
                   size="small"
                   onClick={async () => {
-                    await navigator.clipboard?.writeText(item.command);
+                    await writeClipboardText(item.command);
                     messageApi.success(t('message.copied'));
                   }}
                 >

@@ -97,6 +97,13 @@ export function isCommandShortcut(event = {}, settings = {}) {
   return !!(event.metaKey || event.ctrlKey);
 }
 
+export function isTerminalInputTarget(target) {
+  return !!(
+    target?.classList?.contains?.('xterm-helper-textarea')
+    || target?.closest?.('.xterm')
+  );
+}
+
 export function normalizeShortcutModifier(value) {
   const normalized = String(value || '').trim().toLowerCase();
   return shortcutModifiers.includes(normalized) ? normalized : 'auto';

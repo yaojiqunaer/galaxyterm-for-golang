@@ -194,6 +194,14 @@ assert.ok(
   'running terminal commands must expose a provider-neutral PTY interrupt through each terminal frame',
 );
 assert.ok(
+  terminalPaneSource.includes('onConfirmPaste')
+    && terminalPaneSource.includes('buildTerminalPasteRisk')
+    && !terminalPaneSource.includes('window.confirm')
+    && source.includes('pasteConfirmationPending.current')
+    && source.includes('confirmation?.destroy()'),
+  'all risky paste entry points must use the shared theme-aware confirmation without exposing raw content',
+);
+assert.ok(
   source.includes('className="settings-drawer"')
     && source.includes("width={screens.sm === false ? '100%' : 560}"),
   'settings must use a readable drawer width and fill very narrow windows',

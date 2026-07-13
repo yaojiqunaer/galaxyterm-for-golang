@@ -6,9 +6,11 @@ import { SearchAddon } from '@xterm/addon-search';
 import * as runtime from '../../wailsjs/runtime/runtime.js';
 import * as SessionAPI from '../../wailsjs/go/session/API.js';
 import * as Theme from '../../wailsjs/go/internal/Theme.js';
+import { readClipboardText, writeClipboardText } from '../desktopBridge.js';
 import { t } from '../i18n.js';
 import {
   appendTerminalOutputTail,
+  buildTerminalPasteRisk,
   parseShellIntegrationExitCode,
   terminalOutputIndicatesPrompt,
 } from '../terminalExecution.js';
@@ -18,6 +20,7 @@ function TerminalPane({
   settings,
   onAuditEvent,
   onCommandSubmitted,
+  onConfirmPaste,
   onSessionCreated,
   onSessionClosed,
   onStatusChange,
@@ -35,6 +38,7 @@ function TerminalPane({
   const lastCommandStartedAt = useRef(null);
   const outputTail = useRef('');
   const durationTimer = useRef(null);
+  const pasteConfirmationPending = useRef(false);
   const terminalStatus = useRef({
     cols: 80,
     durationMs: 0,
@@ -94,6 +98,30 @@ function TerminalPane({
     trackSubmittedCommands(data, inputLine, markCommandSubmitted);
   };
 
+  const confirmTerminalPaste = async (data) => {
+    const risk = buildTerminalPasteRisk(data);
+    if (!risk) return true;
+    const detail = `${risk.characterCount} chars, ${risk.lineCount} lines`;
+    if (pasteConfirmationPending.current) {
+      onAuditEvent?.({ detail, type: 'paste.blocked' });
+      return false;
+    }
+    pasteConfirmationPending.current = true;
+    let allowed = false;
+    try {
+      allowed = await onConfirmPaste?.(risk) === true;
+    } catch {
+      allowed = false;
+    } finally {
+      pasteConfirmationPending.current = false;
+    }
+    onAuditEvent?.({
+      detail,
+      type: allowed ? 'paste.sent' : 'paste.blocked',
+    });
+    return allowed;
+  };
+
   useImperativeHandle(ref, () => ({
     fit: () => {
       fitAddon.current?.fit();
@@ -114,13 +142,14 @@ function TerminalPane({
     },
     copySelection: async () => {
       const selection = term.current?.getSelection() || '';
-      if (selection) await navigator.clipboard?.writeText(selection);
+      if (selection) await writeClipboardText(selection);
       term.current?.focus();
       return selection;
     },
     pasteClipboard: async () => {
-      const text = await navigator.clipboard?.readText?.();
+      const text = await readClipboardText();
       if (text && sessionId.current) {
+        if (!await confirmTerminalPaste(text)) return null;
         trackOutgoingData(text);
         SessionAPI.Send(sessionId.current, text);
         term.current?.focus();
@@ -137,7 +166,7 @@ function TerminalPane({
     },
     copyTranscript: async () => {
       const text = terminalBufferText(term.current);
-      if (text) await navigator.clipboard?.writeText(text);
+      if (text) await writeClipboardText(text);
       term.current?.focus();
       return text;
     },
@@ -266,14 +295,10 @@ function TerminalPane({
         });
         SessionAPI.Resize(createdSessionId, size.cols, size.rows);
       });
-      term.current.onData((data) => {
-        if (isRiskyPaste(data) && !window.confirm(t('terminal.confirmPaste'))) {
-          onAuditEvent?.({ detail: `${data.length} chars`, type: 'paste.blocked' });
-          return;
-        }
-        if (isRiskyPaste(data)) {
-          onAuditEvent?.({ detail: `${data.length} chars`, type: 'paste.sent' });
-        } else if (data.includes('\r') || data.includes('\n')) {
+      term.current.onData(async (data) => {
+        if (pasteConfirmationPending.current) return;
+        if (!await confirmTerminalPaste(data)) return;
+        if (data.includes('\r') || data.includes('\n')) {
           onAuditEvent?.({ type: 'input.enter' });
         }
         trackOutgoingData(data);
@@ -379,11 +404,6 @@ function normalizeTerminalTheme(theme, dark = false) {
     foreground: theme?.foreground || '#d7e2ea',
     selectionBackground: theme?.selectionBackground || '#23424d',
   };
-}
-
-function isRiskyPaste(data) {
-  const lineBreaks = (data.match(/\r|\n/g) || []).length;
-  return data.length > 120 || lineBreaks >= 2;
 }
 
 function elapsedSeconds(startedAt) {

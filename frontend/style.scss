@@ -1199,6 +1199,18 @@ select {
   gap: 8px;
 }
 
+.terminal-paste-confirmation {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.terminal-paste-confirmation p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.6;
+}
+
 .terminal-error-popover strong {
   overflow-wrap: anywhere;
   color: var(--danger);

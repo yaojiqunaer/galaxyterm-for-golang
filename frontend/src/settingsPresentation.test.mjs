@@ -9,6 +9,7 @@ import {
   buildTerminalPreview,
   buildWorkspaceSnapshotSummary,
   isCommandShortcut,
+  isTerminalInputTarget,
   normalizeShortcutModifier,
   resolveSettingsSectionNavigation,
   shortcutModifierLabel,
@@ -89,6 +90,10 @@ assert.equal(isCommandShortcut({ metaKey: true, ctrlKey: false }, { shortcutModi
 assert.equal(isCommandShortcut({ metaKey: false, ctrlKey: true }, { shortcutModifier: 'meta' }), false);
 assert.equal(isCommandShortcut({ metaKey: false, ctrlKey: true }, { shortcutModifier: 'ctrl' }), true);
 assert.equal(isCommandShortcut({ metaKey: false, ctrlKey: true }, { shortcutModifier: 'auto' }), true);
+assert.equal(isTerminalInputTarget({ classList: { contains: (value) => value === 'xterm-helper-textarea' } }), true);
+assert.equal(isTerminalInputTarget({ classList: { contains: () => false }, closest: (value) => value === '.xterm' }), true);
+assert.equal(isTerminalInputTarget({ classList: { contains: () => false }, closest: () => null }), false);
+assert.equal(isTerminalInputTarget(null), false);
 
 assert.deepEqual(buildTerminalPreview({
   fontFamily: 'JetBrains Mono',
