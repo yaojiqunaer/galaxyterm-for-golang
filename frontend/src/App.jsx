@@ -1369,6 +1369,7 @@ function App() {
   };
 
   const runSessionPaletteAction = (action) => {
+    if (action === 'restoreClosed') restoreLastClosedSession();
     if (action === 'previousSession') switchSession('previous');
     if (action === 'nextSession') switchSession('next');
     if (action === 'reconnect') reconnectSession();
@@ -3385,6 +3386,7 @@ function App() {
     activeSessionId: activeKey,
     canNavigateSessions: sessionNavigationState.canNavigate,
     closedSessionCount: currentSessionSummary.closed,
+    restorableSessionCount: closedSessions.length,
     favoriteConnectionCount: profiles.filter((profile) => profile.favorite).length,
     profiles,
     quickCommands,
@@ -5321,6 +5323,7 @@ function buildPaletteItems(actions) {
     activeSessionId: actions.activeSessionId,
     canNavigate: actions.canNavigateSessions,
     closedSessionCount: actions.closedSessionCount,
+    restorableSessionCount: actions.restorableSessionCount,
     groupLabel: t('palette.group.sessionActions'),
     labels: {
       clearTerminal: t('action.clearTerminal'),
@@ -5335,6 +5338,7 @@ function buildPaletteItems(actions) {
       previousSession: t('action.previousSession'),
       quickCommands: t('action.commands'),
       reconnect: t('action.reconnect'),
+      restoreClosed: t('action.restoreClosedSession'),
       renameSession: t('action.renameSession'),
       saveAudit: t('action.saveAuditRecord'),
     },

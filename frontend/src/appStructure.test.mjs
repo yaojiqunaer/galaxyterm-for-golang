@@ -120,5 +120,10 @@ assert.ok(
     && source.includes('confirmRemoveSession(activeKey);'),
   'Cmd/Ctrl+W must close the active terminal only inside the session workspace',
 );
+assert.ok(
+  source.includes('restorableSessionCount: closedSessions.length')
+    && source.includes("if (action === 'restoreClosed') restoreLastClosedSession();"),
+  'the command palette must expose recently closed session recovery when available',
+);
 
 console.log('app structure tests passed');

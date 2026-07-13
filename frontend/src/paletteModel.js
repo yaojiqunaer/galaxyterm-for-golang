@@ -59,6 +59,7 @@ export function buildSessionActionPaletteItems({
   closedSessionCount = 0,
   groupLabel = 'Session Actions',
   labels = {},
+  restorableSessionCount = 0,
   runAction = () => {},
   sessionCount = 0,
 } = {}) {
@@ -129,6 +130,12 @@ export function buildSessionActionPaletteItems({
       labels,
       runAction,
     })),
+    restorableSessionCount > 0 && sessionActionItem('restoreClosed', {
+      groupLabel,
+      keywords: 'reopen restore recently closed session tab',
+      labels,
+      runAction,
+    }),
     sessionActionItem('closeClosed', {
       disabled: closedSessionCount <= 0,
       groupLabel,
@@ -165,7 +172,7 @@ export function buildSessionActionPaletteItems({
       labels,
       runAction,
     }),
-  ];
+  ].filter(Boolean);
 }
 
 export function buildConnectionActionPaletteItems({

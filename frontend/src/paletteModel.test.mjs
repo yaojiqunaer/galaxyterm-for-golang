@@ -118,12 +118,14 @@ const sessionActionItems = buildSessionActionPaletteItems({
     previousSession: 'Previous Session',
     quickCommands: 'Quick Commands',
     reconnect: 'Reconnect',
+    restoreClosed: 'Reopen Closed Session',
     renameSession: 'Rename Session',
     saveAudit: 'Save Audit Record',
   },
   runAction: () => {},
   sessionCount: 3,
   closedSessionCount: 1,
+  restorableSessionCount: 1,
 });
 assert.deepEqual(sessionActionItems.map((item) => ({
   disabled: item.disabled,
@@ -139,6 +141,7 @@ assert.deepEqual(sessionActionItems.map((item) => ({
   { disabled: false, id: 'session-action:exportTranscript', title: 'Export Terminal Output' },
   { disabled: false, id: 'session-action:saveAudit', title: 'Save Audit Record' },
   { disabled: false, id: 'session-action:closeSession', title: 'Close Session' },
+  { disabled: false, id: 'session-action:restoreClosed', title: 'Reopen Closed Session' },
   { disabled: false, id: 'session-action:closeClosed', title: 'Close Closed Sessions' },
   { disabled: false, id: 'session-action:closeOthers', title: 'Close Other Sessions' },
   { disabled: false, id: 'session-action:closeAll', title: 'Close All Sessions' },
@@ -192,7 +195,11 @@ assert.deepEqual(buildSessionActionPaletteItems({
 
 assert.deepEqual(filterPaletteItems(sessionActionItems, 'history').map((item) => item.id), ['session-action:commandHistory']);
 assert.deepEqual(filterPaletteItems(sessionActionItems, 'audit').map((item) => item.id), ['session-action:saveAudit']);
-assert.deepEqual(filterPaletteItems(sessionActionItems, 'close closed').map((item) => item.id), ['session-action:closeClosed']);
+assert.deepEqual(filterPaletteItems(sessionActionItems, 'close closed').map((item) => item.id), [
+  'session-action:closeClosed',
+  'session-action:restoreClosed',
+]);
+assert.deepEqual(filterPaletteItems(sessionActionItems, 'reopen closed').map((item) => item.id), ['session-action:restoreClosed']);
 
 const connectionActionItems = buildConnectionActionPaletteItems({
   favoriteCount: 2,
