@@ -99,6 +99,7 @@ import {
   filterConnectionProfiles,
   filterRecentConnectionsByProviders,
   isProfileProviderAvailable,
+  resolveProfileSaveDefault,
   resolveSelectedProfileId,
   selectBatchProfiles,
   summarizeProfileSessions,
@@ -287,6 +288,7 @@ function App() {
   const [tunnels, setTunnels] = useState([]);
   const [activeKey, setActiveKey] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [terminalDrawerIntent, setTerminalDrawerIntent] = useState('session');
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -689,9 +691,11 @@ function App() {
     }
   }, [newType, providers]);
 
-  const openDrawer = (type = terminalDefaults.defaultProviderType, profile = null) => {
+  const openDrawer = (type = terminalDefaults.defaultProviderType, profile = null, intent = 'session') => {
     const providerType = profile?.providerType || type;
+    const resolvedIntent = profile ? 'edit' : intent;
     setNewType(providerType);
+    setTerminalDrawerIntent(resolvedIntent);
     form.setFieldsValue({
       displayName: profile?.displayName || '',
       group: profile?.group || '',
@@ -710,12 +714,14 @@ function App() {
       rememberCredential: !!profile?.auth?.credentialRef,
       shell: profile?.config?.shell || '',
       workingDirectory: profile?.config?.workingDirectory || terminalDefaults.defaultWorkingDirectory,
-      saveProfile: false,
+      saveProfile: resolveProfileSaveDefault({ intent, profile }),
     });
     setEditingProfileId(profile?.id || '');
     setSshAuthType(profile?.auth?.authType || 'password');
     setDrawerOpen(true);
   };
+
+  const openConnectionDrawer = (type = terminalDefaults.defaultProviderType) => openDrawer(type, null, 'connection');
 
   const createSession = async () => {
     const values = await form.validateFields();
@@ -1399,7 +1405,7 @@ function App() {
   const runConnectionPaletteAction = (action) => {
     if (action === 'newLocalTerminal') openDrawer('local');
     if (action === 'quickSsh') openDrawer('ssh');
-    if (action === 'newConnection') openDrawer();
+    if (action === 'newConnection') openConnectionDrawer();
     if (action === 'importSshConfig') setSshConfigOpen(true);
     if (action === 'importProfiles') profileImportRef.current?.click();
     if (action === 'exportProfiles') exportProfiles();
@@ -1923,7 +1929,7 @@ function App() {
           <Button icon={<CloudServerOutlined />} onClick={() => openDrawer('ssh')}>
             {t('action.quickSsh')}
           </Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => openDrawer()}>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => openConnectionDrawer()}>
             {t('action.newConnection')}
           </Button>
         </Space>
@@ -2101,6 +2107,7 @@ function App() {
                   action={connectionEmptyState.primaryAction}
                   clearProfileFilters={clearProfileFilters}
                   openDrawer={openDrawer}
+                  openConnectionDrawer={openConnectionDrawer}
                   primary
                   setSshConfigOpen={setSshConfigOpen}
                 />
@@ -2110,6 +2117,7 @@ function App() {
                     clearProfileFilters={clearProfileFilters}
                     key={action}
                     openDrawer={openDrawer}
+                    openConnectionDrawer={openConnectionDrawer}
                     setSshConfigOpen={setSshConfigOpen}
                   />
                 ))}
@@ -3957,7 +3965,9 @@ function App() {
       </Modal>
 
       <Drawer
-        title={t('drawer.newTerminal')}
+        title={t(terminalDrawerIntent === 'edit'
+          ? 'profile.action.edit'
+          : terminalDrawerIntent === 'connection' ? 'action.newConnection' : 'drawer.newTerminal')}
         width={420}
         open={drawerOpen}
         destroyOnHidden
@@ -3966,7 +3976,9 @@ function App() {
           <Space>
             <Button onClick={() => setDrawerOpen(false)}>{t('action.cancel')}</Button>
             <Button onClick={testConnection} loading={testingConnection}>{t('action.testConnection')}</Button>
-            <Button type="primary" onClick={createSession} loading={creatingSession}>{t('action.create')}</Button>
+            <Button type="primary" onClick={createSession} loading={creatingSession}>
+              {t(terminalDrawerIntent === 'session' ? 'action.create' : 'action.saveAndOpen')}
+            </Button>
           </Space>
         )}
       >
@@ -4054,9 +4066,11 @@ function App() {
               <Alert type="info" showIcon message={t('settings.credentialHint')} />
             </>
           )}
-          <Form.Item name="saveProfile" valuePropName="checked">
-            <Checkbox>{t('field.saveProfile')}</Checkbox>
-          </Form.Item>
+          {terminalDrawerIntent === 'session' && (
+            <Form.Item name="saveProfile" valuePropName="checked">
+              <Checkbox>{t('field.saveProfile')}</Checkbox>
+            </Form.Item>
+          )}
         </Form>
       </Drawer>
 
@@ -4546,6 +4560,7 @@ function TerminalSettingsPreview({ preview }) {
 function ConnectionEmptyAction({
   action,
   clearProfileFilters,
+  openConnectionDrawer,
   openDrawer,
   primary = false,
   setSshConfigOpen,
@@ -4564,7 +4579,7 @@ function ConnectionEmptyAction({
     newConnection: {
       icon: <PlusOutlined />,
       label: t('action.newConnection'),
-      onClick: () => openDrawer(),
+      onClick: () => openConnectionDrawer(),
     },
     quickSsh: {
       icon: <CloudServerOutlined />,

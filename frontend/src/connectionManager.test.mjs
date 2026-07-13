@@ -20,6 +20,13 @@ import {
   sortSidebarProfiles,
 } from './connectionManager.js';
 
+const connectionManager = await import('./connectionManager.js');
+assert.equal(typeof connectionManager.resolveProfileSaveDefault, 'function');
+assert.equal(connectionManager.resolveProfileSaveDefault(), false);
+assert.equal(connectionManager.resolveProfileSaveDefault({ intent: 'session' }), false);
+assert.equal(connectionManager.resolveProfileSaveDefault({ intent: 'connection' }), true);
+assert.equal(connectionManager.resolveProfileSaveDefault({ intent: 'session', profile: { id: 'prod' } }), true);
+
 assert.deepEqual(buildConnectionTransferActions({ profileCount: 0 }), [
   { key: 'importSshConfig', labelKey: 'action.importSshConfig', disabled: false },
   { key: 'importProfiles', labelKey: 'action.importConnections', disabled: false },

@@ -158,5 +158,12 @@ assert.ok(
     && source.includes("if (action === 'restoreClosed') restoreLastClosedSession();"),
   'the command palette must expose recently closed session recovery when available',
 );
+assert.ok(
+  source.includes("const openConnectionDrawer = (type = terminalDefaults.defaultProviderType) => openDrawer(type, null, 'connection');")
+    && source.includes('saveProfile: resolveProfileSaveDefault({ intent, profile })')
+    && source.includes("terminalDrawerIntent === 'session'")
+    && source.includes("terminalDrawerIntent === 'edit'"),
+  'connection entry points must save profiles by default while transient terminal entry points remain optional',
+);
 
 console.log('app structure tests passed');

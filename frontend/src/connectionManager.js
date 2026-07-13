@@ -1,5 +1,9 @@
 export const ungroupedKey = '__ungrouped__';
 
+export function resolveProfileSaveDefault({ intent = 'session', profile = null } = {}) {
+  return Boolean(profile || intent === 'connection');
+}
+
 export function buildConnectionTransferActions({ profileCount = 0 } = {}) {
   return [
     { key: 'importSshConfig', labelKey: 'action.importSshConfig', disabled: false },
