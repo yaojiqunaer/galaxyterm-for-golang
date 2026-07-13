@@ -107,6 +107,7 @@ import {
   ungroupedKey,
 } from './connectionManager.js';
 import {
+  appendClosedSessions,
   buildSessionAuditSummary,
   buildSessionCloseConfirm,
   buildSessionContextFacts,
@@ -120,6 +121,7 @@ import {
   sessionStatusLabel,
   sessionStatusTone,
   sessionSummary,
+  takeClosedSession,
 } from './sessionPresentation.js';
 import {
   buildAppearanceSummary,
@@ -274,6 +276,7 @@ function App() {
   const [messageApi, messageContextHolder] = message.useMessage();
   const [allProviders, setAllProviders] = useState(fallbackProviders);
   const [sessions, setSessions] = useState([]);
+  const [closedSessions, setClosedSessions] = useState([]);
   const [profiles, setProfiles] = useState(() => loadProfiles());
   const [settings, setSettings] = useState(() => loadSettings());
   const [locale, setLocaleState] = useState(() => currentLocale());
@@ -432,6 +435,10 @@ function App() {
         event.preventDefault();
         setPaletteOpen(true);
       }
+      if (key === 't' && event.shiftKey) {
+        event.preventDefault();
+        restoreLastClosedSession();
+      }
       if (key === 'f' && !event.shiftKey && activeKey && selectedNav === 'sessions') {
         event.preventDefault();
         terminalSearchRef.current?.focus();
@@ -494,7 +501,7 @@ function App() {
     };
     window.addEventListener('keydown', handleKeydown, true);
     return () => window.removeEventListener('keydown', handleKeydown, true);
-  }, [activeKey, selectedNav, sessions, settings.shortcutModifier]);
+  }, [activeKey, closedSessions, selectedNav, sessions, settings.shortcutModifier]);
 
   useEffect(() => {
     if (activeKey && terminalRefs.current[activeKey]?.fit) {
@@ -791,6 +798,27 @@ function App() {
       : t('terminal.status.connecting'));
   };
 
+  const rememberClosedSessions = (closingSessions) => {
+    if (!closingSessions?.length) return;
+    setClosedSessions((current) => appendClosedSessions(current, closingSessions, 10));
+  };
+
+  const restoreLastClosedSession = async () => {
+    const { entry, remaining } = takeClosedSession(closedSessions);
+    if (!entry) return;
+    if (!providers.some((provider) => provider.type === entry.providerType)) {
+      messageApi.warning(t('message.providerUnavailable'));
+      return;
+    }
+    setClosedSessions(remaining);
+    try {
+      await startProfileRequests([entry.request]);
+    } catch (error) {
+      setClosedSessions((current) => [entry, ...current].slice(0, 10));
+      messageApi.error(`${t('message.credentialFailed')}: ${error}`);
+    }
+  };
+
   const testConnection = async () => {
     if (newType !== 'ssh') {
       messageApi.info(t('message.localTestSkipped'));
@@ -852,7 +880,9 @@ function App() {
   };
 
   const removeSession = (targetKey) => {
+    const closingSession = sessions.find((session) => session.id === targetKey);
     saveAuditRecord(targetKey);
+    if (closingSession) rememberClosedSessions([closingSession]);
     setSessions((current) => {
       const next = current.filter((item) => item.id !== targetKey);
       if (activeKey === targetKey) {
@@ -882,6 +912,7 @@ function App() {
 
   const closeAllSessions = () => {
     sessions.forEach((session) => saveAuditRecord(session.id));
+    rememberClosedSessions(sessions);
     setSessions([]);
     setActiveKey('');
     setFocusMode(false);
@@ -892,6 +923,7 @@ function App() {
     if (!keepSessionId) return;
     const closingSessions = sessions.filter((session) => session.id !== keepSessionId);
     closingSessions.forEach((session) => saveAuditRecord(session.id));
+    rememberClosedSessions(closingSessions);
     setSessions((current) => current.filter((session) => session.id === keepSessionId));
     setActiveKey(keepSessionId);
     terminalRefs.current = Object.fromEntries(
@@ -902,6 +934,7 @@ function App() {
   const closeClosedSessions = () => {
     const closingSessions = sessions.filter((session) => sessionStatusLabel(session) === 'closed');
     closingSessions.forEach((session) => saveAuditRecord(session.id));
+    rememberClosedSessions(closingSessions);
     const closingSessionIds = new Set(closingSessions.map((session) => session.id));
     setSessions((current) => current.filter((session) => !closingSessionIds.has(session.id)));
     if (closingSessionIds.has(activeKey)) {
@@ -3446,6 +3479,7 @@ function App() {
     { key: 'settings', icon: <SettingOutlined />, label: t('nav.settings') },
   ];
   const sessionMenuActions = {
+    restoreClosed: restoreLastClosedSession,
     view: () => setSessionView(sessionView === 'tabs' ? 'grid' : 'tabs'),
     focus: () => setFocusMode((current) => !current),
     copy: copyTerminalSelection,
@@ -3473,13 +3507,22 @@ function App() {
   };
   const sessionMenuItems = [
     {
+      key: 'restoreClosed',
+      icon: <HistoryOutlined />,
+      label: t('action.restoreClosedSession'),
+      disabled: closedSessions.length === 0,
+    },
+    { type: 'divider' },
+    {
       key: 'view',
       label: sessionView === 'tabs' ? t('action.grid') : t('action.tabs'),
+      disabled: sessions.length === 0,
     },
     {
       key: 'focus',
       icon: focusMode ? <FullscreenExitOutlined /> : <FullscreenOutlined />,
       label: focusMode ? t('action.exitFocus') : t('action.focusMode'),
+      disabled: sessions.length === 0,
     },
     activeKey && { type: 'divider' },
     activeKey && {
@@ -3574,6 +3617,7 @@ function App() {
       key: 'closeAll',
       icon: <DeleteOutlined />,
       label: t('action.closeAll'),
+      disabled: sessions.length === 0,
       danger: true,
     },
   ].filter(Boolean);
@@ -3745,7 +3789,7 @@ function App() {
                 <Text className="command-palette-shortcut" code>{commandPaletteShortcut}</Text>
               </Button>
             </Tooltip>
-            {sessions.length > 0 && (
+            {(sessions.length > 0 || closedSessions.length > 0) && (
               <Dropdown menu={{ items: sessionMenuItems, onClick: ({ key }) => sessionMenuActions[key]?.() }} trigger={['click']}>
                 <Button icon={<CodeOutlined />} aria-label={t('action.sessionActions')} title={t('action.sessionActions')} />
               </Dropdown>

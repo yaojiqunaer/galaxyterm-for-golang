@@ -59,6 +59,7 @@
   "action.restoreWorkspace": "恢复工作区",
   "action.clearWorkspace": "清空快照",
   "action.closeSession": "关闭会话",
+  "action.restoreClosedSession": "恢复最近关闭的会话",
   "action.closeClosed": "关闭已关闭会话",
   "action.closeOthers": "关闭其他会话",
   "action.closeAll": "关闭全部会话",

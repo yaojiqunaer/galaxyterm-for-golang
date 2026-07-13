@@ -12,6 +12,27 @@ export function sessionStatusLabel(session = {}) {
   return 'connecting';
 }
 
+export function appendClosedSessions(stack = [], sessions = [], limit = 10) {
+  const capacity = Math.max(1, Number(limit) || 10);
+  const entries = sessions
+    .filter((session) => session?.request)
+    .map((session) => ({
+      label: session.label || session.request.displayName || session.providerType || 'terminal',
+      providerType: session.providerType || session.request.providerType || 'terminal',
+      request: cloneSessionValue({
+        ...session.request,
+        displayName: session.label || session.request.displayName,
+      }),
+    }))
+    .reverse();
+  return [...entries, ...stack].slice(0, capacity);
+}
+
+export function takeClosedSession(stack = []) {
+  if (stack.length === 0) return { entry: null, remaining: [] };
+  return { entry: stack[0], remaining: stack.slice(1) };
+}
+
 export function sessionSummary(sessions = []) {
   return sessions.reduce((summary, session) => {
     const tone = sessionStatusTone(session);
@@ -294,4 +315,10 @@ function resolveRecordingState(session = {}, options = {}) {
   if (options.recordingActive) return 'active';
   if (session.auditRecordSaved) return 'saved';
   return 'pending';
+}
+
+function cloneSessionValue(value) {
+  if (Array.isArray(value)) return value.map(cloneSessionValue);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, cloneSessionValue(item)]));
 }

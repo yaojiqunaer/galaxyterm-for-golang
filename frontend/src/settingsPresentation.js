@@ -54,6 +54,7 @@ export function buildShortcutGroups(settings = {}) {
       items: [
         [`${modifier} + 1..9`, 'shortcut.switchNumberedSession'],
         [`${modifier} + Shift + [ / ]`, 'shortcut.switchAdjacentSession'],
+        [`${modifier} + Shift + T`, 'action.restoreClosedSession'],
         [`${modifier} + Shift + F`, 'action.focusMode'],
         ['Session menu', 'action.exportTranscript'],
         ['Session menu', 'action.commandHistory'],

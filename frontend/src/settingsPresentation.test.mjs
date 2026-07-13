@@ -68,7 +68,7 @@ assert.deepEqual(buildShortcutGroups().map((group) => ({
   count: group.items.length,
 })), [
   { key: 'terminal', count: 8 },
-  { key: 'sessions', count: 5 },
+  { key: 'sessions', count: 6 },
   { key: 'search', count: 3 },
   { key: 'audit', count: 3 },
   { key: 'workspace', count: 4 },
@@ -79,6 +79,7 @@ assert.equal(buildShortcutGroups({ shortcutModifier: 'meta' })[0].items[0][0], '
 assert.equal(buildShortcutGroups({ shortcutModifier: 'ctrl' })[0].items[0][0], 'Ctrl + N');
 assert.equal(buildShortcutGroups({ shortcutModifier: 'bogus' })[0].items[0][0], 'Cmd/Ctrl + N');
 assert.deepEqual(buildShortcutGroups({ shortcutModifier: 'meta' })[2].items[0], ['Cmd + F', 'shortcut.searchTerminal']);
+assert.equal(buildShortcutGroups({ shortcutModifier: 'meta' })[1].items.some(([shortcut]) => shortcut === 'Cmd + Shift + T'), true);
 assert.equal(shortcutModifierLabel('meta'), 'Cmd');
 assert.equal(shortcutModifierLabel('ctrl'), 'Ctrl');
 assert.equal(normalizeShortcutModifier('bogus'), 'auto');

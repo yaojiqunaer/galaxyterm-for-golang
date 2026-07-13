@@ -59,6 +59,7 @@
   "action.restoreWorkspace": "Restore Workspace",
   "action.clearWorkspace": "Clear Snapshot",
   "action.closeSession": "Close Session",
+  "action.restoreClosedSession": "Reopen closed session",
   "action.closeClosed": "Close Closed Sessions",
   "action.closeOthers": "Close Other Sessions",
   "action.closeAll": "Close All Sessions",

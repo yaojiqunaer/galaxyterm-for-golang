@@ -108,5 +108,12 @@ assert.ok(
     && source.includes("window.removeEventListener('keydown', handleKeydown, true);"),
   'global terminal shortcuts must observe xterm key events in the capture phase',
 );
+assert.ok(
+  source.includes('const [closedSessions, setClosedSessions] = useState([]);')
+    && source.includes("key === 't' && event.shiftKey")
+    && source.includes("key: 'restoreClosed'")
+    && source.includes('restoreLastClosedSession'),
+  'recently closed sessions must be restorable from the menu and Cmd/Ctrl+Shift+T',
+);
 
 console.log('app structure tests passed');

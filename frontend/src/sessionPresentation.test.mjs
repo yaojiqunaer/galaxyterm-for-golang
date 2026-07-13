@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  appendClosedSessions,
   buildSessionAuditSummary,
   buildSessionContextFacts,
   buildSessionCloseConfirm,
@@ -13,6 +14,7 @@ import {
   sessionStatusLabel,
   sessionStatusTone,
   sessionSummary,
+  takeClosedSession,
 } from './sessionPresentation.js';
 
 assert.equal(sessionStatusTone({ status: 'connected' }), 'success');
@@ -23,6 +25,42 @@ assert.equal(sessionStatusTone({}), 'connecting');
 assert.equal(sessionStatusLabel({ status: 'connected' }), 'connected');
 assert.equal(sessionStatusLabel({ status: 'closed' }), 'closed');
 assert.equal(sessionStatusLabel({ status: 'connecting' }), 'connecting');
+
+const closedSource = {
+  id: 'session-1',
+  backendSessionId: 'backend-1',
+  label: 'Production',
+  providerType: 'ssh',
+  request: {
+    displayName: 'Old name',
+    providerType: 'ssh',
+    config: { host: 'prod.example.com' },
+    auth: { username: 'root' },
+  },
+  auditEvents: [{ type: 'session.open' }],
+  status: 'connected',
+};
+const closedStack = appendClosedSessions([], [
+  closedSource,
+  { ...closedSource, id: 'session-2', label: 'Database' },
+], 10);
+assert.equal(closedStack.length, 2);
+assert.equal(closedStack[0].label, 'Database');
+assert.equal(closedStack[1].label, 'Production');
+assert.equal(closedStack[1].request.displayName, 'Production');
+assert.notEqual(closedStack[1].request, closedSource.request);
+assert.equal('id' in closedStack[1], false);
+assert.equal('auditEvents' in closedStack[1], false);
+assert.deepEqual(takeClosedSession(closedStack), {
+  entry: closedStack[0],
+  remaining: [closedStack[1]],
+});
+assert.deepEqual(takeClosedSession([]), { entry: null, remaining: [] });
+assert.equal(appendClosedSessions(closedStack, Array.from({ length: 12 }, (_, index) => ({
+  label: `Session ${index}`,
+  providerType: 'local',
+  request: { providerType: 'local' },
+})), 10).length, 10);
 
 assert.deepEqual(sessionSummary([
   { status: 'connected' },
