@@ -62,7 +62,7 @@ export function buildShortcutGroups(settings = {}) {
     {
       key: 'search',
       items: [
-        ['Top search', 'shortcut.searchTerminal'],
+        [`${modifier} + F`, 'shortcut.searchTerminal'],
         ['Enter', 'action.findNext'],
         ['Previous button', 'action.findPrevious'],
       ],

@@ -78,6 +78,7 @@ assert.equal(buildShortcutGroups().some((group) => group.items.some(([shortcut])
 assert.equal(buildShortcutGroups({ shortcutModifier: 'meta' })[0].items[0][0], 'Cmd + N');
 assert.equal(buildShortcutGroups({ shortcutModifier: 'ctrl' })[0].items[0][0], 'Ctrl + N');
 assert.equal(buildShortcutGroups({ shortcutModifier: 'bogus' })[0].items[0][0], 'Cmd/Ctrl + N');
+assert.deepEqual(buildShortcutGroups({ shortcutModifier: 'meta' })[2].items[0], ['Cmd + F', 'shortcut.searchTerminal']);
 assert.equal(shortcutModifierLabel('meta'), 'Cmd');
 assert.equal(shortcutModifierLabel('ctrl'), 'Ctrl');
 assert.equal(normalizeShortcutModifier('bogus'), 'auto');

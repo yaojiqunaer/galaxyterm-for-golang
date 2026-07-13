@@ -97,5 +97,16 @@ assert.ok(
     && !source.includes("import TerminalPane from './components/TerminalPane.jsx';"),
   'the xterm runtime must load only when a terminal session is first rendered',
 );
+assert.ok(
+  source.includes('const terminalSearchRef = useRef(null);')
+    && source.includes("key === 'f' && !event.shiftKey && activeKey && selectedNav === 'sessions'")
+    && source.includes('ref={terminalSearchRef}'),
+  'Cmd/Ctrl+F must focus terminal output search only inside the session workspace',
+);
+assert.ok(
+  source.includes("window.addEventListener('keydown', handleKeydown, true);")
+    && source.includes("window.removeEventListener('keydown', handleKeydown, true);"),
+  'global terminal shortcuts must observe xterm key events in the capture phase',
+);
 
 console.log('app structure tests passed');

@@ -352,6 +352,7 @@ function App() {
   const [commandForm] = Form.useForm();
   const watchedFilePath = Form.useWatch('path', fileForm);
   const terminalRefs = useRef({});
+  const terminalSearchRef = useRef(null);
   const profileImportRef = useRef(null);
   const activeSession = sessions.find((session) => session.id === activeKey);
 
@@ -431,6 +432,10 @@ function App() {
         event.preventDefault();
         setPaletteOpen(true);
       }
+      if (key === 'f' && !event.shiftKey && activeKey && selectedNav === 'sessions') {
+        event.preventDefault();
+        terminalSearchRef.current?.focus();
+      }
       const numberedSessionIndex = resolveNumberedSessionIndex(key, sessions.length);
       if (numberedSessionIndex >= 0) {
         const nextSession = sessions[numberedSessionIndex];
@@ -487,9 +492,9 @@ function App() {
         resetTerminalFont();
       }
     };
-    window.addEventListener('keydown', handleKeydown);
-    return () => window.removeEventListener('keydown', handleKeydown);
-  }, [activeKey, sessions, settings.shortcutModifier]);
+    window.addEventListener('keydown', handleKeydown, true);
+    return () => window.removeEventListener('keydown', handleKeydown, true);
+  }, [activeKey, selectedNav, sessions, settings.shortcutModifier]);
 
   useEffect(() => {
     if (activeKey && terminalRefs.current[activeKey]?.fit) {
@@ -3754,6 +3759,7 @@ function App() {
               <>
                 <Input.Search
                   className="terminal-search"
+                  ref={terminalSearchRef}
                   allowClear
                   size="middle"
                   value={terminalSearch}
