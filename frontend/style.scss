@@ -964,6 +964,12 @@ select {
   font-size: 13px;
 }
 
+.session-tab-context-trigger {
+  display: inline-flex;
+  width: 100%;
+  min-width: 0;
+}
+
 .session-tab-label.active {
   color: var(--terminal-text);
   font-weight: 650;

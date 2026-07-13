@@ -5,6 +5,7 @@ import {
   buildSessionCloseConfirm,
   buildSessionNavigationState,
   buildSessionStatusFacts,
+  buildSessionTabMenuModel,
   buildSessionToolbarModel,
   filterSessions,
   profileActionModel,
@@ -98,6 +99,22 @@ assert.deepEqual(buildSessionToolbarModel({
     { key: 'closeCurrent', labelKey: 'action.closeSession', disabled: false, danger: true },
   ],
 });
+
+assert.deepEqual(buildSessionTabMenuModel({ sessionCount: 3 }), [
+  { key: 'rename', labelKey: 'action.renameSession' },
+  { key: 'reconnect', labelKey: 'action.reconnect' },
+  { key: 'duplicate', labelKey: 'action.duplicate' },
+  { key: 'closeOthers', labelKey: 'action.closeOthers', disabled: false, danger: true },
+  { key: 'closeCurrent', labelKey: 'action.closeSession', danger: true },
+]);
+
+assert.deepEqual(buildSessionTabMenuModel({ sessionCount: 1 }), [
+  { key: 'rename', labelKey: 'action.renameSession' },
+  { key: 'reconnect', labelKey: 'action.reconnect' },
+  { key: 'duplicate', labelKey: 'action.duplicate' },
+  { key: 'closeOthers', labelKey: 'action.closeOthers', disabled: true, danger: true },
+  { key: 'closeCurrent', labelKey: 'action.closeSession', danger: true },
+]);
 
 assert.deepEqual(buildSessionToolbarModel({
   activeKey: '',

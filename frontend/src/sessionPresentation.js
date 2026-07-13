@@ -88,6 +88,22 @@ export function buildSessionToolbarModel(options = {}) {
   };
 }
 
+export function buildSessionTabMenuModel(options = {}) {
+  const canCloseOthers = (Number(options.sessionCount) || 0) > 1;
+  return [
+    { key: 'rename', labelKey: 'action.renameSession' },
+    { key: 'reconnect', labelKey: 'action.reconnect' },
+    { key: 'duplicate', labelKey: 'action.duplicate' },
+    {
+      key: 'closeOthers',
+      labelKey: 'action.closeOthers',
+      disabled: !canCloseOthers,
+      danger: true,
+    },
+    { key: 'closeCurrent', labelKey: 'action.closeSession', danger: true },
+  ];
+}
+
 export function buildSessionContextFacts(session, options = {}) {
   if (!session) return [];
   const facts = [

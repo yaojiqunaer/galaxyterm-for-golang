@@ -108,6 +108,7 @@ import {
   buildSessionContextFacts,
   buildSessionNavigationState,
   buildSessionStatusFacts,
+  buildSessionTabMenuModel,
   buildSessionToolbarModel,
   filterSessions,
   profileActionModel,
@@ -867,13 +868,14 @@ function App() {
     terminalRefs.current = {};
   };
 
-  const closeOtherSessions = () => {
-    if (!activeKey) return;
-    const closingSessions = sessions.filter((session) => session.id !== activeKey);
+  const closeOtherSessions = (keepSessionId = activeKey) => {
+    if (!keepSessionId) return;
+    const closingSessions = sessions.filter((session) => session.id !== keepSessionId);
     closingSessions.forEach((session) => saveAuditRecord(session.id));
-    setSessions((current) => current.filter((session) => session.id === activeKey));
+    setSessions((current) => current.filter((session) => session.id === keepSessionId));
+    setActiveKey(keepSessionId);
     terminalRefs.current = Object.fromEntries(
-      Object.entries(terminalRefs.current).filter(([sessionId]) => sessionId === activeKey),
+      Object.entries(terminalRefs.current).filter(([sessionId]) => sessionId === keepSessionId),
     );
   };
 
@@ -909,10 +911,10 @@ function App() {
     });
   };
 
-  const confirmCloseOtherSessions = () => {
-    const closingSessions = sessions.filter((session) => session.id !== activeKey);
+  const confirmCloseOtherSessions = (keepSessionId = activeKey) => {
+    const closingSessions = sessions.filter((session) => session.id !== keepSessionId);
     if (settings.confirmDangerousActions === false) {
-      closeOtherSessions();
+      closeOtherSessions(keepSessionId);
       return;
     }
     const confirm = buildSessionCloseConfirm({ mode: 'others', sessions: closingSessions });
@@ -923,7 +925,7 @@ function App() {
       okButtonProps: { danger: true },
       okText: t(confirm.okActionKey),
       cancelText: t('action.cancel'),
-      onOk: closeOtherSessions,
+      onOk: () => closeOtherSessions(keepSessionId),
     });
   };
 
@@ -1678,18 +1680,57 @@ function App() {
     </TerminalFrame>
   );
 
-  const items = sessions.map((session) => ({
-    key: session.id,
-    label: (
-      <SessionTabLabel active={session.id === activeKey} session={session} />
-    ),
-    children: (
-      <div className="terminal-workspace">
-        {renderTerminalPane(session)}
-      </div>
-    ),
-    closable: true,
-  }));
+  const runSessionTabAction = (action, session) => {
+    if (action === 'rename') openRenameSession(session);
+    if (action === 'reconnect') reconnectSession(session.id);
+    if (action === 'duplicate') duplicateSession(session);
+    if (action === 'closeOthers') confirmCloseOtherSessions(session.id);
+    if (action === 'closeCurrent') confirmRemoveSession(session.id);
+  };
+  const items = sessions.map((session) => {
+    const tabMenuItems = buildSessionTabMenuModel({ sessionCount: sessions.length }).flatMap((action, index) => [
+      ...(index === 3 ? [{ key: 'danger-divider', type: 'divider' }] : []),
+      {
+        key: action.key,
+        danger: action.danger,
+        disabled: action.disabled,
+        icon: sessionTabActionIcon(action.key),
+        label: t(action.labelKey),
+      },
+    ]);
+    return {
+      key: session.id,
+      label: (
+        <Dropdown
+          menu={{
+            items: tabMenuItems,
+            onClick: ({ domEvent, key }) => {
+              domEvent?.stopPropagation();
+              runSessionTabAction(key, session);
+            },
+          }}
+          trigger={['contextMenu']}
+        >
+          <span
+            className="session-tab-context-trigger"
+            onContextMenu={() => setActiveKey(session.id)}
+            onDoubleClick={(event) => {
+              event.stopPropagation();
+              openRenameSession(session);
+            }}
+          >
+            <SessionTabLabel active={session.id === activeKey} session={session} />
+          </span>
+        </Dropdown>
+      ),
+      children: (
+        <div className="terminal-workspace">
+          {renderTerminalPane(session)}
+        </div>
+      ),
+      closable: true,
+    };
+  });
 
   const renderSessions = () => {
     if (sessions.length === 0) {
@@ -4548,6 +4589,13 @@ function SessionTabLabel({ active = false, session }) {
       <span className="session-tab-title">{display.title}</span>
     </span>
   );
+}
+
+function sessionTabActionIcon(action) {
+  if (action === 'rename') return <EditOutlined />;
+  if (action === 'reconnect') return <ReloadOutlined />;
+  if (action === 'duplicate') return <CopyOutlined />;
+  return <DeleteOutlined />;
 }
 
 function SessionSidebarLabel({ session }) {
