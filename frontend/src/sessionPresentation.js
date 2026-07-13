@@ -62,13 +62,18 @@ export function buildSessionToolbarModel(options = {}) {
     ? { key: 'tabs', labelKey: 'action.tabs', disabled: false }
     : { key: 'grid', labelKey: 'action.grid', disabled: false };
 
+  const primary = [];
+  if (options.view === 'grid' || sessionCount > 1) primary.push(viewAction);
+  if (canNavigate) {
+    primary.push(
+      { key: 'previous', labelKey: 'action.previousSession', disabled: false },
+      { key: 'next', labelKey: 'action.nextSession', disabled: false },
+    );
+  }
+  primary.push({ key: 'reconnect', labelKey: 'action.reconnect', disabled: !hasActiveSession });
+
   return {
-    primary: [
-      viewAction,
-      { key: 'previous', labelKey: 'action.previousSession', disabled: !canNavigate },
-      { key: 'next', labelKey: 'action.nextSession', disabled: !canNavigate },
-      { key: 'reconnect', labelKey: 'action.reconnect', disabled: !hasActiveSession },
-    ],
+    primary,
     overflow: [
       { key: 'rename', labelKey: 'action.renameSession', disabled: !hasActiveSession },
       { key: 'closeClosed', labelKey: 'action.closeClosed', disabled: closedCount === 0 },

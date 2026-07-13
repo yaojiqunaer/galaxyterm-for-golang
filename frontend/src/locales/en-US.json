@@ -81,6 +81,7 @@
   "action.focusMode": "Focus Mode",
   "action.exitFocus": "Exit Focus",
   "action.sessionActions": "Session",
+  "action.sessionDetails": "Session details",
   "action.workspaceActions": "Workspace",
   "error.app.title": "GalaxyTerm could not render this workspace",
   "error.app.description": "The interface encountered an unexpected error. Connection profiles and local data were not cleared, so the workspace can be recovered after reloading.",

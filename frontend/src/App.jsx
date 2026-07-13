@@ -17,6 +17,7 @@ import {
   List,
   Menu,
   Modal,
+  Popover,
   Segmented,
   Select,
   Slider,
@@ -50,6 +51,7 @@ import {
   FullscreenOutlined,
   GlobalOutlined,
   HistoryOutlined,
+  InfoCircleOutlined,
   ImportOutlined,
   QuestionCircleOutlined,
   LaptopOutlined,
@@ -66,6 +68,7 @@ import {
   StarOutlined,
   ThunderboltOutlined,
   UpOutlined,
+  VideoCameraOutlined,
 } from '@ant-design/icons';
 import {
   buildAsciinemaCast,
@@ -4674,6 +4677,27 @@ function SessionStrip({
   summary,
 }) {
   const facts = buildSessionStatusFacts(summary);
+  const recordingFact = contextFacts.find((fact) => fact.key === 'recording');
+  const detailContent = (
+    <div className="session-strip-detail-list">
+      {contextFacts.map((fact) => (
+        <span key={fact.key}>
+          <small>{sessionContextFactLabel(fact)}</small>
+          <strong>{sessionContextFactValue(fact)}</strong>
+        </span>
+      ))}
+      {facts.map((fact) => (
+        <span key={fact.key}>
+          <small>{t(`session.status.${fact.key}`)}</small>
+          <strong>{fact.value}</strong>
+        </span>
+      ))}
+      <span>
+        <small>{t('label.openSessions')}</small>
+        <strong>{`${summary.active}/${summary.total}`}</strong>
+      </span>
+    </div>
+  );
   return (
     <div className="session-strip">
       <div className={`session-strip-current tone-${sessionStatusTone(activeSession)}`}>
@@ -4705,6 +4729,17 @@ function SessionStrip({
           <strong>{`${summary.active}/${summary.total}`}</strong>
         </span>
       </div>
+      {recordingFact && (
+        <Tooltip title={`${sessionContextFactLabel(recordingFact)}: ${sessionContextFactValue(recordingFact)}`}>
+          <span
+            aria-label={`${sessionContextFactLabel(recordingFact)}: ${sessionContextFactValue(recordingFact)}`}
+            className={`session-recording-indicator tone-${recordingFact.tone}`}
+            role="status"
+          >
+            <VideoCameraOutlined />
+          </span>
+        </Tooltip>
+      )}
       {auditSummary && (
         <Tooltip title={t(auditSummary.descriptionKey, auditSummary.values)}>
           <span
@@ -4716,6 +4751,15 @@ function SessionStrip({
           </span>
         </Tooltip>
       )}
+      <Popover content={detailContent} placement="bottomRight" title={t('action.sessionDetails')} trigger="click">
+        <Button
+          aria-label={t('action.sessionDetails')}
+          className="session-strip-details"
+          icon={<InfoCircleOutlined />}
+          size="small"
+          type="text"
+        />
+      </Popover>
     </div>
   );
 }

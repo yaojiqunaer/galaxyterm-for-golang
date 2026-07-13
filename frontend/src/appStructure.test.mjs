@@ -60,5 +60,14 @@ assert.ok(
   /@media \(max-width: 860px\)[\s\S]*?\.topbar-new-terminal[\s\S]*?\.command-palette-label/.test(styles),
   'narrow workspaces must collapse primary topbar labels without hiding their commands',
 );
+assert.ok(
+  source.includes('className="session-strip-details"')
+    && source.includes('className="session-strip-detail-list"'),
+  'session context must remain available through a compact details control',
+);
+assert.ok(
+  /@media \(max-width: 860px\)[\s\S]*?\.session-strip-facts\s*\{[\s\S]*?display:\s*none[\s\S]*?\.session-strip-details(?:\.ant-btn)?\s*\{[\s\S]*?display:\s*inline-flex/.test(styles),
+  'narrow session workspaces must replace clipped fact pills with the details control',
+);
 
 console.log('app structure tests passed');

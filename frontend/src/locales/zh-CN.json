@@ -81,6 +81,7 @@
   "action.focusMode": "专注模式",
   "action.exitFocus": "退出专注",
   "action.sessionActions": "会话",
+  "action.sessionDetails": "会话详情",
   "action.workspaceActions": "工作区",
   "error.app.title": "GalaxyTerm 无法显示当前工作区",
   "error.app.description": "界面遇到未预期错误。连接配置和本地数据未被清除，重新加载后可以继续恢复工作区。",

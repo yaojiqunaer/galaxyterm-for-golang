@@ -15,11 +15,13 @@ const { currentLocale, setLocale, t } = await import('./i18n.js');
 assert.equal(currentLocale(), 'en-US');
 assert.equal(t('nav.sessions'), 'Sessions');
 assert.equal(t('error.app.title'), 'GalaxyTerm could not render this workspace');
+assert.equal(t('action.sessionDetails'), 'Session details');
 
 setLocale('zh-CN');
 assert.equal(currentLocale(), 'zh-CN');
 assert.equal(t('nav.sessions'), '会话');
 assert.equal(t('error.app.title'), 'GalaxyTerm 无法显示当前工作区');
+assert.equal(t('action.sessionDetails'), '会话详情');
 
 setLocale('en-US');
 assert.equal(currentLocale(), 'en-US');
