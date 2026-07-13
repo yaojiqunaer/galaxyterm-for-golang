@@ -50,6 +50,12 @@ assert.ok(
   'the desktop webview must expose GalaxyTerm branding without a missing favicon request',
 );
 assert.ok(
+  source.includes('document.documentElement.lang = locale;')
+    && source.includes("document.title = t('app.title');")
+    && source.includes("label: t(`locale.${locale}`, locale)"),
+  'runtime locale changes must update document metadata and present readable language names',
+);
+assert.ok(
   !source.includes('session-switcher-list') && !source.includes('session-filter-bar'),
   'the workspace must not duplicate persistent session tabs with a second filter and switcher stack',
 );

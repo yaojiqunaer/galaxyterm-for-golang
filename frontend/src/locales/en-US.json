@@ -1,6 +1,8 @@
 {
   "app.title": "GalaxyTerm",
   "app.subtitle": "Extensible terminal workspace",
+  "locale.en-US": "English",
+  "locale.zh-CN": "Simplified Chinese",
   "action.newTerminal": "New Terminal",
   "action.newConnection": "New Connection",
   "action.quickSsh": "Quick SSH",

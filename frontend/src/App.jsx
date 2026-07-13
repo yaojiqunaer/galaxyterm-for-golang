@@ -361,6 +361,11 @@ function App() {
   const activeSession = sessions.find((session) => session.id === activeKey);
 
   useEffect(() => {
+    document.documentElement.lang = locale;
+    document.title = t('app.title');
+  }, [locale]);
+
+  useEffect(() => {
     Promise.resolve()
       .then(() => SessionAPI.ListProviders())
       .then((loadedProviders) => {
@@ -2853,7 +2858,10 @@ function App() {
             <Form.Item label={t('field.locale')}>
               <Select
                 value={locale}
-                options={availableLocales().map((locale) => ({ value: locale, label: locale }))}
+                options={availableLocales().map((locale) => ({
+                  value: locale,
+                  label: t(`locale.${locale}`, locale),
+                }))}
                 onChange={(nextLocale) => {
                   setLocale(nextLocale);
                   setLocaleState(nextLocale);

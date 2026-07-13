@@ -1,6 +1,8 @@
 {
   "app.title": "GalaxyTerm",
   "app.subtitle": "可扩展终端工作台",
+  "locale.en-US": "English",
+  "locale.zh-CN": "简体中文",
   "action.newTerminal": "新建终端",
   "action.newConnection": "新建连接",
   "action.quickSsh": "快速 SSH",
