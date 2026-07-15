@@ -180,6 +180,8 @@
   "session.filterSummary": "{count}/{total} sessions",
   "session.empty.title": "Open a terminal session",
   "session.empty.description": "Start from a local shell, SSH profile, or saved connection. Sessions keep running until you close the tab.",
+  "session.empty.restoreAvailable": "Restore {count} saved sessions from {updatedAt}",
+  "session.empty.restoreUnavailable": "No saved workspace is available yet",
   "filter.allProviders": "All Providers",
   "filter.allSessions": "All",
   "filter.activeSessions": "Active",

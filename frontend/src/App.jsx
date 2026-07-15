@@ -1992,6 +1992,7 @@ function App() {
           providers={providers}
           recentConnections={visibleRecentConnections}
           restoreWorkspace={restoreWorkspace}
+          workspaceSnapshot={buildWorkspaceSnapshotSummary(workspaceSummary)}
         />
       );
     }
@@ -4874,6 +4875,7 @@ function SessionEmptyPanel({
   providers,
   recentConnections,
   restoreWorkspace,
+  workspaceSnapshot,
 }) {
   const suggestedProfiles = sortSidebarProfiles(profiles, 4, { availableProviders: providers });
   const hasSuggestions = suggestedProfiles.length > 0 || recentConnections.length > 0;
@@ -4892,9 +4894,20 @@ function SessionEmptyPanel({
           <Button icon={<CloudServerOutlined />} onClick={() => openDrawer('ssh')}>
             {t('provider.ssh.name')}
           </Button>
-          <Button icon={<ReloadOutlined />} onClick={() => restoreWorkspace()}>
-            {t('action.restoreWorkspace')}
-          </Button>
+          <Tooltip title={t(
+            workspaceSnapshot.hasSnapshot ? 'session.empty.restoreAvailable' : 'session.empty.restoreUnavailable',
+            workspaceSnapshot,
+          )}>
+            <span>
+              <Button
+                disabled={!workspaceSnapshot.hasSnapshot}
+                icon={<ReloadOutlined />}
+                onClick={() => restoreWorkspace()}
+              >
+                {t('action.restoreWorkspace')}
+              </Button>
+            </span>
+          </Tooltip>
         </Space>
         <Button className="session-empty-connection-link" type="link" icon={<FolderOpenOutlined />} onClick={openConnections}>
           {t('section.connectionManager')}

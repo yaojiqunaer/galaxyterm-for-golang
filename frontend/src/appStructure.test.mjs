@@ -236,6 +236,17 @@ assert.ok(
   'recently closed sessions must be restorable from the menu and Cmd/Ctrl+Shift+T',
 );
 assert.ok(
+  source.includes('workspaceSnapshot={buildWorkspaceSnapshotSummary(workspaceSummary)}')
+    && source.includes('disabled={!workspaceSnapshot.hasSnapshot}')
+    && source.includes("workspaceSnapshot.hasSnapshot ? 'session.empty.restoreAvailable' : 'session.empty.restoreUnavailable'"),
+  'the empty session workspace must only offer restore when a real snapshot exists and explain its state',
+);
+assert.ok(
+  /\.session-empty-panel \.ant-typography\s*\{[\s\S]*?color:\s*var\(--terminal-text\)/.test(styles)
+    && /\.session-empty-panel \.ant-typography-secondary\s*\{[\s\S]*?color:\s*color-mix/.test(styles),
+  'terminal-toned empty states must retain readable text in both app themes',
+);
+assert.ok(
   source.includes("key === 'w' && !event.shiftKey && activeKey && selectedNav === 'sessions'")
     && source.includes('confirmRemoveSession(activeKey);'),
   'Cmd/Ctrl+W must close the active terminal only inside the session workspace',

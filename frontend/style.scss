@@ -1277,6 +1277,14 @@ select {
   color: var(--terminal-text);
 }
 
+.session-empty-panel .ant-typography {
+  color: var(--terminal-text);
+}
+
+.session-empty-panel .ant-typography-secondary {
+  color: color-mix(in srgb, var(--terminal-text) 68%, var(--terminal-bg));
+}
+
 .session-empty-icon {
   display: inline-grid;
   width: 44px;

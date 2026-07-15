@@ -150,9 +150,10 @@ export function buildTerminalDefaults(settings = {}, providers = []) {
 }
 
 export function buildWorkspaceSnapshotSummary(summary = null) {
+  const count = Number(summary?.count) || 0;
   return {
-    count: summary?.count || 0,
-    hasSnapshot: !!summary,
+    count,
+    hasSnapshot: count > 0,
     updatedAt: summary?.updatedAt || '',
   };
 }

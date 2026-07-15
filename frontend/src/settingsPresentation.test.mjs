@@ -143,6 +143,11 @@ assert.deepEqual(buildWorkspaceSnapshotSummary(null), {
   hasSnapshot: false,
   updatedAt: '',
 });
+assert.deepEqual(buildWorkspaceSnapshotSummary({ count: 0, updatedAt: '2026-07-04 12:00' }), {
+  count: 0,
+  hasSnapshot: false,
+  updatedAt: '2026-07-04 12:00',
+});
 assert.deepEqual(buildWorkspaceSnapshotSummary({ count: 3, updatedAt: '2026-07-04 12:00' }), {
   count: 3,
   hasSnapshot: true,

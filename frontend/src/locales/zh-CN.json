@@ -180,6 +180,8 @@
   "session.filterSummary": "{count}/{total} 个会话",
   "session.empty.title": "打开一个终端会话",
   "session.empty.description": "从本地 Shell、SSH 配置或已保存连接开始。会话会保持运行，直到你关闭标签。",
+  "session.empty.restoreAvailable": "恢复 {updatedAt} 保存的 {count} 个会话",
+  "session.empty.restoreUnavailable": "目前还没有可恢复的工作区",
   "filter.allProviders": "全部 Provider",
   "filter.allSessions": "全部",
   "filter.activeSessions": "活动",
