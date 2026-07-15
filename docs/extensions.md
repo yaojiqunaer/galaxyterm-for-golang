@@ -68,13 +68,22 @@ https://github.com/<owner>/<repo>/releases/latest/download/galaxyterm-index.json
 }
 ```
 
-`manifest` 必须与对应 `.gtx` 包内的 `manifest.json` 一致。每个当前平台资产必须提供 HTTPS 或相对 `.gtx` URL，以及该完整文件的 SHA-256。`os` 和 `arch` 可使用 `all` 表示通用包；精确平台资产优先于通用资产。
+`manifest` 必须与对应 `.gtx` 包内的 `manifest.json` 一致。每个当前平台资产必须提供 HTTPS 或相对 `.gtx` URL，以及该完整文件的 SHA-256。`os` 和 `arch` 可使用 `all` 表示通用包；精确平台资产优先于通用资产。平台包仅在运行入口等平台元数据不同时，可在资产内提供 `manifest` 覆盖；官方生成工具会自动处理 Windows `.exe` 入口。
 
-生成校验值：
+从 `dist/extensions/` 中全部 `.gtx` 包读取清单、计算校验值并生成稳定排序的索引：
 
 ```shell
-shasum -a 256 dist/extensions/*.gtx
+./scripts/generate-extension-index.sh
 ```
+
+默认产物为 `dist/extensions/galaxyterm-index.json`，其中使用与索引同目录的相对安装包 URL。需要生成绝对 URL 时：
+
+```shell
+./scripts/generate-extension-index.sh \
+  -base-url https://github.com/<owner>/<repo>/releases/download/<tag>/
+```
+
+同一目录中的包必须使用 `<扩展ID>_<版本>_<OS>_<架构>.gtx` 命名。同一扩展只能包含一个版本；重复平台、未知平台、无效包或不兼容的跨平台 manifest 会让命令失败，且不会覆盖现有索引。
 
 ## 离线安装
 

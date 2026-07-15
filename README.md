@@ -74,6 +74,8 @@
 
 产物位于 `dist/extensions/`。在“扩展”页面选择“离线安装”，安装后“文件”页面会自动发现 SFTP，并按扩展声明的能力显示浏览、编辑、上传、重命名或删除操作。FTP/FTPS 与 S3 扩展将使用相同的 `stdio-json-v1` 文件 Provider 协议接入，无需修改核心文件工作区。
 
+发布到 GitHub Release 前，可执行 `./scripts/generate-extension-index.sh` 为全部平台包生成在线安装索引。
+
 ### 本地启动
 
 ```shell

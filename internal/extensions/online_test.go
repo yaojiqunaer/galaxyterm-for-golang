@@ -90,6 +90,35 @@ func TestFetchCatalogRejectsAssetWithoutChecksum(t *testing.T) {
 	}
 }
 
+func TestFetchCatalogUsesPlatformAssetManifestOverride(t *testing.T) {
+	shared := testOnlineManifest("galaxyterm-extension-sftp", "0.2.0")
+	shared.Runtime = RuntimeManifest{Protocol: "stdio-json-v1", Entrypoint: "bin/extension"}
+	override := shared
+	override.Runtime.Entrypoint = "bin/extension.exe"
+	server := httptest.NewTLSServer(http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		_ = json.NewEncoder(writer).Encode(Catalog{
+			APIVersion: "v1",
+			Extensions: []CatalogExtension{{
+				Manifest: shared,
+				Assets: []CatalogAsset{{
+					OS: runtime.GOOS, Arch: runtime.GOARCH, URL: "/sftp.gtx",
+					SHA256: repeatedDigest("2"), Manifest: &override,
+				}},
+			}},
+		})
+	}))
+	defer server.Close()
+
+	api := NewAPIWithStoreAndClient(filepath.Join(t.TempDir(), "installed.json"), server.Client())
+	items, err := api.FetchCatalog(server.URL)
+	if err != nil {
+		t.Fatalf("FetchCatalog returned error: %v", err)
+	}
+	if len(items) != 1 || items[0].Manifest.Runtime.Entrypoint != "bin/extension.exe" {
+		t.Fatalf("catalog items = %#v", items)
+	}
+}
+
 func TestInstallOnlineVerifiesAndInstallsPackage(t *testing.T) {
 	manifest := testOnlineManifest("galaxyterm-extension-sftp", "0.2.0")
 	packagePath := writeGTXPackage(t, manifest)

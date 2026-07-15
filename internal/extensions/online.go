@@ -36,10 +36,11 @@ type CatalogExtension struct {
 }
 
 type CatalogAsset struct {
-	OS     string `json:"os"`
-	Arch   string `json:"arch"`
-	URL    string `json:"url"`
-	SHA256 string `json:"sha256"`
+	OS       string    `json:"os"`
+	Arch     string    `json:"arch"`
+	URL      string    `json:"url"`
+	SHA256   string    `json:"sha256"`
+	Manifest *Manifest `json:"manifest,omitempty"`
 }
 
 type CatalogItem struct {
@@ -136,8 +137,18 @@ func (api *API) FetchCatalog(source string) ([]CatalogItem, error) {
 		if err := validateSHA256(asset.SHA256); err != nil {
 			return nil, fmt.Errorf("invalid catalog asset for %s: %w", extension.Manifest.ID, err)
 		}
+		selectedManifest := extension.Manifest
+		if asset.Manifest != nil {
+			if err := ValidateManifest(*asset.Manifest); err != nil {
+				return nil, fmt.Errorf("invalid platform manifest for %s: %w", extension.Manifest.ID, err)
+			}
+			if asset.Manifest.ID != extension.Manifest.ID || asset.Manifest.Version != extension.Manifest.Version {
+				return nil, fmt.Errorf("platform manifest identity mismatch for %s", extension.Manifest.ID)
+			}
+			selectedManifest = *asset.Manifest
+		}
 		items = append(items, CatalogItem{
-			Manifest:  extension.Manifest,
+			Manifest:  selectedManifest,
 			Asset:     asset,
 			SourceURL: catalogURL,
 		})

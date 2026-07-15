@@ -68,13 +68,22 @@ Upload `.gtx` packages and an index named `galaxyterm-index.json` to each Releas
 }
 ```
 
-`manifest` must match the `manifest.json` inside each corresponding `.gtx` package. Every current-platform asset requires an HTTPS or relative `.gtx` URL and the SHA-256 of the complete file. Use `all` for platform-independent `os` or `arch` values; exact platform assets take precedence over generic assets.
+`manifest` must match the `manifest.json` inside each corresponding `.gtx` package. Every current-platform asset requires an HTTPS or relative `.gtx` URL and the SHA-256 of the complete file. Use `all` for platform-independent `os` or `arch` values; exact platform assets take precedence over generic assets. An asset may include a `manifest` override when runtime metadata differs by platform; the official generator handles Windows `.exe` entrypoints automatically.
 
-Generate checksums with:
+Read every `.gtx` package from `dist/extensions/`, calculate checksums, and generate a stably ordered index with:
 
 ```shell
-shasum -a 256 dist/extensions/*.gtx
+./scripts/generate-extension-index.sh
 ```
+
+The default output is `dist/extensions/galaxyterm-index.json` with package URLs relative to the index. Generate absolute URLs with:
+
+```shell
+./scripts/generate-extension-index.sh \
+  -base-url https://github.com/<owner>/<repo>/releases/download/<tag>/
+```
+
+Packages in one directory must use `<extension-id>_<version>_<os>_<arch>.gtx`. Each extension may have only one version. Duplicate platforms, unknown targets, invalid packages, or incompatible cross-platform manifests fail without replacing the existing index.
 
 ## Offline Installation
 

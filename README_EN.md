@@ -75,6 +75,8 @@ The base application does not include SFTP, FTP, or S3 SDKs. Build the official 
 
 The package is written to `dist/extensions/`. Install it from Extensions > Offline Install; the Files workspace discovers SFTP automatically and only shows browse, edit, upload, rename, or delete actions declared by the provider. FTP/FTPS and S3 extensions use the same `stdio-json-v1` file-provider protocol without changing the core file workspace.
 
+Run `./scripts/generate-extension-index.sh` before publishing a GitHub Release to generate the online-install catalog for all platform packages.
+
 ### Local start
 
 ```shell
