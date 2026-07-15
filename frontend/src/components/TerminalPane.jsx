@@ -12,6 +12,7 @@ import {
   appendTerminalOutputTail,
   buildTerminalPasteRisk,
   parseShellIntegrationExitCode,
+  shouldNotifyTerminalActivity,
   terminalOutputIndicatesPrompt,
 } from '../terminalExecution.js';
 
@@ -21,6 +22,7 @@ function TerminalPane({
   onAuditEvent,
   onCommandSubmitted,
   onConfirmPaste,
+  onOutputActivity,
   onSessionCreated,
   onSessionClosed,
   onStatusChange,
@@ -38,6 +40,8 @@ function TerminalPane({
   const lastCommandStartedAt = useRef(null);
   const outputTail = useRef('');
   const durationTimer = useRef(null);
+  const lastActivityNotificationAt = useRef(null);
+  const onOutputActivityRef = useRef(onOutputActivity);
   const pasteConfirmationPending = useRef(false);
   const terminalStatus = useRef({
     cols: 80,
@@ -47,6 +51,10 @@ function TerminalPane({
     status: 'connecting',
     updatedAt: new Date().toISOString(),
   });
+
+  useEffect(() => {
+    onOutputActivityRef.current = onOutputActivity;
+  }, [onOutputActivity]);
 
   const stopDurationTicker = () => {
     if (durationTimer.current) window.clearInterval(durationTimer.current);
@@ -239,6 +247,11 @@ function TerminalPane({
 
       cleanupData = runtime.EventsOn(`terminal:data:${createdSessionId}`, (event) => {
         const data = event?.Data || event?.data || '';
+        const activityAt = Date.now();
+        if (data && shouldNotifyTerminalActivity(lastActivityNotificationAt.current, activityAt)) {
+          lastActivityNotificationAt.current = activityAt;
+          onOutputActivityRef.current?.(new Date(activityAt).toISOString());
+        }
         if (data) transcript.current.push(data);
         if (data) outputEvents.current.push({ time: elapsedSeconds(startedAt.current), data });
         if (data) outputTail.current = appendTerminalOutputTail(outputTail.current, data);

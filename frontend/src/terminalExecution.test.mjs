@@ -3,6 +3,7 @@ import {
   appendTerminalOutputTail,
   buildTerminalPasteRisk,
   parseShellIntegrationExitCode,
+  shouldNotifyTerminalActivity,
   terminalOutputIndicatesPrompt,
 } from './terminalExecution.js';
 
@@ -47,5 +48,10 @@ assert.deepEqual(buildTerminalPasteRisk(`${'x'.repeat(121)}\nsecond\nthird`), {
   lineCount: 3,
   reasons: ['large', 'multiline'],
 });
+
+assert.equal(shouldNotifyTerminalActivity(null, 1000, 500), true);
+assert.equal(shouldNotifyTerminalActivity(1000, 1499, 500), false);
+assert.equal(shouldNotifyTerminalActivity(1000, 1500, 500), true);
+assert.equal(shouldNotifyTerminalActivity(1500, 1400, 500), false);
 
 console.log('terminal execution tests passed');

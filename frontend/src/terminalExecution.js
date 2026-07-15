@@ -37,6 +37,14 @@ export function parseShellIntegrationExitCode(output = '') {
   return Number.isSafeInteger(exitCode) ? exitCode : null;
 }
 
+export function shouldNotifyTerminalActivity(previousAt, currentAt = Date.now(), intervalMs = 750) {
+  const current = Number(currentAt);
+  const previous = Number(previousAt);
+  if (!Number.isFinite(current)) return false;
+  if (previousAt === null || previousAt === undefined || !Number.isFinite(previous)) return true;
+  return current >= previous + Math.max(0, Number(intervalMs) || 0);
+}
+
 function stripTerminalControlSequences(value = '') {
   return String(value)
     .replace(/\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g, '')

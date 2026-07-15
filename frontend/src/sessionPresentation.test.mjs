@@ -8,8 +8,12 @@ import {
   buildSessionStatusFacts,
   buildSessionTabMenuModel,
   buildSessionToolbarModel,
+  countUnreadSessions,
   filterSessions,
+  markSessionActivityRead,
   profileActionModel,
+  pruneSessionActivity,
+  recordSessionOutputActivity,
   sessionTabDisplay,
   sessionStatusLabel,
   sessionStatusTone,
@@ -427,7 +431,68 @@ assert.deepEqual(sessionTabDisplay({
   statusLabel: 'connected',
   statusTone: 'success',
   title: 'Local Terminal',
+  unread: false,
 });
+
+assert.deepEqual(sessionTabDisplay({
+  label: 'Build logs',
+  providerType: 'ssh',
+  status: 'connected',
+}, false, { unread: true }), {
+  active: false,
+  iconType: 'ssh',
+  statusLabel: 'connected',
+  statusTone: 'success',
+  title: 'Build logs',
+  unread: true,
+});
+
+const unreadActivity = recordSessionOutputActivity({}, {
+  activeKey: 'session-1',
+  outputAt: '2026-07-16T01:00:00.000Z',
+  sessionId: 'session-2',
+});
+assert.deepEqual(unreadActivity, {
+  'session-2': { outputAt: '2026-07-16T01:00:00.000Z', unread: true },
+});
+assert.equal(recordSessionOutputActivity(unreadActivity, {
+  activeKey: 'session-1',
+  outputAt: '2026-07-16T01:00:01.000Z',
+  sessionId: 'session-2',
+}), unreadActivity);
+assert.equal(recordSessionOutputActivity(unreadActivity, {
+  activeKey: 'session-1',
+  outputAt: '2026-07-16T01:00:01.000Z',
+  sessionId: 'session-1',
+}), unreadActivity);
+assert.deepEqual(recordSessionOutputActivity(unreadActivity, {
+  activeKey: 'session-1',
+  outputAt: '2026-07-16T01:00:01.000Z',
+  sessionId: 'session-2',
+  visibleSessionIds: ['session-2'],
+}), markSessionActivityRead(unreadActivity, 'session-2'));
+assert.deepEqual(recordSessionOutputActivity({}, {
+  activeKey: 'session-1',
+  outputAt: '2026-07-16T01:00:01.000Z',
+  sessionId: 'session-1',
+  visibleSessionIds: [],
+}), {
+  'session-1': { outputAt: '2026-07-16T01:00:01.000Z', unread: true },
+});
+const readActivity = markSessionActivityRead(unreadActivity, 'session-2');
+assert.deepEqual(readActivity, {
+  'session-2': { outputAt: '2026-07-16T01:00:00.000Z', unread: false },
+});
+assert.equal(markSessionActivityRead(readActivity, 'session-2'), readActivity);
+assert.deepEqual(pruneSessionActivity({
+  ...readActivity,
+  removed: { outputAt: '2026-07-16T01:00:02.000Z', unread: true },
+}, ['session-2']), readActivity);
+assert.equal(countUnreadSessions({
+  'session-1': { unread: false },
+  'session-2': { unread: true },
+  'session-3': { unread: true },
+}), 2);
 
 assert.deepEqual(profileActionModel({ favorite: false }), ['connect', 'edit', 'rename', 'duplicate', 'favorite', 'delete']);
 assert.deepEqual(profileActionModel({ favorite: true }), ['connect', 'edit', 'rename', 'duplicate', 'unfavorite', 'delete']);

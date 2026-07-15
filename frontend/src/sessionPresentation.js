@@ -300,14 +300,49 @@ export function buildSessionCloseConfirm(target) {
   };
 }
 
-export function sessionTabDisplay(session = {}, active = false) {
+export function sessionTabDisplay(session = {}, active = false, options = {}) {
   return {
     active,
     iconType: session.providerType || 'terminal',
     statusLabel: sessionStatusLabel(session),
     statusTone: sessionStatusTone(session),
     title: session.label || session.displayName || session.providerType || 'Terminal',
+    unread: Boolean(options.unread) && !active,
   };
+}
+
+export function recordSessionOutputActivity(activity = {}, options = {}) {
+  const sessionId = String(options.sessionId || '').trim();
+  const outputAt = String(options.outputAt || '').trim();
+  if (!sessionId || !outputAt) return activity;
+  const isVisible = Array.isArray(options.visibleSessionIds)
+    ? options.visibleSessionIds.includes(sessionId)
+    : sessionId === options.activeKey;
+  if (isVisible) return markSessionActivityRead(activity, sessionId);
+  if (activity[sessionId]?.unread) return activity;
+  return {
+    ...activity,
+    [sessionId]: { outputAt, unread: true },
+  };
+}
+
+export function markSessionActivityRead(activity = {}, sessionId = '') {
+  if (!sessionId || !activity[sessionId]?.unread) return activity;
+  return {
+    ...activity,
+    [sessionId]: { ...activity[sessionId], unread: false },
+  };
+}
+
+export function pruneSessionActivity(activity = {}, sessionIds = []) {
+  const retainedIds = new Set(sessionIds);
+  const entries = Object.entries(activity).filter(([sessionId]) => retainedIds.has(sessionId));
+  if (entries.length === Object.keys(activity).length) return activity;
+  return Object.fromEntries(entries);
+}
+
+export function countUnreadSessions(activity = {}) {
+  return Object.values(activity).filter((item) => item?.unread).length;
 }
 
 export function profileActionModel(profile = {}) {

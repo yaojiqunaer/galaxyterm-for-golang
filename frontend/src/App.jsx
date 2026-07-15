@@ -110,8 +110,12 @@ import {
   buildSessionNavigationState,
   buildSessionTabMenuModel,
   buildSessionToolbarModel,
+  countUnreadSessions,
   filterSessions,
+  markSessionActivityRead,
   profileActionModel,
+  pruneSessionActivity,
+  recordSessionOutputActivity,
   sessionTabDisplay,
   sessionStatusLabel,
   sessionStatusTone,
@@ -325,6 +329,7 @@ function App() {
   const [renamingSessionName, setRenamingSessionName] = useState('');
   const [terminalSearch, setTerminalSearch] = useState('');
   const [terminalStatuses, setTerminalStatuses] = useState({});
+  const [sessionActivity, setSessionActivity] = useState({});
   const [focusMode, setFocusMode] = useState(false);
   const [sidebarCompact, setSidebarCompact] = useState(() => (
     typeof window !== 'undefined' && window.matchMedia('(max-width: 991px)').matches
@@ -435,6 +440,12 @@ function App() {
   const previousContentPageRef = useRef(selectedNav);
   const activeSession = sessions.find((session) => session.id === activeKey);
   const activeTerminalStatus = terminalStatuses[activeKey] || {};
+  const visibleSessionIds = useMemo(() => {
+    if (selectedNav !== 'sessions') return [];
+    if (sessionView === 'grid') return sessions.map((session) => session.id);
+    return activeKey ? [activeKey] : [];
+  }, [activeKey, selectedNav, sessionView, sessions]);
+  const unreadSessionCount = useMemo(() => countUnreadSessions(sessionActivity), [sessionActivity]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -614,6 +625,17 @@ function App() {
       setTimeout(() => terminalRefs.current[activeKey]?.fit(), 0);
     }
   }, [activeKey, focusMode, selectedNav, sessionView]);
+
+  useEffect(() => {
+    setSessionActivity((current) => visibleSessionIds.reduce(
+      (next, sessionId) => markSessionActivityRead(next, sessionId),
+      current,
+    ));
+  }, [visibleSessionIds]);
+
+  useEffect(() => {
+    setSessionActivity((current) => pruneSessionActivity(current, sessions.map((session) => session.id)));
+  }, [sessions]);
 
   const providers = useMemo(() => filterProvidersByDisabledExtensions(
     allProviders,
@@ -1889,6 +1911,15 @@ function App() {
     setSessions((current) => synchronizeSessionTerminalStatus(current, sessionId, status, revision));
   };
 
+  const recordSessionActivity = (sessionId, outputAt) => {
+    setSessionActivity((current) => recordSessionOutputActivity(current, {
+      activeKey,
+      outputAt,
+      sessionId,
+      visibleSessionIds,
+    }));
+  };
+
   const interruptSession = (sessionId = activeKey) => {
     const terminal = terminalRefs.current[sessionId];
     if (!terminal?.interrupt) {
@@ -1944,6 +1975,7 @@ function App() {
             onAuditEvent={(event) => appendAuditEvent(session.id, event.type, event.detail)}
             onCommandSubmitted={(command) => recordCommandHistory(command, session)}
             onConfirmPaste={confirmTerminalPaste}
+            onOutputActivity={(outputAt) => recordSessionActivity(session.id, outputAt)}
             onSessionCreated={(backendSessionId) => {
               setSessions((current) => current.map((item) => (
                 item.id === session.id ? { ...item, backendSessionId, status: 'connected' } : item
@@ -1996,7 +2028,11 @@ function App() {
               openRenameSession(session);
             }}
           >
-            <SessionTabLabel active={session.id === activeKey} session={session} />
+            <SessionTabLabel
+              active={session.id === activeKey}
+              session={session}
+              unread={sessionActivity[session.id]?.unread}
+            />
           </span>
         </Dropdown>
       ),
@@ -2065,7 +2101,11 @@ function App() {
             >
               {sessionView === 'grid' && (
                 <div className="split-terminal-header">
-                  <SessionTabLabel active={session.id === activeKey} session={session} />
+                  <SessionTabLabel
+                    active={session.id === activeKey}
+                    session={session}
+                    unread={sessionActivity[session.id]?.unread}
+                  />
                   <Space size={2}>
                     <Tooltip title={t('action.renameSession')}>
                       <Button
@@ -4283,7 +4323,24 @@ function App() {
           onSelect={({ key }) => setSelectedNav(key)}
           items={[
             { key: 'connections', icon: <CloudServerOutlined />, label: t('nav.connections') },
-            { key: 'sessions', icon: <CodeOutlined />, label: t('nav.sessions') },
+            {
+              key: 'sessions',
+              icon: (
+                <Badge className="session-nav-badge" dot={unreadSessionCount > 0}>
+                  <CodeOutlined />
+                </Badge>
+              ),
+              label: (
+                <span className="workspace-nav-label">
+                  <span>{t('nav.sessions')}</span>
+                  {unreadSessionCount > 0 && (
+                    <span aria-label={t('session.activity.unreadCount', { count: unreadSessionCount })} className="workspace-nav-count">
+                      {unreadSessionCount}
+                    </span>
+                  )}
+                </span>
+              ),
+            },
             { key: 'files', icon: <FolderOpenOutlined />, label: t('nav.files') },
             { key: 'tunnels', icon: <ApiOutlined />, label: t('nav.tunnels') },
             { key: 'audit', icon: <AuditOutlined />, label: t('nav.audit') },
@@ -4373,7 +4430,10 @@ function App() {
                           setActiveKey(session.id);
                         }}
                       >
-                        <SessionSidebarLabel session={session} />
+                        <SessionSidebarLabel
+                          session={session}
+                          unread={sessionActivity[session.id]?.unread}
+                        />
                         {shortcutNumber && <Text code>{shortcutNumber}</Text>}
                       </List.Item>
                     );
@@ -5330,13 +5390,21 @@ function ConnectionProfilePreview({
   );
 }
 
-function SessionTabLabel({ active = false, session }) {
-  const display = sessionTabDisplay(session, active);
+function SessionTabLabel({ active = false, session, unread = false }) {
+  const display = sessionTabDisplay(session, active, { unread });
   return (
-    <span className={`tab-label session-tab-label tone-${display.statusTone}${display.active ? ' active' : ''}`}>
+    <span className={`tab-label session-tab-label tone-${display.statusTone}${display.active ? ' active' : ''}${display.unread ? ' unread' : ''}`}>
       <span className="session-status-dot" />
       {providerIcons[display.iconType] || <CodeOutlined />}
       <span className="session-tab-title">{display.title}</span>
+      {display.unread && (
+        <span
+          aria-label={t('session.activity.unread')}
+          className="session-activity-dot"
+          role="status"
+          title={t('session.activity.unread')}
+        />
+      )}
     </span>
   );
 }
@@ -5348,7 +5416,7 @@ function sessionTabActionIcon(action) {
   return <DeleteOutlined />;
 }
 
-function SessionSidebarLabel({ session }) {
+function SessionSidebarLabel({ session, unread = false }) {
   const tone = sessionStatusTone(session);
   return (
     <span className={`session-sidebar-label tone-${tone}`}>
@@ -5357,6 +5425,14 @@ function SessionSidebarLabel({ session }) {
         <span>{session.label}</span>
         <small>{t(`session.status.${sessionStatusLabel(session)}`)}</small>
       </span>
+      {unread && (
+        <span
+          aria-label={t('session.activity.unread')}
+          className="session-activity-dot"
+          role="status"
+          title={t('session.activity.unread')}
+        />
+      )}
     </span>
   );
 }

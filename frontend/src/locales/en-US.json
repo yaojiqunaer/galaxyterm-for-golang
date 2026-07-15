@@ -169,6 +169,8 @@
   "session.status.connecting": "Connecting",
   "session.status.error": "Error",
   "session.status.closed": "Closed",
+  "session.activity.unread": "New terminal output",
+  "session.activity.unreadCount": "{count} sessions have new output",
   "session.audit.noSession.title": "No active session",
   "session.audit.noSession.description": "Open a terminal to start capturing session events and terminal output for audit replay.",
   "session.audit.recording.title": "Session recording",
