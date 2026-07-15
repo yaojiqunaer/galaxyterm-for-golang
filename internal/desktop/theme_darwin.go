@@ -33,7 +33,11 @@ static void GalaxyTermSetWindowTheme(const char *theme) {
         if (mode == 1) {
             [window setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameAqua]];
         } else if (mode == 2) {
-            [window setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]];
+            if (@available(macOS 10.14, *)) {
+                [window setAppearance:[NSAppearance appearanceNamed:NSAppearanceNameDarkAqua]];
+            } else {
+                [window setAppearance:nil];
+            }
         } else {
             [window setAppearance:nil];
         }
