@@ -6,6 +6,9 @@ import {
   buildExtensionCardFacts,
   buildExtensionSummary,
   buildInstalledExtensionRows,
+  compareExtensionVersions,
+  findCatalogItemForType,
+  findExtensionUpdate,
   filterProvidersByDisabledExtensions,
   fileProviderSupports,
 } from './extensionPresentation.js';
@@ -119,9 +122,14 @@ assert.equal(fileProviderSupports({ capabilities: ['list'] }, 'delete'), false);
 assert.equal(fileProviderSupports(null, 'list'), false);
 
 assert.deepEqual(buildExtensionAction({ status: 'planned' }), {
-  key: 'install',
-  enabled: true,
-  tone: 'primary',
+	key: 'addSource',
+	enabled: true,
+	tone: 'default',
+});
+assert.deepEqual(buildExtensionAction({ status: 'planned' }, { manifest: { id: 'redis' } }), {
+	key: 'installOnline',
+	enabled: true,
+	tone: 'primary',
 });
 assert.deepEqual(buildExtensionAction({ status: 'installed' }), {
   key: 'manage',
@@ -177,3 +185,35 @@ assert.deepEqual(buildInstalledExtensionRows(installedExtensions, ['galaxyterm-e
 assert.deepEqual(filterProvidersByDisabledExtensions(providers, installedExtensions, [
   'galaxyterm-extension-mysql',
 ]).map((provider) => provider.type), ['local', 'ssh']);
+
+const remoteCatalog = [
+  {
+    manifest: {
+      id: 'galaxyterm-extension-sftp',
+      version: '0.1.0',
+      fileProviders: [{ type: 'sftp' }],
+    },
+  },
+  {
+    manifest: {
+      id: 'galaxyterm-extension-sftp',
+      version: '0.3.0',
+      fileProviders: [{ type: 'sftp' }],
+    },
+  },
+  {
+    manifest: {
+      id: 'galaxyterm-extension-redis',
+      version: '1.0.0-beta.1',
+      providers: [{ type: 'redis' }],
+    },
+  },
+];
+assert.equal(findCatalogItemForType(remoteCatalog, 'sftp')?.manifest.version, '0.3.0');
+assert.equal(findCatalogItemForType(remoteCatalog, 'redis')?.manifest.id, 'galaxyterm-extension-redis');
+assert.equal(findCatalogItemForType(remoteCatalog, 'mysql'), null);
+assert.equal(compareExtensionVersions('0.3.0', '0.2.9'), 1);
+assert.equal(compareExtensionVersions('1.0.0-beta.1', '1.0.0'), -1);
+assert.equal(compareExtensionVersions('1.0.0', '1.0.0'), 0);
+assert.equal(findExtensionUpdate({ id: 'galaxyterm-extension-sftp', version: '0.2.0' }, remoteCatalog)?.manifest.version, '0.3.0');
+assert.equal(findExtensionUpdate({ id: 'galaxyterm-extension-sftp', version: '0.3.0' }, remoteCatalog), null);

@@ -18,6 +18,14 @@ export function InstallOffline(arg1) {
   return callWails(['extensions', 'API', 'InstallOffline'], arg1);
 }
 
+export function FetchCatalog(arg1) {
+  return callWails(['extensions', 'API', 'FetchCatalog'], arg1);
+}
+
+export function InstallOnline(arg1) {
+  return callWails(['extensions', 'API', 'InstallOnline'], arg1);
+}
+
 export function Uninstall(arg1) {
   return callWails(['extensions', 'API', 'Uninstall'], arg1);
 }

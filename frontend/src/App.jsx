@@ -184,13 +184,17 @@ import {
   buildExtensionCardFacts,
   buildExtensionSummary,
   buildInstalledExtensionRows,
+  findCatalogItemForType,
+  findExtensionUpdate,
   filterProvidersByDisabledExtensions,
   fileProviderSupports,
 } from './extensionPresentation.js';
 import {
   defaultExtensionSources,
   normalizeExtensionSource,
+  removeExtensionCatalogSource,
   removeExtensionSource,
+  replaceExtensionCatalogSource,
   upsertExtensionSource,
 } from './extensionSources.js';
 import {
@@ -300,6 +304,8 @@ function App() {
   const [terminalThemes, setTerminalThemes] = useState(['auto']);
   const [installedExtensions, setInstalledExtensions] = useState([]);
   const [extensionSources, setExtensionSources] = useState(() => loadExtensionSources());
+  const [remoteExtensionCatalog, setRemoteExtensionCatalog] = useState([]);
+  const [extensionSourceStates, setExtensionSourceStates] = useState({});
   const [tunnels, setTunnels] = useState([]);
   const [activeKey, setActiveKey] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -357,6 +363,8 @@ function App() {
   const [testingConnection, setTestingConnection] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
   const [extensionBusy, setExtensionBusy] = useState(false);
+  const [extensionRefreshingAll, setExtensionRefreshingAll] = useState(false);
+  const [extensionInstallingId, setExtensionInstallingId] = useState('');
   const [tunnelBusy, setTunnelBusy] = useState(false);
   const [fileAuthType, setFileAuthType] = useState('password');
   const [tunnelAuthType, setTunnelAuthType] = useState('password');
@@ -713,11 +721,24 @@ function App() {
     sessions,
     tunnels,
   }), [auditRecords, installedExtensions, profiles, providers, recentConnections, sessions, tunnels]);
-  const extensionCatalog = useMemo(() => buildExtensionCatalog({
-    installedExtensions,
-    officialExtensions,
-    providers,
-  }), [installedExtensions, providers]);
+  const extensionCatalog = useMemo(() => {
+    const discoveredExtensions = remoteExtensionCatalog.flatMap((item) => [
+      ...(item.manifest?.providers || []),
+      ...(item.manifest?.fileProviders || []),
+    ].map((provider) => ({
+      type: provider.type,
+      name: item.manifest?.name || provider.type,
+    })));
+    const knownTypes = new Set(officialExtensions.map((extension) => extension.type));
+    return buildExtensionCatalog({
+      installedExtensions,
+      officialExtensions: [
+        ...officialExtensions,
+        ...discoveredExtensions.filter((extension) => extension.type && !knownTypes.has(extension.type)),
+      ],
+      providers,
+    });
+  }, [installedExtensions, providers, remoteExtensionCatalog]);
   const extensionSummary = useMemo(() => (
     buildExtensionSummary({
       disabledExtensionIds: settings.disabledExtensionIds,
@@ -726,8 +747,11 @@ function App() {
     })
   ), [installedExtensions, providers, settings.disabledExtensionIds]);
   const installedExtensionRows = useMemo(() => (
-    buildInstalledExtensionRows(installedExtensions, settings.disabledExtensionIds)
-  ), [installedExtensions, settings.disabledExtensionIds]);
+    buildInstalledExtensionRows(installedExtensions, settings.disabledExtensionIds).map((extension) => ({
+      ...extension,
+      updateItem: findExtensionUpdate(extension, remoteExtensionCatalog),
+    }))
+  ), [installedExtensions, remoteExtensionCatalog, settings.disabledExtensionIds]);
   const fileProviders = useMemo(() => (
     buildEnabledFileProviders(installedExtensions, settings.disabledExtensionIds)
   ), [installedExtensions, settings.disabledExtensionIds]);
@@ -2438,7 +2462,22 @@ function App() {
           <Title level={3}>{t('section.extensionManager')}</Title>
         </div>
         <Space>
-          <Button icon={<FolderOpenOutlined />} onClick={() => setExtensionInstallOpen(true)} loading={extensionBusy}>{t('action.installOffline')}</Button>
+          <Button
+            icon={<ReloadOutlined />}
+            disabled={extensionSources.length === 0}
+            loading={extensionRefreshingAll}
+            onClick={refreshAllExtensionSources}
+          >
+            {t('action.refreshSources')}
+          </Button>
+          <Button
+            icon={<FolderOpenOutlined />}
+            disabled={Boolean(extensionInstallingId)}
+            onClick={() => setExtensionInstallOpen(true)}
+            loading={extensionBusy}
+          >
+            {t('action.installOffline')}
+          </Button>
           <Button icon={<PlusOutlined />} onClick={() => setExtensionSourceOpen(true)}>{t('action.addSource')}</Button>
         </Space>
       </div>
@@ -2453,7 +2492,7 @@ function App() {
           <Text strong>{t('extension.coreTitle')}</Text>
           <Text type="secondary">{t('settings.coreOnly')}</Text>
         </div>
-        <Button icon={<FolderOpenOutlined />} onClick={() => setExtensionInstallOpen(true)}>{t('action.installOffline')}</Button>
+        <Button icon={<FolderOpenOutlined />} disabled={Boolean(extensionInstallingId)} onClick={() => setExtensionInstallOpen(true)}>{t('action.installOffline')}</Button>
       </div>
       <section className="extension-section">
         <div className="extension-section-head">
@@ -2473,24 +2512,58 @@ function App() {
               </Empty>
             ),
           }}
-          renderItem={(source) => (
-            <List.Item
-              actions={[
-                <Button key="delete" size="small" danger onClick={() => deleteExtensionSource(source.id)}>{t('action.delete')}</Button>,
-              ]}
-            >
-              <List.Item.Meta
-                avatar={<span className="provider-icon"><GlobalOutlined /></span>}
-                title={(
-                  <span className="installed-extension-title">
-                    <strong>{source.name}</strong>
-                    <span className="connection-profile-badge tone-info">{source.type}</span>
-                  </span>
-                )}
-                description={<span className="installed-extension-description"><span>{source.url}</span></span>}
-              />
-            </List.Item>
-          )}
+          renderItem={(source) => {
+            const sourceState = extensionSourceStates[source.id] || { status: 'idle', count: 0 };
+            return (
+              <List.Item
+                actions={[
+                  <Tooltip key="refresh" title={t('action.refresh')}>
+                    <Button
+                      size="small"
+                      icon={<ReloadOutlined />}
+                      disabled={extensionRefreshingAll}
+                      loading={sourceState.status === 'loading'}
+                      onClick={() => refreshExtensionSource(source)}
+                      aria-label={t('action.refresh')}
+                    />
+                  </Tooltip>,
+                  <Tooltip key="delete" title={t('action.delete')}>
+                    <Button
+                      size="small"
+                      danger
+                      icon={<DeleteOutlined />}
+                      disabled={extensionRefreshingAll || sourceState.status === 'loading'}
+                      onClick={() => deleteExtensionSource(source.id)}
+                      aria-label={t('action.delete')}
+                    />
+                  </Tooltip>,
+                ]}
+              >
+                <List.Item.Meta
+                  avatar={<span className="provider-icon"><GlobalOutlined /></span>}
+                  title={(
+                    <span className="installed-extension-title">
+                      <strong>{source.name}</strong>
+                      <Tag color={extensionSourceStatusColor(sourceState.status)}>
+                        {t(`extension.sourceState.${sourceState.status}`)}
+                      </Tag>
+                    </span>
+                  )}
+                  description={(
+                    <span className="installed-extension-description extension-source-description">
+                      <span>{source.url}</span>
+                      <small>
+                        {sourceState.status === 'ready'
+                          ? t('extension.sourceResult', { count: sourceState.count })
+                          : t('extension.sourceReadyHint')}
+                        {sourceState.refreshedAt && ` · ${formatProfileLastUsed(sourceState.refreshedAt)}`}
+                      </small>
+                    </span>
+                  )}
+                />
+              </List.Item>
+            );
+          }}
         />
       </section>
       <section className="extension-section">
@@ -2514,8 +2587,21 @@ function App() {
                   unCheckedChildren={t('label.disabled')}
                   onChange={(checked) => toggleExtensionEnabled(extension.id, checked)}
                 />,
-                <Button key="uninstall" size="small" danger loading={extensionBusy} onClick={() => uninstallExtension(extension.id)}>{t('action.uninstall')}</Button>,
-              ]}
+                extension.updateItem && (
+                  <Button
+                    key="update"
+                    size="small"
+                    type="primary"
+                    icon={<ReloadOutlined />}
+                    disabled={Boolean(extensionInstallingId)}
+                    loading={extensionInstallingId === extension.id}
+                    onClick={() => installOnlineExtension(extension.updateItem)}
+                  >
+                    {`${t('action.update')} ${extension.updateItem.manifest.version}`}
+                  </Button>
+                ),
+                <Button key="uninstall" size="small" danger disabled={Boolean(extensionInstallingId)} loading={extensionBusy} onClick={() => uninstallExtension(extension.id)}>{t('action.uninstall')}</Button>,
+              ].filter(Boolean)}
             >
               <List.Item.Meta
                 avatar={<span className="provider-icon"><AppstoreAddOutlined /></span>}
@@ -2556,7 +2642,8 @@ function App() {
         </div>
       <div className="extension-grid">
         {extensionCatalog.map((extension) => {
-          const action = buildExtensionAction(extension);
+          const catalogItem = findCatalogItemForType(remoteExtensionCatalog, extension.type);
+          const action = buildExtensionAction(extension, catalogItem);
           const facts = buildExtensionCardFacts(extension);
           const CardTag = action.enabled ? 'button' : 'div';
           return (
@@ -2564,7 +2651,15 @@ function App() {
               className={`extension-card extension-card-${extension.status}`}
               key={`${extension.type}-${extension.status}`}
               type={action.enabled ? 'button' : undefined}
-              onClick={() => action.enabled && setExtensionInstallOpen(true)}
+              disabled={action.enabled && Boolean(extensionInstallingId)}
+              onClick={() => {
+                if (!action.enabled) return;
+                if (catalogItem) {
+                  installOnlineExtension(catalogItem);
+                } else {
+                  setExtensionSourceOpen(true);
+                }
+              }}
             >
               <span className="provider-icon">{providerIcons[extension.type] || <CodeOutlined />}</span>
               <span className="extension-card-body">
@@ -2580,7 +2675,9 @@ function App() {
                   {t(`extension.status.${extension.status}`)}
                 </Tag>
                 <span className={`extension-action tone-${action.tone}`}>
-                  {t(`extension.action.${action.key}`)}
+                  {extensionInstallingId === catalogItem?.manifest?.id
+                    ? t('extension.action.installing')
+                    : t(`extension.action.${action.key}`)}
                 </span>
               </span>
             </CardTag>
@@ -2591,14 +2688,76 @@ function App() {
     </div>
   );
 
-  const saveExtensionSource = () => {
+  const refreshExtensionSource = async (source, { announce = true } = {}) => {
+    setExtensionSourceStates((current) => ({
+      ...current,
+      [source.id]: { ...current[source.id], status: 'loading' },
+    }));
+    try {
+      const items = await ExtensionsAPI.FetchCatalog(source.url);
+      const catalogItems = Array.isArray(items) ? items : [];
+      setRemoteExtensionCatalog((current) => replaceExtensionCatalogSource(current, source, catalogItems));
+      setExtensionSourceStates((current) => ({
+        ...current,
+        [source.id]: {
+          count: catalogItems.length,
+          refreshedAt: new Date().toISOString(),
+          status: 'ready',
+        },
+      }));
+      if (announce) {
+        messageApi.success(t('message.extensionSourceRefreshed', { count: catalogItems.length }));
+      }
+      return catalogItems;
+    } catch (error) {
+      setExtensionSourceStates((current) => ({
+        ...current,
+        [source.id]: { ...current[source.id], status: 'error' },
+      }));
+      showOperationError('message.extensionSourceRefreshFailed', error, {
+        retry: () => refreshExtensionSource(source),
+        scope: 'extension',
+      });
+      return null;
+    }
+  };
+
+  const refreshAllExtensionSources = async () => {
+    if (extensionSources.length === 0) return;
+    setExtensionRefreshingAll(true);
+    let available = 0;
+    let failed = 0;
+    try {
+      for (const source of extensionSources) {
+        const items = await refreshExtensionSource(source, { announce: false });
+        available += items?.length || 0;
+        if (items === null) failed += 1;
+      }
+      if (failed > 0) {
+        messageApi.warning(t('message.extensionSourcesRefreshPartial', {
+          count: available,
+          failed,
+        }));
+      } else {
+        messageApi.success(t('message.extensionSourcesRefreshed', { count: available }));
+      }
+    } finally {
+      setExtensionRefreshingAll(false);
+    }
+  };
+
+  const saveExtensionSource = async () => {
     const source = normalizeExtensionSource({
       name: extensionSourceName,
       url: extensionSourceUrl,
       type: 'github',
     });
     if (!source) {
-      messageApi.warning(t('validation.required'));
+      messageApi.warning(t(
+        extensionSourceName.trim() && extensionSourceUrl.trim()
+          ? 'validation.extensionSourceHttps'
+          : 'validation.required',
+      ));
       return;
     }
     const nextSources = upsertExtensionSource(extensionSources, source);
@@ -2608,12 +2767,19 @@ function App() {
     setExtensionSourceUrl('');
     setExtensionSourceOpen(false);
     messageApi.success(t('message.extensionSourceSaved'));
+    await refreshExtensionSource(source, { announce: false });
   };
 
   const deleteExtensionSource = (sourceId) => {
     const nextSources = removeExtensionSource(extensionSources, sourceId);
     persistExtensionSources(nextSources);
     setExtensionSources(nextSources);
+    setRemoteExtensionCatalog((current) => removeExtensionCatalogSource(current, sourceId));
+    setExtensionSourceStates((current) => {
+      const next = { ...current };
+      delete next[sourceId];
+      return next;
+    });
     messageApi.success(t('message.extensionSourceDeleted'));
   };
 
@@ -2654,6 +2820,35 @@ function App() {
       });
     } finally {
       setExtensionBusy(false);
+    }
+  };
+
+  const installOnlineExtension = async (catalogItem) => {
+    const manifest = catalogItem?.manifest || {};
+    const asset = catalogItem?.asset || {};
+    if (!manifest.id || !asset.url || !asset.sha256) {
+      messageApi.warning(t('message.extensionCatalogUnavailable'));
+      return;
+    }
+    setExtensionInstallingId(manifest.id);
+    try {
+      await ExtensionsAPI.InstallOnline({
+        extensionId: manifest.id,
+        manifest,
+        version: manifest.version,
+        url: asset.url,
+        sha256: asset.sha256,
+      });
+      const items = await ExtensionsAPI.ListInstalled();
+      setInstalledExtensions(Array.isArray(items) ? items : []);
+      messageApi.success(t('message.extensionInstalled'));
+    } catch (error) {
+      showOperationError('message.extensionInstallFailed', error, {
+        retry: () => installOnlineExtension(catalogItem),
+        scope: 'extension',
+      });
+    } finally {
+      setExtensionInstallingId('');
     }
   };
 
@@ -4770,7 +4965,7 @@ function App() {
         open={extensionInstallOpen}
         destroyOnHidden
         onClose={() => setExtensionInstallOpen(false)}
-        extra={<Button type="primary" onClick={installOfflineExtension}>{t('action.installOffline')}</Button>}
+        extra={<Button type="primary" loading={extensionBusy} disabled={Boolean(extensionInstallingId)} onClick={installOfflineExtension}>{t('action.installOffline')}</Button>}
       >
         <Alert type="info" showIcon message={t('settings.extensionPackageHint')} />
         <Form layout="vertical" className="terminal-form">
@@ -5812,6 +6007,13 @@ function formatProfileLastUsed(value = '') {
 function extensionStatusColor(status) {
   if (status === 'builtin') return 'green';
   if (status === 'installed') return 'blue';
+  return 'default';
+}
+
+function extensionSourceStatusColor(status) {
+  if (status === 'ready') return 'green';
+  if (status === 'error') return 'red';
+  if (status === 'loading') return 'blue';
   return 'default';
 }
 

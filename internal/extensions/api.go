@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,6 +29,7 @@ type FileProviderRuntime struct {
 type API struct {
 	installed []Manifest
 	storePath string
+	client    *http.Client
 }
 
 func NewAPI() *API {
@@ -35,7 +37,11 @@ func NewAPI() *API {
 }
 
 func NewAPIWithStore(storePath string) *API {
-	api := &API{installed: []Manifest{}, storePath: storePath}
+	return NewAPIWithStoreAndClient(storePath, nil)
+}
+
+func NewAPIWithStoreAndClient(storePath string, client *http.Client) *API {
+	api := &API{installed: []Manifest{}, storePath: storePath, client: secureHTTPClient(client)}
 	_ = api.load()
 	return api
 }

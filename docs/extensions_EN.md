@@ -1,0 +1,89 @@
+# GalaxyTerm Extension Distribution
+
+English | [简体中文](extensions.md)
+
+The GalaxyTerm core includes local terminals and SSH. SFTP, FTP/FTPS, S3, Kubernetes, Docker, databases, and other terminal or file protocols are distributed as `.gtx` extensions.
+
+## Online Installation
+
+Add one of these HTTPS locations on the Extensions page:
+
+- GitHub repository: `https://github.com/<owner>/<repo>`
+- GitHub Releases: `https://github.com/<owner>/<repo>/releases`
+- Direct index: `https://example.com/galaxyterm-index.json`
+
+GitHub repository and Releases URLs resolve to:
+
+```text
+https://github.com/<owner>/<repo>/releases/latest/download/galaxyterm-index.json
+```
+
+After refreshing a source, GalaxyTerm only shows extensions compatible with the current operating system and CPU architecture. Online installation and updates enforce download size limits, verify the index SHA-256, read the package `manifest.json`, and then run the same manifest, path, and package integrity checks used by offline installation.
+
+## Release Index
+
+Upload `.gtx` packages and an index named `galaxyterm-index.json` to each Release. Relative URLs resolve against the index location, so the index and packages can be assets of the same GitHub Release:
+
+```json
+{
+  "apiVersion": "v1",
+  "extensions": [
+    {
+      "manifest": {
+        "id": "galaxyterm-extension-sftp",
+        "name": "SFTP",
+        "version": "0.1.0",
+        "apiVersion": "v1",
+        "description": "SFTP file provider for GalaxyTerm",
+        "runtime": {
+          "protocol": "stdio-json-v1",
+          "entrypoint": "bin/galaxyterm-extension-sftp"
+        },
+        "fileProviders": [
+          {
+            "type": "sftp",
+            "protocol": "sftp",
+            "capabilities": ["list", "stat", "read", "write", "mkdir", "rename", "delete"],
+            "authMethods": ["password", "privateKey"]
+          }
+        ],
+        "locales": ["zh-CN", "en-US"]
+      },
+      "assets": [
+        {
+          "os": "darwin",
+          "arch": "arm64",
+          "url": "galaxyterm-extension-sftp_0.1.0_darwin_arm64.gtx",
+          "sha256": "<64-character hexadecimal SHA-256>"
+        },
+        {
+          "os": "linux",
+          "arch": "amd64",
+          "url": "galaxyterm-extension-sftp_0.1.0_linux_amd64.gtx",
+          "sha256": "<64-character hexadecimal SHA-256>"
+        }
+      ]
+    }
+  ]
+}
+```
+
+`manifest` must match the `manifest.json` inside each corresponding `.gtx` package. Every current-platform asset requires an HTTPS or relative `.gtx` URL and the SHA-256 of the complete file. Use `all` for platform-independent `os` or `arch` values; exact platform assets take precedence over generic assets.
+
+Generate checksums with:
+
+```shell
+shasum -a 256 dist/extensions/*.gtx
+```
+
+## Offline Installation
+
+Download a `.gtx` package on a connected machine, transfer it to the target device, then choose Offline Install on the Extensions page and enter its absolute local path. Offline installation does not access extension sources and still verifies the manifest, checksum file, file count, extracted size, and archive paths.
+
+Build the official SFTP extension with:
+
+```shell
+./scripts/package-extension.sh sftp
+```
+
+Packages are written to `dist/extensions/`.

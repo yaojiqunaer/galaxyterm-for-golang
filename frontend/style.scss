@@ -2546,8 +2546,17 @@ code {
 
 .extension-summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
+}
+
+.extensions-page .page-header {
+  flex-wrap: wrap;
+}
+
+.extensions-page .page-header > .ant-space {
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .extension-core-banner,
@@ -2618,6 +2627,13 @@ code {
   color: var(--muted);
 }
 
+.extension-source-description small {
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .extension-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
@@ -2644,6 +2660,11 @@ code {
   border-color: var(--accent);
   background: var(--panel-muted);
   transform: translateY(-1px);
+}
+
+.extension-card:disabled {
+  cursor: wait;
+  opacity: 0.72;
 }
 
 .extension-card-installed,
