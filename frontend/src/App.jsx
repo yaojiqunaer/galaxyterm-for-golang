@@ -1,4 +1,4 @@
-import React, { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import React, { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Badge,
@@ -365,6 +365,9 @@ function App() {
   const terminalRefs = useRef({});
   const terminalSearchRef = useRef(null);
   const profileImportRef = useRef(null);
+  const contentPageRef = useRef(null);
+  const contentPageScrollPositionsRef = useRef(new Map());
+  const previousContentPageRef = useRef(selectedNav);
   const activeSession = sessions.find((session) => session.id === activeKey);
   const activeTerminalStatus = terminalStatuses[activeKey] || {};
 
@@ -426,6 +429,19 @@ function App() {
     if (!commandsOpen) return;
     commandForm.setFieldValue('providerType', activeSession?.providerType || 'all');
   }, [activeSession?.providerType, commandForm, commandsOpen]);
+
+  useLayoutEffect(() => {
+    const layer = contentPageRef.current;
+    const previousPage = previousContentPageRef.current;
+    if (!layer || previousPage === selectedNav) return;
+    if (previousPage !== 'sessions') {
+      contentPageScrollPositionsRef.current.set(previousPage, layer.scrollTop);
+    }
+    layer.scrollTop = selectedNav === 'sessions'
+      ? 0
+      : contentPageScrollPositionsRef.current.get(selectedNav) || 0;
+    previousContentPageRef.current = selectedNav;
+  }, [selectedNav]);
 
   useEffect(() => {
     const handleKeydown = (event) => {
@@ -4029,7 +4045,7 @@ function App() {
             </Dropdown>
           </Space>
           <Space className="topbar-actions">
-            {activeKey && (
+            {activeKey && selectedNav === 'sessions' && (
               <>
                 <Input.Search
                   className="terminal-search"
@@ -4080,7 +4096,10 @@ function App() {
               message={t('message.desktopBridgeUnavailable')}
             />
           )}
-          <div className={selectedNav === 'sessions' ? 'content-page-layer hidden' : 'content-page-layer'}>
+          <div
+            className={selectedNav === 'sessions' ? 'content-page-layer hidden' : 'content-page-layer'}
+            ref={contentPageRef}
+          >
             {renderContent()}
           </div>
           <div className={selectedNav === 'sessions' ? 'session-page-layer active' : 'session-page-layer'}>
@@ -4191,14 +4210,13 @@ function App() {
                   >
                     {t('action.save')}
                   </Button>
-                  <Tooltip title={t('action.saveAndOpen')}>
-                    <Button
-                      aria-label={t('action.saveAndOpen')}
-                      disabled={creatingSession}
-                      icon={<ThunderboltOutlined />}
-                      onClick={() => createSession('saveAndOpen')}
-                    />
-                  </Tooltip>
+                  <Button
+                    disabled={creatingSession}
+                    icon={<ThunderboltOutlined />}
+                    onClick={() => createSession('saveAndOpen')}
+                  >
+                    {t('action.saveAndOpen')}
+                  </Button>
                 </>
               )}
             </Space>

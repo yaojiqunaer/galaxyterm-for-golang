@@ -33,6 +33,14 @@ assert.ok(
   /\.content-page-layer,\s*\.session-page-layer\s*\{[\s\S]*?grid-column:\s*1;[\s\S]*?grid-row:\s*2;/.test(styles),
   'content and session layers must share the remaining content grid row',
 );
+assert.ok(
+  source.includes('const contentPageRef = useRef(null);')
+    && source.includes('const contentPageScrollPositionsRef = useRef(new Map());')
+    && source.includes('const previousContentPageRef = useRef(selectedNav);')
+    && source.includes('ref={contentPageRef}')
+    && /useLayoutEffect\(\(\) => \{[\s\S]*?contentPageScrollPositionsRef[\s\S]*?layer\.scrollTop[\s\S]*?\}, \[selectedNav\]\);/.test(source),
+  'workspace pages must restore independent scroll positions instead of inheriting the previous page offset',
+);
 assert.equal(
   source.match(/\{renderTerminalPane\(session\)\}/g)?.length,
   1,
@@ -117,6 +125,10 @@ assert.ok(
 assert.ok(
   /\{terminalSearch\.trim\(\)\s*&&\s*\([\s\S]*?action\.findPrevious[\s\S]*?action\.findNext[\s\S]*?\)\}/.test(source),
   'terminal result navigation must only appear while a search query is active',
+);
+assert.ok(
+  /\{activeKey\s*&&\s*selectedNav\s*===\s*'sessions'\s*&&\s*\([\s\S]*?className="terminal-search"/.test(source),
+  'terminal output search must stay inside the visible session workspace instead of acting on a hidden terminal',
 );
 assert.ok(
   source.includes('const [messageApi, messageContextHolder] = message.useMessage();')
@@ -267,6 +279,10 @@ assert.ok(
     && source.includes('className="terminal-drawer-footer"')
     && /\.terminal-drawer-footer\s*\{[\s\S]*?justify-content:\s*space-between;/.test(styles),
   'terminal form actions must use a stable footer instead of crowding the drawer title',
+);
+assert.ok(
+  /createSession\('saveAndOpen'\)[\s\S]*?\{t\('action\.saveAndOpen'\)\}/.test(source),
+  'save-and-open must use a visible command label instead of an ambiguous icon-only action',
 );
 assert.ok(
   source.includes("if (resolvedIntent !== 'session') setSelectedProfileId('');"),
