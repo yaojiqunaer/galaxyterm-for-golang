@@ -8,6 +8,7 @@ import {
   buildSessionStatusFacts,
   buildSessionTabMenuModel,
   buildSessionToolbarModel,
+  buildSessionToolbarContext,
   countUnreadSessions,
   filterSessions,
   markSessionActivityRead,
@@ -182,6 +183,31 @@ assert.deepEqual(buildSessionToolbarModel({
     { key: 'closeCurrent', labelKey: 'action.closeSession', disabled: false, danger: true },
   ],
 });
+
+assert.deepEqual(buildSessionToolbarContext({
+  providerType: 'ssh',
+  request: {
+    config: { host: 'prod.example.com', port: 2222 },
+    auth: { username: 'root' },
+  },
+}, { providerName: 'SSH' }), {
+  iconType: 'ssh',
+  identity: 'root@prod.example.com:2222',
+  provider: 'SSH',
+  target: 'prod.example.com:2222',
+  user: 'root',
+});
+assert.deepEqual(buildSessionToolbarContext({
+  providerType: 'local',
+  config: { workingDirectory: '/Users/me/project' },
+}, { providerName: 'Local' }), {
+  iconType: 'local',
+  identity: '/Users/me/project',
+  provider: 'Local',
+  target: '/Users/me/project',
+  user: '',
+});
+assert.equal(buildSessionToolbarContext(null), null);
 
 assert.deepEqual(buildSessionToolbarModel({
   activeKey: 'running',

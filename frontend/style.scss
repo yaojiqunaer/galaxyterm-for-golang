@@ -743,6 +743,46 @@ select {
   align-items: center;
 }
 
+.session-tab-extra,
+.session-toolbar-context {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.session-tab-extra {
+  gap: 6px;
+}
+
+.session-toolbar-context {
+  gap: 5px;
+  max-width: min(28vw, 280px);
+  height: 28px;
+  padding: 0 7px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.session-toolbar-context-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+
+.session-toolbar-context-provider {
+  flex: 0 0 auto;
+}
+
+.session-toolbar-context strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--terminal-text);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .session-toolbar-actions {
   flex: 0 0 auto;
   gap: 4px;
@@ -1234,6 +1274,10 @@ select {
 }
 
 @media (max-width: 860px) {
+  .session-toolbar-context {
+    display: none;
+  }
+
   .terminal-status-bar {
     overflow: hidden;
   }

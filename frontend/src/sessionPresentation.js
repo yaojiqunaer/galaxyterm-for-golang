@@ -150,6 +150,22 @@ export function buildSessionToolbarModel(options = {}) {
   };
 }
 
+export function buildSessionToolbarContext(session, options = {}) {
+  if (!session) return null;
+  const config = session.config || session.request?.config || {};
+  const auth = session.auth || session.request?.auth || {};
+  const provider = options.providerName || session.providerType || session.request?.providerType || 'Terminal';
+  const target = resolveSessionTarget(config);
+  const user = config.username || auth.username || '';
+  return {
+    iconType: session.providerType || session.request?.providerType || 'terminal',
+    identity: user && target ? `${user}@${target}` : target || user,
+    provider,
+    target,
+    user,
+  };
+}
+
 export function buildSessionTabMenuModel(options = {}) {
   const canCloseOthers = (Number(options.sessionCount) || 0) > 1;
   return [

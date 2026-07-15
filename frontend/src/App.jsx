@@ -109,6 +109,7 @@ import {
   buildSessionContextFacts,
   buildSessionNavigationState,
   buildSessionTabMenuModel,
+  buildSessionToolbarContext,
   buildSessionToolbarModel,
   countUnreadSessions,
   filterSessions,
@@ -2064,6 +2065,11 @@ function App() {
       terminalStatus: activeTerminalStatus,
       view: sessionView,
     });
+    const sessionToolbarContext = buildSessionToolbarContext(activeSession, {
+      providerName: activeSession
+        ? providerTypeLabel(activeSession.providerType, providers)
+        : '',
+    });
     const runSessionToolbarAction = (action) => {
       if (action === 'grid') setSessionView('grid');
       if (action === 'tabs') setSessionView('tabs');
@@ -2075,7 +2081,10 @@ function App() {
       if (action === 'closeCurrent') confirmRemoveSession(activeKey);
     };
     const sessionToolbarActions = (
-      <SessionToolbarActions model={sessionToolbarModel} onAction={runSessionToolbarAction} />
+      <div className="session-tab-extra">
+        {sessionToolbarContext && <SessionToolbarContext model={sessionToolbarContext} />}
+        <SessionToolbarActions model={sessionToolbarModel} onAction={runSessionToolbarAction} />
+      </div>
     );
     return (
       <div className={`session-tabs-page view-${sessionView}`}>
@@ -5490,6 +5499,22 @@ function SessionToolbarActions({ model, onAction }) {
           </Dropdown>
         </span>
       </Tooltip>
+    </div>
+  );
+}
+
+function SessionToolbarContext({ model }) {
+  return (
+    <div
+      aria-label={t('session.context.summary', model)}
+      className="session-toolbar-context"
+      title={t('session.context.summary', model)}
+    >
+      <span className="session-toolbar-context-icon">
+        {providerIcons[model.iconType] || <CodeOutlined />}
+      </span>
+      <span className="session-toolbar-context-provider">{model.provider}</span>
+      {model.identity && <strong>{model.identity}</strong>}
     </div>
   );
 }
