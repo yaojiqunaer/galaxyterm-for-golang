@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 )
 
@@ -51,6 +52,75 @@ func TestInstallOfflinePackageReadsManifest(t *testing.T) {
 	items := api.ListInstalled()
 	if len(items) != 1 || items[0].Providers[0].Type != "kubernetes" {
 		t.Fatalf("installed items = %#v, want kubernetes provider", items)
+	}
+}
+
+func TestInstallOfflineExtractsAndResolvesFileProviderRuntime(t *testing.T) {
+	storePath := filepath.Join(t.TempDir(), "extensions", "installed.json")
+	api := NewAPIWithStore(storePath)
+	manifest := Manifest{
+		ID:         "galaxyterm-extension-sftp",
+		Name:       "SFTP",
+		Version:    "0.1.0",
+		APIVersion: "v1",
+		Runtime:    RuntimeManifest{Protocol: "stdio-json-v1", Entrypoint: "bin/extension"},
+		FileProviders: []FileProviderManifest{{
+			Type: "sftp", Protocol: "sftp", Capabilities: []string{"list", "read"},
+		}},
+	}
+	packagePath := writeGTXPackageWithFiles(t, manifest, map[string]string{"bin/extension": "#!/bin/sh\n"})
+
+	if _, err := api.InstallOffline(packagePath); err != nil {
+		t.Fatalf("InstallOffline returned error: %v", err)
+	}
+	runtimeInfo, err := api.ResolveFileProvider("sftp")
+	if err != nil {
+		t.Fatalf("ResolveFileProvider returned error: %v", err)
+	}
+	if runtimeInfo.Provider.Type != "sftp" {
+		t.Fatalf("provider = %#v, want sftp", runtimeInfo.Provider)
+	}
+	content, err := os.ReadFile(runtimeInfo.Executable)
+	if err != nil {
+		t.Fatalf("read extracted executable: %v", err)
+	}
+	if string(content) != "#!/bin/sh\n" {
+		t.Fatalf("executable content = %q", content)
+	}
+	if runtime.GOOS != "windows" {
+		info, err := os.Stat(runtimeInfo.Executable)
+		if err != nil {
+			t.Fatalf("stat executable: %v", err)
+		}
+		if info.Mode()&0o100 == 0 {
+			t.Fatalf("executable mode = %v, want owner execute bit", info.Mode())
+		}
+	}
+}
+
+func TestInstallOfflineRejectsArchivePathTraversal(t *testing.T) {
+	storePath := filepath.Join(t.TempDir(), "extensions", "installed.json")
+	api := NewAPIWithStore(storePath)
+	manifest := Manifest{
+		ID:         "galaxyterm-extension-sftp",
+		Name:       "SFTP",
+		Version:    "0.1.0",
+		APIVersion: "v1",
+		Runtime:    RuntimeManifest{Protocol: "stdio-json-v1", Entrypoint: "bin/extension"},
+		FileProviders: []FileProviderManifest{{
+			Type: "sftp", Protocol: "sftp", Capabilities: []string{"list"},
+		}},
+	}
+	packagePath := writeGTXPackageWithFiles(t, manifest, map[string]string{
+		"bin/extension": "#!/bin/sh\n",
+		"../escaped":    "bad",
+	})
+
+	if _, err := api.InstallOffline(packagePath); err == nil {
+		t.Fatal("InstallOffline returned nil error for traversal entry")
+	}
+	if _, err := os.Stat(filepath.Join(filepath.Dir(storePath), "escaped")); !os.IsNotExist(err) {
+		t.Fatalf("escaped file stat error = %v, want not exist", err)
 	}
 }
 
@@ -121,6 +191,10 @@ func TestUninstallRemovesInstalledExtension(t *testing.T) {
 }
 
 func writeGTXPackage(t *testing.T, manifest Manifest) string {
+	return writeGTXPackageWithFiles(t, manifest, nil)
+}
+
+func writeGTXPackageWithFiles(t *testing.T, manifest Manifest, files map[string]string) string {
 	t.Helper()
 	packagePath := filepath.Join(t.TempDir(), manifest.ID+".gtx")
 	file, err := os.Create(packagePath)
@@ -134,6 +208,15 @@ func writeGTXPackage(t *testing.T, manifest Manifest) string {
 	}
 	if err := json.NewEncoder(manifestFile).Encode(manifest); err != nil {
 		t.Fatalf("encode manifest: %v", err)
+	}
+	for name, content := range files {
+		entry, err := writer.Create(name)
+		if err != nil {
+			t.Fatalf("create package file %q: %v", name, err)
+		}
+		if _, err := entry.Write([]byte(content)); err != nil {
+			t.Fatalf("write package file %q: %v", name, err)
+		}
 	}
 	if err := writer.Close(); err != nil {
 		t.Fatalf("close zip: %v", err)
