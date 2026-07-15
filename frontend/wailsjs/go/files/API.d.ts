@@ -8,4 +8,6 @@ export function Delete(arg1:any):Promise<void>;
 
 export function ReadFile(arg1:any):Promise<string>;
 
+export function Rename(arg1:any):Promise<void>;
+
 export function WriteFile(arg1:any):Promise<void>;

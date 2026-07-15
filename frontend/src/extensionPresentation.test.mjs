@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
 import {
+  buildEnabledFileProviders,
   buildExtensionAction,
   buildExtensionCardFacts,
   buildExtensionSummary,
   buildInstalledExtensionRows,
   filterProvidersByDisabledExtensions,
+  fileProviderSupports,
 } from './extensionPresentation.js';
 
 const providers = [
@@ -57,6 +59,38 @@ assert.deepEqual(buildExtensionSummary({
   installedFileProviderTypes: ['s3'],
   installedProviderTypes: ['mysql', 'kubernetes'],
 });
+
+assert.deepEqual(buildEnabledFileProviders([
+  {
+    id: 'galaxyterm-extension-sftp',
+    name: 'SFTP',
+    fileProviders: [{
+      type: 'sftp',
+      protocol: 'sftp',
+      nameKey: 'extension.sftp.name',
+      capabilities: ['list', 'read', 'write'],
+      authMethods: ['password', 'privateKey'],
+    }],
+  },
+  {
+    id: 'galaxyterm-extension-s3',
+    name: 'S3',
+    fileProviders: [{ type: 's3', protocol: 's3', capabilities: ['list'] }],
+  },
+], ['galaxyterm-extension-s3']), [{
+  extensionId: 'galaxyterm-extension-sftp',
+  extensionName: 'SFTP',
+  type: 'sftp',
+  protocol: 'sftp',
+  nameKey: 'extension.sftp.name',
+  description: '',
+  capabilities: ['list', 'read', 'write'],
+  authMethods: ['password', 'privateKey'],
+}]);
+
+assert.equal(fileProviderSupports({ capabilities: ['list', 'read'] }, 'read'), true);
+assert.equal(fileProviderSupports({ capabilities: ['list'] }, 'delete'), false);
+assert.equal(fileProviderSupports(null, 'list'), false);
 
 assert.deepEqual(buildExtensionAction({ status: 'planned' }), {
   key: 'install',

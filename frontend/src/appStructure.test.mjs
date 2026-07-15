@@ -222,6 +222,18 @@ assert.ok(
   'sidebar shortcut badges must describe the actual numbered session action after active-first sorting',
 );
 assert.ok(
+  source.includes('buildEnabledFileProviders(installedExtensions, settings.disabledExtensionIds)')
+    && source.includes('providerType: selectedFileProvider.type')
+    && source.includes("fileProviderSupports(selectedFileProvider, 'write')")
+    && source.includes("fileProviderSupports(selectedFileProvider, 'delete')"),
+  'remote files must resolve installed file providers and hide unsupported operations by capability',
+);
+assert.ok(
+  source.includes("selectedFileProvider.protocol === 'sftp'")
+    && source.includes('resolveSelectedSshProfile(fileProfileId)'),
+  'the SFTP extension must retain saved SSH profile reuse without making it a core protocol implementation',
+);
+assert.ok(
   source.includes("const openConnectionDrawer = (type = terminalDefaults.defaultProviderType) => openDrawer(type, null, 'connection');")
     && source.includes('saveProfile: resolveProfileSaveDefault({ intent, profile })')
     && source.includes("terminalDrawerIntent === 'session'")

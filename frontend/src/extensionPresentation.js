@@ -19,6 +19,32 @@ export function buildExtensionSummary({
   };
 }
 
+export function buildEnabledFileProviders(installedExtensions = [], disabledExtensionIds = []) {
+  const disabledIds = new Set(disabledExtensionIds);
+  const providersByType = new Map();
+  installedExtensions.forEach((extension) => {
+    if (disabledIds.has(extension.id)) return;
+    (extension.fileProviders || []).forEach((provider) => {
+      if (!provider?.type) return;
+      providersByType.set(provider.type, {
+        extensionId: extension.id,
+        extensionName: extension.name || extension.id,
+        type: provider.type,
+        protocol: provider.protocol || provider.type,
+        nameKey: provider.nameKey || '',
+        description: provider.description || '',
+        capabilities: Array.isArray(provider.capabilities) ? provider.capabilities : [],
+        authMethods: Array.isArray(provider.authMethods) ? provider.authMethods : [],
+      });
+    });
+  });
+  return [...providersByType.values()];
+}
+
+export function fileProviderSupports(provider, capability) {
+  return !!provider && (provider.capabilities || []).includes(capability);
+}
+
 export function buildExtensionAction(extension = {}) {
   if (extension.status === 'planned') {
     return { key: 'install', enabled: true, tone: 'primary' };

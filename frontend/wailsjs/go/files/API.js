@@ -18,6 +18,10 @@ export function ReadFile(arg1) {
   return callWails(['files', 'API', 'ReadFile'], arg1);
 }
 
+export function Rename(arg1) {
+  return callWails(['files', 'API', 'Rename'], arg1);
+}
+
 export function WriteFile(arg1) {
   return callWails(['files', 'API', 'WriteFile'], arg1);
 }

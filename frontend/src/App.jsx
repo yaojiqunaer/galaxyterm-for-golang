@@ -177,11 +177,13 @@ import {
   upsertQuickCommand,
 } from './quickCommands.js';
 import {
+  buildEnabledFileProviders,
   buildExtensionAction,
   buildExtensionCardFacts,
   buildExtensionSummary,
   buildInstalledExtensionRows,
   filterProvidersByDisabledExtensions,
+  fileProviderSupports,
 } from './extensionPresentation.js';
 import {
   defaultExtensionSources,
@@ -339,6 +341,7 @@ function App() {
   const [newType, setNewType] = useState('local');
   const [fileEntries, setFileEntries] = useState([]);
   const [fileLoading, setFileLoading] = useState(false);
+  const [fileProviderType, setFileProviderType] = useState('');
   const [fileProfileId, setFileProfileId] = useState('');
   const [testingConnection, setTestingConnection] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
@@ -672,6 +675,20 @@ function App() {
   const installedExtensionRows = useMemo(() => (
     buildInstalledExtensionRows(installedExtensions, settings.disabledExtensionIds)
   ), [installedExtensions, settings.disabledExtensionIds]);
+  const fileProviders = useMemo(() => (
+    buildEnabledFileProviders(installedExtensions, settings.disabledExtensionIds)
+  ), [installedExtensions, settings.disabledExtensionIds]);
+  const selectedFileProvider = fileProviders.find((provider) => provider.type === fileProviderType)
+    || fileProviders[0]
+    || null;
+
+  useEffect(() => {
+    const nextType = selectedFileProvider?.type || '';
+    if (nextType !== fileProviderType) {
+      setFileProviderType(nextType);
+      setFileEntries([]);
+    }
+  }, [fileProviderType, selectedFileProvider?.type]);
   const auditProviderOptions = useMemo(() => [
     { value: 'all', label: t('filter.allProviders') },
     ...Array.from(new Set(auditRecords.map((record) => record.providerType || 'terminal')))
@@ -2635,6 +2652,10 @@ function App() {
   };
 
   const loadFiles = async (overridePath = null) => {
+    if (!selectedFileProvider) {
+      messageApi.warning(t('file.noProviderHint'));
+      return;
+    }
     await fileForm.validateFields();
     const req = await currentFileRequest(overridePath);
     setFileLoading(true);
@@ -2650,14 +2671,28 @@ function App() {
   };
 
   const currentFileRequest = async (overridePath = null) => {
+    if (!selectedFileProvider) throw new Error(t('file.noProviderHint'));
     const values = fileForm.getFieldsValue(true);
+    if (selectedFileProvider.protocol !== 'sftp') {
+      return {
+        providerType: selectedFileProvider.type,
+        config: values.config || {},
+        auth: values.auth || {},
+        path: overridePath || values.path || '.',
+      };
+    }
     const resolvedProfile = await resolveSelectedSshProfile(fileProfileId);
-    const auth = buildSshConnectionAuth(values, resolvedProfile);
+    const connectionAuth = buildSshConnectionAuth(values, resolvedProfile);
     return {
-      host: values.host,
-      port: values.port || 22,
-      username: values.username,
-      ...auth,
+      providerType: selectedFileProvider.type,
+      config: {
+        host: values.host,
+        port: values.port || 22,
+      },
+      auth: {
+        username: values.username,
+        ...connectionAuth,
+      },
       path: overridePath || values.path || '.',
     };
   };
@@ -2793,6 +2828,31 @@ function App() {
     const breadcrumbs = buildRemoteFileBreadcrumbs(fileSummary.path);
     const selectedFileConnection = buildSavedSshConnections(profiles)
       .find((item) => item.id === fileProfileId);
+    if (!selectedFileProvider) {
+      return (
+        <div className="workspace-page remote-workspace-page">
+          <div className="page-header">
+            <div>
+              <Text type="secondary">{t('nav.files')}</Text>
+              <Title level={3}>{t('section.remoteFiles')}</Title>
+            </div>
+          </div>
+          <div className="workspace-empty-state remote-provider-empty">
+            <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('file.noProviderTitle')}>
+              <Text type="secondary">{t('file.noProviderHint')}</Text>
+              <Button type="primary" icon={<AppstoreAddOutlined />} onClick={() => setSelectedNav('extensions')}>
+                {t('file.installProvider')}
+              </Button>
+            </Empty>
+          </div>
+        </div>
+      );
+    }
+    const canListFiles = fileProviderSupports(selectedFileProvider, 'list');
+    const canReadFiles = fileProviderSupports(selectedFileProvider, 'read');
+    const canWriteFiles = fileProviderSupports(selectedFileProvider, 'write');
+    const canCreateDirectories = fileProviderSupports(selectedFileProvider, 'mkdir');
+    const canDeleteFiles = fileProviderSupports(selectedFileProvider, 'delete');
     return (
       <div className="workspace-page remote-workspace-page">
         <div className="page-header">
@@ -2801,8 +2861,8 @@ function App() {
             <Title level={3}>{t('section.remoteFiles')}</Title>
           </div>
           <Space wrap>
-            <Button icon={<ReloadOutlined />} onClick={() => loadFiles()} loading={fileLoading}>{t('action.refresh')}</Button>
-            <Button type="primary" onClick={() => loadFiles()} loading={fileLoading}>{t('action.open')}</Button>
+            <Button icon={<ReloadOutlined />} disabled={!canListFiles} onClick={() => loadFiles()} loading={fileLoading}>{t('action.refresh')}</Button>
+            <Button type="primary" disabled={!canListFiles} onClick={() => loadFiles()} loading={fileLoading}>{t('action.open')}</Button>
           </Space>
         </div>
         <div className="remote-summary-grid">
@@ -2815,6 +2875,22 @@ function App() {
             <Text strong>{t('section.quickConnect')}</Text>
             <Text type="secondary">{t('file.browserHint')}</Text>
             <Form form={fileForm} layout="vertical" className="remote-context-form" initialValues={{ port: 22, path: '.', profileId: '' }}>
+              <Form.Item label={t('field.fileProvider')}>
+                <Select
+                  value={selectedFileProvider.type}
+                  options={fileProviders.map((provider) => ({
+                    value: provider.type,
+                    label: provider.nameKey ? t(provider.nameKey, provider.extensionName) : provider.extensionName,
+                  }))}
+                  onChange={(providerType) => {
+                    setFileProviderType(providerType);
+                    setFileEntries([]);
+                    fileForm.setFieldValue('path', '.');
+                  }}
+                />
+              </Form.Item>
+              {selectedFileProvider.protocol === 'sftp' ? (
+                <>
               <Form.Item name="profileId" hidden><Input /></Form.Item>
               <SavedSSHProfileSelect
                 disabled={fileLoading}
@@ -2861,6 +2937,10 @@ function App() {
                   </Form.Item>
                 </>
               )}
+                </>
+              ) : (
+                <Alert showIcon type="info" message={t('file.providerConfigManagedByExtension')} />
+              )}
               <Form.Item name="path" label={t('field.path')}>
                 <Input />
               </Form.Item>
@@ -2879,9 +2959,9 @@ function App() {
                 ))}
               </div>
               <Space wrap>
-                <Button onClick={goParent}>{t('action.up')}</Button>
-                <Button onClick={() => setMkdirOpen(true)}>{t('action.mkdir')}</Button>
-                <Button onClick={() => setUploadOpen(true)}>{t('action.uploadText')}</Button>
+                <Button disabled={!canListFiles} onClick={goParent}>{t('action.up')}</Button>
+                {canCreateDirectories && <Button onClick={() => setMkdirOpen(true)}>{t('action.mkdir')}</Button>}
+                {canWriteFiles && <Button onClick={() => setUploadOpen(true)}>{t('action.uploadText')}</Button>}
               </Space>
             </div>
             <List
@@ -2899,13 +2979,13 @@ function App() {
                 <List.Item
                   className={entry.isDir ? 'remote-file-row directory' : 'remote-file-row'}
                   actions={[
-                    !entry.isDir && <Button key="edit" size="small" onClick={() => openRemoteFileEditor(entry)} loading={fileEditorLoading}>{t('action.edit')}</Button>,
-                    !entry.isDir && <Button key="download" size="small" onClick={() => downloadRemoteFile(entry)}>{t('action.download')}</Button>,
-                    <Button key="delete" size="small" danger onClick={() => deleteRemoteEntry(entry)}>{t('action.delete')}</Button>,
+                    !entry.isDir && canReadFiles && canWriteFiles && <Button key="edit" size="small" onClick={() => openRemoteFileEditor(entry)} loading={fileEditorLoading}>{t('action.edit')}</Button>,
+                    !entry.isDir && canReadFiles && <Button key="download" size="small" onClick={() => downloadRemoteFile(entry)}>{t('action.download')}</Button>,
+                    canDeleteFiles && <Button key="delete" size="small" danger onClick={() => deleteRemoteEntry(entry)}>{t('action.delete')}</Button>,
                   ].filter(Boolean)}
                   onDoubleClick={() => {
                     if (entry.isDir) loadFiles(entry.path);
-                    if (!entry.isDir) openRemoteFileEditor(entry);
+                    if (!entry.isDir && canReadFiles) openRemoteFileEditor(entry);
                   }}
                 >
                   <List.Item.Meta
