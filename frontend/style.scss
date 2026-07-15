@@ -926,6 +926,15 @@ select {
   min-width: 0;
 }
 
+.session-tab-context-trigger[draggable='true'] {
+  cursor: grab;
+}
+
+.session-tab-context-trigger.dragging {
+  cursor: grabbing;
+  opacity: 0.5;
+}
+
 .session-tab-label.active {
   color: var(--terminal-text);
   font-weight: 650;

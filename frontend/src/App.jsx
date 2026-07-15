@@ -55,10 +55,12 @@ import {
   ImportOutlined,
   QuestionCircleOutlined,
   LaptopOutlined,
+  LeftOutlined,
   MinusOutlined,
   MoreOutlined,
   PlusOutlined,
   ReloadOutlined,
+  RightOutlined,
   SaveOutlined,
   SettingOutlined,
   StarFilled,
@@ -114,9 +116,11 @@ import {
   countUnreadSessions,
   filterSessions,
   markSessionActivityRead,
+  moveSessionInOrder,
   profileActionModel,
   pruneSessionActivity,
   recordSessionOutputActivity,
+  reorderSessions,
   sessionTabDisplay,
   sessionStatusLabel,
   sessionStatusTone,
@@ -439,6 +443,7 @@ function App() {
   const contentPageRef = useRef(null);
   const contentPageScrollPositionsRef = useRef(new Map());
   const previousContentPageRef = useRef(selectedNav);
+  const draggedSessionIdRef = useRef('');
   const activeSession = sessions.find((session) => session.id === activeKey);
   const activeTerminalStatus = terminalStatuses[activeKey] || {};
   const visibleSessionIds = useMemo(() => {
@@ -1994,12 +1999,19 @@ function App() {
     if (action === 'rename') openRenameSession(session);
     if (action === 'reconnect') reconnectSession(session.id);
     if (action === 'duplicate') duplicateSession(session);
+    if (action === 'moveLeft') setSessions((current) => moveSessionInOrder(current, session.id, 'previous'));
+    if (action === 'moveRight') setSessions((current) => moveSessionInOrder(current, session.id, 'next'));
     if (action === 'closeOthers') confirmCloseOtherSessions(session.id);
     if (action === 'closeCurrent') confirmRemoveSession(session.id);
   };
-  const items = sessions.map((session) => {
-    const tabMenuItems = buildSessionTabMenuModel({ sessionCount: sessions.length }).flatMap((action, index) => [
-      ...(index === 3 ? [{ key: 'danger-divider', type: 'divider' }] : []),
+  const items = sessions.map((session, sessionIndex) => {
+    const tabMenuItems = buildSessionTabMenuModel({
+      sessionCount: sessions.length,
+      sessionIndex,
+    }).flatMap((action) => [
+      ...(action.dividerBefore || action.key === 'closeOthers'
+        ? [{ key: `divider-${action.key}`, type: 'divider' }]
+        : []),
       {
         key: action.key,
         danger: action.danger,
@@ -2023,7 +2035,31 @@ function App() {
         >
           <span
             className="session-tab-context-trigger"
+            draggable={sessions.length > 1}
             onContextMenu={() => setActiveKey(session.id)}
+            onDragEnd={(event) => {
+              draggedSessionIdRef.current = '';
+              event.currentTarget.classList.remove('dragging');
+            }}
+            onDragOver={(event) => {
+              if (!draggedSessionIdRef.current) return;
+              event.preventDefault();
+              event.dataTransfer.dropEffect = 'move';
+            }}
+            onDragStart={(event) => {
+              draggedSessionIdRef.current = session.id;
+              event.dataTransfer.effectAllowed = 'move';
+              event.dataTransfer.setData('text/plain', session.id);
+              event.currentTarget.classList.add('dragging');
+            }}
+            onDrop={(event) => {
+              event.preventDefault();
+              const sourceId = draggedSessionIdRef.current || event.dataTransfer.getData('text/plain');
+              const bounds = event.currentTarget.getBoundingClientRect();
+              const position = event.clientX >= bounds.left + bounds.width / 2 ? 'after' : 'before';
+              setSessions((current) => reorderSessions(current, sourceId, session.id, position));
+              draggedSessionIdRef.current = '';
+            }}
             onDoubleClick={(event) => {
               event.stopPropagation();
               openRenameSession(session);
@@ -5422,6 +5458,8 @@ function sessionTabActionIcon(action) {
   if (action === 'rename') return <EditOutlined />;
   if (action === 'reconnect') return <ReloadOutlined />;
   if (action === 'duplicate') return <CopyOutlined />;
+  if (action === 'moveLeft') return <LeftOutlined />;
+  if (action === 'moveRight') return <RightOutlined />;
   return <DeleteOutlined />;
 }
 

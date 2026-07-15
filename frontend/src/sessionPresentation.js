@@ -168,10 +168,27 @@ export function buildSessionToolbarContext(session, options = {}) {
 
 export function buildSessionTabMenuModel(options = {}) {
   const canCloseOthers = (Number(options.sessionCount) || 0) > 1;
-  return [
+  const actions = [
     { key: 'rename', labelKey: 'action.renameSession' },
     { key: 'reconnect', labelKey: 'action.reconnect' },
     { key: 'duplicate', labelKey: 'action.duplicate' },
+  ];
+  if (Number.isInteger(options.sessionIndex)) {
+    actions.push(
+      {
+        key: 'moveLeft',
+        labelKey: 'action.moveSessionLeft',
+        disabled: options.sessionIndex <= 0,
+        dividerBefore: true,
+      },
+      {
+        key: 'moveRight',
+        labelKey: 'action.moveSessionRight',
+        disabled: options.sessionIndex >= (Number(options.sessionCount) || 0) - 1,
+      },
+    );
+  }
+  actions.push(
     {
       key: 'closeOthers',
       labelKey: 'action.closeOthers',
@@ -179,7 +196,8 @@ export function buildSessionTabMenuModel(options = {}) {
       danger: true,
     },
     { key: 'closeCurrent', labelKey: 'action.closeSession', danger: true },
-  ];
+  );
+  return actions;
 }
 
 export function buildSessionContextFacts(session, options = {}) {
@@ -359,6 +377,28 @@ export function pruneSessionActivity(activity = {}, sessionIds = []) {
 
 export function countUnreadSessions(activity = {}) {
   return Object.values(activity).filter((item) => item?.unread).length;
+}
+
+export function moveSessionInOrder(sessions = [], sessionId = '', direction = '') {
+  const sourceIndex = sessions.findIndex((session) => session.id === sessionId);
+  const offset = direction === 'previous' ? -1 : direction === 'next' ? 1 : 0;
+  const targetIndex = sourceIndex + offset;
+  if (sourceIndex < 0 || offset === 0 || targetIndex < 0 || targetIndex >= sessions.length) return sessions;
+  const next = [...sessions];
+  [next[sourceIndex], next[targetIndex]] = [next[targetIndex], next[sourceIndex]];
+  return next;
+}
+
+export function reorderSessions(sessions = [], sourceId = '', targetId = '', position = 'before') {
+  if (!sourceId || sourceId === targetId) return sessions;
+  const sourceIndex = sessions.findIndex((session) => session.id === sourceId);
+  const targetIndex = sessions.findIndex((session) => session.id === targetId);
+  if (sourceIndex < 0 || targetIndex < 0) return sessions;
+  const next = [...sessions];
+  const [source] = next.splice(sourceIndex, 1);
+  const insertionIndex = next.findIndex((session) => session.id === targetId);
+  next.splice(insertionIndex + (position === 'after' ? 1 : 0), 0, source);
+  return next;
 }
 
 export function profileActionModel(profile = {}) {

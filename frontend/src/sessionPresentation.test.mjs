@@ -12,9 +12,11 @@ import {
   countUnreadSessions,
   filterSessions,
   markSessionActivityRead,
+  moveSessionInOrder,
   profileActionModel,
   pruneSessionActivity,
   recordSessionOutputActivity,
+  reorderSessions,
   sessionTabDisplay,
   sessionStatusLabel,
   sessionStatusTone,
@@ -236,6 +238,23 @@ assert.deepEqual(buildSessionTabMenuModel({ sessionCount: 1 }), [
   { key: 'closeOthers', labelKey: 'action.closeOthers', disabled: true, danger: true },
   { key: 'closeCurrent', labelKey: 'action.closeSession', danger: true },
 ]);
+
+assert.deepEqual(
+  buildSessionTabMenuModel({ sessionCount: 3, sessionIndex: 0 })
+    .filter((action) => action.key === 'moveLeft' || action.key === 'moveRight'),
+  [
+    { key: 'moveLeft', labelKey: 'action.moveSessionLeft', disabled: true, dividerBefore: true },
+    { key: 'moveRight', labelKey: 'action.moveSessionRight', disabled: false },
+  ],
+);
+assert.deepEqual(
+  buildSessionTabMenuModel({ sessionCount: 3, sessionIndex: 2 })
+    .filter((action) => action.key === 'moveLeft' || action.key === 'moveRight'),
+  [
+    { key: 'moveLeft', labelKey: 'action.moveSessionLeft', disabled: false, dividerBefore: true },
+    { key: 'moveRight', labelKey: 'action.moveSessionRight', disabled: true },
+  ],
+);
 
 assert.deepEqual(buildSessionToolbarModel({
   activeKey: '',
@@ -519,6 +538,25 @@ assert.equal(countUnreadSessions({
   'session-2': { unread: true },
   'session-3': { unread: true },
 }), 2);
+
+const orderedSessions = [{ id: 's1' }, { id: 's2' }, { id: 's3' }];
+assert.deepEqual(moveSessionInOrder(orderedSessions, 's2', 'previous').map((session) => session.id), [
+  's2', 's1', 's3',
+]);
+assert.deepEqual(moveSessionInOrder(orderedSessions, 's2', 'next').map((session) => session.id), [
+  's1', 's3', 's2',
+]);
+assert.equal(moveSessionInOrder(orderedSessions, 's1', 'previous'), orderedSessions);
+assert.deepEqual(reorderSessions(orderedSessions, 's1', 's3').map((session) => session.id), [
+  's2', 's1', 's3',
+]);
+assert.deepEqual(reorderSessions(orderedSessions, 's1', 's3', 'after').map((session) => session.id), [
+  's2', 's3', 's1',
+]);
+assert.deepEqual(reorderSessions(orderedSessions, 's3', 's1').map((session) => session.id), [
+  's3', 's1', 's2',
+]);
+assert.equal(reorderSessions(orderedSessions, 'missing', 's1'), orderedSessions);
 
 assert.deepEqual(profileActionModel({ favorite: false }), ['connect', 'edit', 'rename', 'duplicate', 'favorite', 'delete']);
 assert.deepEqual(profileActionModel({ favorite: true }), ['connect', 'edit', 'rename', 'duplicate', 'unfavorite', 'delete']);

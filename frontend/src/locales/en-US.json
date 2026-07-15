@@ -71,6 +71,8 @@
   "action.closeOthers": "Close Other Sessions",
   "action.closeAll": "Close All Sessions",
   "action.renameSession": "Rename Session",
+  "action.moveSessionLeft": "Move Tab Left",
+  "action.moveSessionRight": "Move Tab Right",
   "action.reconnect": "Reconnect",
   "action.previousSession": "Previous Session",
   "action.nextSession": "Next Session",
