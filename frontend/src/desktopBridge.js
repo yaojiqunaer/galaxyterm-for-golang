@@ -41,6 +41,24 @@ export function writeClipboardText(text) {
   return Promise.reject(new Error(clipboardUnavailableMessage));
 }
 
+export function syncDesktopWindowTheme(appTheme = 'system') {
+  const desktopTheme = resolveWailsMethod(['desktop', 'API', 'SetWindowTheme']);
+  if (typeof desktopTheme === 'function') {
+    desktopTheme(appTheme);
+    return true;
+  }
+  const runtime = globalThis.window?.runtime;
+  const methodName = appTheme === 'dark'
+    ? 'WindowSetDarkTheme'
+    : appTheme === 'light'
+      ? 'WindowSetLightTheme'
+      : 'WindowSetSystemDefaultTheme';
+  const method = runtime?.[methodName];
+  if (typeof method !== 'function') return false;
+  method.call(runtime);
+  return true;
+}
+
 function resolveWailsMethod(path) {
   return path.reduce((current, key) => current?.[key], globalThis.window?.go);
 }

@@ -25,6 +25,11 @@
 </details>
 
 <details>
+  <summary><b>可插拔文件协议</b></summary>
+  文件工作区由主程序统一提供，SFTP、FTP、S3 及后续 WebDAV 等协议通过 `.gtx` 扩展接入。扩展只实现协议和认证适配，复用统一的文件浏览、传输、凭据引用、错误处理和审计体验，避免把各协议 SDK 打进基础安装包。
+</details>
+
+<details>
   <summary><b>🔀 SSH 端口转发</b></summary>
   支持复用已保存的 SSH 连接创建本地端口转发，并兼容密码、私钥和私钥口令认证；未保存凭据时可输入仅供本次使用的密码或私钥。
 </details>
@@ -50,6 +55,8 @@
 </details>
 
 ## 架构
+
+核心程序只保留本地终端、SSH、会话管理、通用文件工作区、凭据和扩展宿主。终端扩展与文件协议扩展分别声明 `providers` 和 `fileProviders`，可通过 GitHub Releases 在线获取或使用 `.gtx` 包离线安装。文件协议扩展支持按能力声明 `list`、`read`、`write`、`mkdir`、`rename`、`delete` 等操作，界面只展示当前协议实际支持的命令。
 
 ----
 

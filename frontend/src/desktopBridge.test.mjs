@@ -8,6 +8,13 @@ import {
   writeClipboardText,
 } from './desktopBridge.js';
 
+const desktopBridge = await import('./desktopBridge.js');
+assert.equal(
+  typeof desktopBridge.syncDesktopWindowTheme,
+  'function',
+  'desktop bridge must expose native window theme synchronization',
+);
+
 const originalWindow = globalThis.window;
 const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
 
@@ -47,7 +54,25 @@ globalThis.window.runtime = {
 assert.equal(await writeClipboardText('native text'), true);
 assert.equal(await readClipboardText(), 'native text');
 
+const nativeThemeCalls = [];
+globalThis.window.go.desktop = {
+  API: {
+    SetWindowTheme: (theme) => nativeThemeCalls.push(`desktop:${theme}`),
+  },
+};
+globalThis.window.runtime.WindowSetDarkTheme = () => nativeThemeCalls.push('dark');
+globalThis.window.runtime.WindowSetLightTheme = () => nativeThemeCalls.push('light');
+globalThis.window.runtime.WindowSetSystemDefaultTheme = () => nativeThemeCalls.push('system');
+assert.equal(desktopBridge.syncDesktopWindowTheme('dark'), true);
+assert.equal(desktopBridge.syncDesktopWindowTheme('light'), true);
+assert.equal(desktopBridge.syncDesktopWindowTheme('system'), true);
+assert.deepEqual(nativeThemeCalls, ['desktop:dark', 'desktop:light', 'desktop:system']);
+
+delete globalThis.window.go.desktop;
+assert.equal(desktopBridge.syncDesktopWindowTheme('dark'), true);
+assert.deepEqual(nativeThemeCalls, ['desktop:dark', 'desktop:light', 'desktop:system', 'dark']);
 delete globalThis.window.runtime;
+assert.equal(desktopBridge.syncDesktopWindowTheme('dark'), false);
 let browserClipboard = '';
 Object.defineProperty(globalThis, 'navigator', {
   configurable: true,

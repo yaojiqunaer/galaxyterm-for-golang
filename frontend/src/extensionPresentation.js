@@ -10,6 +10,9 @@ export function buildExtensionSummary({
     enabledExtensions: installedExtensions.filter((extension) => !disabledIds.has(extension.id)).length,
     extensionProviders: providers.filter((provider) => provider.category === 'extension').length,
     installedExtensions: installedExtensions.length,
+    installedFileProviderTypes: installedExtensions.flatMap((extension) => (
+      extension.fileProviders || []
+    ).map((provider) => provider.type)).filter(Boolean),
     installedProviderTypes: installedExtensions.flatMap((extension) => (
       extension.providers || []
     ).map((provider) => provider.type)).filter(Boolean),
@@ -39,16 +42,21 @@ export function buildExtensionCardFacts(extension = {}) {
 
 export function buildInstalledExtensionRows(installedExtensions = [], disabledExtensionIds = []) {
   const disabledIds = new Set(disabledExtensionIds);
-  return installedExtensions.map((extension) => ({
-    enabled: !disabledIds.has(extension.id),
-    id: extension.id,
-    name: extension.name,
-    version: extension.version,
-    providers: (extension.providers || []).map((provider) => provider.type).filter(Boolean),
-    capabilities: (extension.providers || [])
-      .flatMap((provider) => provider.capabilities || [])
-      .filter(Boolean),
-  }));
+  return installedExtensions.map((extension) => {
+    const terminalProviders = extension.providers || [];
+    const fileProviders = extension.fileProviders || [];
+    return {
+      enabled: !disabledIds.has(extension.id),
+      id: extension.id,
+      name: extension.name,
+      version: extension.version,
+      providers: terminalProviders.map((provider) => provider.type).filter(Boolean),
+      fileProviders: fileProviders.map((provider) => provider.type).filter(Boolean),
+      capabilities: [...new Set([...terminalProviders, ...fileProviders]
+        .flatMap((provider) => provider.capabilities || [])
+        .filter(Boolean))],
+    };
+  });
 }
 
 export function filterProvidersByDisabledExtensions(

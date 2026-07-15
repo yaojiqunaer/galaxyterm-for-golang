@@ -26,14 +26,21 @@ const installedExtensions = [
     version: '0.2.0',
     providers: [{ type: 'kubernetes', capabilities: ['stream'] }],
   },
+  {
+    id: 'galaxyterm-extension-s3',
+    name: 'S3',
+    version: '0.1.0',
+    fileProviders: [{ type: 's3', protocol: 's3', capabilities: ['list', 'read', 'write'] }],
+  },
 ];
 
 assert.deepEqual(buildExtensionSummary({ providers, installedExtensions }), {
   builtinProviders: 2,
   disabledExtensions: 0,
-  enabledExtensions: 2,
+  enabledExtensions: 3,
   extensionProviders: 1,
-  installedExtensions: 2,
+  installedExtensions: 3,
+  installedFileProviderTypes: ['s3'],
   installedProviderTypes: ['mysql', 'kubernetes'],
 });
 
@@ -44,9 +51,10 @@ assert.deepEqual(buildExtensionSummary({
 }), {
   builtinProviders: 2,
   disabledExtensions: 1,
-  enabledExtensions: 1,
+  enabledExtensions: 2,
   extensionProviders: 1,
-  installedExtensions: 2,
+  installedExtensions: 3,
+  installedFileProviderTypes: ['s3'],
   installedProviderTypes: ['mysql', 'kubernetes'],
 });
 
@@ -83,6 +91,7 @@ assert.deepEqual(buildInstalledExtensionRows(installedExtensions, ['galaxyterm-e
     name: 'MySQL',
     version: '0.1.0',
     providers: ['mysql'],
+    fileProviders: [],
     capabilities: ['stream', 'query'],
   },
   {
@@ -91,7 +100,17 @@ assert.deepEqual(buildInstalledExtensionRows(installedExtensions, ['galaxyterm-e
     name: 'Kubernetes',
     version: '0.2.0',
     providers: ['kubernetes'],
+    fileProviders: [],
     capabilities: ['stream'],
+  },
+  {
+    enabled: true,
+    id: 'galaxyterm-extension-s3',
+    name: 'S3',
+    version: '0.1.0',
+    providers: [],
+    fileProviders: ['s3'],
+    capabilities: ['list', 'read', 'write'],
   },
 ]);
 

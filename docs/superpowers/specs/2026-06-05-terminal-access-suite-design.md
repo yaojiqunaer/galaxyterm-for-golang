@@ -2,7 +2,7 @@
 
 ## Goal
 
-GalaxyTerm should become a small, extensible terminal access desktop app. The core application stays lightweight and stable, while heavier terminal types such as Kubernetes, Docker, MySQL, Redis, PostgreSQL, and MongoDB are delivered as optional extensions.
+GalaxyTerm should become a small, extensible terminal access desktop app. The core application stays lightweight and stable, while heavier terminal types and remote file protocols are delivered as optional extensions.
 
 The first architectural target is not to implement every provider at once. The target is to create a clean terminal session kernel, a provider registry, and an extension model that can support many terminal types without duplicating frontend or backend lifecycle code.
 
@@ -10,11 +10,9 @@ The first architectural target is not to implement every provider at once. The t
 
 - The app will use Go-native SDKs, APIs, or protocols for provider implementations.
 - The app will not rely on local CLI tools such as `kubectl`, `docker`, `mysql`, or `redis-cli` as the core implementation.
-- The core app will include only foundational providers:
-  - Local shell
-  - SSH terminal
-  - SFTP file access
-- Kubernetes, Docker, databases, message systems, and other large integrations will be official extensions.
+- The core app includes the local shell, SSH terminal, shared remote-file workspace, credential references, audit, and extension host.
+- Kubernetes, Docker, databases, message systems, and remote-file protocols are official extensions.
+- SFTP, FTP, S3, WebDAV, and future storage protocols must use the same file-provider contract instead of adding protocol SDKs to the core binary.
 - Official extensions can be hosted in a personal GitHub organization or repository and distributed through GitHub Releases.
 - Offline installation will be supported by downloading extension package files from GitHub Releases and importing them locally.
 - The app and documentation must support multiple languages. Chinese and English are required first, and the design must allow additional languages later.
@@ -151,11 +149,11 @@ Later hardening:
 - SSH agent support
 - Jump host support
 
-### SFTP
+### Remote File Workspace
 
-SFTP is built in because it is tightly related to SSH and is a foundational remote access feature.
+The core owns one protocol-neutral remote-file workspace. It renders navigation, transfer progress, conflict handling, errors, credential selection, and audit events without importing a protocol SDK.
 
-First implementation can expose file operations through a file manager API rather than xterm. The provider should still share connection profile and auth structures with SSH.
+Installed extensions contribute file providers such as SFTP, FTP, S3, or WebDAV. SFTP can reuse an SSH connection profile and credential reference, while object stores can expose buckets and prefixes through the same navigation model.
 
 ## Official Extensions
 
@@ -170,6 +168,9 @@ galaxyterm-extension-postgres
 galaxyterm-extension-mongodb
 galaxyterm-extension-clickhouse
 galaxyterm-extension-kafka
+galaxyterm-extension-sftp
+galaxyterm-extension-ftp
+galaxyterm-extension-s3
 ```
 
 Initial official extension targets:
@@ -178,6 +179,9 @@ Initial official extension targets:
 - Docker container terminal through Docker Engine API
 - MySQL interactive REPL through Go MySQL protocol libraries
 - Redis interactive REPL through Go Redis protocol libraries
+- SFTP file access through the shared file-provider contract
+- FTP and FTPS file access through the shared file-provider contract
+- S3-compatible object storage through the shared file-provider contract
 
 Future terminal types:
 
@@ -221,6 +225,26 @@ galaxyterm-extension-mysql_0.1.0_windows_amd64.gtx
 ```
 
 The `.gtx` extension can be treated as a normal zip or tar archive with a GalaxyTerm-specific suffix.
+
+An extension can contribute terminal providers, file providers, or both. Existing terminal-only manifests remain valid. A file-only extension declares its protocol without appearing in the terminal provider selector:
+
+```json
+{
+  "id": "galaxyterm-extension-s3",
+  "name": "S3",
+  "version": "0.1.0",
+  "apiVersion": "v1",
+  "fileProviders": [
+    {
+      "type": "s3",
+      "protocol": "s3",
+      "nameKey": "extension.s3.name",
+      "capabilities": ["list", "stat", "read", "write", "mkdir", "rename", "delete"],
+      "authMethods": ["accessKey", "credentialProcess"]
+    }
+  ]
+}
+```
 
 ## Extension Distribution
 
@@ -274,6 +298,22 @@ Exit
 Status
 ProviderLog
 ```
+
+File providers use request/response operations over the same authenticated sidecar channel:
+
+```text
+OpenFileConnection
+List
+Stat
+Read
+Write
+Mkdir
+Rename
+Delete
+CloseFileConnection
+```
+
+Capabilities are negotiated per provider. The workspace hides unsupported commands and treats object-store prefixes as virtual directories. Upload and download payloads use bounded streaming rather than loading whole files into the webview or one protocol message.
 
 The protocol must include:
 
@@ -466,12 +506,12 @@ cd frontend && npm run build
 - Convert SSH to the new model
 - Replace duplicate frontend terminal components with `TerminalPane`
 
-### Phase 2: Built-In SSH And SFTP Foundation
+### Phase 2: SSH And Remote File Foundation
 
 - Harden SSH config and auth model
 - Add private key auth structure
-- Add SFTP service interfaces
-- Add file listing and basic file operation API
+- Add a protocol-neutral file-provider interface
+- Add shared file listing, transfer, and operation APIs
 
 ### Phase 3: Extension Model
 
@@ -487,6 +527,9 @@ cd frontend && npm run build
 - Build Docker extension
 - Build MySQL extension
 - Build Redis extension
+- Build SFTP extension
+- Build FTP extension
+- Build S3 extension
 
 ### Phase 5: Marketplace-Like Experience Without Central Lock-In
 
@@ -498,5 +541,5 @@ cd frontend && npm run build
 ## Deferred Decisions And First Defaults
 
 - The official GitHub owner or repository name is a configuration value. Documentation should use `github.com/<owner>/galaxyterm-extensions` until the project chooses a real owner.
-- The first SFTP scope is a backend file operation API plus a simple file list view. A full file manager can be built after the SSH/SFTP connection model is stable.
+- The remote-file workspace is protocol neutral. Protocol-specific connection fields and operations come from extension metadata and negotiated capabilities.
 - Extension package verification starts with checksums and manifest validation. Strong signatures can be added after the package format and release flow are proven.

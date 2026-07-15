@@ -332,6 +332,7 @@
   "extension.fact.type": "Type",
   "extension.fact.status": "Status",
   "extension.fact.capabilities": "Capabilities",
+  "extension.fileProvider": "File protocol extension",
   "extension.coreTitle": "Lightweight core plus pluggable extensions",
   "extension.installedHint": "Local extension packages",
   "extension.officialHint": "Official extensions can be distributed through GitHub Releases or offline .gtx packages",

@@ -332,6 +332,7 @@
   "extension.fact.type": "类型",
   "extension.fact.status": "状态",
   "extension.fact.capabilities": "能力",
+  "extension.fileProvider": "文件协议扩展",
   "extension.coreTitle": "轻量核心 + 可插拔扩展",
   "extension.installedHint": "本机扩展包",
   "extension.officialHint": "官方扩展建议放在 GitHub Release 或离线 .gtx 包分发",

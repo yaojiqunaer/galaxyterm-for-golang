@@ -150,7 +150,7 @@ import {
   buildTerminalStatusFacts,
 } from './terminalStatus.js';
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
-import { hasWailsMethod, writeClipboardText } from './desktopBridge.js';
+import { hasWailsMethod, syncDesktopWindowTheme, writeClipboardText } from './desktopBridge.js';
 import {
   buildConnectionActionPaletteItems,
   buildProfilePaletteItems,
@@ -408,9 +408,12 @@ function App() {
   }, []);
 
   useEffect(() => {
+    const resolvedTheme = resolveAppTheme(settings.appTheme);
     persistSettings(settings);
-    document.documentElement.dataset.appTheme = resolveAppTheme(settings.appTheme);
+    document.documentElement.dataset.appTheme = resolvedTheme;
+    document.documentElement.style.colorScheme = resolvedTheme;
     document.documentElement.dataset.density = settings.interfaceDensity || defaultSettings.interfaceDensity;
+    syncDesktopWindowTheme(settings.appTheme);
   }, [settings]);
 
   useEffect(() => {
@@ -2438,6 +2441,11 @@ function App() {
                     <span>{extension.id}</span>
                     <span className="connection-profile-badges">
                       {extension.providers.map((provider) => <span key={provider} className="connection-profile-badge tone-info">{provider}</span>)}
+                      {extension.fileProviders.map((provider) => (
+                        <span key={`file-${provider}`} className="connection-profile-badge tone-success" title={t('extension.fileProvider')}>
+                          <FolderOpenOutlined /> {provider}
+                        </span>
+                      ))}
                       {extension.capabilities.map((capability) => <span key={capability} className="connection-profile-badge">{capability}</span>)}
                     </span>
                   </span>

@@ -26,6 +26,11 @@ Select a saved SSH connection to browse, edit, upload, and download remote files
 </details>
 
 <details>
+<summary><b>Pluggable file protocols</b></summary>
+The core provides one shared file workspace while SFTP, FTP, S3, and future protocols such as WebDAV are installed as `.gtx` extensions. Extensions implement protocol and authentication adapters while reusing the same browsing, transfer, credential-reference, error, and audit experience. Protocol SDKs stay out of the base package.
+</details>
+
+<details>
 <summary><b>🔀 SSH port forwarding</b></summary>
 Reuse saved SSH connections for local port forwarding with password, private-key, and passphrase authentication. When no credential is stored, enter a password or private key for the current operation only.
 </details>
@@ -51,6 +56,8 @@ Interactive terminals show the current command, live duration, and execution sta
 </details>
 
 ## Architecture
+
+The core contains the local terminal, SSH, session management, shared file workspace, credentials, and extension host. Terminal and file-protocol extensions declare `providers` and `fileProviders` separately and can be installed online from GitHub Releases or offline from `.gtx` packages. File providers advertise capabilities such as `list`, `read`, `write`, `mkdir`, `rename`, and `delete`, so the workspace only exposes operations supported by the active protocol.
 
 ----
 

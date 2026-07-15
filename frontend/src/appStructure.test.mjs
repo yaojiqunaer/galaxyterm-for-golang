@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
 const source = await readFile(new URL('./App.jsx', import.meta.url), 'utf8');
+const mainGoSource = await readFile(new URL('../../main.go', import.meta.url), 'utf8');
 const mainSource = await readFile(new URL('./main.jsx', import.meta.url), 'utf8');
 const indexSource = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 const styles = await readFile(new URL('../style.scss', import.meta.url), 'utf8');
@@ -70,6 +71,18 @@ assert.ok(
 assert.ok(
   /<AppErrorBoundary>\s*<App\s*\/>\s*<\/AppErrorBoundary>/.test(mainSource),
   'the application root must recover from render failures instead of showing a blank window',
+);
+assert.ok(
+  mainGoSource.includes('mac.TitleBarDefault()')
+    && mainGoSource.includes('titleBar.HideTitle = true')
+    && mainGoSource.includes('mac.DefaultAppearance')
+    && !mainGoSource.includes('mac.TitleBarHiddenInset()'),
+  'macOS must use an unobstructed native title bar that starts with the system appearance',
+);
+assert.ok(
+  source.includes('syncDesktopWindowTheme(settings.appTheme);')
+    && source.includes('document.documentElement.style.colorScheme = resolvedTheme;'),
+  'application theme changes must update both native window chrome and webview controls',
 );
 assert.ok(
   indexSource.includes('<link rel="icon" href="/favicon.svg" type="image/svg+xml">')

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"galaxyterm/internal"
 	"galaxyterm/internal/credentials"
+	"galaxyterm/internal/desktop"
 	"galaxyterm/internal/extensions"
 	"galaxyterm/internal/files"
 	"galaxyterm/internal/session"
@@ -23,6 +24,20 @@ var assets embed.FS
 
 //go:embed build/appicon.png
 var icon []byte
+
+func newMacOptions() *mac.Options {
+	titleBar := mac.TitleBarDefault()
+	titleBar.HideTitle = true
+	return &mac.Options{
+		TitleBar:   titleBar,
+		Appearance: mac.DefaultAppearance,
+		About: &mac.AboutInfo{
+			Title:   "GalaxyTerm 0.0.1",
+			Message: "Galaxy Term for handsome users.\nCopyright © 2024",
+			Icon:    icon,
+		},
+	}
+}
 
 func main() {
 	var appCtx context.Context
@@ -70,6 +85,7 @@ func main() {
 		//CSSDragProperty: "--wails-draggable",
 		Bind: []interface{}{
 			session.NewAPI(sessionManager),
+			desktop.NewAPI(),
 			files.NewAPI(),
 			extensions.NewAPI(),
 			credentials.NewAPI(),
@@ -78,22 +94,8 @@ func main() {
 			&internal.Theme{},
 		},
 		Windows: nil,
-		Mac: &mac.Options{
-			TitleBar:   mac.TitleBarHiddenInset(),
-			Appearance: mac.NSAppearanceNameAccessibilityHighContrastVibrantLight,
-			//WindowIsTranslucent: true,
-			//Preferences: &mac.Preferences{
-			//	TabFocusesLinks:        mac.Enabled,
-			//	TextInteractionEnabled: mac.Disabled,
-			//	FullscreenEnabled:      mac.Enabled,
-			//},
-			About: &mac.AboutInfo{
-				Title:   "GalaxyTerm 0.0.1",
-				Message: "Galaxy Term for handsome users.\nCopyright © 2024",
-				Icon:    icon,
-			},
-		},
-		Linux: nil,
+		Mac:     newMacOptions(),
+		Linux:   nil,
 	})
 
 	if err != nil {
