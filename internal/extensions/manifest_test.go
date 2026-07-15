@@ -31,11 +31,75 @@ func TestValidateManifestAcceptsFileTransferOnlyExtension(t *testing.T) {
 			Protocol:     "s3",
 			NameKey:      "extension.s3.name",
 			Capabilities: []string{"list", "read", "write", "delete"},
+			ConfigFields: []FileProviderFieldManifest{
+				{Key: "endpoint", Type: "string", Label: "Endpoint", Required: true},
+				{Key: "port", Type: "number", Label: "Port", Default: float64(443)},
+			},
+			AuthFields: []FileProviderFieldManifest{
+				{Key: "accessKey", Type: "string", Label: "Access key", Required: true},
+				{Key: "secretKey", Type: "password", Label: "Secret key", Required: true},
+			},
 		}},
 	}
 
 	if err := ValidateManifest(manifest); err != nil {
 		t.Fatalf("ValidateManifest returned error for file transfer extension: %v", err)
+	}
+}
+
+func TestValidateManifestRejectsInvalidFileProviderFields(t *testing.T) {
+	base := Manifest{
+		ID:         "galaxyterm-extension-files",
+		Name:       "Files",
+		Version:    "0.1.0",
+		APIVersion: "v1",
+		Runtime:    RuntimeManifest{Protocol: "stdio-json-v1", Entrypoint: "bin/extension"},
+	}
+	cases := [][]FileProviderFieldManifest{
+		{{Key: "endpoint", Type: "color"}},
+		{{Key: "endpoint", Type: "string"}, {Key: "endpoint", Type: "string"}},
+		{{Key: "protocol", Type: "select"}},
+		{{Key: "protocol", Type: "select", Options: []FileProviderFieldOptionManifest{{Value: "ftp"}}, Default: "sftp"}},
+		{{Key: "port", Type: "number", Default: "21"}},
+		{{Key: "tls", Type: "boolean", Default: "yes"}},
+		{{Key: "password", Type: "password", Default: "must-not-ship"}},
+		{{Key: "accessKey", Type: "string", Default: "must-not-ship"}},
+		{{Key: "../endpoint", Type: "string"}},
+	}
+	for _, fields := range cases {
+		manifest := withFileProviders(base, []FileProviderManifest{{
+			Type: "ftp", Protocol: "ftp", Capabilities: []string{"list"}, AuthFields: fields,
+		}})
+		if err := ValidateManifest(manifest); err == nil {
+			t.Fatalf("ValidateManifest accepted invalid fields: %#v", fields)
+		}
+	}
+}
+
+func TestValidateManifestRejectsInvalidConfigFieldDefaults(t *testing.T) {
+	base := Manifest{
+		ID:         "galaxyterm-extension-files",
+		Name:       "Files",
+		Version:    "0.1.0",
+		APIVersion: "v1",
+		Runtime:    RuntimeManifest{Protocol: "stdio-json-v1", Entrypoint: "bin/extension"},
+	}
+	min := float64(1)
+	max := float64(10)
+	cases := [][]FileProviderFieldManifest{
+		{{Key: "endpoint", Type: "string", Default: true}},
+		{{Key: "tls", Type: "boolean", Default: 1}},
+		{{Key: "port", Type: "number", Default: float64(0), Min: &min}},
+		{{Key: "port", Type: "number", Default: float64(11), Max: &max}},
+		{{Key: "endpoint", Type: "string", Min: &min}},
+	}
+	for _, fields := range cases {
+		manifest := withFileProviders(base, []FileProviderManifest{{
+			Type: "ftp", Protocol: "ftp", Capabilities: []string{"list"}, ConfigFields: fields,
+		}})
+		if err := ValidateManifest(manifest); err == nil {
+			t.Fatalf("ValidateManifest accepted invalid config fields: %#v", fields)
+		}
 	}
 }
 

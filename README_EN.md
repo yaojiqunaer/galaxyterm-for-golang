@@ -57,11 +57,21 @@ Interactive terminals show the current command, live duration, and execution sta
 
 ## Architecture
 
-The core contains the local terminal, SSH, session management, shared file workspace, credentials, and extension host. Terminal and file-protocol extensions declare `providers` and `fileProviders` separately and can be installed online from GitHub Releases or offline from `.gtx` packages. File providers advertise capabilities such as `list`, `read`, `write`, `mkdir`, `rename`, and `delete`, so the workspace only exposes operations supported by the active protocol.
+The core contains the local terminal, SSH, session management, shared file workspace, credentials, and extension host. Terminal and file-protocol extensions declare `providers` and `fileProviders` separately and can be installed online from GitHub Releases or offline from `.gtx` packages. File providers advertise capabilities such as `list`, `read`, `write`, `mkdir`, `rename`, and `delete`, then contribute connection forms through `configFields` and `authFields`; the workspace does not need protocol-specific UI code and only exposes fields and operations supported by the active provider.
 
 ----
 
 ## Installation
+
+### File protocol extensions
+
+The base application does not include SFTP, FTP, or S3 SDKs. Build the official SFTP provider as a standalone offline `.gtx` package:
+
+```shell
+./scripts/package-extension.sh sftp
+```
+
+The package is written to `dist/extensions/`. Install it from Extensions > Offline Install; the Files workspace discovers SFTP automatically and only shows browse, edit, upload, rename, or delete actions declared by the provider. FTP/FTPS and S3 extensions use the same `stdio-json-v1` file-provider protocol without changing the core file workspace.
 
 ### Local start
 

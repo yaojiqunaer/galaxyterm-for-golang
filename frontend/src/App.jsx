@@ -178,6 +178,7 @@ import {
 } from './quickCommands.js';
 import {
   buildEnabledFileProviders,
+  buildFileProviderFormValues,
   buildExtensionAction,
   buildExtensionCardFacts,
   buildExtensionSummary,
@@ -207,6 +208,7 @@ import * as TerminalAPI from '../wailsjs/go/terminal/API.js';
 import * as TunnelAPI from '../wailsjs/go/tunnel/API.js';
 import { availableLocales, currentLocale, setLocale, t } from './i18n.js';
 import SavedSSHProfileSelect from './components/SavedSSHProfileSelect.jsx';
+import FileProviderFormFields from './components/FileProviderFormFields.jsx';
 
 const TerminalPane = lazy(() => import('./components/TerminalPane.jsx'));
 const AuditReplayPlayer = lazy(() => import('./components/AuditReplayPlayer.jsx'));
@@ -250,12 +252,17 @@ const officialExtensions = [
   { type: 'docker', nameKey: 'extension.docker' },
   { type: 'mysql', nameKey: 'extension.mysql' },
   { type: 'redis', nameKey: 'extension.redis' },
+  { type: 'sftp', nameKey: 'extension.sftp' },
+  { type: 'ftp', nameKey: 'extension.ftp' },
+  { type: 's3', nameKey: 'extension.s3' },
 ];
 
 const providerIcons = {
   local: <LaptopOutlined />,
   ssh: <CloudServerOutlined />,
   sftp: <FolderOpenOutlined />,
+  ftp: <FolderOpenOutlined />,
+  s3: <CloudServerOutlined />,
   mysql: <DatabaseOutlined />,
   redis: <DatabaseOutlined />,
   kubernetes: <ApiOutlined />,
@@ -689,6 +696,16 @@ function App() {
       setFileEntries([]);
     }
   }, [fileProviderType, selectedFileProvider?.type]);
+
+  useEffect(() => {
+    const nextProvider = selectedFileProvider;
+    if (!nextProvider) return;
+    const values = nextProvider.protocol === 'sftp'
+      ? { config: {}, auth: {} }
+      : buildFileProviderFormValues(nextProvider);
+    fileForm.setFieldValue('config', values.config);
+    fileForm.setFieldValue('auth', values.auth);
+  }, [fileForm, selectedFileProvider?.type]);
   const auditProviderOptions = useMemo(() => [
     { value: 'all', label: t('filter.allProviders') },
     ...Array.from(new Set(auditRecords.map((record) => record.providerType || 'terminal')))
@@ -2939,7 +2956,7 @@ function App() {
               )}
                 </>
               ) : (
-                <Alert showIcon type="info" message={t('file.providerConfigManagedByExtension')} />
+                <FileProviderFormFields provider={selectedFileProvider} />
               )}
               <Form.Item name="path" label={t('field.path')}>
                 <Input />

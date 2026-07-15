@@ -68,7 +68,7 @@ export function buildExtensionCatalog({
   providers = [],
 } = {}) {
   const installedProviderTypes = new Set(installedExtensions.flatMap((extension) => (
-    extension.providers || []
+    [...(extension.providers || []), ...(extension.fileProviders || [])]
   ).map((provider) => provider.type)));
   const builtinItems = providers.map((provider) => ({
     ...provider,

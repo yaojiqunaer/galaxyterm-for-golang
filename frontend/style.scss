@@ -2686,6 +2686,23 @@ code {
   gap: 12px;
 }
 
+.remote-provider-empty {
+  display: grid;
+  min-height: min(54vh, 460px);
+  place-items: center;
+}
+
+.remote-provider-empty .ant-empty {
+  max-width: 560px;
+}
+
+.remote-provider-empty .ant-empty-footer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-direction: column;
+}
+
 .remote-summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

@@ -56,11 +56,21 @@
 
 ## 架构
 
-核心程序只保留本地终端、SSH、会话管理、通用文件工作区、凭据和扩展宿主。终端扩展与文件协议扩展分别声明 `providers` 和 `fileProviders`，可通过 GitHub Releases 在线获取或使用 `.gtx` 包离线安装。文件协议扩展支持按能力声明 `list`、`read`、`write`、`mkdir`、`rename`、`delete` 等操作，界面只展示当前协议实际支持的命令。
+核心程序只保留本地终端、SSH、会话管理、通用文件工作区、凭据和扩展宿主。终端扩展与文件协议扩展分别声明 `providers` 和 `fileProviders`，可通过 GitHub Releases 在线获取或使用 `.gtx` 包离线安装。文件协议扩展支持按能力声明 `list`、`read`、`write`、`mkdir`、`rename`、`delete` 等操作，并通过 `configFields`、`authFields` 贡献连接表单；界面无需识别具体协议，只展示当前 Provider 实际支持的字段和命令。
 
 ----
 
 ## 安装
+
+### 文件协议扩展
+
+基础安装包不包含 SFTP、FTP 或 S3 SDK。官方 SFTP 扩展可独立构建为 `.gtx` 离线包：
+
+```shell
+./scripts/package-extension.sh sftp
+```
+
+产物位于 `dist/extensions/`。在“扩展”页面选择“离线安装”，安装后“文件”页面会自动发现 SFTP，并按扩展声明的能力显示浏览、编辑、上传、重命名或删除操作。FTP/FTPS 与 S3 扩展将使用相同的 `stdio-json-v1` 文件 Provider 协议接入，无需修改核心文件工作区。
 
 ### 本地启动
 

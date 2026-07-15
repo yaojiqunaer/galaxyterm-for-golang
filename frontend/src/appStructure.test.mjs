@@ -234,6 +234,13 @@ assert.ok(
   'the SFTP extension must retain saved SSH profile reuse without making it a core protocol implementation',
 );
 assert.ok(
+  source.includes('<FileProviderFormFields provider={selectedFileProvider} />')
+    && source.includes('buildFileProviderFormValues(nextProvider)')
+    && source.includes('config: values.config || {}')
+    && source.includes('auth: values.auth || {}'),
+  'non-SFTP file providers must contribute connection fields without protocol-specific core UI changes',
+);
+assert.ok(
   source.includes("const openConnectionDrawer = (type = terminalDefaults.defaultProviderType) => openDrawer(type, null, 'connection');")
     && source.includes('saveProfile: resolveProfileSaveDefault({ intent, profile })')
     && source.includes("terminalDrawerIntent === 'session'")

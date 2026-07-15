@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   buildEnabledFileProviders,
+  buildFileProviderFormValues,
   buildExtensionAction,
   buildExtensionCardFacts,
   buildExtensionSummary,
@@ -70,6 +71,11 @@ assert.deepEqual(buildEnabledFileProviders([
       nameKey: 'extension.sftp.name',
       capabilities: ['list', 'read', 'write'],
       authMethods: ['password', 'privateKey'],
+      configFields: [
+        { key: 'endpoint', type: 'string', required: true },
+        { key: 'port', type: 'number', default: 22 },
+      ],
+      authFields: [{ key: 'password', type: 'password', required: true }],
     }],
   },
   {
@@ -86,7 +92,27 @@ assert.deepEqual(buildEnabledFileProviders([
   description: '',
   capabilities: ['list', 'read', 'write'],
   authMethods: ['password', 'privateKey'],
+  configFields: [
+    { key: 'endpoint', type: 'string', required: true },
+    { key: 'port', type: 'number', default: 22 },
+  ],
+  authFields: [{ key: 'password', type: 'password', required: true }],
 }]);
+
+assert.deepEqual(buildFileProviderFormValues({
+  configFields: [
+    { key: 'endpoint', type: 'string' },
+    { key: 'port', type: 'number', default: 443 },
+    { key: 'pathStyle', type: 'boolean', default: false },
+  ],
+  authFields: [
+    { key: 'accessKey', type: 'string' },
+    { key: 'password', type: 'password' },
+  ],
+}), {
+  config: { port: 443, pathStyle: false },
+  auth: {},
+});
 
 assert.equal(fileProviderSupports({ capabilities: ['list', 'read'] }, 'read'), true);
 assert.equal(fileProviderSupports({ capabilities: ['list'] }, 'delete'), false);

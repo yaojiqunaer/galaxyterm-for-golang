@@ -35,10 +35,26 @@ export function buildEnabledFileProviders(installedExtensions = [], disabledExte
         description: provider.description || '',
         capabilities: Array.isArray(provider.capabilities) ? provider.capabilities : [],
         authMethods: Array.isArray(provider.authMethods) ? provider.authMethods : [],
+        configFields: Array.isArray(provider.configFields) ? provider.configFields : [],
+        authFields: Array.isArray(provider.authFields) ? provider.authFields : [],
       });
     });
   });
   return [...providersByType.values()];
+}
+
+export function buildFileProviderFormValues(provider = {}) {
+  const values = { config: {}, auth: {} };
+  for (const [section, fields] of [
+    ['config', provider.configFields || []],
+    ['auth', provider.authFields || []],
+  ]) {
+    fields.forEach((field) => {
+      if (!field?.key || !Object.prototype.hasOwnProperty.call(field, 'default')) return;
+      values[section][field.key] = field.default;
+    });
+  }
+  return values;
 }
 
 export function fileProviderSupports(provider, capability) {

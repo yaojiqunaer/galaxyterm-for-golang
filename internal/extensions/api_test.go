@@ -2,10 +2,15 @@ package extensions
 
 import (
 	"archive/zip"
+	"bytes"
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
+	"sort"
+	"strings"
 	"testing"
 )
 
@@ -124,6 +129,51 @@ func TestInstallOfflineRejectsArchivePathTraversal(t *testing.T) {
 	}
 }
 
+func TestInstallOfflineRejectsChecksumMismatch(t *testing.T) {
+	storePath := filepath.Join(t.TempDir(), "extensions", "installed.json")
+	api := NewAPIWithStore(storePath)
+	manifest := Manifest{
+		ID:         "galaxyterm-extension-sftp",
+		Name:       "SFTP",
+		Version:    "0.1.0",
+		APIVersion: "v1",
+		Runtime:    RuntimeManifest{Protocol: "stdio-json-v1", Entrypoint: "bin/extension"},
+		FileProviders: []FileProviderManifest{{
+			Type: "sftp", Protocol: "sftp", Capabilities: []string{"list"},
+		}},
+	}
+	packagePath := writeGTXPackageArchive(t, manifest, map[string]string{"bin/extension": "tampered"}, true)
+
+	if _, err := api.InstallOffline(packagePath); err == nil {
+		t.Fatal("InstallOffline returned nil error for checksum mismatch")
+	}
+}
+
+func TestHashZipFileHonorsLimit(t *testing.T) {
+	var archive bytes.Buffer
+	writer := zip.NewWriter(&archive)
+	entry, err := writer.Create("payload")
+	if err != nil {
+		t.Fatalf("create payload: %v", err)
+	}
+	if _, err := entry.Write([]byte("12345")); err != nil {
+		t.Fatalf("write payload: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close archive: %v", err)
+	}
+	reader, err := zip.NewReader(bytes.NewReader(archive.Bytes()), int64(archive.Len()))
+	if err != nil {
+		t.Fatalf("open archive: %v", err)
+	}
+	if _, err := hashZipFile(reader.File[0], 4); err == nil {
+		t.Fatal("hashZipFile accepted a file larger than its limit")
+	}
+	if digest, err := hashZipFile(reader.File[0], 5); err != nil || digest == "" {
+		t.Fatalf("hashZipFile within limit = %q, %v", digest, err)
+	}
+}
+
 func TestInstallOfflinePackageRejectsMissingManifest(t *testing.T) {
 	api := NewAPIWithStore(filepath.Join(t.TempDir(), "installed.json"))
 	packagePath := filepath.Join(t.TempDir(), "broken.gtx")
@@ -141,6 +191,58 @@ func TestInstallOfflinePackageRejectsMissingManifest(t *testing.T) {
 
 	if _, err := api.InstallOffline(packagePath); err == nil {
 		t.Fatal("InstallOffline returned nil error, want missing manifest error")
+	}
+}
+
+func TestReadPackageManifestRejectsOversizedManifest(t *testing.T) {
+	packagePath := filepath.Join(t.TempDir(), "oversized.gtx")
+	file, err := os.Create(packagePath)
+	if err != nil {
+		t.Fatalf("create package: %v", err)
+	}
+	writer := zip.NewWriter(file)
+	entry, err := writer.Create("manifest.json")
+	if err != nil {
+		t.Fatalf("create manifest: %v", err)
+	}
+	if _, err := entry.Write(bytes.Repeat([]byte(" "), maxManifestSize+1)); err != nil {
+		t.Fatalf("write manifest: %v", err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close archive: %v", err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatalf("close package: %v", err)
+	}
+	if _, err := ReadPackageManifest(packagePath); err == nil {
+		t.Fatal("ReadPackageManifest accepted an oversized manifest")
+	}
+}
+
+func TestReadPackageManifestRejectsDuplicateManifest(t *testing.T) {
+	packagePath := filepath.Join(t.TempDir(), "duplicate.gtx")
+	file, err := os.Create(packagePath)
+	if err != nil {
+		t.Fatalf("create package: %v", err)
+	}
+	writer := zip.NewWriter(file)
+	for range 2 {
+		entry, err := writer.Create("manifest.json")
+		if err != nil {
+			t.Fatalf("create manifest: %v", err)
+		}
+		if _, err := entry.Write([]byte(`{"id":"duplicate"}`)); err != nil {
+			t.Fatalf("write manifest: %v", err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close archive: %v", err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatalf("close package: %v", err)
+	}
+	if _, err := ReadPackageManifest(packagePath); err == nil {
+		t.Fatal("ReadPackageManifest accepted duplicate manifest.json entries")
 	}
 }
 
@@ -195,6 +297,10 @@ func writeGTXPackage(t *testing.T, manifest Manifest) string {
 }
 
 func writeGTXPackageWithFiles(t *testing.T, manifest Manifest, files map[string]string) string {
+	return writeGTXPackageArchive(t, manifest, files, false)
+}
+
+func writeGTXPackageArchive(t *testing.T, manifest Manifest, files map[string]string, corruptChecksum bool) string {
 	t.Helper()
 	packagePath := filepath.Join(t.TempDir(), manifest.ID+".gtx")
 	file, err := os.Create(packagePath)
@@ -202,12 +308,16 @@ func writeGTXPackageWithFiles(t *testing.T, manifest Manifest, files map[string]
 		t.Fatalf("create package: %v", err)
 	}
 	writer := zip.NewWriter(file)
+	var manifestContent bytes.Buffer
+	if err := json.NewEncoder(&manifestContent).Encode(manifest); err != nil {
+		t.Fatalf("encode manifest: %v", err)
+	}
 	manifestFile, err := writer.Create("manifest.json")
 	if err != nil {
 		t.Fatalf("create manifest: %v", err)
 	}
-	if err := json.NewEncoder(manifestFile).Encode(manifest); err != nil {
-		t.Fatalf("encode manifest: %v", err)
+	if _, err := manifestFile.Write(manifestContent.Bytes()); err != nil {
+		t.Fatalf("write manifest: %v", err)
 	}
 	for name, content := range files {
 		entry, err := writer.Create(name)
@@ -216,6 +326,33 @@ func writeGTXPackageWithFiles(t *testing.T, manifest Manifest, files map[string]
 		}
 		if _, err := entry.Write([]byte(content)); err != nil {
 			t.Fatalf("write package file %q: %v", name, err)
+		}
+	}
+	if manifest.Runtime.Entrypoint != "" {
+		checksums := map[string][]byte{"manifest.json": manifestContent.Bytes()}
+		for name, content := range files {
+			checksums[name] = []byte(content)
+		}
+		names := make([]string, 0, len(checksums))
+		for name := range checksums {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		lines := make([]string, 0, len(names))
+		for _, name := range names {
+			digest := sha256.Sum256(checksums[name])
+			encoded := fmt.Sprintf("%x", digest)
+			if corruptChecksum && name == manifest.Runtime.Entrypoint {
+				encoded = strings.Repeat("0", sha256.Size*2)
+			}
+			lines = append(lines, encoded+"  "+name)
+		}
+		entry, err := writer.Create("checksums.txt")
+		if err != nil {
+			t.Fatalf("create checksums: %v", err)
+		}
+		if _, err := entry.Write([]byte(strings.Join(lines, "\n") + "\n")); err != nil {
+			t.Fatalf("write checksums: %v", err)
 		}
 	}
 	if err := writer.Close(); err != nil {

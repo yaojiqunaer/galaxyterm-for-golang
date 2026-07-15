@@ -64,10 +64,12 @@ assert.deepEqual(filterAuditRecords(auditRecords, { providerType: 'ssh', query: 
 const catalog = buildExtensionCatalog({
   installedExtensions: [
     { id: 'galaxyterm-kubernetes', name: 'Kubernetes', providers: [{ type: 'kubernetes' }] },
+    { id: 'galaxyterm-s3', name: 'S3', fileProviders: [{ type: 's3' }] },
   ],
   officialExtensions: [
     { type: 'kubernetes', nameKey: 'extension.kubernetes' },
     { type: 'redis', nameKey: 'extension.redis' },
+    { type: 's3', nameKey: 'extension.s3' },
   ],
   providers: [
     { type: 'local', name: 'Local', category: 'builtin' },
@@ -80,4 +82,5 @@ assert.deepEqual(catalog.map((item) => `${item.type}:${item.status}`), [
   'ssh:builtin',
   'kubernetes:installed',
   'redis:planned',
+  's3:installed',
 ]);

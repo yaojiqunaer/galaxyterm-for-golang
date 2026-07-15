@@ -1,0 +1,94 @@
+{
+  "id": "galaxyterm-extension-sftp",
+  "name": "SFTP",
+  "version": "0.1.0",
+  "apiVersion": "v1",
+  "description": "Official SFTP file provider for GalaxyTerm",
+  "runtime": {
+    "protocol": "stdio-json-v1",
+    "entrypoint": "bin/galaxyterm-extension-sftp"
+  },
+  "fileProviders": [
+    {
+      "type": "sftp",
+      "protocol": "sftp",
+      "nameKey": "extension.sftp",
+      "description": "Browse and manage remote files over SSH File Transfer Protocol",
+      "capabilities": ["list", "stat", "read", "write", "mkdir", "rename", "delete"],
+      "authMethods": ["password", "privateKey"],
+      "configFields": [
+        {
+          "key": "host",
+          "type": "string",
+          "labelKey": "field.host",
+          "label": "Host",
+          "placeholderKey": "placeholder.host",
+          "required": true
+        },
+        {
+          "key": "port",
+          "type": "number",
+          "labelKey": "field.port",
+          "label": "Port",
+          "default": 22,
+          "min": 1,
+          "max": 65535
+        },
+        {
+          "key": "hostKeyPolicy",
+          "type": "select",
+          "label": "Host key policy",
+          "default": "accept-new",
+          "options": [
+            {"value": "accept-new", "label": "Trust first use"},
+            {"value": "strict", "label": "Strict"}
+          ]
+        },
+        {
+          "key": "knownHostsPath",
+          "type": "string",
+          "label": "Known hosts file"
+        }
+      ],
+      "authFields": [
+        {
+          "key": "username",
+          "type": "string",
+          "labelKey": "field.username",
+          "label": "Username",
+          "required": true
+        },
+        {
+          "key": "authType",
+          "type": "select",
+          "labelKey": "field.authType",
+          "label": "Authentication",
+          "default": "password",
+          "options": [
+            {"value": "password", "labelKey": "auth.password", "label": "Password"},
+            {"value": "privateKey", "labelKey": "auth.privateKey", "label": "Private key"}
+          ]
+        },
+        {
+          "key": "password",
+          "type": "password",
+          "labelKey": "field.password",
+          "label": "Password"
+        },
+        {
+          "key": "privateKey",
+          "type": "textarea",
+          "labelKey": "field.privateKey",
+          "label": "Private key"
+        },
+        {
+          "key": "passphrase",
+          "type": "password",
+          "labelKey": "field.passphrase",
+          "label": "Passphrase"
+        }
+      ]
+    }
+  ],
+  "locales": ["zh-CN", "en-US"]
+}
