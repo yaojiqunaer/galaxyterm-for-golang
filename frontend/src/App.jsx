@@ -194,6 +194,7 @@ import {
   resolveBracketSessionAction,
   resolveNumberedSessionIndex,
   resolveRelativeSessionIndex,
+  resolveSessionShortcutNumber,
 } from './listNavigation.js';
 import * as ExtensionsAPI from '../wailsjs/go/extensions/API.js';
 import * as FilesAPI from '../wailsjs/go/files/API.js';
@@ -688,6 +689,7 @@ function App() {
     activeKey,
     status: 'active',
   }), [activeKey, sessions]);
+  const sessionIds = useMemo(() => sessions.map((session) => session.id), [sessions]);
   const visibleQuickCommands = useMemo(() => filterQuickCommands(quickCommands, commandQuery, {
     favoriteOnly: commandScope === 'favorites',
     providerType: commandScope === 'current' ? activeSession?.providerType || 'all' : 'all',
@@ -1811,7 +1813,10 @@ function App() {
     return (
       <TerminalFrame
         auditSummary={buildSessionAuditSummary(session, { recordingActive })}
-        contextFacts={buildSessionContextFacts(session, { recordingActive })}
+        contextFacts={buildSessionContextFacts(session, {
+          providerName: providerTypeLabel(session.providerType, providers),
+          recordingActive,
+        })}
         onCopyError={() => copyTerminalError(session.id)}
         onInterrupt={() => interruptSession(session.id)}
         onOpenAudit={() => openSessionAudit(session.id)}
@@ -3996,18 +4001,21 @@ function App() {
                 <List
                   size="small"
                   dataSource={sidebarSessions}
-                  renderItem={(session, index) => (
-                    <List.Item
-                      className={session.id === activeKey ? 'session-row active' : 'session-row'}
-                      onClick={() => {
-                        setSelectedNav('sessions');
-                        setActiveKey(session.id);
-                      }}
-                    >
-                      <SessionSidebarLabel session={session} />
-                      {index < 9 && <Text code>{index + 1}</Text>}
-                    </List.Item>
-                  )}
+                  renderItem={(session) => {
+                    const shortcutNumber = resolveSessionShortcutNumber(sessionIds, session.id);
+                    return (
+                      <List.Item
+                        className={session.id === activeKey ? 'session-row active' : 'session-row'}
+                        onClick={() => {
+                          setSelectedNav('sessions');
+                          setActiveKey(session.id);
+                        }}
+                      >
+                        <SessionSidebarLabel session={session} />
+                        {shortcutNumber && <Text code>{shortcutNumber}</Text>}
+                      </List.Item>
+                    );
+                  }}
                 />
               )}
             </div>
@@ -5101,6 +5109,7 @@ function TerminalFrame({
                   role="status"
                 >
                   <VideoCameraOutlined />
+                  <span className="session-capture-indicator-label">{sessionRecordingIndicatorLabel(recordingFact)}</span>
                 </span>
               </Tooltip>
             )}
@@ -5112,6 +5121,7 @@ function TerminalFrame({
                   role="status"
                 >
                   <AuditOutlined />
+                  <span className="session-capture-indicator-label">{sessionAuditIndicatorLabel(auditSummary)}</span>
                 </span>
               </Tooltip>
             )}
@@ -5699,6 +5709,16 @@ function sessionContextFactLabel(fact) {
 function sessionContextFactValue(fact) {
   if (fact.key === 'recording') return t(`recording.state.${fact.value}`);
   return fact.value || '-';
+}
+
+function sessionRecordingIndicatorLabel(fact) {
+  return t(`recording.indicator.${fact?.value || 'pending'}`);
+}
+
+function sessionAuditIndicatorLabel(summary) {
+  if (summary?.titleKey === 'session.audit.saved.title') return t('session.audit.indicator.saved');
+  if (summary?.titleKey === 'session.audit.recording.title') return t('session.audit.indicator.active');
+  return t('session.audit.indicator.pending');
 }
 
 function terminalStatusFactLabel(fact) {

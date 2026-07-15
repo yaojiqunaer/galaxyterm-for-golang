@@ -3,6 +3,7 @@ import {
   resolveListIndex,
   resolveBracketSessionAction,
   resolveNumberedSessionIndex,
+  resolveSessionShortcutNumber,
   resolveRelativeSessionIndex,
 } from './listNavigation.js';
 
@@ -18,6 +19,11 @@ assert.equal(resolveNumberedSessionIndex('1', 4), 0);
 assert.equal(resolveNumberedSessionIndex('4', 4), 3);
 assert.equal(resolveNumberedSessionIndex('5', 4), -1);
 assert.equal(resolveNumberedSessionIndex('0', 4), -1);
+
+assert.equal(resolveSessionShortcutNumber(['s1', 's2'], 's1'), '1');
+assert.equal(resolveSessionShortcutNumber(['s1', 's2'], 's2'), '2');
+assert.equal(resolveSessionShortcutNumber(['s1'], 'missing'), '');
+assert.equal(resolveSessionShortcutNumber(['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9', 's10'], 's10'), '');
 
 assert.equal(resolveRelativeSessionIndex(['s1', 's2', 's3'], 's2', 'next'), 2);
 assert.equal(resolveRelativeSessionIndex(['s1', 's2', 's3'], 's2', 'previous'), 0);

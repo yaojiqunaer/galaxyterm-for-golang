@@ -218,10 +218,6 @@ function TerminalPane({
       term.current.loadAddon(searchAddon.current);
       term.current.open(containerRef.current);
       emitTerminalStatus(onStatusChange, terminalStatus, { status: 'connecting' });
-      const connectingText = `${t('terminal.status.connecting')}\r\n`;
-      transcript.current.push(connectingText);
-      outputEvents.current.push({ time: 0, data: connectingText });
-      term.current.write(connectingText);
 
       const createdSessionId = await SessionAPI.CreateSession(request);
       if (disposed) {

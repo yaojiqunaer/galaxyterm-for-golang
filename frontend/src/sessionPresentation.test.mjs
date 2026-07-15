@@ -269,6 +269,20 @@ assert.deepEqual(buildSessionContextFacts({
   { key: 'recording', value: 'saved', tone: 'closed' },
 ]);
 
+assert.deepEqual(buildSessionContextFacts({
+  providerType: 'ssh',
+  request: {
+    auth: { username: 'deploy' },
+    config: { host: 'edge.example.com', port: 2202 },
+  },
+}, { providerName: 'SSH Terminal', recordingActive: true }), [
+  { key: 'provider', value: 'SSH Terminal', tone: 'neutral' },
+  { key: 'target', value: 'edge.example.com:2202', tone: 'neutral' },
+  { key: 'user', value: 'deploy', tone: 'neutral' },
+  { key: 'audit', value: 0, tone: 'neutral' },
+  { key: 'recording', value: 'active', tone: 'success' },
+]);
+
 assert.deepEqual(buildSessionContextFacts(null), []);
 
 assert.deepEqual(buildSessionAuditSummary(null), {

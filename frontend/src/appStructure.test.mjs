@@ -217,6 +217,11 @@ assert.ok(
   'the command palette must expose recently closed session recovery when available',
 );
 assert.ok(
+  source.includes('resolveSessionShortcutNumber(sessionIds, session.id)')
+    && !source.includes('{index < 9 && <Text code>{index + 1}</Text>}'),
+  'sidebar shortcut badges must describe the actual numbered session action after active-first sorting',
+);
+assert.ok(
   source.includes("const openConnectionDrawer = (type = terminalDefaults.defaultProviderType) => openDrawer(type, null, 'connection');")
     && source.includes('saveProfile: resolveProfileSaveDefault({ intent, profile })')
     && source.includes("terminalDrawerIntent === 'session'")
@@ -235,6 +240,17 @@ assert.ok(
     && terminalPaneSource.includes("SessionAPI.Send(sessionId.current, '\\u0003')")
     && source.includes('onInterrupt={() => interruptSession(session.id)}'),
   'running terminal commands must expose a provider-neutral PTY interrupt through each terminal frame',
+);
+assert.ok(
+  !terminalPaneSource.includes('const connectingText')
+    && !terminalPaneSource.includes('term.current.write(connectingText)'),
+  'connection progress must stay in structured status instead of polluting terminal output and recordings',
+);
+assert.ok(
+  source.includes('sessionRecordingIndicatorLabel(recordingFact)')
+    && source.includes('sessionAuditIndicatorLabel(auditSummary)')
+    && styles.includes('.session-capture-indicator-label'),
+  'recording and audit state must remain readable without relying on icon hover tooltips',
 );
 assert.ok(
   terminalPaneSource.includes('onConfirmPaste')

@@ -768,16 +768,25 @@ select {
 
 .session-audit-indicator,
 .session-recording-indicator {
-  display: inline-grid;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   flex: 0 0 auto;
-  width: 26px;
+  width: auto;
   min-width: 26px;
-  height: 26px;
-  place-items: center;
+  height: 24px;
+  padding: 0 7px;
   border: 1px solid var(--terminal-border);
-  border-radius: 50%;
+  border-radius: 999px;
   background: var(--terminal-chrome-soft);
   color: var(--muted);
+}
+
+.session-capture-indicator-label {
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .session-recording-indicator.tone-success {
@@ -1175,6 +1184,19 @@ select {
   }
 
   .terminal-recovery-label {
+    display: none;
+  }
+}
+
+@media (max-width: 680px) {
+  .session-audit-indicator,
+  .session-recording-indicator {
+    width: 26px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .session-capture-indicator-label {
     display: none;
   }
 }

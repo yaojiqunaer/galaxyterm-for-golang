@@ -168,13 +168,16 @@ export function buildSessionTabMenuModel(options = {}) {
 
 export function buildSessionContextFacts(session, options = {}) {
   if (!session) return [];
+  const config = session.config || session.request?.config || {};
+  const auth = session.auth || session.request?.auth || {};
   const facts = [
-    { key: 'provider', value: session.providerType || 'terminal', tone: 'neutral' },
+    { key: 'provider', value: options.providerName || session.providerType || 'terminal', tone: 'neutral' },
   ];
-  const target = resolveSessionTarget(session);
+  const target = resolveSessionTarget(config);
   if (target) facts.push({ key: 'target', value: target, tone: 'neutral' });
-  if (session.config?.username) {
-    facts.push({ key: 'user', value: session.config.username, tone: 'neutral' });
+  const username = config.username || auth.username;
+  if (username) {
+    facts.push({ key: 'user', value: username, tone: 'neutral' });
   }
   const auditCount = (session.auditEvents || []).length;
   facts.push({ key: 'audit', value: auditCount, tone: auditCount > 0 ? 'success' : 'neutral' });
@@ -339,8 +342,7 @@ function matchesSessionQuery(session = {}, queryTokens = []) {
   return queryTokens.every((token) => searchText.includes(token));
 }
 
-function resolveSessionTarget(session = {}) {
-  const { config = {} } = session;
+function resolveSessionTarget(config = {}) {
   if (config.host) {
     return config.port ? `${config.host}:${config.port}` : config.host;
   }

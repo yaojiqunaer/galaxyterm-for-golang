@@ -13,6 +13,11 @@ export function resolveNumberedSessionIndex(key = '', sessionCount = 0) {
   return index >= 0 && index < sessionCount ? index : -1;
 }
 
+export function resolveSessionShortcutNumber(sessionIds = [], sessionId = '') {
+  const index = sessionIds.indexOf(sessionId);
+  return index >= 0 && index < 9 ? String(index + 1) : '';
+}
+
 export function resolveRelativeSessionIndex(sessionIds = [], activeSessionId = '', action = 'next') {
   if (sessionIds.length === 0) return -1;
   const currentIndex = sessionIds.indexOf(activeSessionId);
