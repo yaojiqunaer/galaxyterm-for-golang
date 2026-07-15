@@ -150,6 +150,35 @@ assert.ok(
   'user feedback must use a theme-aware message context instead of the static API',
 );
 assert.ok(
+  source.includes('const [notificationApi, notificationContextHolder] = notification.useNotification();')
+    && source.includes('{notificationContextHolder}')
+    && source.includes('const showOperationError =')
+    && source.includes('<OperationErrorDescription model={model} />')
+    && source.includes('writeClipboardText(model.detail)')
+    && source.includes("{t('action.copyError')}"),
+  'recoverable operation failures must use one theme-aware structured notification path',
+);
+assert.ok(
+  source.includes("showOperationError('message.connectionTestFailed', error, { retry: testConnection })")
+    && source.includes("showOperationError('message.extensionInstallFailed', error, {")
+    && source.includes("scope: 'extension'")
+    && source.includes("showOperationError('message.fileListFailed', error, {")
+    && source.includes('retry: () => loadFiles(overridePath)')
+    && source.includes("showOperationError('message.tunnelFailed', error, {")
+    && !source.includes("messageApi.error(`${t('message.connectionTestFailed')}: ${error}`)")
+    && !source.includes("messageApi.error(`${t('message.extensionInstallFailed')}: ${error}`)")
+    && !source.includes("messageApi.error(`${t('message.fileListFailed')}: ${error}`)")
+    && !source.includes("messageApi.error(`${t('message.tunnelFailed')}: ${error}`)"),
+  'connection, extension, file, and tunnel failures must expose structured recovery instead of raw error toasts',
+);
+assert.ok(
+  source.includes("showOperationError('message.credentialFailed', error")
+    && source.includes("showOperationError('message.profileImportFailed', error")
+    && !source.includes("messageApi.error(`${t('message.credentialFailed')}: ${error}`)")
+    && !source.includes("messageApi.error(`${t('message.profileImportFailed')}: ${error}`)"),
+  'credential and profile import failures must use the same structured operation feedback',
+);
+assert.ok(
   source.includes('const [modalApi, modalContextHolder] = Modal.useModal();')
     && source.includes('{modalContextHolder}')
     && !source.includes('Modal.confirm({'),

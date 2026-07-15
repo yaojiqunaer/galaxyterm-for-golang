@@ -17,6 +17,7 @@
     "test:i18n": "node src/i18n.test.mjs",
     "test:insights": "node src/workspaceInsights.test.mjs",
     "test:list-navigation": "node src/listNavigation.test.mjs",
+    "test:operation-feedback": "node src/operationFeedback.test.mjs",
     "test:palette": "node src/paletteModel.test.mjs",
     "test:quick-commands": "node src/quickCommands.test.mjs",
     "test:replay-timeline": "node src/replayTimeline.test.mjs",

@@ -28,6 +28,7 @@ import {
   Tooltip,
   Typography,
   message,
+  notification,
   theme as antdTheme,
 } from 'antd';
 import {
@@ -209,6 +210,8 @@ import * as TunnelAPI from '../wailsjs/go/tunnel/API.js';
 import { availableLocales, currentLocale, setLocale, t } from './i18n.js';
 import SavedSSHProfileSelect from './components/SavedSSHProfileSelect.jsx';
 import FileProviderFormFields from './components/FileProviderFormFields.jsx';
+import OperationErrorDescription from './components/OperationErrorDescription.jsx';
+import { buildOperationError } from './operationFeedback.js';
 
 const TerminalPane = lazy(() => import('./components/TerminalPane.jsx'));
 const AuditReplayPlayer = lazy(() => import('./components/AuditReplayPlayer.jsx'));
@@ -286,6 +289,7 @@ function App() {
   const screens = Grid.useBreakpoint();
   const compactConnectionDetail = screens.xl !== true;
   const [messageApi, messageContextHolder] = message.useMessage();
+  const [notificationApi, notificationContextHolder] = notification.useNotification();
   const [modalApi, modalContextHolder] = Modal.useModal();
   const [allProviders, setAllProviders] = useState(fallbackProviders);
   const [sessions, setSessions] = useState([]);
@@ -373,6 +377,48 @@ function App() {
   const [commandForm] = Form.useForm();
   const watchedFilePath = Form.useWatch('path', fileForm);
   const pasteConfirmationPending = useRef(false);
+
+  const showOperationError = (titleKey, error, options = {}) => {
+    const model = buildOperationError(error, { scope: options.scope });
+    const key = `operation-error-${titleKey}`;
+    notificationApi.error({
+      key,
+      message: t(titleKey),
+      description: <OperationErrorDescription model={model} />,
+      duration: model.retryable && options.retry ? 0 : 10,
+      placement: 'bottomRight',
+      btn: (
+        <Space size={8}>
+          <Button
+            size="small"
+            disabled={!model.detail}
+            onClick={async () => {
+              try {
+                await writeClipboardText(model.detail);
+                messageApi.success(t('message.copied'));
+              } catch (clipboardError) {
+                messageApi.error(`${t('message.clipboardFailed')}: ${clipboardError}`);
+              }
+            }}
+          >
+            {t('action.copyError')}
+          </Button>
+          {model.retryable && options.retry && (
+            <Button
+              type="primary"
+              size="small"
+              onClick={() => {
+                notificationApi.destroy(key);
+                options.retry();
+              }}
+            >
+              {t('action.retry')}
+            </Button>
+          )}
+        </Space>
+      ),
+    });
+  };
   const terminalRefs = useRef({});
   const terminalSearchRef = useRef(null);
   const profileImportRef = useRef(null);
@@ -839,7 +885,7 @@ function App() {
       if (!submitPlan.openSession) return;
       await startProfileRequests([request], { closeDrawer: true });
     } catch (error) {
-      messageApi.error(`${t('message.credentialFailed')}: ${error}`);
+      showOperationError('message.credentialFailed', error);
     } finally {
       setCreatingSession(false);
     }
@@ -895,7 +941,7 @@ function App() {
       await startProfileRequests([entry.request]);
     } catch (error) {
       setClosedSessions((current) => [entry, ...current].slice(0, 10));
-      messageApi.error(`${t('message.credentialFailed')}: ${error}`);
+      showOperationError('message.credentialFailed', error, { retry: restoreLastClosedSession });
     }
   };
 
@@ -912,7 +958,7 @@ function App() {
       await TerminalAPI.TestSSHConnection(request);
       messageApi.success(t('message.connectionTestSuccess'));
     } catch (error) {
-      messageApi.error(`${t('message.connectionTestFailed')}: ${error}`);
+      showOperationError('message.connectionTestFailed', error, { retry: testConnection });
     } finally {
       setTestingConnection(false);
     }
@@ -1434,7 +1480,9 @@ function App() {
       await startProfileRequests([profileToRequest(profile)]);
       markProfilesUsed([profile.id]);
     } catch (error) {
-      messageApi.error(`${t('message.credentialFailed')}: ${error}`);
+      showOperationError('message.credentialFailed', error, {
+        retry: () => openProfile(profile),
+      });
     }
   };
 
@@ -1447,7 +1495,9 @@ function App() {
     try {
       await startProfileRequests([connection.request || profileToRequest(recentToProfile(connection))]);
     } catch (error) {
-      messageApi.error(`${t('message.credentialFailed')}: ${error}`);
+      showOperationError('message.credentialFailed', error, {
+        retry: () => openRecentConnection(connection),
+      });
     }
   };
 
@@ -1575,7 +1625,9 @@ function App() {
         messageApi.warning(`${t('message.batchConnectionsSkipped')}: ${skipped}`);
       }
     } catch (error) {
-      messageApi.error(`${t('message.credentialFailed')}: ${error}`);
+      showOperationError('message.credentialFailed', error, {
+        retry: () => openBatchProfiles(options),
+      });
     }
   };
 
@@ -1619,7 +1671,7 @@ function App() {
       setProfiles(nextProfiles);
       messageApi.success(t('message.profileImported'));
     } catch (error) {
-      messageApi.error(`${t('message.profileImportFailed')}: ${error}`);
+      showOperationError('message.profileImportFailed', error);
     }
   };
 
@@ -2595,7 +2647,10 @@ function App() {
       setExtensionPackagePath('');
       messageApi.success(t('message.extensionInstalled'));
     } catch (error) {
-      messageApi.error(`${t('message.extensionInstallFailed')}: ${error}`);
+      showOperationError('message.extensionInstallFailed', error, {
+        retry: installOfflineExtension,
+        scope: 'extension',
+      });
     } finally {
       setExtensionBusy(false);
     }
@@ -2609,7 +2664,10 @@ function App() {
       setInstalledExtensions(Array.isArray(items) ? items : []);
       messageApi.success(t('message.extensionUninstalled'));
     } catch (error) {
-      messageApi.error(`${t('message.extensionInstallFailed')}: ${error}`);
+      showOperationError('message.extensionInstallFailed', error, {
+        retry: () => uninstallExtension(extensionID),
+        scope: 'extension',
+      });
     } finally {
       setExtensionBusy(false);
     }
@@ -2674,14 +2732,16 @@ function App() {
       return;
     }
     await fileForm.validateFields();
-    const req = await currentFileRequest(overridePath);
     setFileLoading(true);
     try {
+      const req = await currentFileRequest(overridePath);
       const entries = await FilesAPI.List(req);
       fileForm.setFieldsValue({ path: req.path });
       setFileEntries(Array.isArray(entries) ? entries : []);
     } catch (error) {
-      messageApi.error(`${t('message.fileListFailed')}: ${error}`);
+      showOperationError('message.fileListFailed', error, {
+        retry: () => loadFiles(overridePath),
+      });
     } finally {
       setFileLoading(false);
     }
@@ -2723,33 +2783,35 @@ function App() {
   const createRemoteDirectory = async () => {
     const name = mkdirName.trim();
     if (!name) return;
-    const req = await currentFileRequest();
-    const base = req.path || '.';
-    req.path = joinRemotePath(base, name);
     setFileLoading(true);
     try {
+      const req = await currentFileRequest();
+      const base = req.path || '.';
+      req.path = joinRemotePath(base, name);
       await FilesAPI.Mkdir(req);
       messageApi.success(t('message.mkdirSuccess'));
       setMkdirOpen(false);
       setMkdirName('');
       await loadFiles(base);
     } catch (error) {
-      messageApi.error(`${t('message.fileListFailed')}: ${error}`);
+      showOperationError('message.fileListFailed', error, { retry: createRemoteDirectory });
     } finally {
       setFileLoading(false);
     }
   };
 
   const deleteRemoteEntry = async (entry) => {
-    const req = await currentFileRequest();
-    req.path = entry.path;
     setFileLoading(true);
     try {
+      const req = await currentFileRequest();
+      req.path = entry.path;
       await FilesAPI.Delete(req);
       messageApi.success(t('message.deleteSuccess'));
       await loadFiles(fileForm.getFieldValue('path') || '.');
     } catch (error) {
-      messageApi.error(`${t('message.fileListFailed')}: ${error}`);
+      showOperationError('message.fileListFailed', error, {
+        retry: () => deleteRemoteEntry(entry),
+      });
     } finally {
       setFileLoading(false);
     }
@@ -2757,10 +2819,10 @@ function App() {
 
   const downloadRemoteFile = async (entry) => {
     if (entry.isDir) return;
-    const req = await currentFileRequest();
-    req.path = entry.path;
     setFileLoading(true);
     try {
+      const req = await currentFileRequest();
+      req.path = entry.path;
       const content = await FilesAPI.ReadFile(req);
       const blob = new Blob([content], { type: 'application/octet-stream' });
       const url = URL.createObjectURL(blob);
@@ -2771,7 +2833,9 @@ function App() {
       URL.revokeObjectURL(url);
       messageApi.success(t('message.downloadStarted'));
     } catch (error) {
-      messageApi.error(`${t('message.fileListFailed')}: ${error}`);
+      showOperationError('message.fileListFailed', error, {
+        retry: () => downloadRemoteFile(entry),
+      });
     } finally {
       setFileLoading(false);
     }
@@ -2783,16 +2847,18 @@ function App() {
       messageApi.warning(t('message.fileTooLarge'));
       return;
     }
-    const req = await currentFileRequest();
-    req.path = entry.path;
     setFileEditorLoading(true);
     try {
+      const req = await currentFileRequest();
+      req.path = entry.path;
       const content = await FilesAPI.ReadFile(req);
       setEditingRemoteFile(entry);
       setEditingRemoteContent(content);
       setFileEditorOpen(true);
     } catch (error) {
-      messageApi.error(`${t('message.fileListFailed')}: ${error}`);
+      showOperationError('message.fileListFailed', error, {
+        retry: () => openRemoteFileEditor(entry),
+      });
     } finally {
       setFileEditorLoading(false);
     }
@@ -2800,16 +2866,16 @@ function App() {
 
   const saveRemoteFile = async () => {
     if (!editingRemoteFile) return;
-    const req = await currentFileRequest();
-    req.path = editingRemoteFile.path;
     setFileEditorLoading(true);
     try {
+      const req = await currentFileRequest();
+      req.path = editingRemoteFile.path;
       await FilesAPI.WriteFile({ ...req, content: editingRemoteContent });
       messageApi.success(t('message.fileSaved'));
       setFileEditorOpen(false);
       await loadFiles(fileForm.getFieldValue('path') || '.');
     } catch (error) {
-      messageApi.error(`${t('message.fileSaveFailed')}: ${error}`);
+      showOperationError('message.fileSaveFailed', error, { retry: saveRemoteFile });
     } finally {
       setFileEditorLoading(false);
     }
@@ -2821,11 +2887,11 @@ function App() {
       messageApi.warning(t('validation.required'));
       return;
     }
-    const req = await currentFileRequest();
-    const base = req.path || '.';
-    req.path = joinRemotePath(base, name);
     setFileLoading(true);
     try {
+      const req = await currentFileRequest();
+      const base = req.path || '.';
+      req.path = joinRemotePath(base, name);
       await FilesAPI.WriteFile({ ...req, content: uploadLocalContent });
       messageApi.success(t('message.uploadSuccess'));
       setUploadOpen(false);
@@ -2833,7 +2899,7 @@ function App() {
       setUploadLocalContent('');
       await loadFiles(base);
     } catch (error) {
-      messageApi.error(`${t('message.uploadFailed')}: ${error}`);
+      showOperationError('message.uploadFailed', error, { retry: uploadTextFile });
     } finally {
       setFileLoading(false);
     }
@@ -3422,7 +3488,7 @@ function App() {
       setTunnels((current) => [...current, info]);
       messageApi.success(t('message.tunnelStarted'));
     } catch (error) {
-      messageApi.error(`${t('message.tunnelFailed')}: ${error}`);
+      showOperationError('message.tunnelFailed', error);
     } finally {
       setTunnelBusy(false);
     }
@@ -3435,7 +3501,9 @@ function App() {
       setTunnels((current) => current.filter((item) => item.id !== id));
       messageApi.success(t('message.tunnelStopped'));
     } catch (error) {
-      messageApi.error(`${t('message.tunnelFailed')}: ${error}`);
+      showOperationError('message.tunnelFailed', error, {
+        retry: () => stopTunnel(id),
+      });
     } finally {
       setTunnelBusy(false);
     }
@@ -3988,6 +4056,7 @@ function App() {
       },
     }}>
     {messageContextHolder}
+    {notificationContextHolder}
     {modalContextHolder}
     <Layout className={`app-shell theme-${isDarkTheme ? 'dark' : 'light'}${focusMode ? ' focus-mode' : ''}`}>
       <Sider
