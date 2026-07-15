@@ -106,6 +106,7 @@ import {
 } from './connectionManager.js';
 import {
   appendClosedSessions,
+  buildSessionAttentionSummary,
   buildSessionAuditSummary,
   buildSessionCloseConfirm,
   buildSessionContextFacts,
@@ -113,12 +114,12 @@ import {
   buildSessionTabMenuModel,
   buildSessionToolbarContext,
   buildSessionToolbarModel,
-  countUnreadSessions,
   filterSessions,
   markSessionActivityRead,
   moveSessionInOrder,
   profileActionModel,
   pruneSessionActivity,
+  recordSessionAttention,
   recordSessionOutputActivity,
   reorderSessions,
   sessionTabDisplay,
@@ -451,7 +452,11 @@ function App() {
     if (sessionView === 'grid') return sessions.map((session) => session.id);
     return activeKey ? [activeKey] : [];
   }, [activeKey, selectedNav, sessionView, sessions]);
-  const unreadSessionCount = useMemo(() => countUnreadSessions(sessionActivity), [sessionActivity]);
+  const sessionAttentionSummary = useMemo(
+    () => buildSessionAttentionSummary(sessionActivity),
+    [sessionActivity],
+  );
+  const unreadSessionCount = sessionAttentionSummary.total;
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -638,6 +643,19 @@ function App() {
       current,
     ));
   }, [visibleSessionIds]);
+
+  useEffect(() => {
+    setSessionActivity((current) => sessions.reduce((next, session) => {
+      const terminalStatus = terminalStatuses[session.id];
+      if (terminalStatus?.status !== 'error') return next;
+      return recordSessionAttention(next, {
+        kind: 'error',
+        occurredAt: terminalStatus.updatedAt,
+        sessionId: session.id,
+        visibleSessionIds,
+      });
+    }, current));
+  }, [sessions, terminalStatuses, visibleSessionIds]);
 
   useEffect(() => {
     setSessionActivity((current) => pruneSessionActivity(current, sessions.map((session) => session.id)));
@@ -2067,6 +2085,7 @@ function App() {
           >
             <SessionTabLabel
               active={session.id === activeKey}
+              activityKind={sessionActivity[session.id]?.kind}
               session={session}
               unread={sessionActivity[session.id]?.unread}
             />
@@ -2148,6 +2167,7 @@ function App() {
                 <div className="split-terminal-header">
                   <SessionTabLabel
                     active={session.id === activeKey}
+                    activityKind={sessionActivity[session.id]?.kind}
                     session={session}
                     unread={sessionActivity[session.id]?.unread}
                   />
@@ -4371,7 +4391,10 @@ function App() {
             {
               key: 'sessions',
               icon: (
-                <Badge className="session-nav-badge" dot={unreadSessionCount > 0}>
+                <Badge
+                  className={`session-nav-badge${sessionAttentionSummary.errors > 0 ? ' tone-error' : ''}`}
+                  dot={unreadSessionCount > 0}
+                >
                   <CodeOutlined />
                 </Badge>
               ),
@@ -4379,7 +4402,19 @@ function App() {
                 <span className="workspace-nav-label">
                   <span>{t('nav.sessions')}</span>
                   {unreadSessionCount > 0 && (
-                    <span aria-label={t('session.activity.unreadCount', { count: unreadSessionCount })} className="workspace-nav-count">
+                    <span
+                      aria-label={t(
+                        sessionAttentionSummary.errors > 0
+                          ? 'session.activity.errorCount'
+                          : 'session.activity.unreadCount',
+                        {
+                          count: sessionAttentionSummary.errors > 0
+                            ? sessionAttentionSummary.errors
+                            : unreadSessionCount,
+                        },
+                      )}
+                      className={`workspace-nav-count${sessionAttentionSummary.errors > 0 ? ' tone-error' : ''}`}
+                    >
                       {unreadSessionCount}
                     </span>
                   )}
@@ -4476,6 +4511,7 @@ function App() {
                         }}
                       >
                         <SessionSidebarLabel
+                          activityKind={sessionActivity[session.id]?.kind}
                           session={session}
                           unread={sessionActivity[session.id]?.unread}
                         />
@@ -5435,8 +5471,11 @@ function ConnectionProfilePreview({
   );
 }
 
-function SessionTabLabel({ active = false, session, unread = false }) {
+function SessionTabLabel({ active = false, activityKind = 'output', session, unread = false }) {
   const display = sessionTabDisplay(session, active, { unread });
+  const activityLabel = activityKind === 'error'
+    ? t('session.activity.error')
+    : t('session.activity.unread');
   return (
     <span className={`tab-label session-tab-label tone-${display.statusTone}${display.active ? ' active' : ''}${display.unread ? ' unread' : ''}`}>
       <span className="session-status-dot" />
@@ -5444,10 +5483,10 @@ function SessionTabLabel({ active = false, session, unread = false }) {
       <span className="session-tab-title">{display.title}</span>
       {display.unread && (
         <span
-          aria-label={t('session.activity.unread')}
-          className="session-activity-dot"
+          aria-label={activityLabel}
+          className={`session-activity-dot${activityKind === 'error' ? ' tone-error' : ''}`}
           role="status"
-          title={t('session.activity.unread')}
+          title={activityLabel}
         />
       )}
     </span>
@@ -5463,8 +5502,11 @@ function sessionTabActionIcon(action) {
   return <DeleteOutlined />;
 }
 
-function SessionSidebarLabel({ session, unread = false }) {
+function SessionSidebarLabel({ activityKind = 'output', session, unread = false }) {
   const tone = sessionStatusTone(session);
+  const activityLabel = activityKind === 'error'
+    ? t('session.activity.error')
+    : t('session.activity.unread');
   return (
     <span className={`session-sidebar-label tone-${tone}`}>
       <span className="session-status-dot" />
@@ -5474,10 +5516,10 @@ function SessionSidebarLabel({ session, unread = false }) {
       </span>
       {unread && (
         <span
-          aria-label={t('session.activity.unread')}
-          className="session-activity-dot"
+          aria-label={activityLabel}
+          className={`session-activity-dot${activityKind === 'error' ? ' tone-error' : ''}`}
           role="status"
-          title={t('session.activity.unread')}
+          title={activityLabel}
         />
       )}
     </span>

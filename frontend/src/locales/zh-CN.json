@@ -173,6 +173,8 @@
   "session.status.closed": "已关闭",
   "session.activity.unread": "终端有新输出",
   "session.activity.unreadCount": "{count} 个会话有新输出",
+  "session.activity.error": "后台会话发生异常",
+  "session.activity.errorCount": "{count} 个后台会话发生异常",
   "session.context.summary": "{provider} · {identity}",
   "session.audit.noSession.title": "暂无活动会话",
   "session.audit.noSession.description": "打开终端后会自动记录会话事件和终端输出，用于审计与回放。",

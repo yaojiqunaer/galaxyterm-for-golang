@@ -5,6 +5,7 @@ import {
   buildSessionContextFacts,
   buildSessionCloseConfirm,
   buildSessionNavigationState,
+  buildSessionAttentionSummary,
   buildSessionStatusFacts,
   buildSessionTabMenuModel,
   buildSessionToolbarModel,
@@ -15,6 +16,7 @@ import {
   moveSessionInOrder,
   profileActionModel,
   pruneSessionActivity,
+  recordSessionAttention,
   recordSessionOutputActivity,
   reorderSessions,
   sessionTabDisplay,
@@ -498,7 +500,11 @@ const unreadActivity = recordSessionOutputActivity({}, {
   sessionId: 'session-2',
 });
 assert.deepEqual(unreadActivity, {
-  'session-2': { outputAt: '2026-07-16T01:00:00.000Z', unread: true },
+  'session-2': {
+    kind: 'output',
+    occurredAt: '2026-07-16T01:00:00.000Z',
+    unread: true,
+  },
 });
 assert.equal(recordSessionOutputActivity(unreadActivity, {
   activeKey: 'session-1',
@@ -522,11 +528,19 @@ assert.deepEqual(recordSessionOutputActivity({}, {
   sessionId: 'session-1',
   visibleSessionIds: [],
 }), {
-  'session-1': { outputAt: '2026-07-16T01:00:01.000Z', unread: true },
+  'session-1': {
+    kind: 'output',
+    occurredAt: '2026-07-16T01:00:01.000Z',
+    unread: true,
+  },
 });
 const readActivity = markSessionActivityRead(unreadActivity, 'session-2');
 assert.deepEqual(readActivity, {
-  'session-2': { outputAt: '2026-07-16T01:00:00.000Z', unread: false },
+  'session-2': {
+    kind: 'output',
+    occurredAt: '2026-07-16T01:00:00.000Z',
+    unread: false,
+  },
 });
 assert.equal(markSessionActivityRead(readActivity, 'session-2'), readActivity);
 assert.deepEqual(pruneSessionActivity({
@@ -538,6 +552,69 @@ assert.equal(countUnreadSessions({
   'session-2': { unread: true },
   'session-3': { unread: true },
 }), 2);
+
+const errorActivity = recordSessionAttention(unreadActivity, {
+  activeKey: 'session-1',
+  kind: 'error',
+  occurredAt: '2026-07-16T01:00:03.000Z',
+  sessionId: 'session-2',
+});
+assert.deepEqual(errorActivity, {
+  'session-2': {
+    kind: 'error',
+    occurredAt: '2026-07-16T01:00:03.000Z',
+    unread: true,
+  },
+});
+assert.equal(recordSessionAttention(errorActivity, {
+  activeKey: 'session-1',
+  kind: 'output',
+  occurredAt: '2026-07-16T01:00:04.000Z',
+  sessionId: 'session-2',
+}), errorActivity);
+const readErrorActivity = markSessionActivityRead(errorActivity, 'session-2');
+assert.equal(recordSessionAttention(readErrorActivity, {
+  activeKey: 'session-1',
+  kind: 'error',
+  occurredAt: '2026-07-16T01:00:03.000Z',
+  sessionId: 'session-2',
+}), readErrorActivity);
+assert.deepEqual(recordSessionAttention(readErrorActivity, {
+  activeKey: 'session-1',
+  kind: 'error',
+  occurredAt: '2026-07-16T01:00:05.000Z',
+  sessionId: 'session-2',
+}), {
+  'session-2': {
+    kind: 'error',
+    occurredAt: '2026-07-16T01:00:05.000Z',
+    unread: true,
+  },
+});
+const visibleErrorActivity = recordSessionAttention({}, {
+  kind: 'error',
+  occurredAt: '2026-07-16T01:00:05.000Z',
+  sessionId: 'session-2',
+  visibleSessionIds: ['session-2'],
+});
+assert.deepEqual(visibleErrorActivity, {
+  'session-2': {
+    kind: 'error',
+    occurredAt: '2026-07-16T01:00:05.000Z',
+    unread: false,
+  },
+});
+assert.equal(recordSessionAttention(visibleErrorActivity, {
+  kind: 'error',
+  occurredAt: '2026-07-16T01:00:05.000Z',
+  sessionId: 'session-2',
+  visibleSessionIds: [],
+}), visibleErrorActivity);
+assert.deepEqual(buildSessionAttentionSummary({
+  output: { kind: 'output', unread: true },
+  error: { kind: 'error', unread: true },
+  read: { kind: 'error', unread: false },
+}), { errors: 1, total: 2 });
 
 const orderedSessions = [{ id: 's1' }, { id: 's2' }, { id: 's3' }];
 assert.deepEqual(moveSessionInOrder(orderedSessions, 's2', 'previous').map((session) => session.id), [

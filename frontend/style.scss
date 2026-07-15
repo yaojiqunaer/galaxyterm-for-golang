@@ -963,9 +963,19 @@ select {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
 }
 
+.session-activity-dot.tone-error {
+  border-color: color-mix(in srgb, var(--danger) 82%, white);
+  background: var(--danger);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 18%, transparent);
+}
+
 .session-nav-badge .ant-badge-dot {
   background: var(--accent);
   box-shadow: 0 0 0 2px var(--panel);
+}
+
+.session-nav-badge.tone-error .ant-badge-dot {
+  background: var(--danger);
 }
 
 .workspace-nav-label {
@@ -988,6 +998,11 @@ select {
   font-size: 10px;
   font-weight: 700;
   line-height: 1;
+}
+
+.workspace-nav-count.tone-error {
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
+  color: var(--danger);
 }
 
 .session-tab-label .session-activity-dot {

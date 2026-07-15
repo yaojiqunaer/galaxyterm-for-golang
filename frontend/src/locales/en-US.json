@@ -173,6 +173,8 @@
   "session.status.closed": "Closed",
   "session.activity.unread": "New terminal output",
   "session.activity.unreadCount": "{count} sessions have new output",
+  "session.activity.error": "Background session error",
+  "session.activity.errorCount": "{count} background sessions have errors",
   "session.context.summary": "{provider} · {identity}",
   "session.audit.noSession.title": "No active session",
   "session.audit.noSession.description": "Open a terminal to start capturing session events and terminal output for audit replay.",

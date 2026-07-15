@@ -346,17 +346,36 @@ export function sessionTabDisplay(session = {}, active = false, options = {}) {
 }
 
 export function recordSessionOutputActivity(activity = {}, options = {}) {
+  return recordSessionAttention(activity, {
+    ...options,
+    kind: 'output',
+    occurredAt: options.outputAt,
+  });
+}
+
+export function recordSessionAttention(activity = {}, options = {}) {
   const sessionId = String(options.sessionId || '').trim();
-  const outputAt = String(options.outputAt || '').trim();
-  if (!sessionId || !outputAt) return activity;
+  const occurredAt = String(options.occurredAt || '').trim();
+  const kind = options.kind === 'error' ? 'error' : 'output';
+  if (!sessionId || !occurredAt) return activity;
   const isVisible = Array.isArray(options.visibleSessionIds)
     ? options.visibleSessionIds.includes(sessionId)
     : sessionId === options.activeKey;
+  const current = activity[sessionId];
+  if (isVisible && kind === 'error') {
+    if (current?.kind === kind && current?.occurredAt === occurredAt && !current.unread) return activity;
+    return {
+      ...activity,
+      [sessionId]: { kind, occurredAt, unread: false },
+    };
+  }
   if (isVisible) return markSessionActivityRead(activity, sessionId);
-  if (activity[sessionId]?.unread) return activity;
+  if (current?.kind === kind && current?.occurredAt === occurredAt) return activity;
+  if (current?.unread && current?.kind === 'error' && kind === 'output') return activity;
+  if (current?.unread && current?.kind === kind && kind === 'output') return activity;
   return {
     ...activity,
-    [sessionId]: { outputAt, unread: true },
+    [sessionId]: { kind, occurredAt, unread: true },
   };
 }
 
@@ -377,6 +396,16 @@ export function pruneSessionActivity(activity = {}, sessionIds = []) {
 
 export function countUnreadSessions(activity = {}) {
   return Object.values(activity).filter((item) => item?.unread).length;
+}
+
+export function buildSessionAttentionSummary(activity = {}) {
+  return Object.values(activity).reduce((summary, item) => {
+    if (!item?.unread) return summary;
+    return {
+      errors: summary.errors + (item.kind === 'error' ? 1 : 0),
+      total: summary.total + 1,
+    };
+  }, { errors: 0, total: 0 });
 }
 
 export function moveSessionInOrder(sessions = [], sessionId = '', direction = '') {
