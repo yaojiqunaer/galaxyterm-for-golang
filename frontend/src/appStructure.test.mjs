@@ -33,6 +33,22 @@ assert.ok(
   /\.content-page-layer,\s*\.session-page-layer\s*\{[\s\S]*?grid-column:\s*1;[\s\S]*?grid-row:\s*2;/.test(styles),
   'content and session layers must share the remaining content grid row',
 );
+assert.equal(
+  source.match(/\{renderTerminalPane\(session\)\}/g)?.length,
+  1,
+  'each live terminal must have one stable render site across tabs and split view',
+);
+assert.ok(
+  source.includes('className={`terminal-pane-deck view-${sessionView}`}')
+    && source.includes('className={`terminal-pane-slot${session.id === activeKey ? \' active\' : \'\'}`}')
+    && source.includes('tabBarExtraContent={sessionToolbarActions}'),
+  'session presentation modes must share one persistent pane deck and tab-bar toolbar',
+);
+assert.ok(
+  !source.includes('<div className="statusbar">')
+    && !/\.statusbar\s*\{/.test(styles),
+  'the app shell must not reserve a redundant debug footer below terminal status',
+);
 
 assert.ok(
   /<Sider[\s\S]*?breakpoint="lg"[\s\S]*?collapsed=\{sidebarCompact\}[\s\S]*?collapsedWidth=\{68\}/.test(source),
@@ -77,13 +93,14 @@ assert.ok(
   'narrow workspaces must collapse primary topbar labels without hiding their commands',
 );
 assert.ok(
-  source.includes('className="session-strip-details"')
-    && source.includes('className="session-strip-detail-list"'),
-  'session context must remain available through a compact details control',
+  source.includes('className={`terminal-status-fact session-context-status-fact')
+    && source.includes('className={`session-recording-indicator')
+    && source.includes('className={`session-audit-indicator'),
+  'session context, recording, and audit state must share the terminal status rail',
 );
 assert.ok(
-  /@media \(max-width: 860px\)[\s\S]*?\.session-strip-facts\s*\{[\s\S]*?display:\s*none[\s\S]*?\.session-strip-details(?:\.ant-btn)?\s*\{[\s\S]*?display:\s*inline-flex/.test(styles),
-  'narrow session workspaces must replace clipped fact pills with the details control',
+  /@media \(max-width: 860px\)[\s\S]*?\.session-context-status-fact\.fact-target[\s\S]*?\.session-context-status-fact\.fact-user[\s\S]*?display:\s*none/.test(styles),
+  'narrow session workspaces must hide secondary context before status and recovery controls',
 );
 assert.ok(
   source.includes('Grid.useBreakpoint()')

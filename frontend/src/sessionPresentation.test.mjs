@@ -169,8 +169,6 @@ assert.deepEqual(buildSessionToolbarModel({
 }), {
   primary: [
     { key: 'grid', labelKey: 'action.grid', disabled: false },
-    { key: 'previous', labelKey: 'action.previousSession', disabled: false },
-    { key: 'next', labelKey: 'action.nextSession', disabled: false },
     { key: 'reconnect', labelKey: 'action.reconnect', disabled: false },
   ],
   overflow: [

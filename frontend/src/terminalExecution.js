@@ -5,6 +5,7 @@ const promptContextPattern = /(?:@|[~/:\\]|\b(?:mysql|mariadb|redis|psql|postgre
 export function buildTerminalPasteRisk(data = '') {
   const value = String(data || '');
   if (!value) return null;
+  if (value === '\r' || value === '\n' || value === '\r\n') return null;
   const lineBreakCount = (value.match(/\r\n|\r|\n/g) || []).length;
   const reasons = [];
   if (value.length > 120) reasons.push('large');

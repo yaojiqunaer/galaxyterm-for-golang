@@ -54,12 +54,10 @@ import {
   ImportOutlined,
   QuestionCircleOutlined,
   LaptopOutlined,
-  LeftOutlined,
   MinusOutlined,
   MoreOutlined,
   PlusOutlined,
   ReloadOutlined,
-  RightOutlined,
   SaveOutlined,
   SettingOutlined,
   StarFilled,
@@ -109,7 +107,6 @@ import {
   buildSessionCloseConfirm,
   buildSessionContextFacts,
   buildSessionNavigationState,
-  buildSessionStatusFacts,
   buildSessionTabMenuModel,
   buildSessionToolbarModel,
   filterSessions,
@@ -668,14 +665,6 @@ function App() {
   const sessionNavigationState = useMemo(() => (
     buildSessionNavigationState(sessions, activeKey)
   ), [activeKey, sessions]);
-  const activeSessionRecording = activeKey ? terminalRefs.current[activeKey]?.recording?.() : null;
-  const activeSessionRecordingActive = !!activeSessionRecording?.startedAt && activeSession?.status !== 'closed';
-  const activeSessionContextFacts = buildSessionContextFacts(activeSession, {
-    recordingActive: activeSessionRecordingActive,
-  });
-  const activeSessionAuditSummary = buildSessionAuditSummary(activeSession, {
-    recordingActive: activeSessionRecordingActive,
-  });
   const sidebarSessions = useMemo(() => filterSessions(sessions, {
     activeKey,
     status: 'active',
@@ -1797,36 +1786,42 @@ function App() {
     setSelectedNav('audit');
   };
 
-  const renderTerminalPane = (session) => (
-    <TerminalFrame
-      onCopyError={() => copyTerminalError(session.id)}
-      onInterrupt={() => interruptSession(session.id)}
-      onOpenAudit={() => openSessionAudit(session.id)}
-      onReconnect={() => reconnectSession(session.id)}
-      status={terminalStatuses[session.id]}
-    >
-      <Suspense fallback={<TerminalLoadingState />}>
-        <TerminalPane
-          key={`${session.id}-${session.revision || 0}`}
-          ref={(el) => {
-            terminalRefs.current[session.id] = el;
-          }}
-          request={session.request}
-          settings={settings}
-          onAuditEvent={(event) => appendAuditEvent(session.id, event.type, event.detail)}
-          onCommandSubmitted={(command) => recordCommandHistory(command, session)}
-          onConfirmPaste={confirmTerminalPaste}
-          onSessionCreated={(backendSessionId) => {
-            setSessions((current) => current.map((item) => (
-              item.id === session.id ? { ...item, backendSessionId, status: 'connected' } : item
-            )));
-          }}
-          onSessionClosed={(backendSessionId) => updateSessionStatus(backendSessionId, 'closed')}
-          onStatusChange={(status) => updateTerminalStatus(session.id, status, session.revision || 0)}
-        />
-      </Suspense>
-    </TerminalFrame>
-  );
+  const renderTerminalPane = (session) => {
+    const recording = terminalRefs.current[session.id]?.recording?.();
+    const recordingActive = Boolean(recording?.startedAt) && session.status !== 'closed';
+    return (
+      <TerminalFrame
+        auditSummary={buildSessionAuditSummary(session, { recordingActive })}
+        contextFacts={buildSessionContextFacts(session, { recordingActive })}
+        onCopyError={() => copyTerminalError(session.id)}
+        onInterrupt={() => interruptSession(session.id)}
+        onOpenAudit={() => openSessionAudit(session.id)}
+        onReconnect={() => reconnectSession(session.id)}
+        status={terminalStatuses[session.id]}
+      >
+        <Suspense fallback={<TerminalLoadingState />}>
+          <TerminalPane
+            key={`${session.id}-${session.revision || 0}`}
+            ref={(el) => {
+              terminalRefs.current[session.id] = el;
+            }}
+            request={session.request}
+            settings={settings}
+            onAuditEvent={(event) => appendAuditEvent(session.id, event.type, event.detail)}
+            onCommandSubmitted={(command) => recordCommandHistory(command, session)}
+            onConfirmPaste={confirmTerminalPaste}
+            onSessionCreated={(backendSessionId) => {
+              setSessions((current) => current.map((item) => (
+                item.id === session.id ? { ...item, backendSessionId, status: 'connected' } : item
+              )));
+            }}
+            onSessionClosed={(backendSessionId) => updateSessionStatus(backendSessionId, 'closed')}
+            onStatusChange={(status) => updateTerminalStatus(session.id, status, session.revision || 0)}
+          />
+        </Suspense>
+      </TerminalFrame>
+    );
+  };
 
   const runSessionTabAction = (action, session) => {
     if (action === 'rename') openRenameSession(session);
@@ -1871,11 +1866,6 @@ function App() {
           </span>
         </Dropdown>
       ),
-      children: (
-        <div className="terminal-workspace">
-          {renderTerminalPane(session)}
-        </div>
-      ),
       closable: true,
     };
   });
@@ -1906,8 +1896,6 @@ function App() {
     const runSessionToolbarAction = (action) => {
       if (action === 'grid') setSessionView('grid');
       if (action === 'tabs') setSessionView('tabs');
-      if (action === 'previous') switchSession('previous');
-      if (action === 'next') switchSession('next');
       if (action === 'interrupt') interruptSession();
       if (action === 'reconnect') reconnectSession();
       if (action === 'rename') openRenameSession();
@@ -1918,54 +1906,8 @@ function App() {
     const sessionToolbarActions = (
       <SessionToolbarActions model={sessionToolbarModel} onAction={runSessionToolbarAction} />
     );
-    if (sessionView === 'grid') {
-      return (
-        <div className="session-grid-page">
-          <div className="session-grid-toolbar">
-            <SessionStrip
-              activeSession={activeSession}
-              auditSummary={activeSessionAuditSummary}
-              contextFacts={activeSessionContextFacts}
-              providers={providers}
-              summary={currentSessionSummary}
-            />
-            {sessionToolbarActions}
-          </div>
-          <div className="session-grid">
-            {sessions.map((session) => (
-              <div
-                className={session.id === activeKey ? 'split-terminal active' : 'split-terminal'}
-                key={session.id}
-                onClick={() => setActiveKey(session.id)}
-              >
-                <div className="split-terminal-header">
-                  <SessionTabLabel active={session.id === activeKey} session={session} />
-                  <Space>
-                    <Button size="small" icon={<EditOutlined />} onClick={() => openRenameSession(session)} />
-                    <Button size="small" icon={<ReloadOutlined />} onClick={() => reconnectSession(session.id)} />
-                    <Button size="small" onClick={() => duplicateSession(session)}>{t('action.duplicate')}</Button>
-                    <Button size="small" danger onClick={() => confirmRemoveSession(session.id)}>{t('action.delete')}</Button>
-                  </Space>
-                </div>
-                {renderTerminalPane(session)}
-              </div>
-            ))}
-          </div>
-        </div>
-      );
-    }
     return (
-      <div className="session-tabs-page">
-        <div className="terminal-session-toolbar">
-          <SessionStrip
-            activeSession={activeSession}
-            auditSummary={activeSessionAuditSummary}
-            contextFacts={activeSessionContextFacts}
-            providers={providers}
-            summary={currentSessionSummary}
-          />
-          {sessionToolbarActions}
-        </div>
+      <div className={`session-tabs-page view-${sessionView}`}>
         <Tabs
           className="terminal-tabs"
           type="editable-card"
@@ -1977,7 +1919,65 @@ function App() {
             if (action === 'remove') confirmRemoveSession(targetKey);
           }}
           items={items}
+          tabBarExtraContent={sessionToolbarActions}
         />
+        <div className={`terminal-pane-deck view-${sessionView}`}>
+          {sessions.map((session) => (
+            <section
+              className={`terminal-pane-slot${session.id === activeKey ? ' active' : ''}`}
+              key={session.id}
+              onMouseDown={() => setActiveKey(session.id)}
+            >
+              {sessionView === 'grid' && (
+                <div className="split-terminal-header">
+                  <SessionTabLabel active={session.id === activeKey} session={session} />
+                  <Space size={2}>
+                    <Tooltip title={t('action.renameSession')}>
+                      <Button
+                        aria-label={t('action.renameSession')}
+                        size="small"
+                        type="text"
+                        icon={<EditOutlined />}
+                        onClick={() => openRenameSession(session)}
+                      />
+                    </Tooltip>
+                    <Tooltip title={t('action.reconnect')}>
+                      <Button
+                        aria-label={t('action.reconnect')}
+                        size="small"
+                        type="text"
+                        icon={<ReloadOutlined />}
+                        onClick={() => reconnectSession(session.id)}
+                      />
+                    </Tooltip>
+                    <Tooltip title={t('action.duplicate')}>
+                      <Button
+                        aria-label={t('action.duplicate')}
+                        size="small"
+                        type="text"
+                        icon={<CopyOutlined />}
+                        onClick={() => duplicateSession(session)}
+                      />
+                    </Tooltip>
+                    <Tooltip title={t('action.closeSession')}>
+                      <Button
+                        aria-label={t('action.closeSession')}
+                        danger
+                        size="small"
+                        type="text"
+                        icon={<DeleteOutlined />}
+                        onClick={() => confirmRemoveSession(session.id)}
+                      />
+                    </Tooltip>
+                  </Space>
+                </div>
+              )}
+              <div className="terminal-workspace">
+                {renderTerminalPane(session)}
+              </div>
+            </section>
+          ))}
+        </div>
       </div>
     );
   };
@@ -4088,11 +4088,6 @@ function App() {
           </div>
         </Content>
 
-        <div className="statusbar">
-          <span>{t('status.sessions')}: {sessions.length}</span>
-          <span>{t('status.providers')}: {providers.length}</span>
-          <span>{t('status.branch')}: core</span>
-        </div>
       </Layout>
 
       <Modal
@@ -4962,8 +4957,6 @@ function SessionToolbarActions({ model, onAction }) {
   const icons = {
     grid: <AppstoreOutlined />,
     interrupt: <StopOutlined />,
-    next: <RightOutlined />,
-    previous: <LeftOutlined />,
     reconnect: <ReloadOutlined />,
     tabs: <CodeOutlined />,
   };
@@ -5017,101 +5010,6 @@ function SessionToolbarActions({ model, onAction }) {
   );
 }
 
-function SessionStrip({
-  activeSession,
-  auditSummary,
-  contextFacts = [],
-  providers = [],
-  summary,
-}) {
-  const facts = buildSessionStatusFacts(summary);
-  const recordingFact = contextFacts.find((fact) => fact.key === 'recording');
-  const detailContent = (
-    <div className="session-strip-detail-list">
-      {contextFacts.map((fact) => (
-        <span key={fact.key}>
-          <small>{sessionContextFactLabel(fact)}</small>
-          <strong>{sessionContextFactValue(fact)}</strong>
-        </span>
-      ))}
-      {facts.map((fact) => (
-        <span key={fact.key}>
-          <small>{t(`session.status.${fact.key}`)}</small>
-          <strong>{fact.value}</strong>
-        </span>
-      ))}
-      <span>
-        <small>{t('label.openSessions')}</small>
-        <strong>{`${summary.active}/${summary.total}`}</strong>
-      </span>
-    </div>
-  );
-  return (
-    <div className="session-strip">
-      <div className={`session-strip-current tone-${sessionStatusTone(activeSession)}`}>
-        <span className="session-status-dot" />
-        <span className="session-strip-title">
-          <strong>{activeSession?.label || '-'}</strong>
-          <small>
-            {activeSession
-              ? `${providerTypeLabel(activeSession.providerType, providers)} · ${t(`session.status.${sessionStatusLabel(activeSession)}`)}`
-              : t('empty.noSessions')}
-          </small>
-        </span>
-      </div>
-      <div className="session-strip-facts">
-        {contextFacts.map((fact) => (
-          <span key={fact.key} className={`session-fact session-context-fact tone-${fact.tone}`}>
-            <small>{sessionContextFactLabel(fact)}</small>
-            <strong>{sessionContextFactValue(fact)}</strong>
-          </span>
-        ))}
-        {facts.map((fact) => (
-          <span key={fact.key} className={`session-fact tone-${fact.tone}`}>
-            <small>{t(`session.status.${fact.key}`)}</small>
-            <strong>{fact.value}</strong>
-          </span>
-        ))}
-        <span className="session-fact">
-          <small>{t('label.openSessions')}</small>
-          <strong>{`${summary.active}/${summary.total}`}</strong>
-        </span>
-      </div>
-      {recordingFact && (
-        <Tooltip title={`${sessionContextFactLabel(recordingFact)}: ${sessionContextFactValue(recordingFact)}`}>
-          <span
-            aria-label={`${sessionContextFactLabel(recordingFact)}: ${sessionContextFactValue(recordingFact)}`}
-            className={`session-recording-indicator tone-${recordingFact.tone}`}
-            role="status"
-          >
-            <VideoCameraOutlined />
-          </span>
-        </Tooltip>
-      )}
-      {auditSummary && (
-        <Tooltip title={t(auditSummary.descriptionKey, auditSummary.values)}>
-          <span
-            aria-label={t(auditSummary.titleKey, auditSummary.values)}
-            className={`session-audit-indicator tone-${auditSummary.tone}`}
-            role="status"
-          >
-            <AuditOutlined />
-          </span>
-        </Tooltip>
-      )}
-      <Popover content={detailContent} placement="bottomRight" title={t('action.sessionDetails')} trigger="click">
-        <Button
-          aria-label={t('action.sessionDetails')}
-          className="session-strip-details"
-          icon={<InfoCircleOutlined />}
-          size="small"
-          type="text"
-        />
-      </Popover>
-    </div>
-  );
-}
-
 function TerminalLoadingState() {
   return (
     <div className="terminal-loading-state" role="status">
@@ -5131,7 +5029,9 @@ function ReplayLoadingState() {
 }
 
 function TerminalFrame({
+  auditSummary,
   children,
+  contextFacts = [],
   onCopyError,
   onInterrupt,
   onOpenAudit,
@@ -5142,11 +5042,22 @@ function TerminalFrame({
   const controlActions = buildTerminalControlActions(status || {});
   const errorDetail = buildTerminalErrorDetail(status || {});
   const recoveryActions = buildTerminalRecoveryActions(status || {});
+  const recordingFact = contextFacts.find((fact) => fact.key === 'recording');
+  const visibleContextFacts = contextFacts.filter((fact) => ['provider', 'target', 'user'].includes(fact.key));
   return (
     <div className="terminal-frame">
       <div className="terminal-frame-body">{children}</div>
       <div className="terminal-status-bar">
         <div className="terminal-status-facts">
+          {visibleContextFacts.map((fact) => (
+            <span
+              key={fact.key}
+              className={`terminal-status-fact session-context-status-fact fact-${fact.key} tone-${fact.tone}`}
+            >
+              <small>{sessionContextFactLabel(fact)}</small>
+              <strong>{sessionContextFactValue(fact)}</strong>
+            </span>
+          ))}
           {facts.map((fact) => (
             <span key={fact.key} className={`terminal-status-fact fact-${fact.key} tone-${fact.tone}`}>
               <small>{terminalStatusFactLabel(fact)}</small>
@@ -5154,8 +5065,30 @@ function TerminalFrame({
             </span>
           ))}
         </div>
-        {(controlActions.length > 0 || errorDetail || recoveryActions.length > 0) && (
+        {(recordingFact || auditSummary || controlActions.length > 0 || errorDetail || recoveryActions.length > 0) && (
           <div className="terminal-recovery-actions">
+            {recordingFact && (
+              <Tooltip title={`${sessionContextFactLabel(recordingFact)}: ${sessionContextFactValue(recordingFact)}`}>
+                <span
+                  aria-label={`${sessionContextFactLabel(recordingFact)}: ${sessionContextFactValue(recordingFact)}`}
+                  className={`session-recording-indicator tone-${recordingFact.tone}`}
+                  role="status"
+                >
+                  <VideoCameraOutlined />
+                </span>
+              </Tooltip>
+            )}
+            {auditSummary && (
+              <Tooltip title={t(auditSummary.descriptionKey, auditSummary.values)}>
+                <span
+                  aria-label={t(auditSummary.titleKey, auditSummary.values)}
+                  className={`session-audit-indicator tone-${auditSummary.tone}`}
+                  role="status"
+                >
+                  <AuditOutlined />
+                </span>
+              </Tooltip>
+            )}
             {controlActions.map((action) => (
               <Tooltip key={action.key} title={terminalRecoveryActionLabel(action)}>
                 <Button

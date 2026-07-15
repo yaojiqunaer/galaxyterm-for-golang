@@ -27,6 +27,9 @@ assert.equal(parseShellIntegrationExitCode('\u001b]133;D;127\u001b\\'), 127);
 assert.equal(parseShellIntegrationExitCode('plain terminal output'), null);
 
 assert.equal(buildTerminalPasteRisk('echo hello'), null);
+assert.equal(buildTerminalPasteRisk('\r'), null);
+assert.equal(buildTerminalPasteRisk('\n'), null);
+assert.equal(buildTerminalPasteRisk('\r\n'), null);
 assert.deepEqual(buildTerminalPasteRisk('first\nsecond\nthird'), {
   characterCount: 18,
   lineCount: 3,

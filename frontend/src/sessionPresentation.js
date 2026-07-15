@@ -103,7 +103,6 @@ export function buildSessionNavigationState(sessions = [], activeKey = '') {
 
 export function buildSessionToolbarModel(options = {}) {
   const hasActiveSession = Boolean(options.activeKey);
-  const canNavigate = Boolean(options.canNavigate);
   const sessionCount = Number(options.sessionCount) || 0;
   const closedCount = Number(options.closedCount) || 0;
   const terminalStatus = typeof options.terminalStatus === 'string'
@@ -116,12 +115,6 @@ export function buildSessionToolbarModel(options = {}) {
 
   const primary = [];
   if (options.view === 'grid' || sessionCount > 1) primary.push(viewAction);
-  if (canNavigate) {
-    primary.push(
-      { key: 'previous', labelKey: 'action.previousSession', disabled: false },
-      { key: 'next', labelKey: 'action.nextSession', disabled: false },
-    );
-  }
   if (canInterrupt) {
     primary.push({
       key: 'interrupt',
