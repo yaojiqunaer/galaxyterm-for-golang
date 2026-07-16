@@ -14,6 +14,11 @@ assert.equal(
   'function',
   'desktop bridge must expose native window theme synchronization',
 );
+assert.equal(
+  typeof desktopBridge.syncDesktopPlatform,
+  'function',
+  'desktop bridge must expose native platform synchronization',
+);
 
 const originalWindow = globalThis.window;
 const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
@@ -21,6 +26,9 @@ const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator
 globalThis.window = {};
 Object.defineProperty(globalThis, 'navigator', { configurable: true, value: {} });
 assert.equal(hasWailsMethod(['session', 'API', 'CreateSession']), false);
+const browserRoot = { dataset: {} };
+assert.equal(await desktopBridge.syncDesktopPlatform(browserRoot), '');
+assert.deepEqual(browserRoot.dataset, {});
 await assert.rejects(
   () => callWails(['session', 'API', 'CreateSession'], { providerType: 'local' }),
   (error) => error.message === bridgeUnavailableMessage,
@@ -50,7 +58,11 @@ globalThis.window.runtime = {
     desktopClipboard = text;
     return true;
   },
+  Environment: () => Promise.resolve({ platform: 'darwin' }),
 };
+const desktopRoot = { dataset: {} };
+assert.equal(await desktopBridge.syncDesktopPlatform(desktopRoot), 'darwin');
+assert.equal(desktopRoot.dataset.platform, 'darwin');
 assert.equal(await writeClipboardText('native text'), true);
 assert.equal(await readClipboardText(), 'native text');
 

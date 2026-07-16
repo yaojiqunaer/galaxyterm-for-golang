@@ -172,6 +172,35 @@ select {
   background: var(--bg);
 }
 
+html[data-platform='darwin'] .workspace-sidebar {
+  position: relative;
+  padding-top: 28px;
+}
+
+html[data-platform='darwin'] .workspace-sidebar::before {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 28px;
+  background: inherit;
+  content: '';
+  --wails-draggable: drag;
+}
+
+html[data-platform='darwin'] .topbar {
+  --wails-draggable: drag;
+}
+
+html[data-platform='darwin'] .topbar :is(button, input, textarea, select, .ant-select, .ant-dropdown-trigger) {
+  --wails-draggable: no-drag;
+}
+
+html[data-platform='darwin'] .app-shell.focus-mode .topbar {
+  padding-left: 82px;
+}
+
 .app-shell.focus-mode .workspace-sidebar {
   display: none;
 }

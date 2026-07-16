@@ -59,6 +59,36 @@ export function syncDesktopWindowTheme(appTheme = 'system') {
   return true;
 }
 
+export async function syncDesktopPlatform(target = globalThis.document?.documentElement) {
+  const environment = globalThis.window?.runtime?.Environment;
+  if (typeof environment !== 'function') {
+    clearDesktopPlatform(target);
+    return '';
+  }
+  try {
+    const info = await environment.call(globalThis.window.runtime);
+    const platform = normalizeDesktopPlatform(info?.platform);
+    if (!platform) {
+      clearDesktopPlatform(target);
+      return '';
+    }
+    if (target?.dataset) target.dataset.platform = platform;
+    return platform;
+  } catch {
+    clearDesktopPlatform(target);
+    return '';
+  }
+}
+
+function normalizeDesktopPlatform(platform) {
+  const value = String(platform || '').trim().toLowerCase();
+  return ['darwin', 'linux', 'windows'].includes(value) ? value : '';
+}
+
+function clearDesktopPlatform(target) {
+  if (target?.dataset) delete target.dataset.platform;
+}
+
 function resolveWailsMethod(path) {
   return path.reduce((current, key) => current?.[key], globalThis.window?.go);
 }

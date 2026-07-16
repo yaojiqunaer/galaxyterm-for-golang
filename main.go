@@ -26,10 +26,8 @@ var assets embed.FS
 var icon []byte
 
 func newMacOptions() *mac.Options {
-	titleBar := mac.TitleBarDefault()
-	titleBar.HideTitle = true
 	return &mac.Options{
-		TitleBar:   titleBar,
+		TitleBar:   mac.TitleBarHiddenInset(),
 		Appearance: mac.DefaultAppearance,
 		About: &mac.AboutInfo{
 			Title:   "GalaxyTerm 0.0.1",

@@ -73,11 +73,16 @@ assert.ok(
   'the application root must recover from render failures instead of showing a blank window',
 );
 assert.ok(
-  mainGoSource.includes('mac.TitleBarDefault()')
-    && mainGoSource.includes('titleBar.HideTitle = true')
+  mainGoSource.includes('mac.TitleBarHiddenInset()')
     && mainGoSource.includes('mac.DefaultAppearance')
-    && !mainGoSource.includes('mac.TitleBarHiddenInset()'),
-  'macOS must use an unobstructed native title bar that starts with the system appearance',
+    && !mainGoSource.includes('mac.TitleBarDefault()'),
+  'macOS must integrate native traffic-light controls into the application chrome',
+);
+assert.ok(
+  mainSource.includes('syncDesktopPlatform(document.documentElement);')
+    && /html\[data-platform='darwin'\][\s\S]*?--wails-draggable:\s*drag/.test(styles)
+    && /html\[data-platform='darwin'\][\s\S]*?\.workspace-sidebar[\s\S]*?padding-top:\s*28px/.test(styles),
+  'the webview must reserve a draggable macOS traffic-light safe area without affecting other platforms',
 );
 assert.ok(
   source.includes('syncDesktopWindowTheme(settings.appTheme);')
