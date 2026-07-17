@@ -139,17 +139,23 @@ import {
   buildOperationalSummary,
   buildSettingsSectionNav,
   buildSecuritySummary,
+  buildShortcutEditorRows,
   buildShortcutGroups,
+  buildShortcutKeyOptions,
   buildTerminalDefaults,
   buildTerminalPreview,
   buildWorkspaceActionState,
+  defaultShortcutBindings,
   isCommandShortcut,
   isTerminalInputTarget,
   normalizeShortcutModifier,
+  normalizeShortcutBindings,
   buildWorkspaceSnapshotSummary,
   normalizeLogLevel,
   resolveSettingsSectionNavigation,
+  resolveConfigurableShortcutAction,
   shortcutModifierLabel,
+  updateShortcutBinding,
 } from './settingsPresentation.js';
 import {
   buildRemoteFileActions,
@@ -271,6 +277,7 @@ const defaultSettings = {
   disabledExtensionIds: [],
   logLevel: 'info',
   shortcutModifier: 'auto',
+  shortcutBindings: defaultShortcutBindings(),
 };
 
 const fallbackProviders = [
@@ -611,37 +618,48 @@ function App() {
         setHelpOpen(true);
         return;
       }
+      if (isEditableTarget(event.target) && !isTerminalInputTarget(event.target)) return;
+      const configurableShortcutAction = resolveConfigurableShortcutAction(event, settings);
+      if (configurableShortcutAction === 'newTerminal') {
+        event.preventDefault();
+        openDrawer();
+        return;
+      }
+      if (configurableShortcutAction === 'quickCommands') {
+        event.preventDefault();
+        setCommandsOpen(true);
+        return;
+      }
+      if (configurableShortcutAction === 'commandPalette') {
+        event.preventDefault();
+        setPaletteOpen(true);
+        return;
+      }
+      if (configurableShortcutAction === 'closeSession') {
+        event.preventDefault();
+        if (activeKey && selectedNav === 'sessions') confirmRemoveSession(activeKey);
+        return;
+      }
+      if (configurableShortcutAction === 'search') {
+        event.preventDefault();
+        if (activeKey && selectedNav === 'sessions') {
+          terminalSearchRef.current?.focus();
+          terminalSearchRef.current?.select?.();
+        }
+        if (selectedNav === 'files') fileSearchRef.current?.focus();
+        return;
+      }
+      if (configurableShortcutAction === 'reconnect') {
+        event.preventDefault();
+        if (activeKey) reconnectSession();
+        return;
+      }
       const commandKey = isCommandShortcut(event, settings);
       if (!commandKey) return;
       const key = event.key.toLowerCase();
-      if (key === 'n') {
-        event.preventDefault();
-        openDrawer();
-      }
-      if (key === 'k') {
-        event.preventDefault();
-        setCommandsOpen(true);
-      }
-      if (key === 'p') {
-        event.preventDefault();
-        setPaletteOpen(true);
-      }
       if (key === 't' && event.shiftKey) {
         event.preventDefault();
         restoreLastClosedSession();
-      }
-      if (key === 'w' && !event.shiftKey && activeKey && selectedNav === 'sessions') {
-        event.preventDefault();
-        confirmRemoveSession(activeKey);
-      }
-      if (key === 'f' && !event.shiftKey && activeKey && selectedNav === 'sessions') {
-        event.preventDefault();
-        terminalSearchRef.current?.focus();
-        terminalSearchRef.current?.select?.();
-      }
-      if (key === 'f' && !event.shiftKey && selectedNav === 'files') {
-        event.preventDefault();
-        fileSearchRef.current?.focus();
       }
       const numberedSessionIndex = resolveNumberedSessionIndex(key, sessions.length);
       if (numberedSessionIndex >= 0) {
@@ -664,17 +682,6 @@ function App() {
       if (key === 'f' && event.shiftKey && sessions.length > 0) {
         event.preventDefault();
         setFocusMode((current) => !current);
-      }
-      if (key === 'r' && activeKey) {
-        event.preventDefault();
-        reconnectSession();
-      }
-      if (
-        isEditableTarget(event.target)
-        && !isTerminalInputTarget(event.target)
-        && ['c', 'v', 'l', '=', '+', '-', '0'].includes(key)
-      ) {
-        return;
       }
       if (key === 'c' && event.shiftKey && activeKey) {
         event.preventDefault();
@@ -703,7 +710,7 @@ function App() {
     };
     window.addEventListener('keydown', handleKeydown, true);
     return () => window.removeEventListener('keydown', handleKeydown, true);
-  }, [activeKey, closedSessions, selectedNav, sessions, settings.confirmDangerousActions, settings.shortcutModifier]);
+  }, [activeKey, closedSessions, selectedNav, sessions, settings.confirmDangerousActions, settings.shortcutBindings, settings.shortcutModifier]);
 
   useEffect(() => {
     if (!activeKey || selectedNav !== 'sessions') return undefined;
@@ -761,11 +768,26 @@ function App() {
   ], [providers, locale]);
   const shortcutModifier = normalizeShortcutModifier(settings.shortcutModifier);
   const shortcutLabel = shortcutModifierLabel(shortcutModifier);
-  const shortcutGroups = useMemo(
-    () => buildShortcutGroups({ shortcutModifier }),
+  const shortcutEditorRows = useMemo(
+    () => buildShortcutEditorRows({
+      shortcutBindings: settings.shortcutBindings,
+      shortcutModifier,
+    }),
+    [settings.shortcutBindings, shortcutModifier],
+  );
+  const shortcutKeyOptions = useMemo(
+    () => buildShortcutKeyOptions({ shortcutModifier }),
     [shortcutModifier],
   );
-  const commandPaletteShortcut = `${shortcutLabel} + P`;
+  const shortcutGroups = useMemo(
+    () => buildShortcutGroups({
+      shortcutBindings: settings.shortcutBindings,
+      shortcutModifier,
+    }),
+    [settings.shortcutBindings, shortcutModifier],
+  );
+  const commandPaletteShortcut = shortcutEditorRows
+    .find((row) => row.action === 'commandPalette')?.shortcut || `${shortcutLabel} + P`;
   const numberedSessionShortcut = `${shortcutLabel} + 1..9`;
 
   const selectedProvider = providers.find((item) => item.type === newType) || providers[0] || fallbackProviders[0];
@@ -3910,6 +3932,14 @@ function App() {
     });
   };
 
+  const resetShortcutBindings = () => {
+    setSettings((current) => ({
+      ...current,
+      shortcutBindings: defaultShortcutBindings(),
+    }));
+    messageApi.success(t('message.shortcutsReset'));
+  };
+
   const renderSettings = () => (
     <div className="workspace-page settings-page">
       <div className="page-header">
@@ -4161,6 +4191,39 @@ function App() {
             </Form.Item>
             <Text type="secondary">{t('settings.shortcutModifierHint', { shortcut: shortcutLabel })}</Text>
           </Form>
+          <div className="settings-shortcut-editor">
+            <div className="settings-shortcut-editor-head">
+              <div>
+                <Text strong>{t('settings.actionShortcuts')}</Text>
+                <Text type="secondary">{t('settings.shortcutBindingHint')}</Text>
+              </div>
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={resetShortcutBindings}
+                size="small"
+                type="text"
+              >
+                {t('action.resetShortcuts')}
+              </Button>
+            </div>
+            <div className="settings-shortcut-editor-grid">
+              {shortcutEditorRows.map((row) => (
+                <div className="settings-shortcut-editor-row" key={row.action}>
+                  <Text>{t(row.labelKey)}</Text>
+                  <Select
+                    aria-label={t(row.labelKey)}
+                    onChange={(value) => setSettings((current) => ({
+                      ...current,
+                      shortcutBindings: updateShortcutBinding(current.shortcutBindings, row.action, value),
+                    }))}
+                    options={shortcutKeyOptions}
+                    size="small"
+                    value={row.key}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
           <div className="shortcut-group-grid">
             {shortcutGroups.map((group) => (
               <div key={group.key} className="shortcut-group">
@@ -6912,6 +6975,7 @@ function normalizeSettings(settings) {
       : [],
     logLevel: normalizeLogLevel(settings.logLevel),
     shortcutModifier: normalizeShortcutModifier(settings.shortcutModifier),
+    shortcutBindings: normalizeShortcutBindings(settings.shortcutBindings),
     fontSize: clampNumber(settings.fontSize, 10, 24, defaultSettings.fontSize),
     scrollback: clampNumber(settings.scrollback, 500, 100000, defaultSettings.scrollback),
   };
@@ -6929,7 +6993,10 @@ function clampNumber(value, min, max, fallback) {
 
 function isEditableTarget(target) {
   const tagName = target?.tagName?.toLowerCase();
-  return tagName === 'input' || tagName === 'textarea' || target?.isContentEditable;
+  return tagName === 'input'
+    || tagName === 'textarea'
+    || tagName === 'select'
+    || target?.isContentEditable;
 }
 
 function isInteractiveControl(target) {

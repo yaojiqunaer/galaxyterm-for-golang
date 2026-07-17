@@ -332,7 +332,7 @@ assert.ok(
 );
 assert.ok(
   source.includes('const terminalSearchRef = useRef(null);')
-    && source.includes("key === 'f' && !event.shiftKey && activeKey && selectedNav === 'sessions'")
+    && source.includes("configurableShortcutAction === 'search'")
     && source.includes('terminalSearchRef.current?.select?.();')
     && source.includes('const closeTerminalSearch = () => {')
     && source.includes("if (event.key === 'Escape') {")
@@ -343,6 +343,43 @@ assert.ok(
   source.includes("window.addEventListener('keydown', handleKeydown, true);")
     && source.includes("window.removeEventListener('keydown', handleKeydown, true);"),
   'global terminal shortcuts must observe xterm key events in the capture phase',
+);
+assert.ok(
+  source.includes("if (isEditableTarget(event.target) && !isTerminalInputTarget(event.target)) return;")
+    && source.indexOf("if (isEditableTarget(event.target) && !isTerminalInputTarget(event.target)) return;")
+      < source.indexOf('const configurableShortcutAction = resolveConfigurableShortcutAction(event, settings);'),
+  'global shortcuts must stop at editable controls before routing actions while remaining available in xterm',
+);
+assert.ok(
+  source.includes('shortcutBindings: defaultShortcutBindings(),')
+    && source.includes('shortcutBindings: normalizeShortcutBindings(settings.shortcutBindings),')
+    && source.includes('const configurableShortcutAction = resolveConfigurableShortcutAction(event, settings);')
+    && source.includes("configurableShortcutAction === 'newTerminal'")
+    && source.includes("configurableShortcutAction === 'quickCommands'")
+    && source.includes("configurableShortcutAction === 'commandPalette'")
+    && source.includes("configurableShortcutAction === 'closeSession'")
+    && source.includes("configurableShortcutAction === 'search'")
+    && source.includes("configurableShortcutAction === 'reconnect'"),
+  'high-frequency global shortcuts must resolve from normalized persisted bindings',
+);
+assert.ok(
+  source.includes('const shortcutEditorRows = useMemo(')
+    && source.includes('const shortcutKeyOptions = useMemo(')
+    && source.includes('updateShortcutBinding(current.shortcutBindings, row.action, value)')
+    && source.includes('shortcutBindings: defaultShortcutBindings()')
+    && source.includes("messageApi.success(t('message.shortcutsReset'))")
+    && /shortcutEditorRows\s*\n\s*\.find\(\(row\) => row\.action === 'commandPalette'\)\?\.shortcut/.test(source),
+  'shortcut settings, reset behavior, help, and topbar hints must share one binding model',
+);
+assert.ok(
+  /\.settings-shortcut-editor-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(2,\s*minmax\(0,\s*1fr\)\)/.test(styles)
+    && /@media \(max-width:\s*720px\)[\s\S]*?\.settings-shortcut-editor-grid\s*\{[\s\S]*?grid-template-columns:\s*1fr/.test(styles),
+  'shortcut editor must use two columns when space allows and collapse cleanly on narrow windows',
+);
+assert.ok(
+  /\.shortcut-group-grid\s*\{[\s\S]*?grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(280px,\s*1fr\)\)/.test(styles)
+    && /\.shortcut-group code\s*\{[\s\S]*?white-space:\s*nowrap/.test(styles),
+  'shortcut reference groups must keep long key combinations readable without wrapping',
 );
 assert.ok(
   source.includes('const [closedSessions, setClosedSessions] = useState([]);')
@@ -363,9 +400,9 @@ assert.ok(
   'terminal-toned empty states must retain readable text in both app themes',
 );
 assert.ok(
-  source.includes("key === 'w' && !event.shiftKey && activeKey && selectedNav === 'sessions'")
-    && source.includes('confirmRemoveSession(activeKey);'),
-  'Cmd/Ctrl+W must close the active terminal only inside the session workspace',
+  source.includes("configurableShortcutAction === 'closeSession'")
+    && source.includes("if (activeKey && selectedNav === 'sessions') confirmRemoveSession(activeKey);"),
+  'the configured close shortcut must close the active terminal only inside the session workspace',
 );
 assert.ok(
   source.includes('restorableSessionCount: closedSessions.length')

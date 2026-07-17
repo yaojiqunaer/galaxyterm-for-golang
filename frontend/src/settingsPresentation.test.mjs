@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import {
   buildAppearanceSummary,
   buildOperationalSummary,
+  buildShortcutEditorRows,
+  buildShortcutKeyOptions,
   buildSettingsSectionNav,
   buildSecuritySummary,
   buildShortcutGroups,
@@ -9,11 +11,15 @@ import {
   buildTerminalPreview,
   buildWorkspaceActionState,
   buildWorkspaceSnapshotSummary,
+  defaultShortcutBindings,
   isCommandShortcut,
   isTerminalInputTarget,
   normalizeShortcutModifier,
+  normalizeShortcutBindings,
+  resolveConfigurableShortcutAction,
   resolveSettingsSectionNavigation,
   shortcutModifierLabel,
+  updateShortcutBinding,
 } from './settingsPresentation.js';
 
 assert.deepEqual(buildSettingsSectionNav('terminal'), [
@@ -95,6 +101,79 @@ assert.equal(isTerminalInputTarget({ classList: { contains: (value) => value ===
 assert.equal(isTerminalInputTarget({ classList: { contains: () => false }, closest: (value) => value === '.xterm' }), true);
 assert.equal(isTerminalInputTarget({ classList: { contains: () => false }, closest: () => null }), false);
 assert.equal(isTerminalInputTarget(null), false);
+
+assert.deepEqual(defaultShortcutBindings(), {
+  closeSession: 'w',
+  commandPalette: 'p',
+  newTerminal: 'n',
+  quickCommands: 'k',
+  reconnect: 'r',
+  search: 'f',
+});
+assert.deepEqual(normalizeShortcutBindings({
+  commandPalette: 'P',
+  newTerminal: 'P',
+  quickCommands: '%',
+}), defaultShortcutBindings());
+assert.deepEqual(updateShortcutBinding(defaultShortcutBindings(), 'newTerminal', 'p'), {
+  closeSession: 'w',
+  commandPalette: 'n',
+  newTerminal: 'p',
+  quickCommands: 'k',
+  reconnect: 'r',
+  search: 'f',
+});
+assert.equal(resolveConfigurableShortcutAction(
+  { key: 'p', metaKey: true },
+  { shortcutModifier: 'meta', shortcutBindings: { newTerminal: 'p', commandPalette: 'n' } },
+), 'newTerminal');
+assert.equal(resolveConfigurableShortcutAction(
+  { key: 'p', metaKey: true, shiftKey: true },
+  { shortcutModifier: 'meta', shortcutBindings: { newTerminal: 'p' } },
+), '');
+assert.equal(resolveConfigurableShortcutAction(
+  { key: 'p', metaKey: true, altKey: true },
+  { shortcutModifier: 'meta', shortcutBindings: { newTerminal: 'p' } },
+), '');
+assert.equal(resolveConfigurableShortcutAction(
+  { key: 'p', ctrlKey: true },
+  { shortcutModifier: 'meta', shortcutBindings: { newTerminal: 'p' } },
+), '');
+assert.equal(resolveConfigurableShortcutAction(
+  {
+    key: 'p',
+    metaKey: true,
+    target: { tagName: 'INPUT', classList: { contains: () => false }, closest: () => null },
+  },
+  { shortcutModifier: 'meta', shortcutBindings: { newTerminal: 'p' } },
+), '');
+assert.equal(resolveConfigurableShortcutAction(
+  {
+    key: 'p',
+    metaKey: true,
+    target: {
+      tagName: 'TEXTAREA',
+      classList: { contains: (name) => name === 'xterm-helper-textarea' },
+      closest: () => null,
+    },
+  },
+  { shortcutModifier: 'meta', shortcutBindings: { newTerminal: 'p' } },
+), 'newTerminal');
+assert.deepEqual(buildShortcutEditorRows({
+  shortcutModifier: 'meta',
+  shortcutBindings: { newTerminal: 'p', commandPalette: 'n' },
+}).slice(0, 2), [
+  { action: 'newTerminal', key: 'p', labelKey: 'action.newTerminal', shortcut: 'Cmd + P' },
+  { action: 'quickCommands', key: 'k', labelKey: 'action.commands', shortcut: 'Cmd + K' },
+]);
+assert.deepEqual(buildShortcutKeyOptions({ shortcutModifier: 'ctrl' })[0], {
+  label: 'Ctrl + B',
+  value: 'b',
+});
+assert.equal(
+  buildShortcutGroups({ shortcutModifier: 'meta', shortcutBindings: { newTerminal: 'p' } })[0].items[0][0],
+  'Cmd + P',
+);
 
 assert.deepEqual(buildTerminalPreview({
   fontFamily: 'JetBrains Mono',

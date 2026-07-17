@@ -3790,9 +3790,58 @@ code {
   margin-bottom: 6px;
 }
 
+.settings-shortcut-editor {
+  margin-bottom: 16px;
+  padding-block: 12px;
+  border-block: 1px solid var(--border-subtle);
+}
+
+.settings-shortcut-editor-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.settings-shortcut-editor-head > div {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-shortcut-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+}
+
+.settings-shortcut-editor-row {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(120px, 1fr) 150px;
+  align-items: center;
+  gap: 10px;
+}
+
+.settings-shortcut-editor-row .ant-select {
+  width: 100%;
+}
+
+@media (max-width: 720px) {
+  .settings-shortcut-editor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-shortcut-editor-row {
+    grid-template-columns: minmax(0, 1fr) minmax(130px, 45%);
+  }
+}
+
 .shortcut-group-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
   gap: 12px;
 }
 
@@ -3812,6 +3861,7 @@ code {
 
 .shortcut-group code {
   flex: 0 0 auto;
+  white-space: nowrap;
 }
 
 .help-panel {

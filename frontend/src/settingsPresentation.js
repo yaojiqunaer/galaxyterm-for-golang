@@ -32,21 +32,32 @@ export function buildAppearanceSummary(settings = {}) {
 }
 
 const shortcutModifiers = ['auto', 'meta', 'ctrl'];
+const configurableShortcutDefinitions = [
+  { action: 'newTerminal', defaultKey: 'n', labelKey: 'action.newTerminal' },
+  { action: 'quickCommands', defaultKey: 'k', labelKey: 'action.commands' },
+  { action: 'commandPalette', defaultKey: 'p', labelKey: 'action.commandPalette' },
+  { action: 'closeSession', defaultKey: 'w', labelKey: 'action.closeSession' },
+  { action: 'search', defaultKey: 'f', labelKey: 'shortcut.searchTerminal' },
+  { action: 'reconnect', defaultKey: 'r', labelKey: 'action.reconnect' },
+];
+const configurableShortcutKeys = ['b', 'd', 'e', 'f', 'g', 'i', 'j', 'k', 'n', 'o', 'p', 'r', 's', 't', 'u', 'w', 'y'];
 
 export function buildShortcutGroups(settings = {}) {
   const modifier = shortcutModifierLabel(settings.shortcutModifier);
+  const bindings = normalizeShortcutBindings(settings.shortcutBindings);
+  const binding = (action) => `${modifier} + ${bindings[action].toUpperCase()}`;
   return [
     {
       key: 'terminal',
       items: [
-        [`${modifier} + N`, 'action.newTerminal'],
-        [`${modifier} + K`, 'action.commands'],
+        [binding('newTerminal'), 'action.newTerminal'],
+        [binding('quickCommands'), 'action.commands'],
         [`${modifier} + Shift + C`, 'action.copySelection'],
         [`${modifier} + Shift + V`, 'action.pasteClipboard'],
         [`${modifier} + L`, 'action.clearTerminal'],
         ['Ctrl + C', 'action.interruptCommand'],
         [`${modifier} + +/-/0`, 'action.zoomReset'],
-        [`${modifier} + R`, 'action.reconnect'],
+        [binding('reconnect'), 'action.reconnect'],
         ['?', 'action.help'],
       ],
     },
@@ -55,7 +66,7 @@ export function buildShortcutGroups(settings = {}) {
       items: [
         [`${modifier} + 1..9`, 'shortcut.switchNumberedSession'],
         [`${modifier} + Shift + [ / ]`, 'shortcut.switchAdjacentSession'],
-        [`${modifier} + W`, 'action.closeSession'],
+        [binding('closeSession'), 'action.closeSession'],
         [`${modifier} + Shift + T`, 'action.restoreClosedSession'],
         [`${modifier} + Shift + F`, 'action.focusMode'],
         ['Session menu', 'action.exportTranscript'],
@@ -65,7 +76,7 @@ export function buildShortcutGroups(settings = {}) {
     {
       key: 'search',
       items: [
-        [`${modifier} + F`, 'shortcut.searchTerminal'],
+        [binding('search'), 'shortcut.searchTerminal'],
         ['Enter', 'action.findNext'],
         ['Previous button', 'action.findPrevious'],
       ],
@@ -81,13 +92,72 @@ export function buildShortcutGroups(settings = {}) {
     {
       key: 'workspace',
       items: [
-        [`${modifier} + P`, 'action.commandPalette'],
-        [`${modifier} + K`, 'action.commands'],
+        [binding('commandPalette'), 'action.commandPalette'],
+        [binding('quickCommands'), 'action.commands'],
         ['Workspace menu', 'action.saveWorkspace'],
         ['Workspace menu', 'action.restoreWorkspace'],
       ],
     },
   ];
+}
+
+export function defaultShortcutBindings() {
+  return Object.fromEntries(configurableShortcutDefinitions.map((definition) => [
+    definition.action,
+    definition.defaultKey,
+  ]));
+}
+
+export function normalizeShortcutBindings(value = {}) {
+  let bindings = defaultShortcutBindings();
+  configurableShortcutDefinitions.forEach(({ action }) => {
+    if (!Object.prototype.hasOwnProperty.call(value || {}, action)) return;
+    const key = normalizeShortcutKey(value[action]);
+    if (!key) return;
+    bindings = swapShortcutBinding(bindings, action, key);
+  });
+  return bindings;
+}
+
+export function updateShortcutBinding(bindings, action, key) {
+  if (!configurableShortcutDefinitions.some((definition) => definition.action === action)) {
+    return normalizeShortcutBindings(bindings);
+  }
+  const normalizedKey = normalizeShortcutKey(key);
+  const current = normalizeShortcutBindings(bindings);
+  return normalizedKey ? swapShortcutBinding(current, action, normalizedKey) : current;
+}
+
+export function resolveConfigurableShortcutAction(event = {}, settings = {}) {
+  if (
+    !isCommandShortcut(event, settings)
+    || event.altKey
+    || event.shiftKey
+    || isEditableShortcutTarget(event.target)
+  ) return '';
+  const key = normalizeShortcutKey(event.key);
+  if (!key) return '';
+  const bindings = normalizeShortcutBindings(settings.shortcutBindings);
+  return configurableShortcutDefinitions.find(({ action }) => bindings[action] === key)?.action || '';
+}
+
+export function buildShortcutEditorRows(settings = {}) {
+  const modifier = shortcutModifierLabel(settings.shortcutModifier);
+  const bindings = normalizeShortcutBindings(settings.shortcutBindings);
+  return configurableShortcutDefinitions.map(({ action, labelKey }) => ({
+    action,
+    key: bindings[action],
+    labelKey,
+    shortcut: `${modifier} + ${bindings[action].toUpperCase()}`,
+  }));
+}
+
+export function buildShortcutKeyOptions(settings = {}) {
+  const modifier = shortcutModifierLabel(settings.shortcutModifier);
+  return configurableShortcutKeys.map((key) => ({
+    label: `${modifier} + ${key.toUpperCase()}`,
+    value: key,
+  }));
 }
 
 export function isCommandShortcut(event = {}, settings = {}) {
@@ -104,6 +174,15 @@ export function isTerminalInputTarget(target) {
   );
 }
 
+function isEditableShortcutTarget(target) {
+  const tagName = target?.tagName?.toLowerCase();
+  const editable = tagName === 'input'
+    || tagName === 'textarea'
+    || tagName === 'select'
+    || target?.isContentEditable;
+  return !!editable && !isTerminalInputTarget(target);
+}
+
 export function normalizeShortcutModifier(value) {
   const normalized = String(value || '').trim().toLowerCase();
   return shortcutModifiers.includes(normalized) ? normalized : 'auto';
@@ -114,6 +193,23 @@ export function shortcutModifierLabel(value) {
   if (modifier === 'meta') return 'Cmd';
   if (modifier === 'ctrl') return 'Ctrl';
   return 'Cmd/Ctrl';
+}
+
+function normalizeShortcutKey(value) {
+  const key = String(value || '').trim().toLowerCase();
+  return configurableShortcutKeys.includes(key) ? key : '';
+}
+
+function swapShortcutBinding(bindings, action, key) {
+  const previousKey = bindings[action];
+  const owner = configurableShortcutDefinitions.find((definition) => (
+    definition.action !== action && bindings[definition.action] === key
+  ));
+  return {
+    ...bindings,
+    [action]: key,
+    ...(owner ? { [owner.action]: previousKey } : {}),
+  };
 }
 
 export function buildSecuritySummary(settings = {}) {
