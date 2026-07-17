@@ -109,6 +109,40 @@ export function buildRemoteFileBreadcrumbs(path = '.') {
   return crumbs;
 }
 
+export function buildRemoteFileActions(entry = {}, capabilities = []) {
+  const supported = new Set(capabilities);
+  const actions = [];
+  if (entry.isDir && supported.has('list')) {
+    actions.push({ key: 'open', labelKey: 'action.open' });
+  }
+  if (!entry.isDir && supported.has('read')) {
+    actions.push({
+      key: supported.has('write') ? 'edit' : 'view',
+      labelKey: supported.has('write') ? 'action.edit' : 'action.view',
+    });
+    actions.push({ key: 'download', labelKey: 'action.download' });
+  }
+  if (supported.has('rename')) {
+    actions.push({ key: 'rename', labelKey: 'action.rename' });
+  }
+  if (supported.has('delete')) {
+    actions.push({ danger: true, key: 'delete', labelKey: 'action.delete' });
+  }
+  return actions;
+}
+
+export function buildRemoteRenameDestination(entryPath = '', nextName = '') {
+  const name = String(nextName || '').trim();
+  if (!name || name === '.' || name === '..' || /[/\\]/.test(name)) return '';
+  const source = String(entryPath || '').trim();
+  if (!source) return '';
+  const normalized = source.replace(/\/+$/, '');
+  const separator = normalized.lastIndexOf('/');
+  if (separator < 0) return name;
+  if (separator === 0) return `/${name}`;
+  return `${normalized.slice(0, separator)}/${name}`;
+}
+
 function splitAddress(address = '') {
   const text = String(address || '');
   const index = text.lastIndexOf(':');

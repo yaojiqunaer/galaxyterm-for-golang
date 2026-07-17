@@ -270,8 +270,16 @@ assert.ok(
   source.includes('buildEnabledFileProviders(installedExtensions, settings.disabledExtensionIds)')
     && source.includes('providerType: selectedFileProvider.type')
     && source.includes("fileProviderSupports(selectedFileProvider, 'write')")
-    && source.includes("fileProviderSupports(selectedFileProvider, 'delete')"),
+    && source.includes("fileProviderSupports(selectedFileProvider, 'delete')")
+    && source.includes("fileProviderSupports(selectedFileProvider, 'rename')"),
   'remote files must resolve installed file providers and hide unsupported operations by capability',
+);
+assert.ok(
+  source.includes('buildRemoteFileActions(entry, selectedFileProvider.capabilities)')
+    && source.includes('await FilesAPI.Rename')
+    && source.includes('const confirmDeleteRemoteEntry = (entry) =>')
+    && source.includes("title: t('confirm.deleteRemoteEntryTitle')"),
+  'remote file rows must expose capability-driven actions, safe rename, and destructive confirmation',
 );
 assert.ok(
   source.includes("selectedFileProvider.protocol === 'sftp'")

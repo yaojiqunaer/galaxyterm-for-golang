@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import {
+  buildRemoteFileActions,
   buildRemoteFileBreadcrumbs,
+  buildRemoteRenameDestination,
   buildRemoteFileSummary,
   buildSavedSshConnections,
   buildSshConnectionAuth,
@@ -144,6 +146,29 @@ assert.deepEqual(buildRemoteFileBreadcrumbs('var/log'), [
   { key: 'var', label: 'var', path: 'var' },
   { key: 'var/log', label: 'log', path: 'var/log' },
 ]);
+
+assert.deepEqual(buildRemoteFileActions({ isDir: true }, ['list', 'rename', 'delete']), [
+  { key: 'open', labelKey: 'action.open' },
+  { key: 'rename', labelKey: 'action.rename' },
+  { danger: true, key: 'delete', labelKey: 'action.delete' },
+]);
+assert.deepEqual(buildRemoteFileActions({ isDir: false }, ['read', 'write', 'rename', 'delete']), [
+  { key: 'edit', labelKey: 'action.edit' },
+  { key: 'download', labelKey: 'action.download' },
+  { key: 'rename', labelKey: 'action.rename' },
+  { danger: true, key: 'delete', labelKey: 'action.delete' },
+]);
+assert.deepEqual(buildRemoteFileActions({ isDir: false }, ['read']), [
+  { key: 'view', labelKey: 'action.view' },
+  { key: 'download', labelKey: 'action.download' },
+]);
+assert.deepEqual(buildRemoteFileActions({ isDir: false }, []), []);
+
+assert.equal(buildRemoteRenameDestination('/etc/nginx.conf', ' nginx.prod.conf '), '/etc/nginx.prod.conf');
+assert.equal(buildRemoteRenameDestination('nginx.conf', 'nginx.prod.conf'), 'nginx.prod.conf');
+assert.equal(buildRemoteRenameDestination('/etc/nginx.conf', '../secret'), '');
+assert.equal(buildRemoteRenameDestination('/etc/nginx.conf', 'nested/name'), '');
+assert.equal(buildRemoteRenameDestination('/etc/nginx.conf', ''), '');
 
 const tunnels = [
   {

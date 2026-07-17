@@ -3718,6 +3718,11 @@ code {
   resize: vertical;
 }
 
+.remote-rename-path {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
 .ssh-config-import-editor {
   min-height: 56vh !important;
   margin-top: 12px;

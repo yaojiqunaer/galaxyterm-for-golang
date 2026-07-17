@@ -42,6 +42,7 @@ import {
   CopyOutlined,
   DatabaseOutlined,
   DeleteOutlined,
+  DownloadOutlined,
   DownOutlined,
   EditOutlined,
   ExportOutlined,
@@ -146,7 +147,9 @@ import {
   shortcutModifierLabel,
 } from './settingsPresentation.js';
 import {
+  buildRemoteFileActions,
   buildRemoteFileBreadcrumbs,
+  buildRemoteRenameDestination,
   buildRemoteFileSummary,
   buildSavedSshConnections,
   buildSshConnectionAuth,
@@ -389,6 +392,8 @@ function App() {
   const [uploadLocalContent, setUploadLocalContent] = useState('');
   const [mkdirOpen, setMkdirOpen] = useState(false);
   const [mkdirName, setMkdirName] = useState('');
+  const [renamingRemoteEntry, setRenamingRemoteEntry] = useState(null);
+  const [remoteRenameName, setRemoteRenameName] = useState('');
   const [sshAuthType, setSshAuthType] = useState('password');
   const [form] = Form.useForm();
   const [fileForm] = Form.useForm();
@@ -3101,6 +3106,44 @@ function App() {
     }
   };
 
+  const openRemoteRename = (entry) => {
+    setRenamingRemoteEntry(entry);
+    setRemoteRenameName(entry.name || '');
+  };
+
+  const renameRemoteEntry = async () => {
+    if (!renamingRemoteEntry) return;
+    const destinationPath = buildRemoteRenameDestination(
+      renamingRemoteEntry.path,
+      remoteRenameName,
+    );
+    if (!destinationPath) {
+      messageApi.warning(t('validation.remoteEntryName'));
+      return;
+    }
+    if (destinationPath === renamingRemoteEntry.path) {
+      setRenamingRemoteEntry(null);
+      return;
+    }
+    setFileLoading(true);
+    try {
+      const req = await currentFileRequest();
+      await FilesAPI.Rename({
+        ...req,
+        destinationPath,
+        path: renamingRemoteEntry.path,
+      });
+      messageApi.success(t('message.fileRenameSuccess'));
+      setRenamingRemoteEntry(null);
+      setRemoteRenameName('');
+      await loadFiles(fileForm.getFieldValue('path') || '.');
+    } catch (error) {
+      showOperationError('message.fileRenameFailed', error, { retry: renameRemoteEntry });
+    } finally {
+      setFileLoading(false);
+    }
+  };
+
   const deleteRemoteEntry = async (entry) => {
     setFileLoading(true);
     try {
@@ -3110,12 +3153,30 @@ function App() {
       messageApi.success(t('message.deleteSuccess'));
       await loadFiles(fileForm.getFieldValue('path') || '.');
     } catch (error) {
-      showOperationError('message.fileListFailed', error, {
+      showOperationError('message.fileDeleteFailed', error, {
         retry: () => deleteRemoteEntry(entry),
       });
     } finally {
       setFileLoading(false);
     }
+  };
+
+  const confirmDeleteRemoteEntry = (entry) => {
+    if (settings.confirmDangerousActions === false) {
+      deleteRemoteEntry(entry);
+      return;
+    }
+    modalApi.confirm({
+      title: t('confirm.deleteRemoteEntryTitle'),
+      content: t('confirm.deleteRemoteEntryContent', {
+        name: entry.name || entry.path,
+        path: entry.path || '-',
+      }),
+      okButtonProps: { danger: true },
+      okText: t('action.delete'),
+      cancelText: t('action.cancel'),
+      onOk: () => deleteRemoteEntry(entry),
+    });
   };
 
   const downloadRemoteFile = async (entry) => {
@@ -3237,6 +3298,14 @@ function App() {
     const canWriteFiles = fileProviderSupports(selectedFileProvider, 'write');
     const canCreateDirectories = fileProviderSupports(selectedFileProvider, 'mkdir');
     const canDeleteFiles = fileProviderSupports(selectedFileProvider, 'delete');
+    const canRenameFiles = fileProviderSupports(selectedFileProvider, 'rename');
+    const runRemoteFileAction = (action, entry) => {
+      if (action === 'open') loadFiles(entry.path);
+      if (action === 'edit' || action === 'view') openRemoteFileEditor(entry);
+      if (action === 'download') downloadRemoteFile(entry);
+      if (action === 'rename' && canRenameFiles) openRemoteRename(entry);
+      if (action === 'delete' && canDeleteFiles) confirmDeleteRemoteEntry(entry);
+    };
     return (
       <div className="workspace-page remote-workspace-page">
         <div className="page-header">
@@ -3359,37 +3428,65 @@ function App() {
                   </Empty>
                 ),
               }}
-              renderItem={(entry) => (
-                <List.Item
-                  className={entry.isDir ? 'remote-file-row directory' : 'remote-file-row'}
-                  actions={[
-                    !entry.isDir && canReadFiles && canWriteFiles && <Button key="edit" size="small" onClick={() => openRemoteFileEditor(entry)} loading={fileEditorLoading}>{t('action.edit')}</Button>,
-                    !entry.isDir && canReadFiles && <Button key="download" size="small" onClick={() => downloadRemoteFile(entry)}>{t('action.download')}</Button>,
-                    canDeleteFiles && <Button key="delete" size="small" danger onClick={() => deleteRemoteEntry(entry)}>{t('action.delete')}</Button>,
-                  ].filter(Boolean)}
-                  onDoubleClick={() => {
-                    if (entry.isDir) loadFiles(entry.path);
-                    if (!entry.isDir && canReadFiles) openRemoteFileEditor(entry);
-                  }}
-                >
-                  <List.Item.Meta
-                    avatar={<span className="provider-icon">{entry.isDir ? <FolderOpenOutlined /> : <CodeOutlined />}</span>}
-                    title={(
-                      <span className="remote-file-title">
-                        <strong>{entry.name}</strong>
-                        {entry.isDir && <span className="connection-profile-badge tone-info">{t('field.path')}</span>}
-                      </span>
-                    )}
-                    description={(
-                      <span className="remote-file-meta">
-                        <span>{entry.mode}</span>
-                        <span>{entry.isDir ? '-' : entry.size}</span>
-                        <span>{entry.modTime}</span>
-                      </span>
-                    )}
-                  />
-                </List.Item>
-              )}
+              renderItem={(entry) => {
+                const entryActions = buildRemoteFileActions(entry, selectedFileProvider.capabilities);
+                return (
+                  <List.Item
+                    className={entry.isDir ? 'remote-file-row directory' : 'remote-file-row'}
+                    actions={[
+                      entryActions.length > 0 && (
+                        <Dropdown
+                          key="actions"
+                          trigger={['click']}
+                          menu={{
+                            items: entryActions.map((action) => ({
+                              key: action.key,
+                              danger: action.danger,
+                              icon: remoteFileActionIcon(action.key),
+                              label: t(action.labelKey),
+                            })),
+                            onClick: ({ key, domEvent }) => {
+                              domEvent?.stopPropagation();
+                              runRemoteFileAction(key, entry);
+                            },
+                          }}
+                        >
+                          <Button
+                            aria-label={t('file.entryActions', { name: entry.name })}
+                            disabled={fileLoading || fileEditorLoading}
+                            icon={<MoreOutlined />}
+                            size="small"
+                            type="text"
+                            onClick={(event) => event.stopPropagation()}
+                            onDoubleClick={(event) => event.stopPropagation()}
+                          />
+                        </Dropdown>
+                      ),
+                    ].filter(Boolean)}
+                    onDoubleClick={() => {
+                      if (entry.isDir && canListFiles) loadFiles(entry.path);
+                      if (!entry.isDir && canReadFiles) openRemoteFileEditor(entry);
+                    }}
+                  >
+                    <List.Item.Meta
+                      avatar={<span className="provider-icon">{entry.isDir ? <FolderOpenOutlined /> : <CodeOutlined />}</span>}
+                      title={(
+                        <span className="remote-file-title">
+                          <strong>{entry.name}</strong>
+                          {entry.isDir && <span className="connection-profile-badge tone-info">{t('field.path')}</span>}
+                        </span>
+                      )}
+                      description={(
+                        <span className="remote-file-meta">
+                          <span>{entry.mode}</span>
+                          <span>{entry.isDir ? '-' : entry.size}</span>
+                          <span>{entry.modTime}</span>
+                        </span>
+                      )}
+                    />
+                  </List.Item>
+                );
+              }}
             />
           </div>
         </div>
@@ -3403,18 +3500,42 @@ function App() {
         <Input value={mkdirName} onChange={(event) => setMkdirName(event.target.value)} placeholder={t('field.name')} />
       </Drawer>
       <Drawer
-        title={editingRemoteFile ? `${t('action.edit')} ${editingRemoteFile.name}` : t('action.edit')}
+        title={editingRemoteFile
+          ? `${t(canWriteFiles ? 'action.edit' : 'action.view')} ${editingRemoteFile.name}`
+          : t(canWriteFiles ? 'action.edit' : 'action.view')}
         width={760}
         open={fileEditorOpen}
         onClose={() => setFileEditorOpen(false)}
-        extra={<Button type="primary" loading={fileEditorLoading} onClick={saveRemoteFile}>{t('action.save')}</Button>}
+        extra={canWriteFiles && <Button type="primary" loading={fileEditorLoading} onClick={saveRemoteFile}>{t('action.save')}</Button>}
       >
         <Input.TextArea
           className="remote-file-editor"
           value={editingRemoteContent}
           onChange={(event) => setEditingRemoteContent(event.target.value)}
+          readOnly={!canWriteFiles}
           spellCheck={false}
         />
+      </Drawer>
+      <Drawer
+        title={t('file.renameTitle')}
+        width={360}
+        open={Boolean(renamingRemoteEntry)}
+        onClose={() => setRenamingRemoteEntry(null)}
+        extra={<Button type="primary" loading={fileLoading} onClick={renameRemoteEntry}>{t('action.rename')}</Button>}
+      >
+        <Form layout="vertical">
+          <Form.Item label={t('field.name')} required>
+            <Input
+              autoFocus
+              value={remoteRenameName}
+              onChange={(event) => setRemoteRenameName(event.target.value)}
+              onPressEnter={renameRemoteEntry}
+            />
+          </Form.Item>
+          {renamingRemoteEntry?.path && (
+            <Text type="secondary" className="remote-rename-path">{renamingRemoteEntry.path}</Text>
+          )}
+        </Form>
       </Drawer>
       <Drawer
         title={t('action.uploadText')}
@@ -5499,6 +5620,14 @@ function sessionTabActionIcon(action) {
   if (action === 'duplicate') return <CopyOutlined />;
   if (action === 'moveLeft') return <LeftOutlined />;
   if (action === 'moveRight') return <RightOutlined />;
+  return <DeleteOutlined />;
+}
+
+function remoteFileActionIcon(action) {
+  if (action === 'open') return <FolderOpenOutlined />;
+  if (action === 'edit' || action === 'rename') return <EditOutlined />;
+  if (action === 'view') return <FileTextOutlined />;
+  if (action === 'download') return <DownloadOutlined />;
   return <DeleteOutlined />;
 }
 
