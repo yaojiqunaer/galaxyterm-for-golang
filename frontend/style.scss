@@ -673,7 +673,7 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   }
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 1320px) {
   .topbar-secondary-action {
     display: none;
   }
@@ -683,7 +683,7 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   }
 }
 
-@media (max-width: 860px) {
+@media (max-width: 1200px) {
   .topbar-command-group {
     flex: 0 0 auto;
   }
@@ -848,10 +848,10 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   width: auto;
   min-width: 26px;
   height: 24px;
-  padding: 0 7px;
-  border: 1px solid var(--terminal-border);
-  border-radius: 999px;
-  background: var(--terminal-chrome-soft);
+  padding: 0 5px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--muted);
 }
 
@@ -863,22 +863,18 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
 }
 
 .session-recording-indicator.tone-success {
-  border-color: rgb(52 211 153 / 32%);
   color: var(--success);
 }
 
 .session-recording-indicator.tone-warning {
-  border-color: rgb(245 197 66 / 32%);
   color: var(--warning);
 }
 
 .session-audit-indicator.tone-success {
-  border-color: rgb(52 211 153 / 32%);
   color: var(--success);
 }
 
 .session-audit-indicator.tone-warning {
-  border-color: rgb(245 197 66 / 32%);
   color: var(--warning);
 }
 
@@ -1291,12 +1287,30 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   align-items: baseline;
   gap: 5px;
   max-width: 320px;
-  padding: 1px 7px;
-  border: 1px solid var(--terminal-border);
-  border-radius: 999px;
-  background: var(--terminal-chrome-soft);
+  padding: 1px 8px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   color: var(--muted);
   white-space: nowrap;
+}
+
+.terminal-status-fact + .terminal-status-fact {
+  border-left: 1px solid var(--terminal-border);
+}
+
+.terminal-status-fact.fact-status::before {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  align-self: center;
+  border-radius: 50%;
+  background: currentColor;
+  content: '';
+}
+
+.terminal-status-fact.fact-status strong {
+  color: currentColor;
 }
 
 .terminal-status-fact small {
@@ -1312,17 +1326,14 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
 }
 
 .terminal-status-fact.tone-success {
-  border-color: rgb(52 211 153 / 25%);
   color: var(--success);
 }
 
 .terminal-status-fact.tone-warning {
-  border-color: rgb(245 197 66 / 25%);
   color: var(--warning);
 }
 
 .terminal-status-fact.tone-danger {
-  border-color: rgb(248 113 113 / 35%);
   color: var(--danger);
 }
 

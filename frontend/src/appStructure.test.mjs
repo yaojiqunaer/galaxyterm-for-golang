@@ -115,8 +115,12 @@ assert.ok(
   'topbar primary commands must expose responsive label hooks',
 );
 assert.ok(
-  /@media \(max-width: 860px\)[\s\S]*?\.topbar-new-terminal[\s\S]*?\.command-palette-label/.test(styles),
+  /@media \(max-width: 1200px\)[\s\S]*?\.topbar-new-terminal[\s\S]*?\.command-palette-label/.test(styles),
   'narrow workspaces must collapse primary topbar labels without hiding their commands',
+);
+assert.ok(
+  /@media \(max-width: 1320px\)[\s\S]*?\.topbar-secondary-action\s*\{[\s\S]*?display:\s*none/.test(styles),
+  'non-fullscreen desktop windows must remove secondary topbar width before the shell can overflow',
 );
 assert.ok(
   source.includes('className={`terminal-status-fact session-context-status-fact')
@@ -308,7 +312,7 @@ assert.ok(
   source.includes("language: () => setSettingsOpen(true)")
     && source.includes("{ key: 'language', icon: <GlobalOutlined />, label: t('action.language') }")
     && (source.match(/className="topbar-utility-action"/g) || []).length === 4
-    && /@media \(max-width: 860px\)[\s\S]*?\.topbar-utility-action\s*\{[\s\S]*?display:\s*none/.test(styles),
+    && /@media \(max-width: 1200px\)[\s\S]*?\.topbar-utility-action\s*\{[\s\S]*?display:\s*none/.test(styles),
   'narrow topbars must move duplicate utility actions into the discoverable workspace menu',
 );
 assert.ok(
@@ -364,6 +368,17 @@ assert.ok(
   'running terminal commands must expose a provider-neutral PTY interrupt through each terminal frame',
 );
 assert.ok(
+  terminalPaneSource.includes('const callbacksRef = useRef({')
+    && terminalPaneSource.includes('callbacksRef.current = {')
+    && terminalPaneSource.includes('callbacksRef.current.onCommandSubmitted?.(command)')
+    && terminalPaneSource.includes('callbacksRef.current.onConfirmPaste?.(risk)')
+    && terminalPaneSource.includes('callbacksRef.current.onStatusChange')
+    && terminalPaneSource.includes('callbacksRef.current.onAuditEvent?.(')
+    && terminalPaneSource.includes('callbacksRef.current.onSessionCreated?.(createdSessionId)')
+    && terminalPaneSource.includes('callbacksRef.current.onSessionClosed?.(createdSessionId)'),
+  'persistent terminals must dispatch through current callbacks instead of retaining initial app state',
+);
+assert.ok(
   !terminalPaneSource.includes('const connectingText')
     && !terminalPaneSource.includes('term.current.write(connectingText)'),
   'connection progress must stay in structured status instead of polluting terminal output and recordings',
@@ -373,6 +388,12 @@ assert.ok(
     && source.includes('sessionAuditIndicatorLabel(auditSummary)')
     && styles.includes('.session-capture-indicator-label'),
   'recording and audit state must remain readable without relying on icon hover tooltips',
+);
+assert.ok(
+  /\.terminal-status-fact\s*\{[\s\S]*?border:\s*0;[\s\S]*?border-radius:\s*0;[\s\S]*?background:\s*transparent;/.test(styles)
+    && /\.terminal-status-fact\.fact-status::before\s*\{[\s\S]*?border-radius:\s*50%;/.test(styles)
+    && /\.session-audit-indicator,\s*\.session-recording-indicator\s*\{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;/.test(styles),
+  'terminal status should use a quiet desktop status strip instead of stacked pill controls',
 );
 assert.ok(
   terminalPaneSource.includes('onConfirmPaste')

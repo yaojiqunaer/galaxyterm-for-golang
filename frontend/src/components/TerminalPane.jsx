@@ -41,8 +41,25 @@ function TerminalPane({
   const outputTail = useRef('');
   const durationTimer = useRef(null);
   const lastActivityNotificationAt = useRef(null);
-  const onOutputActivityRef = useRef(onOutputActivity);
   const pasteConfirmationPending = useRef(false);
+  const callbacksRef = useRef({
+    onAuditEvent,
+    onCommandSubmitted,
+    onConfirmPaste,
+    onOutputActivity,
+    onSessionClosed,
+    onSessionCreated,
+    onStatusChange,
+  });
+  callbacksRef.current = {
+    onAuditEvent,
+    onCommandSubmitted,
+    onConfirmPaste,
+    onOutputActivity,
+    onSessionClosed,
+    onSessionCreated,
+    onStatusChange,
+  };
   const terminalStatus = useRef({
     cols: 80,
     durationMs: 0,
@@ -52,9 +69,9 @@ function TerminalPane({
     updatedAt: new Date().toISOString(),
   });
 
-  useEffect(() => {
-    onOutputActivityRef.current = onOutputActivity;
-  }, [onOutputActivity]);
+  const emitStatus = (patch) => {
+    emitTerminalStatus(callbacksRef.current.onStatusChange, terminalStatus, patch);
+  };
 
   const stopDurationTicker = () => {
     if (durationTimer.current) window.clearInterval(durationTimer.current);
@@ -68,7 +85,7 @@ function TerminalPane({
         stopDurationTicker();
         return;
       }
-      emitTerminalStatus(onStatusChange, terminalStatus, {
+      emitStatus({
         durationMs: commandDurationMs(lastCommandStartedAt.current),
       });
     }, 500);
@@ -78,7 +95,7 @@ function TerminalPane({
     lastCommand.current = command;
     lastCommandStartedAt.current = new Date();
     outputTail.current = '';
-    emitTerminalStatus(onStatusChange, terminalStatus, {
+    emitStatus({
       durationMs: 0,
       error: '',
       exitCode: undefined,
@@ -86,16 +103,16 @@ function TerminalPane({
       status: 'busy',
     });
     startDurationTicker();
-    onCommandSubmitted?.(command);
+    callbacksRef.current.onCommandSubmitted?.(command);
   };
 
   const markCommandInterrupted = () => {
     if (!isCommandInFlight(terminalStatus.current.status)) return;
-    emitTerminalStatus(onStatusChange, terminalStatus, {
+    emitStatus({
       durationMs: commandDurationMs(lastCommandStartedAt.current),
       status: 'interrupting',
     });
-    onAuditEvent?.({
+    callbacksRef.current.onAuditEvent?.({
       detail: lastCommand.current,
       type: 'command.interrupt',
     });
@@ -111,19 +128,19 @@ function TerminalPane({
     if (!risk) return true;
     const detail = `${risk.characterCount} chars, ${risk.lineCount} lines`;
     if (pasteConfirmationPending.current) {
-      onAuditEvent?.({ detail, type: 'paste.blocked' });
+      callbacksRef.current.onAuditEvent?.({ detail, type: 'paste.blocked' });
       return false;
     }
     pasteConfirmationPending.current = true;
     let allowed = false;
     try {
-      allowed = await onConfirmPaste?.(risk) === true;
+      allowed = await callbacksRef.current.onConfirmPaste?.(risk) === true;
     } catch {
       allowed = false;
     } finally {
       pasteConfirmationPending.current = false;
     }
-    onAuditEvent?.({
+    callbacksRef.current.onAuditEvent?.({
       detail,
       type: allowed ? 'paste.sent' : 'paste.blocked',
     });
@@ -225,7 +242,7 @@ function TerminalPane({
       term.current.loadAddon(fitAddon.current);
       term.current.loadAddon(searchAddon.current);
       term.current.open(containerRef.current);
-      emitTerminalStatus(onStatusChange, terminalStatus, { status: 'connecting' });
+      emitStatus({ status: 'connecting' });
 
       const createdSessionId = await SessionAPI.CreateSession(request);
       if (disposed) {
@@ -234,13 +251,13 @@ function TerminalPane({
       }
 
       sessionId.current = createdSessionId;
-      emitTerminalStatus(onStatusChange, terminalStatus, {
+      emitStatus({
         cols: term.current?.cols || 80,
         rows: term.current?.rows || 24,
         status: 'connected',
       });
-      onSessionCreated?.(createdSessionId);
-      onAuditEvent?.({
+      callbacksRef.current.onSessionCreated?.(createdSessionId);
+      callbacksRef.current.onAuditEvent?.({
         detail: request.displayName || request.providerType,
         type: 'session.created',
       });
@@ -250,7 +267,7 @@ function TerminalPane({
         const activityAt = Date.now();
         if (data && shouldNotifyTerminalActivity(lastActivityNotificationAt.current, activityAt)) {
           lastActivityNotificationAt.current = activityAt;
-          onOutputActivityRef.current?.(new Date(activityAt).toISOString());
+          callbacksRef.current.onOutputActivity?.(new Date(activityAt).toISOString());
         }
         if (data) transcript.current.push(data);
         if (data) outputEvents.current.push({ time: elapsedSeconds(startedAt.current), data });
@@ -262,7 +279,7 @@ function TerminalPane({
           && (exitCode !== null || terminalOutputIndicatesPrompt(outputTail.current))
         ) {
           stopDurationTicker();
-          emitTerminalStatus(onStatusChange, terminalStatus, {
+          emitStatus({
             durationMs: commandDurationMs(lastCommandStartedAt.current),
             ...(exitCode !== null ? { exitCode } : {}),
             status: lastCommand.current ? 'idle' : 'connected',
@@ -275,30 +292,30 @@ function TerminalPane({
         const message = event?.Error?.defaultMessage || event?.error?.defaultMessage || t('terminal.error.disconnected');
         transcript.current.push(`\r\n${message}`);
         outputEvents.current.push({ time: elapsedSeconds(startedAt.current), data: `\r\n${message}` });
-        emitTerminalStatus(onStatusChange, terminalStatus, {
+        emitStatus({
           durationMs: commandDurationMs(lastCommandStartedAt.current),
           error: message,
           status: 'error',
         });
-        onAuditEvent?.({ detail: message, type: 'session.error' });
+        callbacksRef.current.onAuditEvent?.({ detail: message, type: 'session.error' });
         term.current?.writeln(`\r\n${message}`);
       });
       cleanupExit = runtime.EventsOn(`terminal:exit:${createdSessionId}`, () => {
         stopDurationTicker();
         transcript.current.push(`\r\n${t('terminal.status.closed')}`);
         outputEvents.current.push({ time: elapsedSeconds(startedAt.current), data: `\r\n${t('terminal.status.closed')}` });
-        emitTerminalStatus(onStatusChange, terminalStatus, {
+        emitStatus({
           durationMs: commandDurationMs(lastCommandStartedAt.current),
           status: 'closed',
         });
-        onAuditEvent?.({ type: 'session.closed' });
+        callbacksRef.current.onAuditEvent?.({ type: 'session.closed' });
         term.current?.writeln(`\r\n${t('terminal.status.closed')}`);
-        onSessionClosed?.(createdSessionId);
+        callbacksRef.current.onSessionClosed?.(createdSessionId);
       });
 
       term.current.onResize((size) => {
-        onAuditEvent?.({ detail: `${size.cols}x${size.rows}`, type: 'terminal.resize' });
-        emitTerminalStatus(onStatusChange, terminalStatus, {
+        callbacksRef.current.onAuditEvent?.({ detail: `${size.cols}x${size.rows}`, type: 'terminal.resize' });
+        emitStatus({
           cols: size.cols,
           rows: size.rows,
         });
@@ -308,7 +325,7 @@ function TerminalPane({
         if (pasteConfirmationPending.current) return;
         if (!await confirmTerminalPaste(data)) return;
         if (data.includes('\r') || data.includes('\n')) {
-          onAuditEvent?.({ type: 'input.enter' });
+          callbacksRef.current.onAuditEvent?.({ type: 'input.enter' });
         }
         trackOutgoingData(data);
         SessionAPI.Send(createdSessionId, data);
@@ -338,7 +355,7 @@ function TerminalPane({
         cleanupWindow = cleanup;
       })
       .catch((error) => {
-        emitTerminalStatus(onStatusChange, terminalStatus, {
+        emitStatus({
           error: String(error),
           status: 'error',
         });
@@ -348,7 +365,7 @@ function TerminalPane({
     return () => {
       disposed = true;
       stopDurationTicker();
-      emitTerminalStatus(onStatusChange, terminalStatus, {
+      emitStatus({
         durationMs: commandDurationMs(lastCommandStartedAt.current),
         status: 'closed',
       });
