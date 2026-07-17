@@ -18,12 +18,24 @@ type protocolRequest struct {
 	DestinationPath string         `json:"destinationPath,omitempty"`
 	Content         string         `json:"content,omitempty"`
 	LocalPath       string         `json:"localPath,omitempty"`
+	Features        []string       `json:"features,omitempty"`
 }
 
 type protocolResponse struct {
 	RequestID string         `json:"requestId"`
 	Result    any            `json:"result,omitempty"`
 	Error     *providerError `json:"error,omitempty"`
+}
+
+type protocolProgressFrame struct {
+	Type      string           `json:"type"`
+	RequestID string           `json:"requestId"`
+	Progress  transferProgress `json:"progress"`
+}
+
+type transferProgress struct {
+	Bytes int64 `json:"bytes"`
+	Total int64 `json:"total,omitempty"`
 }
 
 type providerError struct {

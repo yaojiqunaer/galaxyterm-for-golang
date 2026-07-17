@@ -223,6 +223,97 @@ func TestCanceledTransferDoesNotInvokeProvider(t *testing.T) {
 	}
 }
 
+func TestUploadWithIDStreamsProgressFrames(t *testing.T) {
+	sourcePath := filepath.Join(t.TempDir(), "progress.bin")
+	if err := os.WriteFile(sourcePath, []byte("progress"), 0o600); err != nil {
+		t.Fatalf("write upload source: %v", err)
+	}
+	executable := writeSidecarScript(t, `
+read request
+case "$request" in
+  *'"features":["transfer-progress-v1"]'*) ;;
+  *) exit 18 ;;
+esac
+request_id=$(printf '%s' "$request" | sed -E 's/.*"requestId":"([^"]+)".*/\1/')
+printf '{"type":"progress","requestId":"%s","progress":{"bytes":3,"total":8}}\n' "$request_id"
+printf '{"type":"progress","requestId":"%s","progress":{"bytes":8,"total":8}}\n' "$request_id"
+printf '{"requestId":"%s","result":{}}\n' "$request_id"
+`)
+	api := newTestAPI(executable, []string{"upload"})
+	api.dialogs = stubFileDialogs{openPath: sourcePath}
+	api.contextProvider = func() context.Context { return context.Background() }
+	var progress []TransferProgress
+	api.progressEmitter = func(event TransferProgress) {
+		progress = append(progress, event)
+	}
+
+	if _, err := api.UploadWithID(FileOperationRequest{ProviderType: "sftp", Path: "/incoming"}, "transfer-1"); err != nil {
+		t.Fatalf("UploadWithID returned error: %v", err)
+	}
+	if len(progress) != 2 || progress[0].Bytes != 3 || progress[1].Bytes != 8 {
+		t.Fatalf("progress = %#v, want two streamed updates", progress)
+	}
+	for _, event := range progress {
+		if event.TransferID != "transfer-1" || event.Total != 8 {
+			t.Fatalf("progress event = %#v", event)
+		}
+	}
+}
+
+func TestSidecarRejectsRegressingTransferProgress(t *testing.T) {
+	executable := writeSidecarScript(t, `
+read request
+request_id=$(printf '%s' "$request" | sed -E 's/.*"requestId":"([^"]+)".*/\1/')
+printf '{"type":"progress","requestId":"%s","progress":{"bytes":8,"total":10}}\n' "$request_id"
+printf '{"type":"progress","requestId":"%s","progress":{"bytes":3,"total":10}}\n' "$request_id"
+printf '{"requestId":"%s","result":{}}\n' "$request_id"
+`)
+	api := newTestAPI(executable, []string{"upload"})
+	request := FileOperationRequest{ProviderType: "sftp", Path: "/incoming/file"}
+	request.localPath = filepath.Join(t.TempDir(), "payload")
+	err := api.invokeWithContext(context.Background(), "upload", request, nil, time.Second, func(sidecarProgress) {})
+	if err == nil || !strings.Contains(err.Error(), "invalid transfer progress") {
+		t.Fatalf("invokeWithContext error = %v, want invalid transfer progress", err)
+	}
+}
+
+func TestCancelTransferStopsRunningSidecar(t *testing.T) {
+	sourcePath := filepath.Join(t.TempDir(), "cancel.bin")
+	if err := os.WriteFile(sourcePath, []byte("cancel"), 0o600); err != nil {
+		t.Fatalf("write upload source: %v", err)
+	}
+	startedPath := filepath.Join(t.TempDir(), "started")
+	executable := writeSidecarScript(t, `
+read request
+touch `+shellQuote(startedPath)+`
+exec sleep 10
+`)
+	api := newTestAPI(executable, []string{"upload"})
+	api.dialogs = stubFileDialogs{openPath: sourcePath}
+	api.contextProvider = func() context.Context { return context.Background() }
+	completed := make(chan error, 1)
+	go func() {
+		_, err := api.UploadWithID(FileOperationRequest{ProviderType: "sftp", Path: "/incoming"}, "transfer-cancel")
+		completed <- err
+	}()
+
+	waitForFile(t, startedPath)
+	if !api.CancelTransfer("transfer-cancel") {
+		t.Fatal("CancelTransfer returned false for a running transfer")
+	}
+	select {
+	case err := <-completed:
+		if !errors.Is(err, ErrTransferCanceled) {
+			t.Fatalf("UploadWithID error = %v, want ErrTransferCanceled", err)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("canceled transfer did not stop promptly")
+	}
+	if api.CancelTransfer("transfer-cancel") {
+		t.Fatal("completed transfer remained registered")
+	}
+}
+
 func newTestAPI(executable string, capabilities []string) *API {
 	return NewAPI(stubProviderResolver{runtime: extensions.FileProviderRuntime{
 		Executable: executable,
@@ -247,4 +338,16 @@ func writeSidecarScript(t *testing.T, body string) string {
 
 func shellQuote(value string) string {
 	return "'" + strings.ReplaceAll(value, "'", "'\\''") + "'"
+}
+
+func waitForFile(t *testing.T, filePath string) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if _, err := os.Stat(filePath); err == nil {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("timed out waiting for %s", filePath)
 }

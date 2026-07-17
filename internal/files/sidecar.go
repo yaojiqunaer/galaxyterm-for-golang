@@ -1,6 +1,7 @@
 package files
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/json"
@@ -32,12 +33,20 @@ type sidecarRequest struct {
 	DestinationPath string         `json:"destinationPath,omitempty"`
 	Content         string         `json:"content,omitempty"`
 	LocalPath       string         `json:"localPath,omitempty"`
+	Features        []string       `json:"features,omitempty"`
 }
 
 type sidecarResponse struct {
-	RequestID string          `json:"requestId"`
-	Result    json.RawMessage `json:"result,omitempty"`
-	Error     *ProviderError  `json:"error,omitempty"`
+	Type      string           `json:"type,omitempty"`
+	RequestID string           `json:"requestId"`
+	Result    json.RawMessage  `json:"result,omitempty"`
+	Error     *ProviderError   `json:"error,omitempty"`
+	Progress  *sidecarProgress `json:"progress,omitempty"`
+}
+
+type sidecarProgress struct {
+	Bytes int64 `json:"bytes"`
+	Total int64 `json:"total,omitempty"`
 }
 
 func runSidecar(
@@ -46,6 +55,18 @@ func runSidecar(
 	request FileOperationRequest,
 	result any,
 	timeout time.Duration,
+) error {
+	return runSidecarWithContext(context.Background(), runtimeInfo, operation, request, result, timeout, nil)
+}
+
+func runSidecarWithContext(
+	parent context.Context,
+	runtimeInfo extensions.FileProviderRuntime,
+	operation string,
+	request FileOperationRequest,
+	result any,
+	timeout time.Duration,
+	onProgress func(sidecarProgress),
 ) error {
 	message := sidecarRequest{
 		APIVersion:      fileProviderAPIVersion,
@@ -58,6 +79,7 @@ func runSidecar(
 		DestinationPath: request.DestinationPath,
 		Content:         request.Content,
 		LocalPath:       request.localPath,
+		Features:        []string{"transfer-progress-v1"},
 	}
 	payload, err := json.Marshal(message)
 	if err != nil {
@@ -68,33 +90,93 @@ func runSidecar(
 	}
 	payload = append(payload, '\n')
 
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	ctx, cancel := context.WithTimeout(parent, timeout)
 	defer cancel()
 	command := exec.CommandContext(ctx, runtimeInfo.Executable)
 	command.Dir = filepath.Dir(runtimeInfo.Executable)
 	command.Env = safeSidecarEnvironment()
 	command.Stdin = bytes.NewReader(payload)
-	stdout := newLimitedBuffer(maxSidecarMessageSize)
+	stdout, err := command.StdoutPipe()
+	if err != nil {
+		return fmt.Errorf("open file provider output: %w", err)
+	}
 	stderr := newLimitedBuffer(64 << 10)
-	command.Stdout = stdout
 	command.Stderr = stderr
-	runErr := command.Run()
+	if err := command.Start(); err != nil {
+		return fmt.Errorf("start file provider process: %w", err)
+	}
+
+	var response sidecarResponse
+	foundResponse := false
+	outputSize := 0
+	lastProgressBytes := int64(0)
+	scanner := bufio.NewScanner(stdout)
+	scanner.Buffer(make([]byte, 64<<10), maxSidecarMessageSize)
+	for scanner.Scan() {
+		line := bytes.TrimSpace(scanner.Bytes())
+		if len(line) == 0 {
+			continue
+		}
+		outputSize += len(line) + 1
+		if outputSize > maxSidecarMessageSize {
+			_ = command.Process.Kill()
+			_ = command.Wait()
+			return fmt.Errorf("file provider output exceeded the allowed size")
+		}
+		var frame sidecarResponse
+		if err := json.Unmarshal(line, &frame); err != nil {
+			_ = command.Process.Kill()
+			_ = command.Wait()
+			return fmt.Errorf("decode file provider response: %w", err)
+		}
+		if frame.RequestID != message.RequestID {
+			_ = command.Process.Kill()
+			_ = command.Wait()
+			return ErrMismatchedResponse
+		}
+		if frame.Type == "progress" {
+			if frame.Progress == nil ||
+				frame.Progress.Bytes < lastProgressBytes ||
+				frame.Progress.Total < 0 ||
+				(frame.Progress.Total > 0 && frame.Progress.Bytes > frame.Progress.Total) {
+				_ = command.Process.Kill()
+				_ = command.Wait()
+				return fmt.Errorf("invalid transfer progress from file provider")
+			}
+			lastProgressBytes = frame.Progress.Bytes
+			if onProgress != nil {
+				onProgress(*frame.Progress)
+			}
+			continue
+		}
+		if foundResponse {
+			_ = command.Process.Kill()
+			_ = command.Wait()
+			return fmt.Errorf("file provider returned multiple final responses")
+		}
+		response = frame
+		foundResponse = true
+	}
+	if scanErr := scanner.Err(); scanErr != nil {
+		_ = command.Process.Kill()
+		_ = command.Wait()
+		return fmt.Errorf("read file provider output: %w", scanErr)
+	}
+	runErr := command.Wait()
+	if errors.Is(parent.Err(), context.Canceled) {
+		return ErrTransferCanceled
+	}
 	if errors.Is(ctx.Err(), context.DeadlineExceeded) {
 		return ErrProviderTimeout
 	}
-	if stdout.exceeded || stderr.exceeded {
+	if stderr.exceeded {
 		return fmt.Errorf("file provider output exceeded the allowed size")
 	}
 	if runErr != nil {
 		return fmt.Errorf("file provider process failed: %w", runErr)
 	}
-
-	var response sidecarResponse
-	if err := json.Unmarshal(stdout.Bytes(), &response); err != nil {
-		return fmt.Errorf("decode file provider response: %w", err)
-	}
-	if response.RequestID != message.RequestID {
-		return ErrMismatchedResponse
+	if !foundResponse {
+		return fmt.Errorf("file provider returned no final response")
 	}
 	if response.Error != nil {
 		return response.Error

@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -17,6 +18,13 @@ var (
 	ErrDesktopUnavailable = errors.New("desktop file dialog is unavailable")
 	ErrInvalidLocalFile   = errors.New("selected local file is invalid")
 )
+
+type TransferProgress struct {
+	TransferID string `json:"transferId"`
+	Phase      string `json:"phase"`
+	Bytes      int64  `json:"bytes"`
+	Total      int64  `json:"total,omitempty"`
+}
 
 type FileTransferResult struct {
 	Canceled   bool   `json:"canceled"`
@@ -47,6 +55,10 @@ func (wailsFileDialogs) SaveFile(ctx context.Context, fileName string) (string, 
 }
 
 func (api *API) Upload(request FileOperationRequest) (FileTransferResult, error) {
+	return api.UploadWithID(request, "")
+}
+
+func (api *API) UploadWithID(request FileOperationRequest, transferID string) (FileTransferResult, error) {
 	ctx, err := api.desktopContext()
 	if err != nil {
 		return FileTransferResult{}, err
@@ -68,7 +80,12 @@ func (api *API) Upload(request FileOperationRequest) (FileTransferResult, error)
 	fileName := filepath.Base(sourcePath)
 	request.Path = joinRemotePath(request.Path, fileName)
 	request.localPath = stagedPath
-	if err := api.invokeWithTimeout("upload", request, nil, api.transferTimeout); err != nil {
+	transferCtx, transferID, done, err := api.beginTransfer(ctx, transferID)
+	if err != nil {
+		return FileTransferResult{}, err
+	}
+	defer done()
+	if err := api.invokeWithContext(transferCtx, "upload", request, nil, api.transferTimeout, api.progressHandler(transferID)); err != nil {
 		return FileTransferResult{}, err
 	}
 	return FileTransferResult{
@@ -79,6 +96,10 @@ func (api *API) Upload(request FileOperationRequest) (FileTransferResult, error)
 }
 
 func (api *API) Download(request FileOperationRequest, suggestedName string) (FileTransferResult, error) {
+	return api.DownloadWithID(request, suggestedName, "")
+}
+
+func (api *API) DownloadWithID(request FileOperationRequest, suggestedName, transferID string) (FileTransferResult, error) {
 	if _, err := normalizeFileOperation("download", request); err != nil {
 		return FileTransferResult{}, err
 	}
@@ -105,7 +126,12 @@ func (api *API) Download(request FileOperationRequest, suggestedName string) (Fi
 	defer cleanup()
 
 	request.localPath = stagedPath
-	if err := api.invokeWithTimeout("download", request, nil, api.transferTimeout); err != nil {
+	transferCtx, transferID, done, err := api.beginTransfer(ctx, transferID)
+	if err != nil {
+		return FileTransferResult{}, err
+	}
+	defer done()
+	if err := api.invokeWithContext(transferCtx, "download", request, nil, api.transferTimeout, api.progressHandler(transferID)); err != nil {
 		return FileTransferResult{}, err
 	}
 	size, err := commitDownloadedFile(stagedPath, destinationPath)
@@ -117,6 +143,54 @@ func (api *API) Download(request FileOperationRequest, suggestedName string) (Fi
 		RemotePath: request.Path,
 		Bytes:      size,
 	}, nil
+}
+
+func (api *API) beginTransfer(parent context.Context, transferID string) (context.Context, string, func(), error) {
+	transferID = strings.TrimSpace(transferID)
+	if transferID == "" {
+		transferID = uuid.NewString()
+	}
+	ctx, cancel := context.WithCancel(parent)
+	api.transferMu.Lock()
+	if _, exists := api.transfers[transferID]; exists {
+		api.transferMu.Unlock()
+		cancel()
+		return nil, transferID, nil, ErrTransferAlreadyActive
+	}
+	api.transfers[transferID] = cancel
+	api.transferMu.Unlock()
+	done := func() {
+		api.transferMu.Lock()
+		delete(api.transfers, transferID)
+		api.transferMu.Unlock()
+		cancel()
+	}
+	return ctx, transferID, done, nil
+}
+
+func (api *API) CancelTransfer(transferID string) bool {
+	api.transferMu.Lock()
+	cancel := api.transfers[strings.TrimSpace(transferID)]
+	api.transferMu.Unlock()
+	if cancel == nil {
+		return false
+	}
+	cancel()
+	return true
+}
+
+func (api *API) progressHandler(transferID string) func(sidecarProgress) {
+	if api.progressEmitter == nil {
+		return nil
+	}
+	return func(progress sidecarProgress) {
+		api.progressEmitter(TransferProgress{
+			TransferID: transferID,
+			Phase:      "transferring",
+			Bytes:      progress.Bytes,
+			Total:      progress.Total,
+		})
+	}
 }
 
 func (api *API) desktopContext() (context.Context, error) {

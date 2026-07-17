@@ -5,6 +5,8 @@ import {
   buildRemoteFileView,
   buildRemoteRenameDestination,
   buildRemoteFileSummary,
+  createFileTransferID,
+  updateFileTransferProgress,
   buildSavedSshConnections,
   buildSshConnectionAuth,
   buildSshProfileFields,
@@ -134,6 +136,29 @@ assert.deepEqual(buildRemoteFileSummary(files, { path: '/etc/nginx', loading: fa
 
 assert.equal(buildRemoteFileSummary([], { path: '.', loading: true }).state, 'loading');
 assert.equal(buildRemoteFileSummary([], { path: '.', loading: false }).state, 'empty');
+
+const transferID = createFileTransferID(() => 'native-id');
+assert.equal(transferID, 'native-id');
+assert.deepEqual(updateFileTransferProgress({
+  id: transferID,
+  bytes: 0,
+  total: 0,
+}, {
+  transferId: transferID,
+  bytes: 256,
+  total: 1024,
+}), {
+  id: transferID,
+  bytes: 256,
+  total: 1024,
+  percent: 25,
+});
+assert.deepEqual(updateFileTransferProgress({ id: transferID, bytes: 256, total: 1024 }, {
+  transferId: 'another-transfer',
+  bytes: 1024,
+  total: 1024,
+}), { id: transferID, bytes: 256, total: 1024 });
+assert.equal(updateFileTransferProgress(null, { transferId: transferID }), null);
 
 assert.deepEqual(buildRemoteFileBreadcrumbs('/etc/nginx/sites-enabled'), [
   { key: '/', label: '/', path: '/' },

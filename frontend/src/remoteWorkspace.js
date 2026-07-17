@@ -58,7 +58,7 @@ export function buildSshConnectionAuth(fields = {}, resolvedProfileRequest = nul
   };
 }
 
-function readableBytes(bytes) {
+export function readableBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
   let value = bytes;
   let unitIndex = 0;
@@ -68,6 +68,32 @@ function readableBytes(bytes) {
   }
   const rounded = value >= 10 || unitIndex === 0 ? Math.round(value) : Math.round(value * 10) / 10;
   return `${rounded} ${units[unitIndex]}`;
+}
+
+export function createFileTransferID(randomUUID = globalThis.crypto?.randomUUID?.bind(globalThis.crypto)) {
+  if (typeof randomUUID === 'function') return randomUUID();
+  return `transfer-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+export function updateFileTransferProgress(current, event = {}) {
+  if (!current) return current;
+  const payload = event?.data || event?.Data || event;
+  const transferID = payload?.transferId || payload?.TransferID;
+  if (transferID && transferID !== current.id) return current;
+  const reportedBytes = Number(payload?.bytes ?? payload?.Bytes);
+  const reportedTotal = Number(payload?.total ?? payload?.Total);
+  const bytes = Number.isFinite(reportedBytes)
+    ? Math.max(Number(current.bytes || 0), reportedBytes, 0)
+    : Number(current.bytes || 0);
+  const total = Number.isFinite(reportedTotal) && reportedTotal > 0
+    ? reportedTotal
+    : Number(current.total || 0);
+  return {
+    ...current,
+    bytes,
+    total,
+    ...(total > 0 ? { percent: Math.min(100, Math.round((bytes / total) * 100)) } : {}),
+  };
 }
 
 export function buildRemoteFileSummary(entries = [], { path = '.', loading = false } = {}) {

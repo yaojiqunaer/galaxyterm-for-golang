@@ -19,6 +19,7 @@ import {
   Menu,
   Modal,
   Popover,
+  Progress,
   Segmented,
   Select,
   Space,
@@ -159,6 +160,9 @@ import {
   buildSshProfileFields,
   buildTunnelDisplay,
   buildTunnelSummary,
+  createFileTransferID,
+  readableBytes,
+  updateFileTransferProgress,
 } from './remoteWorkspace.js';
 import {
   buildTerminalControlActions,
@@ -228,6 +232,7 @@ import * as CredentialsAPI from '../wailsjs/go/credentials/API.js';
 import * as SessionAPI from '../wailsjs/go/session/API.js';
 import * as TerminalAPI from '../wailsjs/go/terminal/API.js';
 import * as TunnelAPI from '../wailsjs/go/tunnel/API.js';
+import * as runtime from '../wailsjs/runtime/runtime.js';
 import { availableLocales, currentLocale, setLocale, t } from './i18n.js';
 import SavedSSHProfileSelect from './components/SavedSSHProfileSelect.jsx';
 import FileProviderFormFields from './components/FileProviderFormFields.jsx';
@@ -408,6 +413,8 @@ function App() {
   const [commandForm] = Form.useForm();
   const watchedFilePath = Form.useWatch('path', fileForm);
   const pasteConfirmationPending = useRef(false);
+  const fileTransferCleanupRef = useRef(null);
+  const canceledTransferIdsRef = useRef(new Set());
   const extensionOperationBusy = extensionOfflineInstalling
     || Boolean(extensionInstallingId)
     || Boolean(extensionUninstallingId);
@@ -453,6 +460,11 @@ function App() {
       ),
     });
   };
+
+  useEffect(() => () => {
+    fileTransferCleanupRef.current?.();
+    fileTransferCleanupRef.current = null;
+  }, []);
   const terminalRefs = useRef({});
   const terminalSearchRef = useRef(null);
   const fileSearchRef = useRef(null);
@@ -3209,22 +3221,69 @@ function App() {
     });
   };
 
+  const beginFileTransfer = (kind, name, total = 0) => {
+    const transferId = createFileTransferID();
+    fileTransferCleanupRef.current?.();
+    fileTransferCleanupRef.current = typeof window !== 'undefined' && window.runtime?.EventsOn
+      ? runtime.EventsOn(`files:transfer:${transferId}`, (event) => {
+        setFileTransfer((current) => updateFileTransferProgress(current, event));
+      })
+      : () => {};
+    setFileTransfer({ id: transferId, kind, name, bytes: 0, total, percent: 0, canceling: false });
+    return transferId;
+  };
+
+  const finishFileTransfer = (transferId) => {
+    fileTransferCleanupRef.current?.();
+    fileTransferCleanupRef.current = null;
+    setFileTransfer((current) => (current?.id === transferId ? null : current));
+  };
+
+  const cancelFileTransfer = async () => {
+    const transfer = fileTransfer;
+    if (!transfer || transfer.canceling) return;
+    setFileTransfer((current) => (
+      current?.id === transfer.id ? { ...current, canceling: true } : current
+    ));
+    canceledTransferIdsRef.current.add(transfer.id);
+    try {
+      const canceled = await FilesAPI.CancelTransfer(transfer.id);
+      if (!canceled) {
+        canceledTransferIdsRef.current.delete(transfer.id);
+        setFileTransfer((current) => (
+          current?.id === transfer.id ? { ...current, canceling: false } : current
+        ));
+      }
+    } catch (error) {
+      canceledTransferIdsRef.current.delete(transfer.id);
+      setFileTransfer((current) => (
+        current?.id === transfer.id ? { ...current, canceling: false } : current
+      ));
+      showOperationError('message.transferCancelFailed', error);
+    }
+  };
+
   const downloadRemoteFile = async (entry) => {
     if (entry.isDir) return;
-    setFileTransfer({ kind: 'download', name: entry.name });
+    const transferId = beginFileTransfer('download', entry.name, Number(entry.size || 0));
     try {
       const req = await currentFileRequest();
       req.path = entry.path;
-      const result = await FilesAPI.Download(req, entry.name);
+      const result = await FilesAPI.DownloadWithID(req, entry.name, transferId);
       if (!result?.canceled) {
         messageApi.success(t('message.downloadSuccess', { name: result?.fileName || entry.name }));
       }
     } catch (error) {
-      showOperationError('message.downloadFailed', error, {
-        retry: () => downloadRemoteFile(entry),
-      });
+      if (canceledTransferIdsRef.current.has(transferId)) {
+        messageApi.info(t('message.transferCanceled'));
+      } else {
+        showOperationError('message.downloadFailed', error, {
+          retry: () => downloadRemoteFile(entry),
+        });
+      }
     } finally {
-      setFileTransfer(null);
+      canceledTransferIdsRef.current.delete(transferId);
+      finishFileTransfer(transferId);
     }
   };
 
@@ -3235,18 +3294,23 @@ function App() {
     } catch {
       return;
     }
-    setFileTransfer({ kind: 'upload', name: '' });
+    const transferId = beginFileTransfer('upload', '');
     try {
       const req = await currentFileRequest();
-      const result = await FilesAPI.Upload(req);
+      const result = await FilesAPI.UploadWithID(req, transferId);
       if (!result?.canceled) {
         messageApi.success(t('message.uploadFileSuccess', { name: result?.fileName || '' }));
         await loadFiles(base);
       }
     } catch (error) {
-      showOperationError('message.uploadFailed', error, { retry: uploadRemoteFile });
+      if (canceledTransferIdsRef.current.has(transferId)) {
+        messageApi.info(t('message.transferCanceled'));
+      } else {
+        showOperationError('message.uploadFailed', error, { retry: uploadRemoteFile });
+      }
     } finally {
-      setFileTransfer(null);
+      canceledTransferIdsRef.current.delete(transferId);
+      finishFileTransfer(transferId);
     }
   };
 
@@ -3464,13 +3528,6 @@ function App() {
                 ))}
               </div>
               <Space wrap>
-                {fileTransfer && (
-                  <Tag className="remote-transfer-status" icon={<LoadingOutlined spin />}>
-                    {fileTransfer.kind === 'upload'
-                      ? t('file.uploading')
-                      : t('file.downloading', { name: fileTransfer.name || '' })}
-                  </Tag>
-                )}
                 <Button disabled={!canListFiles || fileBusy} onClick={goParent}>{t('action.up')}</Button>
                 {canCreateDirectories && <Button disabled={fileBusy} onClick={() => setMkdirOpen(true)}>{t('action.mkdir')}</Button>}
                 {canUploadFiles && (
@@ -3487,6 +3544,42 @@ function App() {
                 {canWriteFiles && <Button disabled={fileBusy} icon={<FileTextOutlined />} onClick={() => setUploadOpen(true)}>{t('action.newTextFile')}</Button>}
               </Space>
             </div>
+            {fileTransfer && (
+              <div className="remote-transfer-bar" role="status" aria-live="polite">
+                <div className="remote-transfer-copy">
+                  <Text strong ellipsis>
+                    {fileTransfer.kind === 'upload'
+                      ? t('file.uploading')
+                      : t('file.downloading', { name: fileTransfer.name || '' })}
+                  </Text>
+                  <Text type="secondary">
+                    {fileTransfer.total > 0
+                      ? t('file.transferProgress', {
+                        bytes: readableBytes(fileTransfer.bytes),
+                        total: readableBytes(fileTransfer.total),
+                      })
+                      : t('file.transferStarting')}
+                  </Text>
+                </div>
+                <div className="remote-transfer-track">
+                  {fileTransfer.total > 0 ? (
+                    <Progress percent={fileTransfer.percent} showInfo={false} size="small" />
+                  ) : (
+                    <LoadingOutlined spin />
+                  )}
+                </div>
+                <Tooltip title={t('action.cancel')}>
+                  <Button
+                    aria-label={t('action.cancel')}
+                    danger
+                    type="text"
+                    icon={<StopOutlined />}
+                    loading={fileTransfer.canceling}
+                    onClick={cancelFileTransfer}
+                  />
+                </Tooltip>
+              </div>
+            )}
             <div className="remote-file-filterbar">
               <Input.Search
                 ref={fileSearchRef}

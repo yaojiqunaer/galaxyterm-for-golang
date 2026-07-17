@@ -20,8 +20,10 @@ Text viewing and editing continue to use `read`, `write`, and the size-limited J
 - `download` requires an explicit `download` capability. `path` is the remote source and `localPath` is the absolute path of a private temporary file created by the host.
 - Providers must copy with a bounded streaming buffer and must not place file content in the response. Return an empty result or transfer metadata only.
 - `localPath` is scoped to one request. Providers must not persist or log it as user configuration. The host removes its temporary directory after success, failure, or cancellation.
+- A progress-capable host sends `"features":["transfer-progress-v1"]`. Before the final response, a provider may emit newline-delimited frames such as `{"type":"progress","requestId":"...","progress":{"bytes":131072,"total":1048576}}`. Every frame must use the current `requestId`, and `bytes` must increase monotonically.
+- Without `transfer-progress-v1`, a provider must emit one final JSON response only. This keeps new extensions compatible with older GalaxyTerm releases, while new releases continue to accept legacy providers with no progress frames.
 
-GalaxyTerm uses native operating-system open/save dialogs. Cancellation does not invoke the provider. Downloads are staged first and committed to the selected destination only after the provider completes. FTP, S3, WebDAV, and future extensions can reuse the same operations without protocol-specific UI.
+GalaxyTerm uses native operating-system open/save dialogs. Canceling a file dialog does not invoke the provider; an active transfer can be canceled from its progress bar. Downloads are staged first and committed to the selected destination only after the provider completes. FTP, S3, WebDAV, and future extensions can reuse the same operations without protocol-specific UI.
 
 ## Online Installation
 
@@ -51,7 +53,7 @@ Upload `.gtx` packages and an index named `galaxyterm-index.json` to each Releas
       "manifest": {
         "id": "galaxyterm-extension-sftp",
         "name": "SFTP",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "apiVersion": "v1",
         "description": "SFTP file provider for GalaxyTerm",
         "runtime": {
@@ -72,13 +74,13 @@ Upload `.gtx` packages and an index named `galaxyterm-index.json` to each Releas
         {
           "os": "darwin",
           "arch": "arm64",
-          "url": "galaxyterm-extension-sftp_0.2.0_darwin_arm64.gtx",
+          "url": "galaxyterm-extension-sftp_0.3.0_darwin_arm64.gtx",
           "sha256": "<64-character hexadecimal SHA-256>"
         },
         {
           "os": "linux",
           "arch": "amd64",
-          "url": "galaxyterm-extension-sftp_0.2.0_linux_amd64.gtx",
+          "url": "galaxyterm-extension-sftp_0.3.0_linux_amd64.gtx",
           "sha256": "<64-character hexadecimal SHA-256>"
         }
       ]

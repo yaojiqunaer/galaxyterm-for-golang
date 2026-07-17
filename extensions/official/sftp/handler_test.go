@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"galaxyterm/internal/extensions"
 )
@@ -29,6 +30,15 @@ func TestManifestMatchesCoreFileProviderContract(t *testing.T) {
 	}
 	if len(manifest.FileProviders) != 1 || len(manifest.FileProviders[0].ConfigFields) == 0 || len(manifest.FileProviders[0].AuthFields) == 0 {
 		t.Fatalf("manifest does not contribute file provider fields: %#v", manifest.FileProviders)
+	}
+}
+
+func TestTransferProgressRequiresHostFeatureNegotiation(t *testing.T) {
+	if supportsFeature(nil, "transfer-progress-v1") {
+		t.Fatal("legacy host unexpectedly enables progress frames")
+	}
+	if !supportsFeature([]string{"transfer-progress-v1"}, "transfer-progress-v1") {
+		t.Fatal("compatible host did not enable progress frames")
 	}
 }
 
@@ -146,7 +156,13 @@ func TestFileTransferOperationsStreamBinaryContent(t *testing.T) {
 		},
 		removeRemote: func(string) error { return nil },
 	}
-	if err := uploadLocalFile(ops, "/remote/source.bin", sourcePath); err != nil {
+	var uploadProgress []int64
+	if err := uploadLocalFile(ops, "/remote/source.bin", sourcePath, func(bytes, total int64) {
+		if total != int64(len(payload)) {
+			t.Fatalf("upload total = %d", total)
+		}
+		uploadProgress = append(uploadProgress, bytes)
+	}); err != nil {
 		t.Fatalf("uploadLocalFile returned error: %v", err)
 	}
 	if path.Dir(createdPath) != "/remote" || !strings.Contains(path.Base(createdPath), "galaxyterm-upload") {
@@ -164,13 +180,28 @@ func TestFileTransferOperationsStreamBinaryContent(t *testing.T) {
 			}
 			return io.NopCloser(bytes.NewReader(payload)), nil
 		},
+		statRemote: func(string) (fs.FileInfo, error) {
+			return fakeFileInfo{size: int64(len(payload))}, nil
+		},
 	}
-	if err := downloadLocalFile(ops, "/remote/source.bin", destinationPath); err != nil {
+	var downloadProgress []int64
+	if err := downloadLocalFile(ops, "/remote/source.bin", destinationPath, func(bytes, total int64) {
+		if total != int64(len(payload)) {
+			t.Fatalf("download total = %d", total)
+		}
+		downloadProgress = append(downloadProgress, bytes)
+	}); err != nil {
 		t.Fatalf("downloadLocalFile returned error: %v", err)
 	}
 	downloaded, err := os.ReadFile(destinationPath)
 	if err != nil || !bytes.Equal(downloaded, payload) {
 		t.Fatalf("downloaded content = %v, %v", downloaded, err)
+	}
+	if len(uploadProgress) == 0 || uploadProgress[len(uploadProgress)-1] != int64(len(payload)) {
+		t.Fatalf("upload progress = %v", uploadProgress)
+	}
+	if len(downloadProgress) == 0 || downloadProgress[len(downloadProgress)-1] != int64(len(payload)) {
+		t.Fatalf("download progress = %v", downloadProgress)
 	}
 }
 
@@ -196,7 +227,7 @@ func TestUploadRemovesRemoteStagingFileWhenStreamingFails(t *testing.T) {
 			return nil
 		},
 	}
-	if err := uploadLocalFile(ops, "/remote/source.bin", sourcePath); err == nil {
+	if err := uploadLocalFile(ops, "/remote/source.bin", sourcePath, nil); err == nil {
 		t.Fatal("uploadLocalFile returned nil error for failed stream")
 	}
 	if stagedPath == "" || removedPath != stagedPath {
@@ -214,6 +245,15 @@ type failingWriteCloser struct{}
 
 func (failingWriteCloser) Write([]byte) (int, error) { return 0, errors.New("write failed") }
 func (failingWriteCloser) Close() error              { return nil }
+
+type fakeFileInfo struct{ size int64 }
+
+func (info fakeFileInfo) Name() string       { return "payload" }
+func (info fakeFileInfo) Size() int64        { return info.size }
+func (info fakeFileInfo) Mode() fs.FileMode  { return 0o600 }
+func (info fakeFileInfo) ModTime() time.Time { return time.Time{} }
+func (info fakeFileInfo) IsDir() bool        { return false }
+func (info fakeFileInfo) Sys() any           { return nil }
 
 func TestHandleRequestReturnsStructuredValidationAndOperationErrors(t *testing.T) {
 	response := handleRequest(protocolRequest{RequestID: "request-1"})

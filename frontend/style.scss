@@ -3080,15 +3080,41 @@ code {
   font-size: 12px;
 }
 
-.remote-transfer-status {
-  max-width: 220px;
-  margin-inline-end: 0;
-  overflow: hidden;
-  border-color: color-mix(in srgb, var(--accent) 36%, var(--border-subtle));
-  background: var(--accent-soft);
+.remote-transfer-bar {
+  display: grid;
+  grid-template-columns: minmax(150px, 280px) minmax(120px, 1fr) 32px;
+  align-items: center;
+  gap: 14px;
+  min-height: 52px;
+  padding: 7px 10px 7px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border-subtle));
+  background: color-mix(in srgb, var(--accent-soft) 58%, var(--panel));
+}
+
+.remote-transfer-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.remote-transfer-copy .ant-typography {
+  min-width: 0;
+  margin: 0;
+}
+
+.remote-transfer-copy .ant-typography-secondary {
+  font-size: 12px;
+}
+
+.remote-transfer-track {
+  display: flex;
+  min-width: 0;
+  align-items: center;
   color: var(--accent);
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.remote-transfer-track .ant-progress {
+  margin: 0;
 }
 
 .remote-breadcrumbs {
@@ -3143,6 +3169,16 @@ code {
 }
 
 @media (max-width: 720px) {
+  .remote-transfer-bar {
+    grid-template-columns: minmax(0, 1fr) 32px;
+    gap: 8px 10px;
+  }
+
+  .remote-transfer-track {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
   .remote-file-filterbar {
     grid-template-columns: minmax(0, 1fr) 140px;
   }

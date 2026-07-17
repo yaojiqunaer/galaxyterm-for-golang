@@ -295,11 +295,14 @@ assert.ok(
   'remote files must support provider-neutral filtering, sorting, result counts, and keyboard search focus',
 );
 assert.ok(
-  source.includes('await FilesAPI.Upload(req)')
-    && source.includes('await FilesAPI.Download(req, entry.name)')
+  source.includes('await FilesAPI.UploadWithID(req, transferId)')
+    && source.includes('await FilesAPI.DownloadWithID(req, entry.name, transferId)')
+    && source.includes('await FilesAPI.CancelTransfer(transfer.id)')
+    && source.includes('runtime.EventsOn(`files:transfer:${transferId}`')
+    && source.includes('<Progress')
     && source.includes("t('action.newTextFile')")
     && !source.includes('new Blob([content], { type: \'application/octet-stream\' })'),
-  'remote files must use native binary transfers while retaining text-file creation as a distinct action',
+  'remote files must expose real native transfer progress and cancellation while retaining text-file creation',
 );
 assert.ok(
   source.includes("language: () => setSettingsOpen(true)")

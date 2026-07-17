@@ -6,6 +6,8 @@ The official SFTP file provider. It runs through GalaxyTerm's `stdio-json-v1` fi
 
 - Directory listing, file metadata, and text read/write
 - Stream binary and large-file uploads/downloads through host-owned private staging files
+- Negotiate real byte progress with hosts that advertise `transfer-progress-v1`; older hosts still receive one compatible response
+- Let GalaxyTerm cancel active transfers while always cleaning host-owned staging files
 - Stage uploads beside the remote target and rename only after a complete write, avoiding partial destination files after interruption
 - Create directories, rename entries, and delete files or empty directories
 - Password and private-key authentication

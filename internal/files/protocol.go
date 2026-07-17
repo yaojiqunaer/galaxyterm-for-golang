@@ -6,9 +6,11 @@ import (
 	"fmt"
 	"path"
 	"strings"
+	"sync"
 	"time"
 
 	"galaxyterm/internal/extensions"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 const defaultProviderTimeout = 45 * time.Second
@@ -18,6 +20,8 @@ const defaultTransferTimeout = 30 * time.Minute
 var (
 	ErrMismatchedResponse    = errors.New("file provider response id does not match request")
 	ErrProviderTimeout       = errors.New("file provider operation timed out")
+	ErrTransferCanceled      = errors.New("file transfer canceled")
+	ErrTransferAlreadyActive = errors.New("file transfer id is already active")
 	ErrProviderTypeRequired  = errors.New("file provider type is required")
 	ErrUnsupportedCapability = errors.New("file provider capability is not supported")
 )
@@ -32,6 +36,9 @@ type API struct {
 	transferTimeout time.Duration
 	contextProvider func() context.Context
 	dialogs         fileDialogs
+	transferMu      sync.Mutex
+	transfers       map[string]context.CancelFunc
+	progressEmitter func(TransferProgress)
 }
 
 func NewAPI(resolvers ...ProviderResolver) *API {
@@ -43,6 +50,7 @@ func NewAPI(resolvers ...ProviderResolver) *API {
 		resolver:        resolver,
 		timeout:         defaultProviderTimeout,
 		transferTimeout: defaultTransferTimeout,
+		transfers:       make(map[string]context.CancelFunc),
 	}
 }
 
@@ -50,6 +58,12 @@ func NewDesktopAPI(resolver ProviderResolver, contextProvider func() context.Con
 	api := NewAPI(resolver)
 	api.contextProvider = contextProvider
 	api.dialogs = wailsFileDialogs{}
+	api.progressEmitter = func(progress TransferProgress) {
+		ctx := contextProvider()
+		if ctx != nil {
+			runtime.EventsEmit(ctx, "files:transfer:"+progress.TransferID, progress)
+		}
+	}
 	return api
 }
 
@@ -133,6 +147,17 @@ func (api *API) invoke(operation string, request FileOperationRequest, result an
 }
 
 func (api *API) invokeWithTimeout(operation string, request FileOperationRequest, result any, timeout time.Duration) error {
+	return api.invokeWithContext(context.Background(), operation, request, result, timeout, nil)
+}
+
+func (api *API) invokeWithContext(
+	ctx context.Context,
+	operation string,
+	request FileOperationRequest,
+	result any,
+	timeout time.Duration,
+	onProgress func(sidecarProgress),
+) error {
 	normalized, err := normalizeFileOperation(operation, request)
 	if err != nil {
 		return err
@@ -147,7 +172,7 @@ func (api *API) invokeWithTimeout(operation string, request FileOperationRequest
 	if !hasCapability(runtimeInfo.Provider.Capabilities, operation) {
 		return fmt.Errorf("%w: %s", ErrUnsupportedCapability, operation)
 	}
-	return runSidecar(runtimeInfo, operation, normalized, result, timeout)
+	return runSidecarWithContext(ctx, runtimeInfo, operation, normalized, result, timeout, onProgress)
 }
 
 func normalizeFileOperation(operation string, request FileOperationRequest) (FileOperationRequest, error) {

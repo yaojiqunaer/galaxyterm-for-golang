@@ -20,8 +20,10 @@ FTP、S3、WebDAV 等新协议只需实现 `stdio-json-v1` 操作并声明真实
 - `download` 需要 Provider 显式声明 `download` 能力。`path` 是远程来源，`localPath` 是宿主预创建的私有临时文件绝对路径。
 - Provider 必须使用有界缓冲流式复制，不得把文件内容写入响应；完成后只返回空结果或传输元数据。
 - `localPath` 只在当前请求中使用，不得保存、记录或当作用户配置。宿主会在成功、失败和取消后清理临时目录。
+- 支持进度的宿主会在请求中发送 `"features":["transfer-progress-v1"]`。Provider 可在最终响应前逐行发送 `{"type":"progress","requestId":"...","progress":{"bytes":131072,"total":1048576}}`；每帧必须使用当前 `requestId`，`bytes` 必须单调递增。
+- 未声明 `transfer-progress-v1` 时，Provider 只能输出一个最终 JSON 响应。这样新版扩展仍能在旧版 GalaxyTerm 中运行；新版 GalaxyTerm 同样接受只返回最终响应的旧扩展。
 
-GalaxyTerm 使用系统原生打开/保存对话框。用户取消时不会调用 Provider；下载先写入临时文件，完整成功后才提交到用户选择的位置。FTP、S3、WebDAV 等扩展可复用同一操作，无需新增协议专用 UI。
+GalaxyTerm 使用系统原生打开/保存对话框。用户在文件对话框中取消时不会调用 Provider；运行中的传输可从进度条取消。下载先写入临时文件，完整成功后才提交到用户选择的位置。FTP、S3、WebDAV 等扩展可复用同一操作，无需新增协议专用 UI。
 
 ## 在线安装
 
@@ -51,7 +53,7 @@ https://github.com/<owner>/<repo>/releases/latest/download/galaxyterm-index.json
       "manifest": {
         "id": "galaxyterm-extension-sftp",
         "name": "SFTP",
-        "version": "0.2.0",
+        "version": "0.3.0",
         "apiVersion": "v1",
         "description": "SFTP file provider for GalaxyTerm",
         "runtime": {
@@ -72,13 +74,13 @@ https://github.com/<owner>/<repo>/releases/latest/download/galaxyterm-index.json
         {
           "os": "darwin",
           "arch": "arm64",
-          "url": "galaxyterm-extension-sftp_0.2.0_darwin_arm64.gtx",
+          "url": "galaxyterm-extension-sftp_0.3.0_darwin_arm64.gtx",
           "sha256": "<64 位十六进制 SHA-256>"
         },
         {
           "os": "linux",
           "arch": "amd64",
-          "url": "galaxyterm-extension-sftp_0.2.0_linux_amd64.gtx",
+          "url": "galaxyterm-extension-sftp_0.3.0_linux_amd64.gtx",
           "sha256": "<64 位十六进制 SHA-256>"
         }
       ]

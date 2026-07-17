@@ -37,16 +37,23 @@ type transferOperations struct {
 	createRemote func(string) (io.WriteCloser, error)
 	renameRemote func(string, string) error
 	removeRemote func(string) error
+	statRemote   func(string) (os.FileInfo, error)
 }
 
+type transferProgressReporter func(bytes, total int64)
+
 func handleRequest(request protocolRequest) protocolResponse {
+	return handleRequestWithProgress(request, nil)
+}
+
+func handleRequestWithProgress(request protocolRequest, reportProgress transferProgressReporter) protocolResponse {
 	response := protocolResponse{RequestID: request.RequestID}
 	normalized, err := normalizeRequest(request)
 	if err != nil {
 		response.Error = structuredError(err)
 		return response
 	}
-	result, err := executeOperation(normalized)
+	result, err := executeOperationWithProgress(normalized, reportProgress)
 	if err != nil {
 		response.Error = structuredError(err)
 		return response
@@ -144,6 +151,10 @@ func normalizeRequest(request protocolRequest) (normalizedRequest, error) {
 }
 
 func executeOperation(request normalizedRequest) (any, error) {
+	return executeOperationWithProgress(request, nil)
+}
+
+func executeOperationWithProgress(request normalizedRequest, reportProgress transferProgressReporter) (any, error) {
 	sshClient, sftpClient, err := dial(request)
 	if err != nil {
 		return nil, err
@@ -174,9 +185,9 @@ func executeOperation(request normalizedRequest) (any, error) {
 	case "write":
 		return map[string]any{}, writeTextFile(sftpClient, request.Path, request.Content)
 	case "upload":
-		return map[string]any{}, uploadLocalFile(transferOps, request.Path, request.LocalPath)
+		return map[string]any{}, uploadLocalFile(transferOps, request.Path, request.LocalPath, reportProgress)
 	case "download":
-		return map[string]any{}, downloadLocalFile(transferOps, request.Path, request.LocalPath)
+		return map[string]any{}, downloadLocalFile(transferOps, request.Path, request.LocalPath, reportProgress)
 	case "mkdir":
 		return map[string]any{}, sftpClient.MkdirAll(request.Path)
 	case "rename":
@@ -204,10 +215,11 @@ func newTransferOperations(client *sftp.Client) transferOperations {
 			return client.Rename(source, destination)
 		},
 		removeRemote: client.Remove,
+		statRemote:   client.Stat,
 	}
 }
 
-func uploadLocalFile(operations transferOperations, remotePath, localPath string) error {
+func uploadLocalFile(operations transferOperations, remotePath, localPath string, reportProgress transferProgressReporter) error {
 	source, err := os.Open(localPath)
 	if err != nil {
 		return err
@@ -237,7 +249,8 @@ func uploadLocalFile(operations transferOperations, remotePath, localPath string
 			_ = operations.removeRemote(temporaryPath)
 		}
 	}()
-	_, copyErr := io.CopyBuffer(destination, source, make([]byte, 128<<10))
+	writer := newProgressWriter(destination, info.Size(), reportProgress)
+	_, copyErr := io.CopyBuffer(writer, source, make([]byte, 128<<10))
 	closeErr := destination.Close()
 	if copyErr != nil {
 		return copyErr
@@ -252,7 +265,15 @@ func uploadLocalFile(operations transferOperations, remotePath, localPath string
 	return nil
 }
 
-func downloadLocalFile(operations transferOperations, remotePath, localPath string) error {
+func downloadLocalFile(operations transferOperations, remotePath, localPath string, reportProgress transferProgressReporter) error {
+	total := int64(0)
+	if operations.statRemote != nil {
+		info, err := operations.statRemote(remotePath)
+		if err != nil {
+			return err
+		}
+		total = info.Size()
+	}
 	source, err := operations.openRemote(remotePath)
 	if err != nil {
 		return err
@@ -262,7 +283,8 @@ func downloadLocalFile(operations transferOperations, remotePath, localPath stri
 	if err != nil {
 		return err
 	}
-	_, copyErr := io.CopyBuffer(destination, source, make([]byte, 128<<10))
+	writer := newProgressWriter(destination, total, reportProgress)
+	_, copyErr := io.CopyBuffer(writer, source, make([]byte, 128<<10))
 	syncErr := destination.Sync()
 	closeErr := destination.Close()
 	if copyErr != nil {
@@ -272,6 +294,37 @@ func downloadLocalFile(operations transferOperations, remotePath, localPath stri
 		return syncErr
 	}
 	return closeErr
+}
+
+type progressWriter struct {
+	destination io.Writer
+	lastReport  time.Time
+	reported    int64
+	report      transferProgressReporter
+	total       int64
+	written     int64
+}
+
+func newProgressWriter(destination io.Writer, total int64, report transferProgressReporter) *progressWriter {
+	writer := &progressWriter{destination: destination, report: report, total: total}
+	if report != nil {
+		report(0, total)
+		writer.lastReport = time.Now()
+	}
+	return writer
+}
+
+func (writer *progressWriter) Write(value []byte) (int, error) {
+	written, err := writer.destination.Write(value)
+	writer.written += int64(written)
+	if writer.report != nil && (writer.written == writer.total ||
+		writer.written-writer.reported >= 1<<20 ||
+		time.Since(writer.lastReport) >= 250*time.Millisecond) {
+		writer.report(writer.written, writer.total)
+		writer.reported = writer.written
+		writer.lastReport = time.Now()
+	}
+	return written, err
 }
 
 func dial(request normalizedRequest) (*ssh.Client, *sftp.Client, error) {
