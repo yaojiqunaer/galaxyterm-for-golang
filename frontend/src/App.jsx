@@ -314,7 +314,7 @@ function quickCommandProviderLabel(type, providers = []) {
 
 function App() {
   const screens = Grid.useBreakpoint();
-  const compactConnectionDetail = screens.xl !== true;
+  const compactConnectionDetail = screens.xxl !== true;
   const [messageApi, messageContextHolder] = message.useMessage();
   const [notificationApi, notificationContextHolder] = notification.useNotification();
   const [modalApi, modalContextHolder] = Modal.useModal();
@@ -735,7 +735,7 @@ function App() {
     [profiles, profileQuery, groupQuery, providerFilter, profileSort],
   );
   const explicitlySelectedProfile = visibleProfiles.find((profile) => profile.id === selectedProfileId) || null;
-  const selectedProfile = explicitlySelectedProfile || visibleProfiles[0] || null;
+  const selectedProfile = explicitlySelectedProfile || (compactConnectionDetail ? null : visibleProfiles[0] || null);
   const hasProfileFilters = profileQuery.trim() || groupQuery !== 'all' || providerFilter !== 'all' || profileSort !== 'favorites';
   const connectionEmptyState = useMemo(() => buildConnectionEmptyState({
     profileCount: profiles.length,
@@ -2315,10 +2315,15 @@ function App() {
 
   const renderConnections = () => (
     <div className="workspace-page connections-page">
-      <div className="page-header">
+      <div className="page-header connection-page-header">
         <div>
-          <Text type="secondary">{t('nav.connections')}</Text>
           <Title level={3}>{t('section.connectionManager')}</Title>
+          <div className="connection-summary-strip">
+            <span>{`${t('metric.savedConnections')}: ${workspaceInsights.profiles.total}`}</span>
+            <span>{`${t('label.favorite')}: ${workspaceInsights.profiles.favorites}`}</span>
+            <span>{`${t('metric.activeSessions')}: ${workspaceInsights.sessions.active}`}</span>
+            <span>{`${t('metric.providers')}: ${workspaceInsights.providers.total}`}</span>
+          </div>
         </div>
         <Space>
           <Button icon={<CloudServerOutlined />} onClick={() => openDrawer('ssh')}>
@@ -2328,13 +2333,6 @@ function App() {
             {t('action.newConnection')}
           </Button>
         </Space>
-      </div>
-
-      <div className="connection-summary-strip">
-        <span>{`${t('metric.savedConnections')}: ${workspaceInsights.profiles.total}`}</span>
-        <span>{`${t('label.favorite')}: ${workspaceInsights.profiles.favorites}`}</span>
-        <span>{`${t('metric.activeSessions')}: ${workspaceInsights.sessions.active}`}</span>
-        <span>{`${t('metric.providers')}: ${workspaceInsights.providers.total}`}</span>
       </div>
 
       <div className={selectedProfile && !compactConnectionDetail ? 'connection-manager-layout' : 'connection-manager-layout no-detail'}>
@@ -2377,7 +2375,6 @@ function App() {
         <section className="connection-list-panel">
           <div className="connection-list-header">
             <div>
-              <Text type="secondary">{t('section.savedConnections')}</Text>
               <Title level={4}>{connectionGroupLabel(connectionGroupNav.find((item) => item.key === groupQuery) || { key: groupQuery, type: 'group' })}</Title>
               <Text type="secondary">{`${t('metric.visibleConnections')}: ${visibleProfiles.length}`}</Text>
             </div>
@@ -2534,23 +2531,33 @@ function App() {
                     event.stopPropagation();
                     runConnectionProfilePrimaryAction(profile);
                   }} disabled={primaryAction.disabled}>{t(primaryAction.labelKey)}</Button>,
-                  <Dropdown
-                    key="manage"
-                    trigger={['click']}
-                    menu={{
-                      items: profileActionModel(profile).filter((action) => action !== 'connect').map((action) => ({
-                        key: action,
-                        danger: action === 'delete',
-                        label: t(`profile.action.${action}`),
-                      })),
-                      onClick: ({ domEvent, key }) => {
-                        domEvent.stopPropagation();
-                        runProfileAction(key, profile);
-                      },
-                    }}
-                  >
-                    <Button size="small" icon={<MoreOutlined />} onClick={(event) => event.stopPropagation()}>{t('action.manage')}</Button>
-                  </Dropdown>,
+                  <Tooltip key="manage" title={t('action.manage')}>
+                    <span className="tooltip-dropdown-trigger">
+                      <Dropdown
+                        trigger={['click']}
+                        menu={{
+                          items: profileActionModel(profile)
+                            .filter((action) => action !== 'connect' || primaryAction.action === 'focus')
+                            .map((action) => ({
+                              key: action,
+                              danger: action === 'delete',
+                              label: t(`profile.action.${action}`),
+                            })),
+                          onClick: ({ domEvent, key }) => {
+                            domEvent.stopPropagation();
+                            runProfileAction(key, profile);
+                          },
+                        }}
+                      >
+                        <Button
+                          aria-label={t('action.manage')}
+                          size="small"
+                          icon={<MoreOutlined />}
+                          onClick={(event) => event.stopPropagation()}
+                        />
+                      </Dropdown>
+                    </span>
+                  </Tooltip>,
                   <Tooltip key="favorite" title={profile.favorite ? t('action.unfavorite') : t('action.favorite')}>
                     <Button
                       size="small"
@@ -5755,6 +5762,11 @@ function ConnectionProfilePreview({
         >
           {t(primaryAction.labelKey)}
         </Button>
+        {primaryAction.action === 'focus' && (
+          <Button size="small" icon={<PlusOutlined />} onClick={() => openProfile(profile)}>
+            {t('action.newTerminal')}
+          </Button>
+        )}
         <Button size="small" icon={<EditOutlined />} onClick={() => openProfileEditor(profile)}>{t('action.edit')}</Button>
       </div>
       <Alert

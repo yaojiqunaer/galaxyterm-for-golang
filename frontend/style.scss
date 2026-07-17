@@ -1587,16 +1587,25 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
 .connection-summary-strip {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 0;
+  margin-top: 5px;
 }
 
 .connection-summary-strip span {
-  padding: 5px 9px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--panel);
+  padding: 0 10px;
+  border-left: 1px solid var(--border);
   color: var(--muted);
   font-size: 12px;
+}
+
+.connection-summary-strip span:first-child {
+  padding-left: 0;
+  border-left: 0;
+}
+
+.connection-page-header {
+  align-items: center;
+  margin-bottom: 0;
 }
 
 .metric-card {
@@ -1741,6 +1750,13 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   background: var(--panel);
 }
 
+.connection-groups-panel,
+.connection-detail-panel {
+  position: sticky;
+  top: 12px;
+  max-height: calc(100vh - 128px);
+}
+
 .connection-groups-panel {
   align-self: start;
   overflow: hidden;
@@ -1765,6 +1781,8 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
 .connection-group-nav {
   display: flex;
   flex-direction: column;
+  max-height: calc(100vh - 172px);
+  overflow-y: auto;
   padding: 6px;
 }
 
@@ -1826,7 +1844,7 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
 .connection-detail-panel {
   align-self: start;
   min-width: 0;
-  overflow: hidden;
+  overflow: auto;
 }
 
 .connection-detail-drawer .ant-drawer-body {
@@ -2137,7 +2155,23 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   width: 180px;
 }
 
-@media (max-width: 1280px) {
+@media (max-width: 1599px) {
+  .connection-manager-layout,
+  .connection-manager-layout.no-detail {
+    grid-template-columns: 190px minmax(0, 1fr);
+  }
+
+  .connection-list-hint {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .settings-appearance-strip {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 960px) {
   .connection-manager-layout,
   .connection-manager-layout.no-detail {
     grid-template-columns: minmax(0, 1fr);
@@ -2152,18 +2186,16 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
     flex: 1 1 150px;
   }
 
-  .connection-list-hint {
-    width: 100%;
-    margin-left: 0;
+  .connection-groups-panel {
+    position: static;
+    max-height: none;
   }
 
-  .connection-detail-panel {
-    order: -1;
+  .connection-group-nav {
+    max-height: none;
+    overflow-y: visible;
   }
 
-  .settings-appearance-strip {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-height: 760px) {

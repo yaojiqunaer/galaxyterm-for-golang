@@ -21,8 +21,31 @@ assert.ok(
 );
 
 assert.ok(
-  /@media \(max-width: 1280px\)[\s\S]*?\.connection-manager-layout,\s*\.connection-manager-layout\.no-detail\s*\{\s*grid-template-columns:\s*minmax\(0, 1fr\)/.test(styles),
-  'the compact connection layout must override both populated and empty workbench grids',
+  source.includes('const compactConnectionDetail = screens.xxl !== true;')
+    && /@media \(max-width: 1599px\)[\s\S]*?\.connection-manager-layout,\s*\.connection-manager-layout\.no-detail\s*\{[\s\S]*?grid-template-columns:\s*190px minmax\(0, 1fr\)/.test(styles)
+    && /@media \(max-width: 960px\)[\s\S]*?\.connection-manager-layout,\s*\.connection-manager-layout\.no-detail\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\)/.test(styles)
+    && !/\.connection-detail-panel\s*\{[^}]*order:\s*-1;/.test(styles),
+  'connection details, group navigation, and list columns must use aligned responsive breakpoints',
+);
+
+assert.ok(
+  source.includes("const selectedProfile = explicitlySelectedProfile || (compactConnectionDetail ? null : visibleProfiles[0] || null);")
+    && source.includes('aria-label={t(\'action.manage\')}')
+    && !source.includes("<Button size=\"small\" icon={<MoreOutlined />} onClick={(event) => event.stopPropagation()}>{t('action.manage')}</Button>"),
+  'compact connection lists must expose an icon menu without keeping an invisible default selection',
+);
+
+assert.ok(
+  /\.connection-groups-panel,\s*\.connection-detail-panel\s*\{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*12px;/.test(styles)
+    && /\.connection-group-nav\s*\{[\s\S]*?overflow-y:\s*auto;/.test(styles)
+    && /@media \(max-width: 960px\)[\s\S]*?\.connection-groups-panel\s*\{[\s\S]*?position:\s*static;/.test(styles),
+  'connection groups and wide details must stay available while long profile lists scroll',
+);
+
+assert.ok(
+  source.includes("action !== 'connect' || primaryAction.action === 'focus'")
+    && /primaryAction\.action === 'focus'\s*&&\s*\([\s\S]*?openProfile\(profile\)[\s\S]*?action\.newTerminal/.test(source),
+  'profiles with active sessions must expose both focus-existing and open-new actions',
 );
 
 assert.ok(
@@ -195,7 +218,7 @@ assert.ok(
 );
 assert.equal(
   source.match(/className="tooltip-dropdown-trigger"/g)?.length,
-  2,
+  3,
   'tooltip-wrapped dropdowns must expose stable DOM triggers for focus and popup positioning',
 );
 assert.ok(
