@@ -623,6 +623,10 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   display: inline-flex;
 }
 
+.tooltip-disabled-action {
+  display: inline-flex;
+}
+
 .topbar .ant-btn {
   border-color: var(--border);
   box-shadow: none;

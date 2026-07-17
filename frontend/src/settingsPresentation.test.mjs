@@ -7,6 +7,7 @@ import {
   buildShortcutGroups,
   buildTerminalDefaults,
   buildTerminalPreview,
+  buildWorkspaceActionState,
   buildWorkspaceSnapshotSummary,
   isCommandShortcut,
   isTerminalInputTarget,
@@ -152,4 +153,21 @@ assert.deepEqual(buildWorkspaceSnapshotSummary({ count: 3, updatedAt: '2026-07-0
   count: 3,
   hasSnapshot: true,
   updatedAt: '2026-07-04 12:00',
+});
+
+assert.deepEqual(buildWorkspaceActionState({
+  hasSnapshot: false,
+  sessionCount: 0,
+}), {
+  clear: { disabled: true, reasonKey: 'palette.reason.noWorkspaceSnapshot' },
+  restore: { disabled: true, reasonKey: 'palette.reason.noWorkspaceSnapshot' },
+  save: { disabled: true, reasonKey: 'palette.reason.noWorkspaceSession' },
+});
+assert.deepEqual(buildWorkspaceActionState({
+  hasSnapshot: true,
+  sessionCount: 2,
+}), {
+  clear: { disabled: false, reasonKey: '' },
+  restore: { disabled: false, reasonKey: '' },
+  save: { disabled: false, reasonKey: '' },
 });

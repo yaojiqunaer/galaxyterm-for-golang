@@ -158,6 +158,24 @@ export function buildWorkspaceSnapshotSummary(summary = null) {
   };
 }
 
+export function buildWorkspaceActionState({ hasSnapshot = false, sessionCount = 0 } = {}) {
+  const hasSessions = Number(sessionCount) > 0;
+  return {
+    clear: {
+      disabled: !hasSnapshot,
+      reasonKey: hasSnapshot ? '' : 'palette.reason.noWorkspaceSnapshot',
+    },
+    restore: {
+      disabled: !hasSnapshot,
+      reasonKey: hasSnapshot ? '' : 'palette.reason.noWorkspaceSnapshot',
+    },
+    save: {
+      disabled: !hasSessions,
+      reasonKey: hasSessions ? '' : 'palette.reason.noWorkspaceSession',
+    },
+  };
+}
+
 export function normalizeLogLevel(value) {
   const normalized = String(value || '').trim().toLowerCase();
   return ['error', 'warn', 'info', 'debug'].includes(normalized) ? normalized : 'info';

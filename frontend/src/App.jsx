@@ -142,6 +142,7 @@ import {
   buildShortcutGroups,
   buildTerminalDefaults,
   buildTerminalPreview,
+  buildWorkspaceActionState,
   isCommandShortcut,
   isTerminalInputTarget,
   normalizeShortcutModifier,
@@ -870,6 +871,10 @@ function App() {
     query: auditQuery,
   }), [auditProviderFilter, auditQuery, auditRecords]);
   const currentSessionSummary = useMemo(() => sessionSummary(sessions), [sessions]);
+  const workspaceActionState = buildWorkspaceActionState({
+    hasSnapshot: buildWorkspaceSnapshotSummary(workspaceSummary).hasSnapshot,
+    sessionCount: sessions.length,
+  });
   const sessionNavigationState = useMemo(() => (
     buildSessionNavigationState(sessions, activeKey)
   ), [activeKey, sessions]);
@@ -1540,6 +1545,10 @@ function App() {
   };
 
   const saveWorkspace = () => {
+    if (workspaceActionState.save.disabled) {
+      messageApi.info(t(workspaceActionState.save.reasonKey));
+      return;
+    }
     const snapshot = buildWorkspaceSnapshot(sessions, activeKey, sessionView);
     persistWorkspaceSnapshot(snapshot);
     setWorkspaceSummary(loadWorkspaceSummary());
@@ -1586,6 +1595,10 @@ function App() {
   };
 
   const clearWorkspaceSnapshot = () => {
+    if (workspaceActionState.clear.disabled) {
+      messageApi.info(t(workspaceActionState.clear.reasonKey));
+      return;
+    }
     localStorage.removeItem(workspaceStorageKey);
     setWorkspaceSummary(loadWorkspaceSummary());
     messageApi.success(t('message.workspaceCleared'));
@@ -3963,9 +3976,28 @@ function App() {
             </Space>
             <WorkspaceSnapshotStatus summary={buildWorkspaceSnapshotSummary(workspaceSummary)} />
             <Space wrap>
-              <Button icon={<SaveOutlined />} onClick={saveWorkspace}>{t('action.saveWorkspace')}</Button>
-              <Button icon={<ReloadOutlined />} onClick={() => restoreWorkspace()}>{t('action.restoreWorkspace')}</Button>
-              <Button danger icon={<DeleteOutlined />} onClick={clearWorkspaceSnapshot}>{t('action.clearWorkspace')}</Button>
+              <WorkspaceActionButton
+                action={workspaceActionState.save}
+                icon={<SaveOutlined />}
+                onClick={saveWorkspace}
+              >
+                {t('action.saveWorkspace')}
+              </WorkspaceActionButton>
+              <WorkspaceActionButton
+                action={workspaceActionState.restore}
+                icon={<ReloadOutlined />}
+                onClick={() => restoreWorkspace()}
+              >
+                {t('action.restoreWorkspace')}
+              </WorkspaceActionButton>
+              <WorkspaceActionButton
+                action={workspaceActionState.clear}
+                danger
+                icon={<DeleteOutlined />}
+                onClick={clearWorkspaceSnapshot}
+              >
+                {t('action.clearWorkspace')}
+              </WorkspaceActionButton>
             </Space>
           </Space>
           </SettingsPanel>
@@ -4451,6 +4483,10 @@ function App() {
   };
 
   const isDarkTheme = resolveAppTheme(settings.appTheme) === 'dark';
+  const openLanguageSettings = () => {
+    setSettingsSection('interface');
+    setSettingsOpen(true);
+  };
   const paletteItems = buildPaletteItems({
     activeSessionId: activeKey,
     canNavigateSessions: sessionNavigationState.canNavigate,
@@ -4472,10 +4508,11 @@ function App() {
     runSessionAction: runSessionPaletteAction,
     savedConnectionCount: profiles.length,
     setCommandsOpen,
-    setSettingsOpen,
+    openLanguageSettings,
     setHelpOpen,
     saveWorkspace,
     restoreWorkspace,
+    workspaceActionState,
     commandPaletteShortcut,
   });
   const visiblePaletteItems = filterPaletteItems(paletteItems, paletteQuery);
@@ -4540,14 +4577,24 @@ function App() {
     restoreWorkspace: () => restoreWorkspace(),
     quickCommands: () => setCommandsOpen(true),
     commandHistory: () => setHistoryOpen(true),
-    language: () => setSettingsOpen(true),
+    language: openLanguageSettings,
     help: () => setHelpOpen(true),
     extensions: () => setSelectedNav('extensions'),
     settings: () => setSelectedNav('settings'),
   };
   const workspaceMenuItems = [
-    { key: 'saveWorkspace', icon: <SaveOutlined />, label: t('action.saveWorkspace') },
-    { key: 'restoreWorkspace', icon: <ReloadOutlined />, label: t('action.restoreWorkspace') },
+    {
+      key: 'saveWorkspace',
+      disabled: workspaceActionState.save.disabled,
+      icon: <SaveOutlined />,
+      label: t('action.saveWorkspace'),
+    },
+    {
+      key: 'restoreWorkspace',
+      disabled: workspaceActionState.restore.disabled,
+      icon: <ReloadOutlined />,
+      label: t('action.restoreWorkspace'),
+    },
     { key: 'quickCommands', icon: <CodeOutlined />, label: t('action.commands') },
     { key: 'commandHistory', icon: <HistoryOutlined />, label: t('action.commandHistory') },
     { key: 'language', icon: <GlobalOutlined />, label: t('action.language') },
@@ -4945,7 +4992,7 @@ function App() {
               </>
             )}
             <Tooltip title={t('action.language')}>
-              <Button className="topbar-utility-action" aria-label={t('action.language')} icon={<GlobalOutlined />} onClick={() => setSettingsOpen(true)} />
+              <Button className="topbar-utility-action" aria-label={t('action.language')} icon={<GlobalOutlined />} onClick={openLanguageSettings} />
             </Tooltip>
             <Tooltip title={t('action.help')}>
               <Button className="topbar-utility-action" aria-label={t('action.help')} icon={<QuestionCircleOutlined />} onClick={() => setHelpOpen(true)} />
@@ -5724,6 +5771,20 @@ function WorkspaceSnapshotStatus({ summary }) {
   );
 }
 
+function WorkspaceActionButton({ action, children, ...buttonProps }) {
+  const button = (
+    <Button {...buttonProps} disabled={action.disabled}>
+      {children}
+    </Button>
+  );
+  if (!action.disabled) return button;
+  return (
+    <Tooltip title={t(action.reasonKey)}>
+      <span className="tooltip-disabled-action">{button}</span>
+    </Tooltip>
+  );
+}
+
 function ConnectionProfilePreview({
   confirmDeleteProfile,
   duplicateProfile,
@@ -6440,6 +6501,8 @@ function buildPaletteItems(actions) {
       description: t('settings.autoSaveHint'),
       icon: <SaveOutlined />,
       keywords: 'save workspace snapshot',
+      disabled: actions.workspaceActionState.save.disabled,
+      reasonKey: actions.workspaceActionState.save.reasonKey,
       run: actions.saveWorkspace,
     },
     {
@@ -6449,6 +6512,8 @@ function buildPaletteItems(actions) {
       description: t('settings.workspaceSnapshot'),
       icon: <ReloadOutlined />,
       keywords: 'restore workspace snapshot',
+      disabled: actions.workspaceActionState.restore.disabled,
+      reasonKey: actions.workspaceActionState.restore.reasonKey,
       run: actions.restoreWorkspace,
     },
     {
@@ -6458,7 +6523,7 @@ function buildPaletteItems(actions) {
       description: t('settings.languageHint'),
       icon: <GlobalOutlined />,
       keywords: 'language locale settings',
-      run: () => actions.setSettingsOpen(true),
+      run: actions.openLanguageSettings,
     },
     {
       id: 'help:shortcuts',

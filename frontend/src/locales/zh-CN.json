@@ -533,6 +533,8 @@
   "palette.reason.noClosedSession": "没有已关闭会话可清理",
   "palette.reason.noOtherSession": "没有其他会话可关闭",
   "palette.reason.noSession": "没有可关闭的会话",
+  "palette.reason.noWorkspaceSession": "请先打开至少一个会话，再保存工作区。",
+  "palette.reason.noWorkspaceSnapshot": "请先保存工作区，再执行恢复或清理。",
   "palette.empty.title": "没有匹配的命令",
   "palette.empty.description": "可以直接创建终端，或回到连接管理。",
   "message.profileSaved": "连接已保存",

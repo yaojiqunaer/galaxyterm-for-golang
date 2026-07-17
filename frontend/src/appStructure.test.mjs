@@ -307,6 +307,23 @@ assert.ok(
   'the command palette must expose recently closed session recovery when available',
 );
 assert.ok(
+  source.includes('const workspaceActionState = buildWorkspaceActionState({')
+    && source.includes('if (workspaceActionState.save.disabled)')
+    && source.includes('disabled: workspaceActionState.save.disabled')
+    && source.includes('disabled: workspaceActionState.restore.disabled')
+    && source.includes('action={workspaceActionState.clear}')
+    && source.includes('action={workspaceActionState.restore}')
+    && source.includes('action={workspaceActionState.save}'),
+  'workspace menu, palette, and settings actions must share truthful availability state',
+);
+assert.ok(
+  source.includes("const openLanguageSettings = () => {")
+    && source.includes("setSettingsSection('interface');")
+    && source.includes('openLanguageSettings,')
+    && source.includes('run: actions.openLanguageSettings'),
+  'language entry points must open the interface settings section directly',
+);
+assert.ok(
   source.includes('resolveSessionShortcutNumber(sessionIds, session.id)')
     && !source.includes('{index < 9 && <Text code>{index + 1}</Text>}'),
   'sidebar shortcut badges must describe the actual numbered session action after active-first sorting',
@@ -350,7 +367,7 @@ assert.ok(
   'remote files must expose real native transfer progress and cancellation while retaining text-file creation',
 );
 assert.ok(
-  source.includes("language: () => setSettingsOpen(true)")
+  source.includes('language: openLanguageSettings')
     && source.includes("{ key: 'language', icon: <GlobalOutlined />, label: t('action.language') }")
     && (source.match(/className="topbar-utility-action"/g) || []).length === 4
     && /@media \(max-width: 1200px\)[\s\S]*?\.topbar-utility-action\s*\{[\s\S]*?display:\s*none/.test(styles),
