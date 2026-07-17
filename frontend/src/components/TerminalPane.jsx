@@ -151,6 +151,9 @@ function TerminalPane({
     fit: () => {
       fitAddon.current?.fit();
     },
+    focus: () => {
+      term.current?.focus();
+    },
     send: (data) => {
       if (sessionId.current) {
         trackOutgoingData(data);

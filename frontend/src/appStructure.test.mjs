@@ -77,6 +77,23 @@ assert.ok(
   'session presentation modes must share one persistent pane deck and tab-bar toolbar',
 );
 assert.ok(
+  terminalPaneSource.includes('focus: () => {')
+    && terminalPaneSource.includes('term.current?.focus();')
+    && source.includes('const focusTerminalSession = (sessionId = activeKey) => {')
+    && source.includes('const activateSession = (sessionId) => {')
+    && source.includes('onChange={activateSession}')
+    && source.includes('onTabClick={focusTerminalSession}'),
+  'session navigation must return keyboard focus to the selected terminal without another canvas click',
+);
+assert.ok(
+  source.includes("if (!activeKey || selectedNav !== 'sessions') return undefined;")
+    && source.includes('window.requestAnimationFrame(() => {')
+    && source.includes('terminalRefs.current[activeKey]?.focus?.();')
+    && source.includes('if (isInteractiveControl(event.target)) return;')
+    && !source.includes('onContextMenu={() => setActiveKey(session.id)}'),
+  'terminal focus restoration must stay inside the visible session page and preserve inactive-tab context menus',
+);
+assert.ok(
   !source.includes('<div className="statusbar">')
     && !/\.statusbar\s*\{/.test(styles),
   'the app shell must not reserve a redundant debug footer below terminal status',
@@ -270,8 +287,11 @@ assert.ok(
 assert.ok(
   source.includes('const terminalSearchRef = useRef(null);')
     && source.includes("key === 'f' && !event.shiftKey && activeKey && selectedNav === 'sessions'")
+    && source.includes('terminalSearchRef.current?.select?.();')
+    && source.includes('const closeTerminalSearch = () => {')
+    && source.includes("if (event.key === 'Escape') {")
     && source.includes('ref={terminalSearchRef}'),
-  'Cmd/Ctrl+F must focus terminal output search only inside the session workspace',
+  'terminal search must select the current query and return focus to the terminal on Escape',
 );
 assert.ok(
   source.includes("window.addEventListener('keydown', handleKeydown, true);")

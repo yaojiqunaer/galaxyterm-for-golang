@@ -479,6 +479,23 @@ function App() {
   const contentPageScrollPositionsRef = useRef(new Map());
   const previousContentPageRef = useRef(selectedNav);
   const draggedSessionIdRef = useRef('');
+  const focusTerminalSession = (sessionId = activeKey) => {
+    if (!sessionId) return;
+    window.requestAnimationFrame(() => {
+      terminalRefs.current[sessionId]?.focus?.();
+    });
+  };
+  const activateSession = (sessionId) => {
+    if (!sessionId) return;
+    setActiveKey(sessionId);
+    setSelectedNav('sessions');
+    focusTerminalSession(sessionId);
+  };
+  const closeTerminalSearch = () => {
+    setTerminalSearch('');
+    terminalRefs.current[activeKey]?.clearSearch?.();
+    focusTerminalSession(activeKey);
+  };
   const activeSession = sessions.find((session) => session.id === activeKey);
   const activeTerminalStatus = terminalStatuses[activeKey] || {};
   const visibleSessionIds = useMemo(() => {
@@ -600,6 +617,7 @@ function App() {
       if (key === 'f' && !event.shiftKey && activeKey && selectedNav === 'sessions') {
         event.preventDefault();
         terminalSearchRef.current?.focus();
+        terminalSearchRef.current?.select?.();
       }
       if (key === 'f' && !event.shiftKey && selectedNav === 'files') {
         event.preventDefault();
@@ -610,8 +628,7 @@ function App() {
         const nextSession = sessions[numberedSessionIndex];
         if (nextSession) {
           event.preventDefault();
-          setActiveKey(nextSession.id);
-          setSelectedNav('sessions');
+          activateSession(nextSession.id);
         }
       }
       const relativeSessionAction = resolveBracketSessionAction(event);
@@ -621,8 +638,7 @@ function App() {
         const nextSession = sessions[nextIndex];
         if (nextSession) {
           event.preventDefault();
-          setActiveKey(nextSession.id);
-          setSelectedNav('sessions');
+          activateSession(nextSession.id);
         }
       }
       if (key === 'f' && event.shiftKey && sessions.length > 0) {
@@ -670,9 +686,12 @@ function App() {
   }, [activeKey, closedSessions, selectedNav, sessions, settings.confirmDangerousActions, settings.shortcutModifier]);
 
   useEffect(() => {
-    if (activeKey && terminalRefs.current[activeKey]?.fit) {
-      setTimeout(() => terminalRefs.current[activeKey]?.fit(), 0);
-    }
+    if (!activeKey || selectedNav !== 'sessions') return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      terminalRefs.current[activeKey]?.fit?.();
+      terminalRefs.current[activeKey]?.focus?.();
+    });
+    return () => window.cancelAnimationFrame(frame);
   }, [activeKey, focusMode, selectedNav, sessionView]);
 
   useEffect(() => {
@@ -1656,8 +1675,7 @@ function App() {
       openProfile(profile);
       return;
     }
-    setActiveKey(summary.focusSessionId);
-    setSelectedNav('sessions');
+    activateSession(summary.focusSessionId);
   };
 
   const runConnectionProfilePrimaryAction = (profile) => {
@@ -1680,8 +1698,7 @@ function App() {
       ? sessionNavigationState.previousId
       : sessionNavigationState.nextId;
     if (!nextId) return;
-    setActiveKey(nextId);
-    setSelectedNav('sessions');
+    activateSession(nextId);
   };
 
   const runSessionPaletteAction = (action) => {
@@ -2148,7 +2165,6 @@ function App() {
           <span
             className="session-tab-context-trigger"
             draggable={sessions.length > 1}
-            onContextMenu={() => setActiveKey(session.id)}
             onDragEnd={(event) => {
               draggedSessionIdRef.current = '';
               event.currentTarget.classList.remove('dragging');
@@ -2243,7 +2259,8 @@ function App() {
           hideAdd={false}
           addIcon={<PlusOutlined />}
           activeKey={activeKey}
-          onChange={setActiveKey}
+          onChange={activateSession}
+          onTabClick={focusTerminalSession}
           onEdit={(targetKey, action) => {
             if (action === 'add') openDrawer();
             if (action === 'remove') confirmRemoveSession(targetKey);
@@ -2256,7 +2273,10 @@ function App() {
             <section
               className={`terminal-pane-slot${session.id === activeKey ? ' active' : ''}`}
               key={session.id}
-              onMouseDown={() => setActiveKey(session.id)}
+              onMouseDown={(event) => {
+                if (isInteractiveControl(event.target)) return;
+                activateSession(session.id);
+              }}
             >
               {sessionView === 'grid' && (
                 <div className="split-terminal-header">
@@ -4500,7 +4520,7 @@ function App() {
     sessions,
     sessionCount: sessions.length,
     setSelectedNav,
-    setActiveKey,
+    activateSession,
     openDrawer,
     openProfile,
     runQuickCommand,
@@ -4905,10 +4925,7 @@ function App() {
                     return (
                       <List.Item
                         className={session.id === activeKey ? 'session-row active' : 'session-row'}
-                        onClick={() => {
-                          setSelectedNav('sessions');
-                          setActiveKey(session.id);
-                        }}
+                        onClick={() => activateSession(session.id)}
                       >
                         <SessionSidebarLabel
                           activityKind={sessionActivity[session.id]?.kind}
@@ -4975,6 +4992,12 @@ function App() {
                   onChange={(event) => {
                     setTerminalSearch(event.target.value);
                     if (!event.target.value) terminalRefs.current[activeKey]?.clearSearch?.();
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Escape') {
+                      event.preventDefault();
+                      closeTerminalSearch();
+                    }
                   }}
                   onSearch={() => findInTerminal('next')}
                   placeholder={t('placeholder.searchTerminal')}
@@ -6448,10 +6471,7 @@ function buildPaletteItems(actions) {
     description: `${sessionStatusLabel(session.status)} · ${profileDescription(profileFromRequest(session.request))}`,
     icon: providerIcons[session.providerType] || <CodeOutlined />,
     keywords: `${session.label} ${session.providerType} ${session.status} ${index + 1}`,
-    run: () => {
-      actions.setActiveKey(session.id);
-      actions.setSelectedNav('sessions');
-    },
+    run: () => actions.activateSession(session.id),
   }));
 
   const sessionActionItems = buildSessionActionPaletteItems({
@@ -6842,6 +6862,12 @@ function clampNumber(value, min, max, fallback) {
 function isEditableTarget(target) {
   const tagName = target?.tagName?.toLowerCase();
   return tagName === 'input' || tagName === 'textarea' || target?.isContentEditable;
+}
+
+function isInteractiveControl(target) {
+  return Boolean(target?.closest?.(
+    'button, a, input, textarea, select, summary, [role="button"], [role="menuitem"]',
+  ));
 }
 
 function resolveAppTheme(theme) {
