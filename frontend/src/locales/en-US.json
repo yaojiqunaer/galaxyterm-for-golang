@@ -121,6 +121,7 @@
   "action.help": "Help",
   "label.favorite": "Favorite",
   "label.lastUsed": "Last used",
+  "label.defaultShell": "Default shell",
   "label.openSessions": "Open",
   "label.provider": "Type",
   "label.target": "Target",

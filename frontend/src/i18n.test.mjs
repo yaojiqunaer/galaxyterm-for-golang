@@ -46,6 +46,17 @@ assert.equal(t('session.empty.restoreUnavailable'), '目前还没有可恢复的
 assert.equal(t('session.status.error'), '异常');
 assert.equal(t('locale.en-US'), 'English');
 assert.equal(t('locale.zh-CN'), '简体中文');
+assert.equal(t('label.defaultShell'), '默认 Shell');
+assert.equal(t('filter.allProviders'), '全部类型');
+assert.equal(t('metric.builtinProviders'), '内置终端类型');
+assert.equal(t('section.installedProviders'), '已安装终端类型');
+assert.equal(t('extension.sftp'), 'SFTP 文件扩展');
+assert.equal(t('file.noProviderHint'), '安装 SFTP、FTP、S3 或兼容的文件协议扩展后即可浏览远程文件。');
+[
+  'operation.error.reason.unavailable',
+  'operation.error.suggestion.unavailable',
+  'placeholder.auditSearch',
+].forEach((key) => assert.doesNotMatch(t(key), /Provider/, `${key} must use user-facing Chinese terminology`));
 
 setLocale('en-US');
 assert.equal(currentLocale(), 'en-US');

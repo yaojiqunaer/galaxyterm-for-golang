@@ -312,6 +312,10 @@ function quickCommandProviderLabel(type, providers = []) {
   return !type || type === 'all' ? t('filter.allProviders') : providerTypeLabel(type, providers);
 }
 
+function localizedConnectionProfileSubtitle(profile) {
+  return buildConnectionProfileSubtitle(profile, { defaultShellLabel: t('label.defaultShell') });
+}
+
 function App() {
   const screens = Grid.useBreakpoint();
   const compactConnectionDetail = screens.xxl !== true;
@@ -747,8 +751,8 @@ function App() {
     [profiles, providers],
   );
   const visibleRecentConnections = useMemo(
-    () => filterRecentConnectionsByProviders(recentConnections, providers),
-    [recentConnections, providers],
+    () => filterRecentConnectionsByProviders(recentConnections, providers, profiles),
+    [recentConnections, profiles, providers],
   );
 
   useEffect(() => {
@@ -2474,7 +2478,7 @@ function App() {
                     <span className="provider-icon">{providerIcons[connection.providerType] || <CodeOutlined />}</span>
                     <span>
                       <strong>{connection.displayName}</strong>
-                      <small>{connection.description}</small>
+                      <small>{localizedConnectionProfileSubtitle(recentToProfile(connection))}</small>
                     </span>
                   </button>
                 ))}
@@ -2600,7 +2604,7 @@ function App() {
                     )}
                     description={(
                       <span className="connection-profile-description">
-                        <span className="connection-profile-endpoint-line">{buildConnectionProfileSubtitle(profile)}</span>
+                        <span className="connection-profile-endpoint-line">{localizedConnectionProfileSubtitle(profile)}</span>
                         <span className="connection-profile-badges">
                           {badges.map((badge) => (
                             <span key={badge.key} className={`connection-profile-badge tone-${badge.tone}`}>
@@ -4812,12 +4816,12 @@ function App() {
                         <List.Item
                           className={sessionInfo.activeCount > 0 ? 'quick-profile-row active' : 'quick-profile-row'}
                           onClick={() => focusProfileSession(profile)}
-                          title={`${profile.displayName} · ${buildConnectionProfileSubtitle(profile)}`}
+                          title={`${profile.displayName} · ${localizedConnectionProfileSubtitle(profile)}`}
                         >
                           <span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>
                           <span className="quick-profile-main">
                             <span>{profile.displayName}</span>
-                            <small>{buildConnectionProfileSubtitle(profile)}</small>
+                            <small>{localizedConnectionProfileSubtitle(profile)}</small>
                             {badges.length > 0 && (
                               <span className="quick-profile-badges">
                                 {badges.map((badge) => (
@@ -5594,7 +5598,7 @@ function SessionEmptyPanel({
                     <span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>
                     <span>
                       <strong>{profile.displayName}</strong>
-                      <small>{buildConnectionProfileSubtitle(profile)}</small>
+                      <small>{localizedConnectionProfileSubtitle(profile)}</small>
                     </span>
                   </button>
                 ))}
@@ -5610,7 +5614,7 @@ function SessionEmptyPanel({
                     <span className="provider-icon">{providerIcons[connection.providerType] || <CodeOutlined />}</span>
                     <span>
                       <strong>{connection.displayName}</strong>
-                      <small>{connection.description}</small>
+                      <small>{localizedConnectionProfileSubtitle(recentToProfile(connection))}</small>
                     </span>
                   </button>
                 ))}
@@ -5733,7 +5737,7 @@ function ConnectionProfilePreview({
   const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
   const providerAvailable = isProfileProviderAvailable(profile, providers);
   const badges = buildConnectionProfileBadges(profile, sessionInfo, { providerAvailable });
-  const facts = buildConnectionProfileFacts(profile);
+  const facts = buildConnectionProfileFacts(profile, { defaultShellLabel: t('label.defaultShell') });
   const hints = buildConnectionProfileHints(sessionInfo);
   const primaryAction = buildConnectionProfilePrimaryAction({ providerAvailable, sessionInfo });
   const statusSummary = buildConnectionProfileStatusSummary({ providerAvailable, sessionInfo });
@@ -5744,7 +5748,7 @@ function ConnectionProfilePreview({
         <div>
           <Text type="secondary">{providerTypeLabel(profile.providerType, providers)}</Text>
           <Title level={4}>{profile.displayName}</Title>
-          <Text className="connection-profile-endpoint">{buildConnectionProfileSubtitle(profile)}</Text>
+          <Text className="connection-profile-endpoint">{localizedConnectionProfileSubtitle(profile)}</Text>
         </div>
       </div>
       <div className="connection-profile-actions">
@@ -6723,7 +6727,7 @@ function profileDescription(profile) {
   if (profile.providerType === 'ssh') {
     return `${profile.auth?.username || '-'}@${profile.config?.host || '-'}:${profile.config?.port || 22}`;
   }
-  return profile.config?.shell || 'default shell';
+  return profile.config?.shell || t('label.defaultShell');
 }
 
 function loadSettings() {

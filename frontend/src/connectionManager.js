@@ -258,15 +258,21 @@ export function isProfileProviderAvailable(profile = {}, providers = []) {
   return providers.some((provider) => provider.type === profile.providerType);
 }
 
-export function filterRecentConnectionsByProviders(connections = [], providers = []) {
+export function filterRecentConnectionsByProviders(connections = [], providers = [], profiles = []) {
   const providerTypes = new Set(providers.map((provider) => provider.type).filter(Boolean));
+  const profileIds = new Set(profiles.map((profile) => profile.id).filter(Boolean));
+  const profileFingerprints = new Set(profiles.map(connectionFingerprint).filter(Boolean));
   return connections.filter((connection) => {
     const providerType = connection.providerType || connection.request?.providerType;
-    return providerTypes.has(providerType);
+    if (!providerTypes.has(providerType)) return false;
+    const profileId = connection.request?.profileId || connection.profileId;
+    if (profileId && profileIds.has(profileId)) return false;
+    const fingerprint = connectionFingerprint(connection);
+    return !fingerprint || !profileFingerprints.has(fingerprint);
   });
 }
 
-export function buildConnectionProfileFacts(profile = {}) {
+export function buildConnectionProfileFacts(profile = {}, { defaultShellLabel = 'default shell' } = {}) {
   if (profile.providerType === 'ssh') {
     return [
       { key: 'host', value: profile.config?.host || '-' },
@@ -277,20 +283,20 @@ export function buildConnectionProfileFacts(profile = {}) {
     ].filter(Boolean);
   }
   return [
-    { key: 'shell', value: profile.config?.shell || 'default shell' },
+    { key: 'shell', value: profile.config?.shell || defaultShellLabel },
     profile.config?.workingDirectory && { key: 'workingDirectory', value: profile.config.workingDirectory },
     { key: 'lastUsed', value: profile.lastUsedAt || '' },
   ].filter(Boolean);
 }
 
-export function buildConnectionProfileSubtitle(profile = {}) {
+export function buildConnectionProfileSubtitle(profile = {}, { defaultShellLabel = 'default shell' } = {}) {
   if (profile.providerType === 'ssh') {
     const host = profile.config?.host || '-';
     const port = profile.config?.port || 22;
     const username = profile.auth?.username;
     return `${username ? `${username}@` : ''}${host}:${port}`;
   }
-  return profile.config?.shell || 'default shell';
+  return profile.config?.shell || defaultShellLabel;
 }
 
 export function buildConnectionProfileHints(sessionInfo = {}) {
@@ -351,6 +357,21 @@ export function buildConnectionProfileStatusSummary({
 
 function compareText(left = '', right = '') {
   return String(left || '').localeCompare(String(right || ''));
+}
+
+function connectionFingerprint(connection = {}) {
+  const request = connection.request || connection;
+  const providerType = request.providerType || connection.providerType || '';
+  if (providerType === 'ssh') {
+    const host = String(request.config?.host || '').trim().toLowerCase();
+    if (!host) return '';
+    const username = String(request.auth?.username || '').trim();
+    return `ssh:${username}@${host}:${request.config?.port || 22}`;
+  }
+  if (providerType === 'local') {
+    return `local:${String(request.config?.shell || 'default').trim() || 'default'}`;
+  }
+  return '';
 }
 
 function compareGroup(left, right) {

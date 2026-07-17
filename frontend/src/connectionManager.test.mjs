@@ -226,6 +226,46 @@ assert.deepEqual(filterRecentConnectionsByProviders([
   { id: 'recent-request-redis', request: { providerType: 'redis' } },
 ], [{ type: 'ssh' }, { type: 'redis' }]).map((item) => item.id), ['recent-ssh', 'recent-request-redis']);
 
+const recentSuggestions = [
+  {
+    id: 'saved-by-id',
+    providerType: 'ssh',
+    request: { providerType: 'ssh', profileId: 'prod-db' },
+  },
+  {
+    id: 'legacy-saved-ssh',
+    providerType: 'ssh',
+    request: {
+      providerType: 'ssh',
+      config: { host: '10.0.0.20', port: 22 },
+      auth: { username: 'deploy' },
+    },
+  },
+  {
+    id: 'legacy-saved-local',
+    providerType: 'local',
+    request: { providerType: 'local', config: { shell: '/bin/zsh' } },
+  },
+  {
+    id: 'temporary-ssh',
+    providerType: 'ssh',
+    request: {
+      providerType: 'ssh',
+      config: { host: '10.0.0.30', port: 22 },
+      auth: { username: 'ops' },
+    },
+  },
+  { id: 'unavailable-mysql', providerType: 'mysql' },
+];
+assert.deepEqual(
+  filterRecentConnectionsByProviders(
+    recentSuggestions,
+    [{ type: 'local' }, { type: 'ssh' }],
+    profiles,
+  ).map((item) => item.id),
+  ['temporary-ssh'],
+);
+
 assert.deepEqual(buildConnectionProfileFacts(profiles[0]), [
   { key: 'host', value: '10.0.0.10' },
   { key: 'port', value: 22 },
@@ -250,6 +290,15 @@ assert.deepEqual(buildConnectionProfileFacts(profiles[2]), [
 assert.equal(buildConnectionProfileSubtitle(profiles[0]), '10.0.0.10:22');
 assert.equal(buildConnectionProfileSubtitle(profiles[1]), 'deploy@10.0.0.20:22');
 assert.equal(buildConnectionProfileSubtitle(profiles[2]), '/bin/zsh');
+assert.equal(buildConnectionProfileSubtitle({ providerType: 'local', config: {} }, {
+  defaultShellLabel: 'Default shell',
+}), 'Default shell');
+assert.deepEqual(buildConnectionProfileFacts({ providerType: 'local', config: {} }, {
+  defaultShellLabel: 'Default shell',
+}), [
+  { key: 'shell', value: 'Default shell' },
+  { key: 'lastUsed', value: '' },
+]);
 assert.deepEqual(buildConnectionProfileHints({ activeCount: 0 }), ['enterOpen', 'doubleClickOpen']);
 assert.deepEqual(buildConnectionProfileHints({ activeCount: 2 }), ['focusOpenSession', 'enterOpen', 'doubleClickOpen']);
 assert.deepEqual(buildConnectionProfilePrimaryAction({
