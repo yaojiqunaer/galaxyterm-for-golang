@@ -390,6 +390,15 @@ assert.ok(
   'recording and audit state must remain readable without relying on icon hover tooltips',
 );
 assert.ok(
+  source.includes('persistAuditRecordSet(localStorage, auditRecordStorageKey, records, options)')
+    && /persistAuditRecords\([\s\S]*?\[record, \.\.\.loadAuditRecords\(\)\][\s\S]*?preferredId:\s*record\.id/.test(source)
+    && source.includes('if (!persistence.preferredStored)')
+    && source.includes("t('message.auditRecordStorageFailed')")
+    && source.includes("t('message.auditRecordsPruned'")
+    && source.includes('if (!persistence.persisted)'),
+  'audit storage pressure must degrade explicitly without blocking session lifecycle actions',
+);
+assert.ok(
   /\.terminal-status-fact\s*\{[\s\S]*?border:\s*0;[\s\S]*?border-radius:\s*0;[\s\S]*?background:\s*transparent;/.test(styles)
     && /\.terminal-status-fact\.fact-status::before\s*\{[\s\S]*?border-radius:\s*50%;/.test(styles)
     && /\.session-audit-indicator,\s*\.session-recording-indicator\s*\{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;/.test(styles),

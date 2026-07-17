@@ -132,6 +132,29 @@ export function buildAuditRecordSummary(record = {}) {
   };
 }
 
+export function persistAuditRecordSet(storage, key, records = [], options = {}) {
+  const limit = Math.max(1, Number(options.limit) || 100);
+  const preferredId = String(options.preferredId || '');
+  const normalized = records
+    .filter((record) => record?.id && record?.title)
+    .map(sanitizeAuditRecord)
+    .slice(0, limit);
+
+  const primary = writeLargestRecordPrefix(storage, key, normalized);
+  if (primary) return buildAuditPersistenceResult(normalized, primary, preferredId, true);
+
+  if (preferredId) {
+    const fallbackRecords = normalized.filter((record) => record.id !== preferredId);
+    const fallback = writeLargestRecordPrefix(storage, key, fallbackRecords, true);
+    if (fallback) return buildAuditPersistenceResult(normalized, fallback, preferredId, true);
+  } else if (writeAuditRecords(storage, key, [])) {
+    return buildAuditPersistenceResult(normalized, [], preferredId, true);
+  }
+
+  const existing = readStoredAuditRecords(storage, key, limit);
+  return buildAuditPersistenceResult(normalized, existing, preferredId, false);
+}
+
 export function resolveReplayEventTime(events = [], currentTime = 0, direction = 'next') {
   if (events.length === 0) return 0;
   const times = events.map((event) => Number(event.time) || 0).sort((left, right) => left - right);
@@ -149,6 +172,57 @@ function safeJsonParse(value) {
   } catch {
     return null;
   }
+}
+
+function writeLargestRecordPrefix(storage, key, records, allowEmpty = false) {
+  let lower = 1;
+  let upper = records.length;
+  let largest = null;
+  while (lower <= upper) {
+    const length = Math.floor((lower + upper) / 2);
+    const candidate = records.slice(0, length);
+    if (writeAuditRecords(storage, key, candidate)) {
+      largest = candidate;
+      lower = length + 1;
+    } else {
+      upper = length - 1;
+    }
+  }
+  if (largest) return largest;
+  if (allowEmpty && writeAuditRecords(storage, key, [])) return [];
+  return null;
+}
+
+function writeAuditRecords(storage, key, records) {
+  try {
+    storage.setItem(key, JSON.stringify(records));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function readStoredAuditRecords(storage, key, limit) {
+  try {
+    const parsed = safeJsonParse(storage.getItem(key) || '[]');
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .filter((record) => record?.id && record?.title)
+      .map(sanitizeAuditRecord)
+      .slice(0, limit);
+  } catch {
+    return [];
+  }
+}
+
+function buildAuditPersistenceResult(requested, stored, preferredId, persisted) {
+  const storedIds = new Set(stored.map((record) => record.id));
+  return {
+    evictedCount: requested.reduce((count, record) => count + Number(!storedIds.has(record.id)), 0),
+    persisted,
+    preferredStored: !preferredId || storedIds.has(preferredId),
+    records: stored,
+  };
 }
 
 function redactObject(value = {}) {

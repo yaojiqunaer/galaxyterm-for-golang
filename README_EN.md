@@ -42,7 +42,7 @@ Save non-sensitive SSH connection metadata such as name, group, host, port, user
 
 <details>
 <summary><b>🧾 Audit logs and terminal recordings</b></summary>
-Records session open, reconnect, close, error, clear, quick command, and large paste events. Terminal output is stored as asciinema v2 text recordings. The Audit page uses a read-only xterm renderer to restore ANSI colors, carriage-return updates, screen clearing, and cursor movement at the original timestamps. Playback supports pause, restart, seeking, event stepping, speed control, and `.cast` or `.log` export.
+Records session open, reconnect, close, error, clear, quick command, and large paste events. Terminal output is stored as asciinema v2 text recordings. The Audit page uses a read-only xterm renderer to restore ANSI colors, carriage-return updates, screen clearing, and cursor movement at the original timestamps. Playback supports pause, restart, seeking, event stepping, speed control, and `.cast` or `.log` export. When local audit storage is full, GalaxyTerm removes the oldest records first. If the new recording still cannot be stored, existing history is preserved, the failure is shown explicitly, and session closing continues.
 </details>
 
 <details>

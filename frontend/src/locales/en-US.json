@@ -611,5 +611,9 @@
   "message.transcriptExported": "Transcript exported",
   "message.auditRecordSaved": "Audit record saved",
   "message.auditRecordDeleted": "Audit record deleted",
-  "message.auditRecordsCleared": "Audit records cleared"
+  "message.auditRecordsCleared": "Audit records cleared",
+  "message.auditRecordStorageFailed": "Recording could not be saved",
+  "message.auditRecordStorageFailedHint": "Audit storage is unavailable or full. The session can still be closed; export or remove older recordings before trying again.",
+  "message.auditRecordsPruned": "Removed {count} older audit records to make room",
+  "message.auditStorageUpdateFailed": "Audit storage could not be updated"
 }

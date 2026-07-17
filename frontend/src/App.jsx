@@ -79,6 +79,7 @@ import {
   buildAuditRecord,
   buildAuditRecordSummary,
   createAuditEvent,
+  persistAuditRecordSet,
   sanitizeAuditRecord,
 } from './auditLog.js';
 import {
@@ -1473,8 +1474,24 @@ function App() {
       startedAt: recording?.startedAt || session.startedAt || '',
       title: session.label,
     });
-    const nextRecords = persistAuditRecords([record, ...loadAuditRecords()]);
-    setAuditRecords(nextRecords);
+    const persistence = persistAuditRecords(
+      [record, ...loadAuditRecords()],
+      { preferredId: record.id },
+    );
+    setAuditRecords(persistence.records);
+    if (!persistence.preferredStored) {
+      notificationApi.error({
+        key: 'audit-storage-failed',
+        message: t('message.auditRecordStorageFailed'),
+        description: t('message.auditRecordStorageFailedHint'),
+        duration: 0,
+        placement: 'bottomRight',
+      });
+      return null;
+    }
+    if (persistence.evictedCount > 0) {
+      messageApi.warning(t('message.auditRecordsPruned', { count: persistence.evictedCount }));
+    }
     setSessions((current) => current.map((item) => (
       item.id === session.id ? { ...item, auditRecordSaved: true } : item
     )));
@@ -1482,15 +1499,23 @@ function App() {
   };
 
   const deleteAuditRecord = (recordId) => {
-    const nextRecords = persistAuditRecords(auditRecords.filter((record) => record.id !== recordId));
-    setAuditRecords(nextRecords);
+    const persistence = persistAuditRecords(auditRecords.filter((record) => record.id !== recordId));
+    setAuditRecords(persistence.records);
+    if (!persistence.persisted) {
+      messageApi.error(t('message.auditStorageUpdateFailed'));
+      return;
+    }
     if (replayRecord?.id === recordId) setReplayRecord(null);
     messageApi.success(t('message.auditRecordDeleted'));
   };
 
   const clearAuditRecords = () => {
-    persistAuditRecords([]);
-    setAuditRecords([]);
+    const persistence = persistAuditRecords([]);
+    setAuditRecords(persistence.records);
+    if (!persistence.persisted) {
+      messageApi.error(t('message.auditStorageUpdateFailed'));
+      return;
+    }
     setReplayRecord(null);
     messageApi.success(t('message.auditRecordsCleared'));
   };
@@ -6202,7 +6227,11 @@ function loadAuditRecords() {
       .slice(0, 100);
     const serialized = JSON.stringify(nextRecords);
     if (stored && stored !== serialized) {
-      localStorage.setItem(auditRecordStorageKey, serialized);
+      try {
+        localStorage.setItem(auditRecordStorageKey, serialized);
+      } catch {
+        // Existing valid records stay readable when storage cleanup cannot be persisted.
+      }
     }
     return nextRecords;
   } catch {
@@ -6210,10 +6239,8 @@ function loadAuditRecords() {
   }
 }
 
-function persistAuditRecords(records) {
-  const nextRecords = records.filter(Boolean).map(sanitizeAuditRecord).slice(0, 100);
-  localStorage.setItem(auditRecordStorageKey, JSON.stringify(nextRecords));
-  return nextRecords;
+function persistAuditRecords(records, options = {}) {
+  return persistAuditRecordSet(localStorage, auditRecordStorageKey, records, options);
 }
 
 function rememberConnection(request, setRecentConnections) {

@@ -6,6 +6,7 @@ import {
   resolveReplayEventTime,
   createAuditEvent,
   parseAsciinemaCast,
+  persistAuditRecordSet,
   renderCastFrame,
   renderReplayFrame,
   redactSensitive,
@@ -148,3 +149,69 @@ assert.equal(resolveReplayEventTime(parsed.events, 0.2, 'next'), 1.5);
 assert.equal(resolveReplayEventTime(parsed.events, 1.5, 'previous'), 0);
 assert.equal(resolveReplayEventTime(parsed.events, 2, 'next'), 1.5);
 assert.equal(resolveReplayEventTime([], 2, 'previous'), 0);
+
+const quotaRecords = [
+  { id: 'new', title: 'New', cast: 'n'.repeat(80) },
+  { id: 'middle', title: 'Middle', cast: 'm'.repeat(40) },
+  { id: 'old', title: 'Old', cast: 'o'.repeat(40) },
+];
+const twoRecordLimit = JSON.stringify(quotaRecords.slice(0, 2).map(sanitizeAuditRecord)).length;
+const quotaStorage = createLengthLimitedStorage(twoRecordLimit);
+const quotaResult = persistAuditRecordSet(quotaStorage, 'audit', quotaRecords);
+assert.equal(quotaResult.persisted, true);
+assert.equal(quotaResult.evictedCount, 1);
+assert.deepEqual(quotaResult.records.map((record) => record.id), ['new', 'middle']);
+
+const manyRecords = Array.from({ length: 100 }, (_, index) => ({
+  id: `record-${index}`,
+  title: `Record ${index}`,
+  cast: 'x'.repeat(20),
+}));
+const boundedStorage = createLengthLimitedStorage(
+  JSON.stringify(manyRecords.slice(0, 37).map(sanitizeAuditRecord)).length,
+);
+const boundedResult = persistAuditRecordSet(boundedStorage, 'audit', manyRecords);
+assert.equal(boundedResult.records.length, 37);
+assert.ok(boundedStorage.writeCount() <= 7, 'quota fallback should use bounded write attempts');
+
+const existingRecord = { id: 'existing', title: 'Existing', cast: 'small' };
+const oversizedRecord = { id: 'oversized', title: 'Oversized', cast: 'x'.repeat(500) };
+const fallbackStorage = createLengthLimitedStorage(JSON.stringify([sanitizeAuditRecord(existingRecord)]).length);
+fallbackStorage.setItem('audit', JSON.stringify([sanitizeAuditRecord(existingRecord)]));
+const fallbackResult = persistAuditRecordSet(
+  fallbackStorage,
+  'audit',
+  [oversizedRecord, existingRecord],
+  { preferredId: 'oversized' },
+);
+assert.equal(fallbackResult.persisted, true);
+assert.equal(fallbackResult.preferredStored, false);
+assert.deepEqual(fallbackResult.records.map((record) => record.id), ['existing']);
+
+const unavailableStorage = {
+  getItem: () => JSON.stringify([sanitizeAuditRecord(existingRecord)]),
+  setItem: () => { throw new Error('storage unavailable'); },
+};
+const unavailableResult = persistAuditRecordSet(
+  unavailableStorage,
+  'audit',
+  [{ id: 'replacement', title: 'Replacement' }],
+  { preferredId: 'replacement' },
+);
+assert.equal(unavailableResult.persisted, false);
+assert.equal(unavailableResult.preferredStored, false);
+assert.deepEqual(unavailableResult.records.map((record) => record.id), ['existing']);
+
+function createLengthLimitedStorage(maxLength) {
+  const values = new Map();
+  let writes = 0;
+  return {
+    getItem: (key) => values.get(key) || null,
+    setItem: (key, value) => {
+      writes += 1;
+      if (String(value).length > maxLength) throw new Error('quota exceeded');
+      values.set(key, String(value));
+    },
+    writeCount: () => writes,
+  };
+}

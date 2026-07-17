@@ -611,5 +611,9 @@
   "message.transcriptExported": "会话记录已导出",
   "message.auditRecordSaved": "审计记录已保存",
   "message.auditRecordDeleted": "审计记录已删除",
-  "message.auditRecordsCleared": "审计记录已清空"
+  "message.auditRecordsCleared": "审计记录已清空",
+  "message.auditRecordStorageFailed": "录屏记录未能保存",
+  "message.auditRecordStorageFailedHint": "审计存储不可用或空间已满。会话仍可正常关闭，请导出或删除旧录屏后重试。",
+  "message.auditRecordsPruned": "已清理 {count} 条较早的审计记录以腾出空间",
+  "message.auditStorageUpdateFailed": "无法更新审计存储"
 }
