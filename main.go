@@ -48,6 +48,7 @@ func main() {
 	terminal.RegisterBuiltInProviders(sessionManager)
 	tunnelAPI := tunnel.NewAPI()
 	extensionAPI := extensions.NewAPI()
+	fileAPI := files.NewDesktopAPI(extensionAPI, func() context.Context { return appCtx })
 
 	// Create application with options
 	var err = wails.Run(&options.App{
@@ -85,7 +86,7 @@ func main() {
 		Bind: []interface{}{
 			session.NewAPI(sessionManager),
 			desktop.NewAPI(),
-			files.NewAPI(extensionAPI),
+			fileAPI,
 			extensionAPI,
 			credentials.NewAPI(),
 			terminal.NewAPI(),

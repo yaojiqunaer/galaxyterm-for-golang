@@ -239,7 +239,7 @@ An extension can contribute terminal providers, file providers, or both. Existin
       "type": "s3",
       "protocol": "s3",
       "nameKey": "extension.s3.name",
-      "capabilities": ["list", "stat", "read", "write", "mkdir", "rename", "delete"],
+      "capabilities": ["list", "stat", "read", "write", "upload", "download", "mkdir", "rename", "delete"],
       "authMethods": ["accessKey", "credentialProcess"]
     }
   ]

@@ -6,8 +6,12 @@ export function Mkdir(arg1:any):Promise<void>;
 
 export function Delete(arg1:any):Promise<void>;
 
+export function Download(arg1:any, arg2:string):Promise<any>;
+
 export function ReadFile(arg1:any):Promise<string>;
 
 export function Rename(arg1:any):Promise<void>;
+
+export function Upload(arg1:any):Promise<any>;
 
 export function WriteFile(arg1:any):Promise<void>;

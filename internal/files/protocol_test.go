@@ -31,6 +31,24 @@ func TestAPIRejectsUnsupportedProviderCapabilityBeforeExecution(t *testing.T) {
 	}
 }
 
+func TestTransferOperationsRequireExplicitCapabilities(t *testing.T) {
+	api := NewAPI(stubProviderResolver{runtime: extensions.FileProviderRuntime{
+		Executable: filepath.Join(t.TempDir(), "must-not-run"),
+		Provider: extensions.FileProviderManifest{
+			Type: "sftp", Capabilities: []string{"read", "write"},
+		},
+	}})
+	for _, operation := range []string{"upload", "download"} {
+		err := api.invoke(operation, FileOperationRequest{
+			ProviderType: "sftp",
+			Path:         "/payload.bin",
+		}, nil)
+		if !errors.Is(err, ErrUnsupportedCapability) {
+			t.Fatalf("%s error = %v, want ErrUnsupportedCapability", operation, err)
+		}
+	}
+}
+
 func TestAPIRequiresInstalledProviderAndProviderType(t *testing.T) {
 	api := NewAPI(stubProviderResolver{err: errors.New("missing")})
 	if _, err := api.List(FileOperationRequest{}); !errors.Is(err, ErrProviderTypeRequired) {

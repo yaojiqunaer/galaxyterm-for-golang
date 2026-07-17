@@ -1,10 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"io"
 	"io/fs"
 	"os"
+	"path"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"galaxyterm/internal/extensions"
@@ -96,6 +101,119 @@ func TestNormalizeRequestAcceptsPrivateKeyAndValidatesMutationPaths(t *testing.T
 		t.Fatal("delete without path returned nil error")
 	}
 }
+
+func TestNormalizeRequestRequiresAbsoluteLocalPathForTransfers(t *testing.T) {
+	base := protocolRequest{
+		APIVersion: "v1", RequestID: "request-1", ProviderType: "sftp", Operation: "upload",
+		Config: map[string]any{"host": "example.com"},
+		Auth:   map[string]any{"username": "deploy", "authType": "password", "password": "secret"},
+		Path:   "/incoming/payload.bin",
+	}
+	if _, err := normalizeRequest(base); err == nil {
+		t.Fatal("upload without localPath returned nil error")
+	}
+	base.LocalPath = "relative.bin"
+	if _, err := normalizeRequest(base); err == nil {
+		t.Fatal("upload with relative localPath returned nil error")
+	}
+	base.LocalPath = filepath.Join(t.TempDir(), "payload.bin")
+	normalized, err := normalizeRequest(base)
+	if err != nil || normalized.LocalPath != base.LocalPath {
+		t.Fatalf("normalized transfer = %#v, %v", normalized, err)
+	}
+}
+
+func TestFileTransferOperationsStreamBinaryContent(t *testing.T) {
+	sourcePath := filepath.Join(t.TempDir(), "source.bin")
+	payload := []byte{0x00, 0x01, 0x80, 0xff}
+	if err := os.WriteFile(sourcePath, payload, 0o600); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	var uploaded bytes.Buffer
+	var createdPath string
+	var renamedFrom string
+	var renamedTo string
+	ops := transferOperations{
+		mkdirAll: func(string) error { return nil },
+		createRemote: func(name string) (io.WriteCloser, error) {
+			createdPath = name
+			return nopWriteCloser{Writer: &uploaded}, nil
+		},
+		renameRemote: func(source, destination string) error {
+			renamedFrom = source
+			renamedTo = destination
+			return nil
+		},
+		removeRemote: func(string) error { return nil },
+	}
+	if err := uploadLocalFile(ops, "/remote/source.bin", sourcePath); err != nil {
+		t.Fatalf("uploadLocalFile returned error: %v", err)
+	}
+	if path.Dir(createdPath) != "/remote" || !strings.Contains(path.Base(createdPath), "galaxyterm-upload") {
+		t.Fatalf("temporary upload path = %q", createdPath)
+	}
+	if renamedFrom != createdPath || renamedTo != "/remote/source.bin" || !bytes.Equal(uploaded.Bytes(), payload) {
+		t.Fatalf("uploaded path/content = %q -> %q, %v", renamedFrom, renamedTo, uploaded.Bytes())
+	}
+
+	destinationPath := filepath.Join(t.TempDir(), "destination.bin")
+	ops = transferOperations{
+		openRemote: func(name string) (io.ReadCloser, error) {
+			if name != "/remote/source.bin" {
+				t.Fatalf("remote open path = %q", name)
+			}
+			return io.NopCloser(bytes.NewReader(payload)), nil
+		},
+	}
+	if err := downloadLocalFile(ops, "/remote/source.bin", destinationPath); err != nil {
+		t.Fatalf("downloadLocalFile returned error: %v", err)
+	}
+	downloaded, err := os.ReadFile(destinationPath)
+	if err != nil || !bytes.Equal(downloaded, payload) {
+		t.Fatalf("downloaded content = %v, %v", downloaded, err)
+	}
+}
+
+func TestUploadRemovesRemoteStagingFileWhenStreamingFails(t *testing.T) {
+	sourcePath := filepath.Join(t.TempDir(), "source.bin")
+	if err := os.WriteFile(sourcePath, []byte("payload"), 0o600); err != nil {
+		t.Fatalf("write source: %v", err)
+	}
+	var stagedPath string
+	var removedPath string
+	ops := transferOperations{
+		mkdirAll: func(string) error { return nil },
+		createRemote: func(name string) (io.WriteCloser, error) {
+			stagedPath = name
+			return failingWriteCloser{}, nil
+		},
+		renameRemote: func(string, string) error {
+			t.Fatal("rename called after failed upload")
+			return nil
+		},
+		removeRemote: func(name string) error {
+			removedPath = name
+			return nil
+		},
+	}
+	if err := uploadLocalFile(ops, "/remote/source.bin", sourcePath); err == nil {
+		t.Fatal("uploadLocalFile returned nil error for failed stream")
+	}
+	if stagedPath == "" || removedPath != stagedPath {
+		t.Fatalf("staged/removed paths = %q, %q", stagedPath, removedPath)
+	}
+}
+
+type nopWriteCloser struct {
+	io.Writer
+}
+
+func (nopWriteCloser) Close() error { return nil }
+
+type failingWriteCloser struct{}
+
+func (failingWriteCloser) Write([]byte) (int, error) { return 0, errors.New("write failed") }
+func (failingWriteCloser) Close() error              { return nil }
 
 func TestHandleRequestReturnsStructuredValidationAndOperationErrors(t *testing.T) {
 	response := handleRequest(protocolRequest{RequestID: "request-1"})

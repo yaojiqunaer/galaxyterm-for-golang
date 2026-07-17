@@ -121,6 +121,8 @@ export function buildRemoteFileActions(entry = {}, capabilities = []) {
       key: supported.has('write') ? 'edit' : 'view',
       labelKey: supported.has('write') ? 'action.edit' : 'action.view',
     });
+  }
+  if (!entry.isDir && supported.has('download')) {
     actions.push({ key: 'download', labelKey: 'action.download' });
   }
   if (supported.has('rename')) {

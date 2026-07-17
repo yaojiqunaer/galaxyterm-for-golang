@@ -17,6 +17,7 @@ type protocolRequest struct {
 	Path            string         `json:"path,omitempty"`
 	DestinationPath string         `json:"destinationPath,omitempty"`
 	Content         string         `json:"content,omitempty"`
+	LocalPath       string         `json:"localPath,omitempty"`
 }
 
 type protocolResponse struct {
@@ -46,6 +47,7 @@ type normalizedRequest struct {
 	Path            string
 	DestinationPath string
 	Content         string
+	LocalPath       string
 }
 
 type fileEntry struct {

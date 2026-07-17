@@ -275,6 +275,11 @@ assert.ok(
   'remote files must resolve installed file providers and hide unsupported operations by capability',
 );
 assert.ok(
+  source.includes("fileProviderSupports(selectedFileProvider, 'upload')")
+    && source.includes("fileProviderSupports(selectedFileProvider, 'download')"),
+  'native file transfers must be negotiated independently from text read and write capabilities',
+);
+assert.ok(
   source.includes('buildRemoteFileActions(entry, selectedFileProvider.capabilities)')
     && source.includes('await FilesAPI.Rename')
     && source.includes('const confirmDeleteRemoteEntry = (entry) =>')
@@ -288,6 +293,13 @@ assert.ok(
     && source.includes("t('file.visibleCount'")
     && source.includes("fileView.filtered ? 'file.emptyFilteredTitle' : 'empty.noFiles'"),
   'remote files must support provider-neutral filtering, sorting, result counts, and keyboard search focus',
+);
+assert.ok(
+  source.includes('await FilesAPI.Upload(req)')
+    && source.includes('await FilesAPI.Download(req, entry.name)')
+    && source.includes("t('action.newTextFile')")
+    && !source.includes('new Blob([content], { type: \'application/octet-stream\' })'),
+  'remote files must use native binary transfers while retaining text-file creation as a distinct action',
 );
 assert.ok(
   source.includes("selectedFileProvider.protocol === 'sftp'")

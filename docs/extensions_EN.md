@@ -6,11 +6,22 @@ The GalaxyTerm core includes local terminals and SSH. SFTP, FTP/FTPS, S3, Kubern
 
 ## File Provider Capabilities
 
-The remote-file workspace derives every available action from `fileProviders[].capabilities`; it contains no protocol-specific action branches. `list` enables directory browsing, `read` enables viewing and downloads, `write` enables editing and uploads, while `mkdir`, `rename`, and `delete` control their matching operations. A provider with `read` but no `write` opens files read-only. Delete actions require confirmation by default.
+The remote-file workspace derives every available action from `fileProviders[].capabilities`; it contains no protocol-specific action branches. `list` enables directory browsing; `read` and `write` control size-limited text viewing and editing; `upload` and `download` control native streamed transfers; and `mkdir`, `rename`, and `delete` control their matching operations. A provider with `read` but no `write` opens files read-only. Delete actions require confirmation by default. Transfer capabilities must be declared explicitly, so older text-only providers never receive the new operations.
 
 Every file provider automatically receives current-directory name/path search, directory-first ordering, and Name, Recently modified, and Size sort modes.
 
 New FTP, S3, WebDAV, and similar providers only implement the `stdio-json-v1` operations and declare their actual capabilities. They do not modify the core file list. Object-store operations that are not supported should be omitted from the manifest so the corresponding UI stays hidden.
+
+## Binary Transfer Contract
+
+Text viewing and editing continue to use `read`, `write`, and the size-limited JSON `content` field. Regular uploads and downloads use separate streamed operations, so binary content never enters the WebView or a single JSON message:
+
+- `upload` requires an explicit `upload` capability. `path` is the remote destination and `localPath` is the absolute path of a private temporary file staged by the host.
+- `download` requires an explicit `download` capability. `path` is the remote source and `localPath` is the absolute path of a private temporary file created by the host.
+- Providers must copy with a bounded streaming buffer and must not place file content in the response. Return an empty result or transfer metadata only.
+- `localPath` is scoped to one request. Providers must not persist or log it as user configuration. The host removes its temporary directory after success, failure, or cancellation.
+
+GalaxyTerm uses native operating-system open/save dialogs. Cancellation does not invoke the provider. Downloads are staged first and committed to the selected destination only after the provider completes. FTP, S3, WebDAV, and future extensions can reuse the same operations without protocol-specific UI.
 
 ## Online Installation
 
@@ -40,7 +51,7 @@ Upload `.gtx` packages and an index named `galaxyterm-index.json` to each Releas
       "manifest": {
         "id": "galaxyterm-extension-sftp",
         "name": "SFTP",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "apiVersion": "v1",
         "description": "SFTP file provider for GalaxyTerm",
         "runtime": {
@@ -51,7 +62,7 @@ Upload `.gtx` packages and an index named `galaxyterm-index.json` to each Releas
           {
             "type": "sftp",
             "protocol": "sftp",
-            "capabilities": ["list", "stat", "read", "write", "mkdir", "rename", "delete"],
+            "capabilities": ["list", "stat", "read", "write", "upload", "download", "mkdir", "rename", "delete"],
             "authMethods": ["password", "privateKey"]
           }
         ],
@@ -61,13 +72,13 @@ Upload `.gtx` packages and an index named `galaxyterm-index.json` to each Releas
         {
           "os": "darwin",
           "arch": "arm64",
-          "url": "galaxyterm-extension-sftp_0.1.0_darwin_arm64.gtx",
+          "url": "galaxyterm-extension-sftp_0.2.0_darwin_arm64.gtx",
           "sha256": "<64-character hexadecimal SHA-256>"
         },
         {
           "os": "linux",
           "arch": "amd64",
-          "url": "galaxyterm-extension-sftp_0.1.0_linux_amd64.gtx",
+          "url": "galaxyterm-extension-sftp_0.2.0_linux_amd64.gtx",
           "sha256": "<64-character hexadecimal SHA-256>"
         }
       ]

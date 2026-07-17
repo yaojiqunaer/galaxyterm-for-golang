@@ -1,6 +1,7 @@
 package files
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path"
@@ -11,6 +12,8 @@ import (
 )
 
 const defaultProviderTimeout = 45 * time.Second
+
+const defaultTransferTimeout = 30 * time.Minute
 
 var (
 	ErrMismatchedResponse    = errors.New("file provider response id does not match request")
@@ -24,8 +27,11 @@ type ProviderResolver interface {
 }
 
 type API struct {
-	resolver ProviderResolver
-	timeout  time.Duration
+	resolver        ProviderResolver
+	timeout         time.Duration
+	transferTimeout time.Duration
+	contextProvider func() context.Context
+	dialogs         fileDialogs
 }
 
 func NewAPI(resolvers ...ProviderResolver) *API {
@@ -33,7 +39,18 @@ func NewAPI(resolvers ...ProviderResolver) *API {
 	if len(resolvers) > 0 {
 		resolver = resolvers[0]
 	}
-	return &API{resolver: resolver, timeout: defaultProviderTimeout}
+	return &API{
+		resolver:        resolver,
+		timeout:         defaultProviderTimeout,
+		transferTimeout: defaultTransferTimeout,
+	}
+}
+
+func NewDesktopAPI(resolver ProviderResolver, contextProvider func() context.Context) *API {
+	api := NewAPI(resolver)
+	api.contextProvider = contextProvider
+	api.dialogs = wailsFileDialogs{}
+	return api
 }
 
 type FileOperationRequest struct {
@@ -43,6 +60,7 @@ type FileOperationRequest struct {
 	Path            string         `json:"path,omitempty"`
 	DestinationPath string         `json:"destinationPath,omitempty"`
 	Content         string         `json:"content,omitempty"`
+	localPath       string
 }
 
 type FileEntry struct {
@@ -111,6 +129,10 @@ func (api *API) Delete(request FileOperationRequest) error {
 }
 
 func (api *API) invoke(operation string, request FileOperationRequest, result any) error {
+	return api.invokeWithTimeout(operation, request, result, api.timeout)
+}
+
+func (api *API) invokeWithTimeout(operation string, request FileOperationRequest, result any, timeout time.Duration) error {
 	normalized, err := normalizeFileOperation(operation, request)
 	if err != nil {
 		return err
@@ -125,7 +147,7 @@ func (api *API) invoke(operation string, request FileOperationRequest, result an
 	if !hasCapability(runtimeInfo.Provider.Capabilities, operation) {
 		return fmt.Errorf("%w: %s", ErrUnsupportedCapability, operation)
 	}
-	return runSidecar(runtimeInfo, operation, normalized, result, api.timeout)
+	return runSidecar(runtimeInfo, operation, normalized, result, timeout)
 }
 
 func normalizeFileOperation(operation string, request FileOperationRequest) (FileOperationRequest, error) {

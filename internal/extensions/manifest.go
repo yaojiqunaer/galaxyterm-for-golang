@@ -14,13 +14,15 @@ var extensionIdentifierPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]
 var extensionFieldKeyPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9._-]*$`)
 
 var fileProviderCapabilities = map[string]struct{}{
-	"delete": {},
-	"list":   {},
-	"mkdir":  {},
-	"read":   {},
-	"rename": {},
-	"stat":   {},
-	"write":  {},
+	"delete":   {},
+	"download": {},
+	"list":     {},
+	"mkdir":    {},
+	"read":     {},
+	"rename":   {},
+	"stat":     {},
+	"upload":   {},
+	"write":    {},
 }
 
 var fileProviderFieldTypes = map[string]struct{}{

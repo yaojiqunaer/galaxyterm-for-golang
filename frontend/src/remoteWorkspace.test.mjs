@@ -153,7 +153,7 @@ assert.deepEqual(buildRemoteFileActions({ isDir: true }, ['list', 'rename', 'del
   { key: 'rename', labelKey: 'action.rename' },
   { danger: true, key: 'delete', labelKey: 'action.delete' },
 ]);
-assert.deepEqual(buildRemoteFileActions({ isDir: false }, ['read', 'write', 'rename', 'delete']), [
+assert.deepEqual(buildRemoteFileActions({ isDir: false }, ['read', 'write', 'download', 'rename', 'delete']), [
   { key: 'edit', labelKey: 'action.edit' },
   { key: 'download', labelKey: 'action.download' },
   { key: 'rename', labelKey: 'action.rename' },
@@ -161,6 +161,8 @@ assert.deepEqual(buildRemoteFileActions({ isDir: false }, ['read', 'write', 'ren
 ]);
 assert.deepEqual(buildRemoteFileActions({ isDir: false }, ['read']), [
   { key: 'view', labelKey: 'action.view' },
+]);
+assert.deepEqual(buildRemoteFileActions({ isDir: false }, ['download']), [
   { key: 'download', labelKey: 'action.download' },
 ]);
 assert.deepEqual(buildRemoteFileActions({ isDir: false }, []), []);

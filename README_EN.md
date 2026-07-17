@@ -22,7 +22,7 @@ Provides secure and reliable remote ssh access
 
 <details>
 <summary><b>🔗 Remote file access </b></summary>
-Select a saved SSH connection to browse, edit, upload, and download remote files without re-entering the host, port, or username. System credentials are resolved only when an operation runs.
+Select a saved SSH connection to browse, edit, upload, and download remote files. Binary and large files use native file dialogs and streamed transfers instead of passing through WebView text memory. Hosts, ports, and usernames do not need to be re-entered, and system credentials are resolved only when an operation runs.
 </details>
 
 <details>
@@ -57,7 +57,7 @@ Interactive terminals show the current command, live duration, and execution sta
 
 ## Architecture
 
-The core contains the local terminal, SSH, session management, shared file workspace, credentials, and extension host. Terminal and file-protocol extensions declare `providers` and `fileProviders` separately and can be installed online from GitHub Releases or offline from `.gtx` packages. File providers advertise capabilities such as `list`, `read`, `write`, `mkdir`, `rename`, and `delete`, then contribute connection forms through `configFields` and `authFields`; the workspace does not need protocol-specific UI code and only exposes fields and operations supported by the active provider.
+The core contains the local terminal, SSH, session management, shared file workspace, credentials, and extension host. Terminal and file-protocol extensions declare `providers` and `fileProviders` separately and can be installed online from GitHub Releases or offline from `.gtx` packages. File providers advertise capabilities such as `list`, `read`, `write`, `upload`, `download`, `mkdir`, `rename`, and `delete`, then contribute connection forms through `configFields` and `authFields`; the workspace does not need protocol-specific UI code and only exposes fields and operations supported by the active provider.
 
 See [Extension Distribution](docs/extensions_EN.md) for extension sources, `galaxyterm-index.json`, and the GitHub Release format.
 

@@ -14,12 +14,20 @@ export function Delete(arg1) {
   return callWails(['files', 'API', 'Delete'], arg1);
 }
 
+export function Download(arg1, arg2) {
+  return callWails(['files', 'API', 'Download'], arg1, arg2);
+}
+
 export function ReadFile(arg1) {
   return callWails(['files', 'API', 'ReadFile'], arg1);
 }
 
 export function Rename(arg1) {
   return callWails(['files', 'API', 'Rename'], arg1);
+}
+
+export function Upload(arg1) {
+  return callWails(['files', 'API', 'Upload'], arg1);
 }
 
 export function WriteFile(arg1) {

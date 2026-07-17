@@ -6,11 +6,22 @@ GalaxyTerm 核心包内置本地终端与 SSH。SFTP、FTP/FTPS、S3、Kubernete
 
 ## 文件 Provider 能力
 
-远程文件工作区只根据 `fileProviders[].capabilities` 展示可用操作，不包含协议专用分支。`list` 控制目录浏览，`read` 控制查看与下载，`write` 控制编辑与上传，`mkdir`、`rename`、`delete` 分别控制新建目录、重命名和删除。只有 `read` 而没有 `write` 时，文件以只读方式打开；删除操作默认需要二次确认。
+远程文件工作区只根据 `fileProviders[].capabilities` 展示可用操作，不包含协议专用分支。`list` 控制目录浏览，`read`、`write` 控制受限文本查看与编辑，`upload`、`download` 控制原生流式传输，`mkdir`、`rename`、`delete` 分别控制新建目录、重命名和删除。只有 `read` 而没有 `write` 时，文件以只读方式打开；删除操作默认需要二次确认。传输能力必须显式声明，旧版只支持文本读写的扩展不会收到新增操作。
 
 所有文件 Provider 自动获得当前目录名称/路径搜索、目录优先排序，以及按名称、最近修改、大小切换排序的统一浏览体验。
 
 FTP、S3、WebDAV 等新协议只需实现 `stdio-json-v1` 操作并声明真实能力，无需修改核心文件列表。对象存储不支持的操作应从 manifest 中省略，界面会自动隐藏对应入口。
+
+## 二进制传输协议
+
+文本查看与编辑继续使用 `read`、`write` 和受限的 JSON `content` 字段。常规文件上传、下载使用独立的流式操作，二进制内容不会进入 WebView 或单条 JSON 消息：
+
+- `upload` 需要 Provider 显式声明 `upload` 能力。`path` 是远程目标，`localPath` 是宿主创建并填充的私有临时文件绝对路径。
+- `download` 需要 Provider 显式声明 `download` 能力。`path` 是远程来源，`localPath` 是宿主预创建的私有临时文件绝对路径。
+- Provider 必须使用有界缓冲流式复制，不得把文件内容写入响应；完成后只返回空结果或传输元数据。
+- `localPath` 只在当前请求中使用，不得保存、记录或当作用户配置。宿主会在成功、失败和取消后清理临时目录。
+
+GalaxyTerm 使用系统原生打开/保存对话框。用户取消时不会调用 Provider；下载先写入临时文件，完整成功后才提交到用户选择的位置。FTP、S3、WebDAV 等扩展可复用同一操作，无需新增协议专用 UI。
 
 ## 在线安装
 
@@ -40,7 +51,7 @@ https://github.com/<owner>/<repo>/releases/latest/download/galaxyterm-index.json
       "manifest": {
         "id": "galaxyterm-extension-sftp",
         "name": "SFTP",
-        "version": "0.1.0",
+        "version": "0.2.0",
         "apiVersion": "v1",
         "description": "SFTP file provider for GalaxyTerm",
         "runtime": {
@@ -51,7 +62,7 @@ https://github.com/<owner>/<repo>/releases/latest/download/galaxyterm-index.json
           {
             "type": "sftp",
             "protocol": "sftp",
-            "capabilities": ["list", "stat", "read", "write", "mkdir", "rename", "delete"],
+            "capabilities": ["list", "stat", "read", "write", "upload", "download", "mkdir", "rename", "delete"],
             "authMethods": ["password", "privateKey"]
           }
         ],
@@ -61,13 +72,13 @@ https://github.com/<owner>/<repo>/releases/latest/download/galaxyterm-index.json
         {
           "os": "darwin",
           "arch": "arm64",
-          "url": "galaxyterm-extension-sftp_0.1.0_darwin_arm64.gtx",
+          "url": "galaxyterm-extension-sftp_0.2.0_darwin_arm64.gtx",
           "sha256": "<64 位十六进制 SHA-256>"
         },
         {
           "os": "linux",
           "arch": "amd64",
-          "url": "galaxyterm-extension-sftp_0.1.0_linux_amd64.gtx",
+          "url": "galaxyterm-extension-sftp_0.2.0_linux_amd64.gtx",
           "sha256": "<64 位十六进制 SHA-256>"
         }
       ]

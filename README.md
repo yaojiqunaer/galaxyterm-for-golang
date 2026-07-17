@@ -21,7 +21,7 @@
 
 <details>
   <summary><b>🔗 远程文件访问</b></summary>
-  支持直接选择已保存的 SSH 连接浏览、编辑、上传和下载远程文件；无需重复填写 Host、端口和账号，系统凭据仅在执行操作时按需解析。
+  支持直接选择已保存的 SSH 连接浏览、编辑、上传和下载远程文件；二进制和大文件使用原生文件选择器与流式传输，不经过 WebView 文本内存。无需重复填写 Host、端口和账号，系统凭据仅在执行操作时按需解析。
 </details>
 
 <details>
@@ -56,7 +56,7 @@
 
 ## 架构
 
-核心程序只保留本地终端、SSH、会话管理、通用文件工作区、凭据和扩展宿主。终端扩展与文件协议扩展分别声明 `providers` 和 `fileProviders`，可通过 GitHub Releases 在线获取或使用 `.gtx` 包离线安装。文件协议扩展支持按能力声明 `list`、`read`、`write`、`mkdir`、`rename`、`delete` 等操作，并通过 `configFields`、`authFields` 贡献连接表单；界面无需识别具体协议，只展示当前 Provider 实际支持的字段和命令。
+核心程序只保留本地终端、SSH、会话管理、通用文件工作区、凭据和扩展宿主。终端扩展与文件协议扩展分别声明 `providers` 和 `fileProviders`，可通过 GitHub Releases 在线获取或使用 `.gtx` 包离线安装。文件协议扩展支持按能力声明 `list`、`read`、`write`、`upload`、`download`、`mkdir`、`rename`、`delete` 等操作，并通过 `configFields`、`authFields` 贡献连接表单；界面无需识别具体协议，只展示当前 Provider 实际支持的字段和命令。
 
 扩展源、`galaxyterm-index.json` 与 GitHub Release 发布格式见 [扩展分发文档](docs/extensions.md)。
 

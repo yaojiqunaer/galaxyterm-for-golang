@@ -1,7 +1,7 @@
 {
   "id": "galaxyterm-extension-sftp",
   "name": "SFTP",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "apiVersion": "v1",
   "description": "Official SFTP file provider for GalaxyTerm",
   "runtime": {
@@ -14,7 +14,7 @@
       "protocol": "sftp",
       "nameKey": "extension.sftp",
       "description": "Browse and manage remote files over SSH File Transfer Protocol",
-      "capabilities": ["list", "stat", "read", "write", "mkdir", "rename", "delete"],
+      "capabilities": ["list", "stat", "read", "write", "upload", "download", "mkdir", "rename", "delete"],
       "authMethods": ["password", "privateKey"],
       "configFields": [
         {

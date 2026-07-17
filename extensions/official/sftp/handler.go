@@ -20,13 +20,23 @@ import (
 const maxTextFileSize = 12 << 20
 
 var supportedOperations = map[string]struct{}{
-	"delete": {},
-	"list":   {},
-	"mkdir":  {},
-	"read":   {},
-	"rename": {},
-	"stat":   {},
-	"write":  {},
+	"delete":   {},
+	"download": {},
+	"list":     {},
+	"mkdir":    {},
+	"read":     {},
+	"rename":   {},
+	"stat":     {},
+	"upload":   {},
+	"write":    {},
+}
+
+type transferOperations struct {
+	mkdirAll     func(string) error
+	openRemote   func(string) (io.ReadCloser, error)
+	createRemote func(string) (io.WriteCloser, error)
+	renameRemote func(string, string) error
+	removeRemote func(string) error
 }
 
 func handleRequest(request protocolRequest) protocolResponse {
@@ -98,6 +108,15 @@ func normalizeRequest(request protocolRequest) (normalizedRequest, error) {
 	if request.Operation == "rename" && destinationPath == "" {
 		return normalizedRequest{}, &requestError{code: "invalid_request", message: "missing required field: destinationPath"}
 	}
+	localPath := strings.TrimSpace(request.LocalPath)
+	if request.Operation == "upload" || request.Operation == "download" {
+		if localPath == "" {
+			return normalizedRequest{}, &requestError{code: "invalid_request", message: "missing required field: localPath"}
+		}
+		if !filepath.IsAbs(localPath) {
+			return normalizedRequest{}, &requestError{code: "invalid_request", message: "localPath must be absolute"}
+		}
+	}
 	hostKeyPolicy := stringValue(request.Config, "hostKeyPolicy")
 	if hostKeyPolicy == "" {
 		hostKeyPolicy = "accept-new"
@@ -120,6 +139,7 @@ func normalizeRequest(request protocolRequest) (normalizedRequest, error) {
 		Path:            operationPath,
 		DestinationPath: destinationPath,
 		Content:         request.Content,
+		LocalPath:       localPath,
 	}, nil
 }
 
@@ -130,6 +150,7 @@ func executeOperation(request normalizedRequest) (any, error) {
 	}
 	defer sshClient.Close()
 	defer sftpClient.Close()
+	transferOps := newTransferOperations(sftpClient)
 
 	switch request.Operation {
 	case "list":
@@ -152,6 +173,10 @@ func executeOperation(request normalizedRequest) (any, error) {
 		return readTextFile(sftpClient, request.Path)
 	case "write":
 		return map[string]any{}, writeTextFile(sftpClient, request.Path, request.Content)
+	case "upload":
+		return map[string]any{}, uploadLocalFile(transferOps, request.Path, request.LocalPath)
+	case "download":
+		return map[string]any{}, downloadLocalFile(transferOps, request.Path, request.LocalPath)
 	case "mkdir":
 		return map[string]any{}, sftpClient.MkdirAll(request.Path)
 	case "rename":
@@ -161,6 +186,92 @@ func executeOperation(request normalizedRequest) (any, error) {
 	default:
 		return nil, &requestError{code: "unsupported_operation", message: "unsupported operation"}
 	}
+}
+
+func newTransferOperations(client *sftp.Client) transferOperations {
+	return transferOperations{
+		mkdirAll: client.MkdirAll,
+		openRemote: func(name string) (io.ReadCloser, error) {
+			return client.Open(name)
+		},
+		createRemote: func(name string) (io.WriteCloser, error) {
+			return client.Create(name)
+		},
+		renameRemote: func(source, destination string) error {
+			if err := client.PosixRename(source, destination); err == nil {
+				return nil
+			}
+			return client.Rename(source, destination)
+		},
+		removeRemote: client.Remove,
+	}
+}
+
+func uploadLocalFile(operations transferOperations, remotePath, localPath string) error {
+	source, err := os.Open(localPath)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+	info, err := source.Stat()
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() {
+		return &requestError{code: "invalid_local_file", message: "local upload source is not a regular file"}
+	}
+	parent := path.Dir(remotePath)
+	if parent != "." && parent != "/" {
+		if err := operations.mkdirAll(parent); err != nil {
+			return err
+		}
+	}
+	temporaryPath := path.Join(parent, fmt.Sprintf(".galaxyterm-upload-%d", time.Now().UnixNano()))
+	destination, err := operations.createRemote(temporaryPath)
+	if err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			_ = operations.removeRemote(temporaryPath)
+		}
+	}()
+	_, copyErr := io.CopyBuffer(destination, source, make([]byte, 128<<10))
+	closeErr := destination.Close()
+	if copyErr != nil {
+		return copyErr
+	}
+	if closeErr != nil {
+		return closeErr
+	}
+	if err := operations.renameRemote(temporaryPath, remotePath); err != nil {
+		return err
+	}
+	committed = true
+	return nil
+}
+
+func downloadLocalFile(operations transferOperations, remotePath, localPath string) error {
+	source, err := operations.openRemote(remotePath)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+	destination, err := os.OpenFile(localPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	_, copyErr := io.CopyBuffer(destination, source, make([]byte, 128<<10))
+	syncErr := destination.Sync()
+	closeErr := destination.Close()
+	if copyErr != nil {
+		return copyErr
+	}
+	if syncErr != nil {
+		return syncErr
+	}
+	return closeErr
 }
 
 func dial(request normalizedRequest) (*ssh.Client, *sftp.Client, error) {

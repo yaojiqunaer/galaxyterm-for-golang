@@ -54,6 +54,7 @@ import {
   HistoryOutlined,
   InfoCircleOutlined,
   ImportOutlined,
+  LoadingOutlined,
   QuestionCircleOutlined,
   LaptopOutlined,
   LeftOutlined,
@@ -69,6 +70,7 @@ import {
   StopOutlined,
   ThunderboltOutlined,
   UpOutlined,
+  UploadOutlined,
   VideoCameraOutlined,
 } from '@ant-design/icons';
 import {
@@ -388,6 +390,7 @@ function App() {
   const [tunnelProfileId, setTunnelProfileId] = useState('');
   const [fileEditorOpen, setFileEditorOpen] = useState(false);
   const [fileEditorLoading, setFileEditorLoading] = useState(false);
+  const [fileTransfer, setFileTransfer] = useState(null);
   const [editingRemoteFile, setEditingRemoteFile] = useState(null);
   const [editingRemoteContent, setEditingRemoteContent] = useState('');
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -3190,25 +3193,42 @@ function App() {
 
   const downloadRemoteFile = async (entry) => {
     if (entry.isDir) return;
-    setFileLoading(true);
+    setFileTransfer({ kind: 'download', name: entry.name });
     try {
       const req = await currentFileRequest();
       req.path = entry.path;
-      const content = await FilesAPI.ReadFile(req);
-      const blob = new Blob([content], { type: 'application/octet-stream' });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = entry.name;
-      anchor.click();
-      URL.revokeObjectURL(url);
-      messageApi.success(t('message.downloadStarted'));
+      const result = await FilesAPI.Download(req, entry.name);
+      if (!result?.canceled) {
+        messageApi.success(t('message.downloadSuccess', { name: result?.fileName || entry.name }));
+      }
     } catch (error) {
-      showOperationError('message.fileListFailed', error, {
+      showOperationError('message.downloadFailed', error, {
         retry: () => downloadRemoteFile(entry),
       });
     } finally {
-      setFileLoading(false);
+      setFileTransfer(null);
+    }
+  };
+
+  const uploadRemoteFile = async () => {
+    const base = fileForm.getFieldValue('path') || '.';
+    try {
+      await fileForm.validateFields();
+    } catch {
+      return;
+    }
+    setFileTransfer({ kind: 'upload', name: '' });
+    try {
+      const req = await currentFileRequest();
+      const result = await FilesAPI.Upload(req);
+      if (!result?.canceled) {
+        messageApi.success(t('message.uploadFileSuccess', { name: result?.fileName || '' }));
+        await loadFiles(base);
+      }
+    } catch (error) {
+      showOperationError('message.uploadFailed', error, { retry: uploadRemoteFile });
+    } finally {
+      setFileTransfer(null);
     }
   };
 
@@ -3252,7 +3272,7 @@ function App() {
     }
   };
 
-  const uploadTextFile = async () => {
+  const createRemoteTextFile = async () => {
     const name = uploadRemoteName.trim();
     if (!name) {
       messageApi.warning(t('validation.required'));
@@ -3270,7 +3290,7 @@ function App() {
       setUploadLocalContent('');
       await loadFiles(base);
     } catch (error) {
-      showOperationError('message.uploadFailed', error, { retry: uploadTextFile });
+      showOperationError('message.uploadFailed', error, { retry: createRemoteTextFile });
     } finally {
       setFileLoading(false);
     }
@@ -3306,13 +3326,16 @@ function App() {
     const canListFiles = fileProviderSupports(selectedFileProvider, 'list');
     const canReadFiles = fileProviderSupports(selectedFileProvider, 'read');
     const canWriteFiles = fileProviderSupports(selectedFileProvider, 'write');
+    const canUploadFiles = fileProviderSupports(selectedFileProvider, 'upload');
+    const canDownloadFiles = fileProviderSupports(selectedFileProvider, 'download');
     const canCreateDirectories = fileProviderSupports(selectedFileProvider, 'mkdir');
     const canDeleteFiles = fileProviderSupports(selectedFileProvider, 'delete');
     const canRenameFiles = fileProviderSupports(selectedFileProvider, 'rename');
+    const fileBusy = fileLoading || Boolean(fileTransfer);
     const runRemoteFileAction = (action, entry) => {
       if (action === 'open') loadFiles(entry.path);
       if (action === 'edit' || action === 'view') openRemoteFileEditor(entry);
-      if (action === 'download') downloadRemoteFile(entry);
+      if (action === 'download' && canDownloadFiles) downloadRemoteFile(entry);
       if (action === 'rename' && canRenameFiles) openRemoteRename(entry);
       if (action === 'delete' && canDeleteFiles) confirmDeleteRemoteEntry(entry);
     };
@@ -3324,8 +3347,8 @@ function App() {
             <Title level={3}>{t('section.remoteFiles')}</Title>
           </div>
           <Space wrap>
-            <Button icon={<ReloadOutlined />} disabled={!canListFiles} onClick={() => loadFiles()} loading={fileLoading}>{t('action.refresh')}</Button>
-            <Button type="primary" disabled={!canListFiles} onClick={() => loadFiles()} loading={fileLoading}>{t('action.open')}</Button>
+            <Button icon={<ReloadOutlined />} disabled={!canListFiles || fileBusy} onClick={() => loadFiles()} loading={fileLoading}>{t('action.refresh')}</Button>
+            <Button type="primary" disabled={!canListFiles || fileBusy} onClick={() => loadFiles()} loading={fileLoading}>{t('action.open')}</Button>
           </Space>
         </div>
         <div className="remote-summary-grid">
@@ -3337,7 +3360,7 @@ function App() {
           <div className="remote-context-panel">
             <Text strong>{t('section.quickConnect')}</Text>
             <Text type="secondary">{t('file.browserHint')}</Text>
-            <Form form={fileForm} layout="vertical" className="remote-context-form" initialValues={{ port: 22, path: '.', profileId: '' }}>
+            <Form form={fileForm} layout="vertical" className="remote-context-form" disabled={fileBusy} initialValues={{ port: 22, path: '.', profileId: '' }}>
               <Form.Item label={t('field.fileProvider')}>
                 <Select
                   value={selectedFileProvider.type}
@@ -3416,16 +3439,34 @@ function App() {
                 {breadcrumbs.map((crumb, index) => (
                   <React.Fragment key={crumb.key}>
                     {index > 0 && <span className="remote-breadcrumb-separator">/</span>}
-                    <button type="button" onClick={() => loadFiles(crumb.path)}>
+                    <button type="button" disabled={fileBusy} onClick={() => loadFiles(crumb.path)}>
                       {crumb.label}
                     </button>
                   </React.Fragment>
                 ))}
               </div>
               <Space wrap>
-                <Button disabled={!canListFiles} onClick={goParent}>{t('action.up')}</Button>
-                {canCreateDirectories && <Button onClick={() => setMkdirOpen(true)}>{t('action.mkdir')}</Button>}
-                {canWriteFiles && <Button onClick={() => setUploadOpen(true)}>{t('action.uploadText')}</Button>}
+                {fileTransfer && (
+                  <Tag className="remote-transfer-status" icon={<LoadingOutlined spin />}>
+                    {fileTransfer.kind === 'upload'
+                      ? t('file.uploading')
+                      : t('file.downloading', { name: fileTransfer.name || '' })}
+                  </Tag>
+                )}
+                <Button disabled={!canListFiles || fileBusy} onClick={goParent}>{t('action.up')}</Button>
+                {canCreateDirectories && <Button disabled={fileBusy} onClick={() => setMkdirOpen(true)}>{t('action.mkdir')}</Button>}
+                {canUploadFiles && (
+                  <Button
+                    type="primary"
+                    icon={<UploadOutlined />}
+                    loading={fileTransfer?.kind === 'upload'}
+                    disabled={fileBusy && fileTransfer?.kind !== 'upload'}
+                    onClick={uploadRemoteFile}
+                  >
+                    {t('action.upload')}
+                  </Button>
+                )}
+                {canWriteFiles && <Button disabled={fileBusy} icon={<FileTextOutlined />} onClick={() => setUploadOpen(true)}>{t('action.newTextFile')}</Button>}
               </Space>
             </div>
             <div className="remote-file-filterbar">
@@ -3493,7 +3534,7 @@ function App() {
                         >
                           <Button
                             aria-label={t('file.entryActions', { name: entry.name })}
-                            disabled={fileLoading || fileEditorLoading}
+                            disabled={fileBusy || fileEditorLoading}
                             icon={<MoreOutlined />}
                             size="small"
                             type="text"
@@ -3504,6 +3545,7 @@ function App() {
                       ),
                     ].filter(Boolean)}
                     onDoubleClick={() => {
+                      if (fileBusy) return;
                       if (entry.isDir && canListFiles) loadFiles(entry.path);
                       if (!entry.isDir && canReadFiles) openRemoteFileEditor(entry);
                     }}
@@ -3578,11 +3620,11 @@ function App() {
         </Form>
       </Drawer>
       <Drawer
-        title={t('action.uploadText')}
+        title={t('action.newTextFile')}
         width={560}
         open={uploadOpen}
         onClose={() => setUploadOpen(false)}
-        extra={<Button type="primary" onClick={uploadTextFile} loading={fileLoading}>{t('action.upload')}</Button>}
+        extra={<Button type="primary" onClick={createRemoteTextFile} loading={fileLoading}>{t('action.create')}</Button>}
       >
         <Form layout="vertical" className="terminal-form">
           <Form.Item label={t('field.name')} required>

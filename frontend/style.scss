@@ -3050,6 +3050,7 @@ code {
 
 .remote-file-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -3060,13 +3061,30 @@ code {
 }
 
 .remote-file-toolbar > div:first-child {
+  flex: 1 1 220px;
   min-width: 0;
+}
+
+.remote-file-toolbar > .ant-space {
+  flex: 0 1 auto;
+  justify-content: flex-end;
 }
 
 .remote-file-toolbar .ant-typography-secondary {
   display: block;
   margin-top: 2px;
   font-size: 12px;
+}
+
+.remote-transfer-status {
+  max-width: 220px;
+  margin-inline-end: 0;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--accent) 36%, var(--border-subtle));
+  background: var(--accent-soft);
+  color: var(--accent);
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .remote-breadcrumbs {
@@ -3093,6 +3111,11 @@ code {
 .remote-breadcrumbs button:hover {
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+.remote-breadcrumbs button:disabled {
+  color: var(--muted);
+  cursor: wait;
 }
 
 .remote-breadcrumb-separator {

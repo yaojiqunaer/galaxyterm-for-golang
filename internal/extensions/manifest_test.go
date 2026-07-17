@@ -30,7 +30,7 @@ func TestValidateManifestAcceptsFileTransferOnlyExtension(t *testing.T) {
 			Type:         "s3",
 			Protocol:     "s3",
 			NameKey:      "extension.s3.name",
-			Capabilities: []string{"list", "read", "write", "delete"},
+			Capabilities: []string{"list", "read", "write", "upload", "download", "delete"},
 			ConfigFields: []FileProviderFieldManifest{
 				{Key: "endpoint", Type: "string", Label: "Endpoint", Required: true},
 				{Key: "port", Type: "number", Label: "Port", Default: float64(443)},

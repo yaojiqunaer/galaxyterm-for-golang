@@ -31,6 +31,7 @@ type sidecarRequest struct {
 	Path            string         `json:"path,omitempty"`
 	DestinationPath string         `json:"destinationPath,omitempty"`
 	Content         string         `json:"content,omitempty"`
+	LocalPath       string         `json:"localPath,omitempty"`
 }
 
 type sidecarResponse struct {
@@ -56,6 +57,7 @@ func runSidecar(
 		Path:            request.Path,
 		DestinationPath: request.DestinationPath,
 		Content:         request.Content,
+		LocalPath:       request.localPath,
 	}
 	payload, err := json.Marshal(message)
 	if err != nil {
