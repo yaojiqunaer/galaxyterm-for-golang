@@ -56,6 +56,8 @@ import {
   InfoCircleOutlined,
   ImportOutlined,
   LoadingOutlined,
+  MenuFoldOutlined,
+  MenuUnfoldOutlined,
   QuestionCircleOutlined,
   LaptopOutlined,
   LeftOutlined,
@@ -148,12 +150,14 @@ import {
   defaultShortcutBindings,
   isCommandShortcut,
   isTerminalInputTarget,
+  normalizeSidebarMode,
   normalizeShortcutModifier,
   normalizeShortcutBindings,
   buildWorkspaceSnapshotSummary,
   normalizeLogLevel,
   resolveSettingsSectionNavigation,
   resolveConfigurableShortcutAction,
+  resolveSidebarCompact,
   shortcutModifierLabel,
   updateShortcutBinding,
 } from './settingsPresentation.js';
@@ -269,6 +273,7 @@ const defaultSettings = {
   fontSize: 14,
   scrollback: 5000,
   interfaceDensity: 'comfortable',
+  sidebarMode: 'auto',
   autoSaveWorkspace: true,
   autoRestoreWorkspace: false,
   confirmDangerousActions: true,
@@ -361,9 +366,7 @@ function App() {
   const [terminalStatuses, setTerminalStatuses] = useState({});
   const [sessionActivity, setSessionActivity] = useState({});
   const [focusMode, setFocusMode] = useState(false);
-  const [sidebarCompact, setSidebarCompact] = useState(() => (
-    typeof window !== 'undefined' && window.matchMedia('(max-width: 991px)').matches
-  ));
+  const sidebarCompact = resolveSidebarCompact(settings.sidebarMode, screens.lg === false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [paletteQuery, setPaletteQuery] = useState('');
   const [paletteActiveIndex, setPaletteActiveIndex] = useState(-1);
@@ -635,6 +638,14 @@ function App() {
         setPaletteOpen(true);
         return;
       }
+      if (configurableShortcutAction === 'toggleSidebar') {
+        event.preventDefault();
+        setSettings((current) => ({
+          ...current,
+          sidebarMode: sidebarCompact ? 'expanded' : 'compact',
+        }));
+        return;
+      }
       if (configurableShortcutAction === 'closeSession') {
         event.preventDefault();
         if (activeKey && selectedNav === 'sessions') confirmRemoveSession(activeKey);
@@ -710,7 +721,7 @@ function App() {
     };
     window.addEventListener('keydown', handleKeydown, true);
     return () => window.removeEventListener('keydown', handleKeydown, true);
-  }, [activeKey, closedSessions, selectedNav, sessions, settings.confirmDangerousActions, settings.shortcutBindings, settings.shortcutModifier]);
+  }, [activeKey, closedSessions, selectedNav, sessions, settings.confirmDangerousActions, settings.shortcutBindings, settings.shortcutModifier, sidebarCompact]);
 
   useEffect(() => {
     if (!activeKey || selectedNav !== 'sessions') return undefined;
@@ -4018,6 +4029,18 @@ function App() {
                 onChange={(value) => setSettings((current) => ({ ...current, interfaceDensity: value }))}
               />
             </Form.Item>
+            <Form.Item label={t('field.sidebarMode')} extra={t('settings.sidebarModeHint')}>
+              <Segmented
+                block
+                value={settings.sidebarMode || defaultSettings.sidebarMode}
+                options={[
+                  { value: 'auto', label: t('sidebar.auto') },
+                  { value: 'expanded', label: t('sidebar.expanded') },
+                  { value: 'compact', label: t('sidebar.compact') },
+                ]}
+                onChange={(value) => setSettings((current) => ({ ...current, sidebarMode: value }))}
+              />
+            </Form.Item>
             <Text type="secondary">{t('settings.languageHint')}</Text>
           </Form>
           </SettingsPanel>
@@ -4926,7 +4949,6 @@ function App() {
         collapsedWidth={68}
         collapsible
         className="workspace-sidebar"
-        onBreakpoint={setSidebarCompact}
         trigger={null}
         width={248}
       >
@@ -5086,6 +5108,19 @@ function App() {
       <Layout className="main-layout">
         <div className="topbar">
           <Space className="topbar-command-group">
+            {!focusMode && (
+              <Tooltip title={t(sidebarCompact ? 'action.expandSidebar' : 'action.collapseSidebar')}>
+                <Button
+                  aria-label={t(sidebarCompact ? 'action.expandSidebar' : 'action.collapseSidebar')}
+                  className="topbar-sidebar-toggle"
+                  icon={sidebarCompact ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}
+                  onClick={() => setSettings((current) => ({
+                    ...current,
+                    sidebarMode: sidebarCompact ? 'expanded' : 'compact',
+                  }))}
+                />
+              </Tooltip>
+            )}
             <Tooltip title={t('action.newTerminal')}>
               <Button
                 aria-label={t('action.newTerminal')}
@@ -6968,6 +7003,7 @@ function normalizeSettings(settings) {
     ...settings,
     confirmDangerousActions: settings.confirmDangerousActions !== false,
     interfaceDensity,
+    sidebarMode: normalizeSidebarMode(settings.sidebarMode),
     defaultProviderType: String(settings.defaultProviderType || defaultSettings.defaultProviderType).trim() || defaultSettings.defaultProviderType,
     defaultWorkingDirectory: String(settings.defaultWorkingDirectory || '').trim(),
     disabledExtensionIds: Array.isArray(settings.disabledExtensionIds)

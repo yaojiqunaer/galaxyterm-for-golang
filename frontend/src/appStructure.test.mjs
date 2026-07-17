@@ -103,6 +103,23 @@ assert.ok(
   /<Sider[\s\S]*?breakpoint="lg"[\s\S]*?collapsed=\{sidebarCompact\}[\s\S]*?collapsedWidth=\{68\}/.test(source),
   'the workspace sidebar must collapse before narrow desktop layouts become crowded',
 );
+assert.ok(
+  source.includes("sidebarMode: 'auto',")
+    && source.includes('sidebarMode: normalizeSidebarMode(settings.sidebarMode),')
+    && source.includes('const sidebarCompact = resolveSidebarCompact(settings.sidebarMode, screens.lg === false);')
+    && source.includes("value={settings.sidebarMode || defaultSettings.sidebarMode}")
+    && source.includes("{ value: 'auto', label: t('sidebar.auto') }")
+    && source.includes("{ value: 'expanded', label: t('sidebar.expanded') }")
+    && source.includes("{ value: 'compact', label: t('sidebar.compact') }"),
+  'sidebar layout preference must support responsive auto mode and persisted explicit modes',
+);
+assert.ok(
+  source.includes("configurableShortcutAction === 'toggleSidebar'")
+    && source.includes('icon={sidebarCompact ? <MenuUnfoldOutlined /> : <MenuFoldOutlined />}')
+    && source.includes("sidebarMode: sidebarCompact ? 'expanded' : 'compact'")
+    && source.includes("aria-label={t(sidebarCompact ? 'action.expandSidebar' : 'action.collapseSidebar')}"),
+  'the sidebar must be discoverable from the topbar and the configurable keyboard router',
+);
 assert.ok(!styles.includes('min-width: 900px'), 'the app shell must not force a viewport wider than the desktop window');
 assert.ok(
   styles.includes('.workspace-sidebar:not(.ant-layout-sider-collapsed)'),
@@ -359,7 +376,8 @@ assert.ok(
     && source.includes("configurableShortcutAction === 'commandPalette'")
     && source.includes("configurableShortcutAction === 'closeSession'")
     && source.includes("configurableShortcutAction === 'search'")
-    && source.includes("configurableShortcutAction === 'reconnect'"),
+    && source.includes("configurableShortcutAction === 'reconnect'")
+    && source.includes("configurableShortcutAction === 'toggleSidebar'"),
   'high-frequency global shortcuts must resolve from normalized persisted bindings',
 );
 assert.ok(

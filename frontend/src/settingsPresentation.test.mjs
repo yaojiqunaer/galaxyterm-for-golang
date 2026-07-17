@@ -14,8 +14,10 @@ import {
   defaultShortcutBindings,
   isCommandShortcut,
   isTerminalInputTarget,
+  normalizeSidebarMode,
   normalizeShortcutModifier,
   normalizeShortcutBindings,
+  resolveSidebarCompact,
   resolveConfigurableShortcutAction,
   resolveSettingsSectionNavigation,
   shortcutModifierLabel,
@@ -79,7 +81,7 @@ assert.deepEqual(buildShortcutGroups().map((group) => ({
   { key: 'sessions', count: 7 },
   { key: 'search', count: 3 },
   { key: 'audit', count: 3 },
-  { key: 'workspace', count: 4 },
+  { key: 'workspace', count: 5 },
 ]);
 
 assert.equal(buildShortcutGroups().some((group) => group.items.some(([shortcut]) => shortcut === '?')), true);
@@ -109,6 +111,7 @@ assert.deepEqual(defaultShortcutBindings(), {
   quickCommands: 'k',
   reconnect: 'r',
   search: 'f',
+  toggleSidebar: 'b',
 });
 assert.deepEqual(normalizeShortcutBindings({
   commandPalette: 'P',
@@ -122,6 +125,7 @@ assert.deepEqual(updateShortcutBinding(defaultShortcutBindings(), 'newTerminal',
   quickCommands: 'k',
   reconnect: 'r',
   search: 'f',
+  toggleSidebar: 'b',
 });
 assert.equal(resolveConfigurableShortcutAction(
   { key: 'p', metaKey: true },
@@ -162,7 +166,8 @@ assert.equal(resolveConfigurableShortcutAction(
 assert.deepEqual(buildShortcutEditorRows({
   shortcutModifier: 'meta',
   shortcutBindings: { newTerminal: 'p', commandPalette: 'n' },
-}).slice(0, 2), [
+}).slice(0, 3), [
+  { action: 'toggleSidebar', key: 'b', labelKey: 'action.toggleSidebar', shortcut: 'Cmd + B' },
   { action: 'newTerminal', key: 'p', labelKey: 'action.newTerminal', shortcut: 'Cmd + P' },
   { action: 'quickCommands', key: 'k', labelKey: 'action.commands', shortcut: 'Cmd + K' },
 ]);
@@ -174,6 +179,20 @@ assert.equal(
   buildShortcutGroups({ shortcutModifier: 'meta', shortcutBindings: { newTerminal: 'p' } })[0].items[0][0],
   'Cmd + P',
 );
+assert.deepEqual(
+  buildShortcutGroups({ shortcutModifier: 'meta' })
+    .find((group) => group.key === 'workspace').items[0],
+  ['Cmd + B', 'action.toggleSidebar'],
+);
+
+assert.equal(normalizeSidebarMode('auto'), 'auto');
+assert.equal(normalizeSidebarMode('expanded'), 'expanded');
+assert.equal(normalizeSidebarMode('compact'), 'compact');
+assert.equal(normalizeSidebarMode('unknown'), 'auto');
+assert.equal(resolveSidebarCompact('auto', false), false);
+assert.equal(resolveSidebarCompact('auto', true), true);
+assert.equal(resolveSidebarCompact('expanded', true), false);
+assert.equal(resolveSidebarCompact('compact', false), true);
 
 assert.deepEqual(buildTerminalPreview({
   fontFamily: 'JetBrains Mono',

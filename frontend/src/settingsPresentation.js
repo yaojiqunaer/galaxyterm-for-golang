@@ -32,7 +32,9 @@ export function buildAppearanceSummary(settings = {}) {
 }
 
 const shortcutModifiers = ['auto', 'meta', 'ctrl'];
+const sidebarModes = ['auto', 'expanded', 'compact'];
 const configurableShortcutDefinitions = [
+  { action: 'toggleSidebar', defaultKey: 'b', labelKey: 'action.toggleSidebar' },
   { action: 'newTerminal', defaultKey: 'n', labelKey: 'action.newTerminal' },
   { action: 'quickCommands', defaultKey: 'k', labelKey: 'action.commands' },
   { action: 'commandPalette', defaultKey: 'p', labelKey: 'action.commandPalette' },
@@ -92,6 +94,7 @@ export function buildShortcutGroups(settings = {}) {
     {
       key: 'workspace',
       items: [
+        [binding('toggleSidebar'), 'action.toggleSidebar'],
         [binding('commandPalette'), 'action.commandPalette'],
         [binding('quickCommands'), 'action.commands'],
         ['Workspace menu', 'action.saveWorkspace'],
@@ -186,6 +189,18 @@ function isEditableShortcutTarget(target) {
 export function normalizeShortcutModifier(value) {
   const normalized = String(value || '').trim().toLowerCase();
   return shortcutModifiers.includes(normalized) ? normalized : 'auto';
+}
+
+export function normalizeSidebarMode(value) {
+  const normalized = String(value || '').trim().toLowerCase();
+  return sidebarModes.includes(normalized) ? normalized : 'auto';
+}
+
+export function resolveSidebarCompact(value, isNarrow = false) {
+  const mode = normalizeSidebarMode(value);
+  if (mode === 'compact') return true;
+  if (mode === 'expanded') return false;
+  return !!isNarrow;
 }
 
 export function shortcutModifierLabel(value) {
