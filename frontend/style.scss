@@ -3099,6 +3099,33 @@ code {
   color: var(--muted);
 }
 
+.remote-file-filterbar {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 170px auto;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--panel);
+}
+
+.remote-file-visible-count {
+  min-width: 86px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .remote-file-filterbar {
+    grid-template-columns: minmax(0, 1fr) 140px;
+  }
+
+  .remote-file-visible-count {
+    grid-column: 1 / -1;
+    text-align: left;
+  }
+}
+
 .file-browser-form {
   gap: 8px 0;
   margin-bottom: 14px;

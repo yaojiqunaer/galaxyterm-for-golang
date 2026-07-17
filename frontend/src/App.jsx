@@ -149,6 +149,7 @@ import {
 import {
   buildRemoteFileActions,
   buildRemoteFileBreadcrumbs,
+  buildRemoteFileView,
   buildRemoteRenameDestination,
   buildRemoteFileSummary,
   buildSavedSshConnections,
@@ -372,6 +373,8 @@ function App() {
   const [newType, setNewType] = useState('local');
   const [fileEntries, setFileEntries] = useState([]);
   const [fileLoading, setFileLoading] = useState(false);
+  const [fileQuery, setFileQuery] = useState('');
+  const [fileSort, setFileSort] = useState('name');
   const [fileProviderType, setFileProviderType] = useState('');
   const [fileProfileId, setFileProfileId] = useState('');
   const [testingConnection, setTestingConnection] = useState(false);
@@ -445,6 +448,7 @@ function App() {
   };
   const terminalRefs = useRef({});
   const terminalSearchRef = useRef(null);
+  const fileSearchRef = useRef(null);
   const profileImportRef = useRef(null);
   const contentPageRef = useRef(null);
   const contentPageScrollPositionsRef = useRef(new Map());
@@ -571,6 +575,10 @@ function App() {
       if (key === 'f' && !event.shiftKey && activeKey && selectedNav === 'sessions') {
         event.preventDefault();
         terminalSearchRef.current?.focus();
+      }
+      if (key === 'f' && !event.shiftKey && selectedNav === 'files') {
+        event.preventDefault();
+        fileSearchRef.current?.focus();
       }
       const numberedSessionIndex = resolveNumberedSessionIndex(key, sessions.length);
       if (numberedSessionIndex >= 0) {
@@ -815,6 +823,7 @@ function App() {
     if (nextType !== fileProviderType) {
       setFileProviderType(nextType);
       setFileEntries([]);
+      setFileQuery('');
     }
   }, [fileProviderType, selectedFileProvider?.type]);
 
@@ -3270,6 +3279,7 @@ function App() {
   const renderFiles = () => {
     const currentPath = watchedFilePath || fileForm.getFieldValue('path') || '.';
     const fileSummary = buildRemoteFileSummary(fileEntries, { path: currentPath, loading: fileLoading });
+    const fileView = buildRemoteFileView(fileEntries, { query: fileQuery, sortBy: fileSort });
     const breadcrumbs = buildRemoteFileBreadcrumbs(fileSummary.path);
     const selectedFileConnection = buildSavedSshConnections(profiles)
       .find((item) => item.id === fileProfileId);
@@ -3338,6 +3348,7 @@ function App() {
                   onChange={(providerType) => {
                     setFileProviderType(providerType);
                     setFileEntries([]);
+                    setFileQuery('');
                     fileForm.setFieldValue('path', '.');
                   }}
                 />
@@ -3417,14 +3428,43 @@ function App() {
                 {canWriteFiles && <Button onClick={() => setUploadOpen(true)}>{t('action.uploadText')}</Button>}
               </Space>
             </div>
+            <div className="remote-file-filterbar">
+              <Input.Search
+                ref={fileSearchRef}
+                allowClear
+                value={fileQuery}
+                onChange={(event) => setFileQuery(event.target.value)}
+                placeholder={t('placeholder.searchRemoteFiles')}
+              />
+              <Select
+                className="remote-file-sort"
+                value={fileSort}
+                onChange={setFileSort}
+                options={[
+                  { value: 'name', label: t('sort.name') },
+                  { value: 'modified', label: t('sort.modified') },
+                  { value: 'size', label: t('sort.size') },
+                ]}
+              />
+              <Text type="secondary" className="remote-file-visible-count">
+                {t('file.visibleCount', { visible: fileView.visible, total: fileView.total })}
+              </Text>
+            </div>
             <List
               className="remote-file-list"
               loading={fileLoading}
-              dataSource={fileEntries}
+              dataSource={fileView.entries}
               locale={{
                 emptyText: (
-                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noFiles')}>
-                    <Button type="primary" onClick={() => loadFiles()} loading={fileLoading}>{t('action.open')}</Button>
+                  <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description={t(fileView.filtered ? 'file.emptyFilteredTitle' : 'empty.noFiles')}
+                  >
+                    {fileView.filtered ? (
+                      <Button onClick={() => setFileQuery('')}>{t('action.clearFilters')}</Button>
+                    ) : (
+                      <Button type="primary" onClick={() => loadFiles()} loading={fileLoading}>{t('action.open')}</Button>
+                    )}
                   </Empty>
                 ),
               }}

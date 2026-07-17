@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   buildRemoteFileActions,
   buildRemoteFileBreadcrumbs,
+  buildRemoteFileView,
   buildRemoteRenameDestination,
   buildRemoteFileSummary,
   buildSavedSshConnections,
@@ -169,6 +170,35 @@ assert.equal(buildRemoteRenameDestination('nginx.conf', 'nginx.prod.conf'), 'ngi
 assert.equal(buildRemoteRenameDestination('/etc/nginx.conf', '../secret'), '');
 assert.equal(buildRemoteRenameDestination('/etc/nginx.conf', 'nested/name'), '');
 assert.equal(buildRemoteRenameDestination('/etc/nginx.conf', ''), '');
+
+const remoteFileViewEntries = [
+  { name: 'logs-10', path: '/srv/logs-10', isDir: true, modTime: '2026-07-15T08:00:00Z' },
+  { name: 'logs-2', path: '/srv/logs-2', isDir: true, modTime: '2026-07-16T08:00:00Z' },
+  { name: 'app.log', path: '/srv/app.log', isDir: false, size: 200, modTime: '2026-07-17T08:00:00Z' },
+  { name: 'README', path: '/srv/README', isDir: false, size: 100, modTime: '2026-07-14T08:00:00Z' },
+];
+assert.deepEqual(buildRemoteFileView(remoteFileViewEntries, { sortBy: 'name' }), {
+  entries: [remoteFileViewEntries[1], remoteFileViewEntries[0], remoteFileViewEntries[2], remoteFileViewEntries[3]],
+  filtered: false,
+  total: 4,
+  visible: 4,
+});
+assert.deepEqual(buildRemoteFileView(remoteFileViewEntries, { query: 'APP', sortBy: 'size' }), {
+  entries: [remoteFileViewEntries[2]],
+  filtered: true,
+  total: 4,
+  visible: 1,
+});
+assert.deepEqual(
+  buildRemoteFileView(remoteFileViewEntries, { sortBy: 'modified' }).entries,
+  [remoteFileViewEntries[1], remoteFileViewEntries[0], remoteFileViewEntries[2], remoteFileViewEntries[3]],
+);
+assert.deepEqual(buildRemoteFileView(remoteFileViewEntries, { query: 'missing' }), {
+  entries: [],
+  filtered: true,
+  total: 4,
+  visible: 0,
+});
 
 const tunnels = [
   {

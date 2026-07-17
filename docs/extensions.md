@@ -8,6 +8,8 @@ GalaxyTerm 核心包内置本地终端与 SSH。SFTP、FTP/FTPS、S3、Kubernete
 
 远程文件工作区只根据 `fileProviders[].capabilities` 展示可用操作，不包含协议专用分支。`list` 控制目录浏览，`read` 控制查看与下载，`write` 控制编辑与上传，`mkdir`、`rename`、`delete` 分别控制新建目录、重命名和删除。只有 `read` 而没有 `write` 时，文件以只读方式打开；删除操作默认需要二次确认。
 
+所有文件 Provider 自动获得当前目录名称/路径搜索、目录优先排序，以及按名称、最近修改、大小切换排序的统一浏览体验。
+
 FTP、S3、WebDAV 等新协议只需实现 `stdio-json-v1` 操作并声明真实能力，无需修改核心文件列表。对象存储不支持的操作应从 manifest 中省略，界面会自动隐藏对应入口。
 
 ## 在线安装

@@ -1,4 +1,5 @@
 const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+const remoteFileNameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
 
 export function buildSavedSshConnections(profiles = []) {
   return profiles
@@ -141,6 +142,43 @@ export function buildRemoteRenameDestination(entryPath = '', nextName = '') {
   if (separator < 0) return name;
   if (separator === 0) return `/${name}`;
   return `${normalized.slice(0, separator)}/${name}`;
+}
+
+export function buildRemoteFileView(entries = [], { query = '', sortBy = 'name' } = {}) {
+  const normalizedQuery = String(query || '').trim().toLocaleLowerCase();
+  const visibleEntries = entries.filter((entry) => {
+    if (!normalizedQuery) return true;
+    return `${entry?.name || ''}\n${entry?.path || ''}`.toLocaleLowerCase().includes(normalizedQuery);
+  });
+  visibleEntries.sort((left, right) => {
+    const directoryOrder = Number(!!right?.isDir) - Number(!!left?.isDir);
+    if (directoryOrder) return directoryOrder;
+    if (sortBy === 'modified') {
+      const modifiedOrder = safeTimestamp(right?.modTime) - safeTimestamp(left?.modTime);
+      if (modifiedOrder) return modifiedOrder;
+    }
+    if (sortBy === 'size') {
+      const sizeOrder = safeNumber(right?.size) - safeNumber(left?.size);
+      if (sizeOrder) return sizeOrder;
+    }
+    return remoteFileNameCollator.compare(String(left?.name || ''), String(right?.name || ''));
+  });
+  return {
+    entries: visibleEntries,
+    filtered: normalizedQuery.length > 0,
+    total: entries.length,
+    visible: visibleEntries.length,
+  };
+}
+
+function safeTimestamp(value) {
+  const parsed = Date.parse(value || '');
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function safeNumber(value) {
+  const parsed = Number(value || 0);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 function splitAddress(address = '') {

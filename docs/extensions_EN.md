@@ -8,6 +8,8 @@ The GalaxyTerm core includes local terminals and SSH. SFTP, FTP/FTPS, S3, Kubern
 
 The remote-file workspace derives every available action from `fileProviders[].capabilities`; it contains no protocol-specific action branches. `list` enables directory browsing, `read` enables viewing and downloads, `write` enables editing and uploads, while `mkdir`, `rename`, and `delete` control their matching operations. A provider with `read` but no `write` opens files read-only. Delete actions require confirmation by default.
 
+Every file provider automatically receives current-directory name/path search, directory-first ordering, and Name, Recently modified, and Size sort modes.
+
 New FTP, S3, WebDAV, and similar providers only implement the `stdio-json-v1` operations and declare their actual capabilities. They do not modify the core file list. Object-store operations that are not supported should be omitted from the manifest so the corresponding UI stays hidden.
 
 ## Online Installation

@@ -282,6 +282,14 @@ assert.ok(
   'remote file rows must expose capability-driven actions, safe rename, and destructive confirmation',
 );
 assert.ok(
+  source.includes('buildRemoteFileView(fileEntries, { query: fileQuery, sortBy: fileSort })')
+    && source.includes('ref={fileSearchRef}')
+    && source.includes("selectedNav === 'files'")
+    && source.includes("t('file.visibleCount'")
+    && source.includes("fileView.filtered ? 'file.emptyFilteredTitle' : 'empty.noFiles'"),
+  'remote files must support provider-neutral filtering, sorting, result counts, and keyboard search focus',
+);
+assert.ok(
   source.includes("selectedFileProvider.protocol === 'sftp'")
     && source.includes('resolveSelectedSshProfile(fileProfileId)'),
   'the SFTP extension must retain saved SSH profile reuse without making it a core protocol implementation',
