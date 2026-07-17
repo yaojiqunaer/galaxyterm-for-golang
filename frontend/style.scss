@@ -705,6 +705,10 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   .command-palette-shortcut {
     display: none;
   }
+
+  .topbar-utility-action {
+    display: none;
+  }
 }
 
 .content-area {

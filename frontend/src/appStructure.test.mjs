@@ -302,6 +302,13 @@ assert.ok(
   'remote files must use native binary transfers while retaining text-file creation as a distinct action',
 );
 assert.ok(
+  source.includes("language: () => setSettingsOpen(true)")
+    && source.includes("{ key: 'language', icon: <GlobalOutlined />, label: t('action.language') }")
+    && (source.match(/className="topbar-utility-action"/g) || []).length === 4
+    && /@media \(max-width: 860px\)[\s\S]*?\.topbar-utility-action\s*\{[\s\S]*?display:\s*none/.test(styles),
+  'narrow topbars must move duplicate utility actions into the discoverable workspace menu',
+);
+assert.ok(
   source.includes("selectedFileProvider.protocol === 'sftp'")
     && source.includes('resolveSelectedSshProfile(fileProfileId)'),
   'the SFTP extension must retain saved SSH profile reuse without making it a core protocol implementation',

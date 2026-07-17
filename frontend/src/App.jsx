@@ -4392,6 +4392,7 @@ function App() {
     restoreWorkspace: () => restoreWorkspace(),
     quickCommands: () => setCommandsOpen(true),
     commandHistory: () => setHistoryOpen(true),
+    language: () => setSettingsOpen(true),
     help: () => setHelpOpen(true),
     extensions: () => setSelectedNav('extensions'),
     settings: () => setSelectedNav('settings'),
@@ -4401,6 +4402,7 @@ function App() {
     { key: 'restoreWorkspace', icon: <ReloadOutlined />, label: t('action.restoreWorkspace') },
     { key: 'quickCommands', icon: <CodeOutlined />, label: t('action.commands') },
     { key: 'commandHistory', icon: <HistoryOutlined />, label: t('action.commandHistory') },
+    { key: 'language', icon: <GlobalOutlined />, label: t('action.language') },
     { key: 'help', icon: <QuestionCircleOutlined />, label: t('action.help') },
     { key: 'extensions', icon: <AppstoreAddOutlined />, label: t('nav.extensions') },
     { key: 'settings', icon: <SettingOutlined />, label: t('nav.settings') },
@@ -4795,16 +4797,16 @@ function App() {
               </>
             )}
             <Tooltip title={t('action.language')}>
-              <Button aria-label={t('action.language')} icon={<GlobalOutlined />} onClick={() => setSettingsOpen(true)} />
+              <Button className="topbar-utility-action" aria-label={t('action.language')} icon={<GlobalOutlined />} onClick={() => setSettingsOpen(true)} />
             </Tooltip>
             <Tooltip title={t('action.help')}>
-              <Button aria-label={t('action.help')} icon={<QuestionCircleOutlined />} onClick={() => setHelpOpen(true)} />
+              <Button className="topbar-utility-action" aria-label={t('action.help')} icon={<QuestionCircleOutlined />} onClick={() => setHelpOpen(true)} />
             </Tooltip>
             <Tooltip title={t('nav.extensions')}>
-              <Button aria-label={t('nav.extensions')} icon={<AppstoreAddOutlined />} onClick={() => setSelectedNav('extensions')} />
+              <Button className="topbar-utility-action" aria-label={t('nav.extensions')} icon={<AppstoreAddOutlined />} onClick={() => setSelectedNav('extensions')} />
             </Tooltip>
             <Tooltip title={t('nav.settings')}>
-              <Button aria-label={t('nav.settings')} icon={<SettingOutlined />} onClick={() => setSelectedNav('settings')} />
+              <Button className="topbar-utility-action" aria-label={t('nav.settings')} icon={<SettingOutlined />} onClick={() => setSelectedNav('settings')} />
             </Tooltip>
           </Space>
         </div>
