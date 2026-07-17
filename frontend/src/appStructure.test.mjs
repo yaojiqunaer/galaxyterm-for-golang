@@ -280,6 +280,25 @@ assert.ok(
   'recordings must use a read-only xterm renderer and a frame-based playback clock',
 );
 assert.ok(
+  replaySource.includes('replayPlaybackState({')
+    && replaySource.includes('seekReplayTime(current, parsedCast.duration, offset)')
+    && replaySource.includes("window.addEventListener('keydown', handleReplayKeyDown);")
+    && replaySource.includes("event.code === 'Space'")
+    && replaySource.includes("event.key === 'ArrowLeft'")
+    && replaySource.includes("event.key === 'ArrowRight'")
+    && replaySource.includes("aria-label={t('action.seekBackward5')}")
+    && replaySource.includes("aria-label={t('action.seekForward5')}")
+    && replaySource.includes("target?.closest?.('.audit-replay-terminal')")
+    && replaySource.includes('className={`audit-player-state tone-${playbackState}`}')
+    && replaySource.includes("t('replay.eventProgress'"),
+  'recording replay must expose video-like keyboard transport, playback state, and frame progress',
+);
+assert.ok(
+  /\.audit-player-state\s*\{[\s\S]*?font-size:\s*11px;/.test(styles)
+    && /\.audit-player-state\.tone-playing\s*\{[\s\S]*?color:\s*var\(--success\)/.test(styles),
+  'recording playback state must remain compact and visually distinct',
+);
+assert.ok(
   viteConfig.includes("return 'xterm-runtime';")
     && viteConfig.indexOf("return 'xterm-runtime';") < viteConfig.indexOf("return 'vendor-runtime';"),
   'production chunking must keep xterm out of the eagerly preloaded vendor runtime',

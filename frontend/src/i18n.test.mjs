@@ -27,6 +27,11 @@ assert.equal(t('session.empty.restoreAvailable', { count: 3, updatedAt: '12:00' 
 assert.equal(t('session.empty.restoreUnavailable'), 'No saved workspace is available yet');
 assert.equal(t('palette.reason.noWorkspaceSession'), 'Open at least one session before saving a workspace.');
 assert.equal(t('palette.reason.noWorkspaceSnapshot'), 'Save a workspace before restoring or clearing it.');
+assert.equal(t('replay.state.playing'), 'Playing');
+assert.equal(t('action.seekBackward5'), 'Back 5 seconds');
+assert.equal(t('action.seekForward5'), 'Forward 5 seconds');
+assert.equal(t('replay.keyboardHint'), 'Space/K play or pause · Left/Right 5s · Home/End');
+assert.equal(t('replay.eventProgress', { current: 3, total: 8 }), '3 / 8 output events');
 assert.equal(t('session.status.error'), 'Error');
 assert.equal(t('locale.en-US'), 'English');
 assert.equal(t('locale.zh-CN'), 'Simplified Chinese');
@@ -47,6 +52,11 @@ assert.equal(t('session.empty.restoreAvailable', { count: 3, updatedAt: '12:00' 
 assert.equal(t('session.empty.restoreUnavailable'), '目前还没有可恢复的工作区');
 assert.equal(t('palette.reason.noWorkspaceSession'), '请先打开至少一个会话，再保存工作区。');
 assert.equal(t('palette.reason.noWorkspaceSnapshot'), '请先保存工作区，再执行恢复或清理。');
+assert.equal(t('replay.state.playing'), '播放中');
+assert.equal(t('action.seekBackward5'), '后退 5 秒');
+assert.equal(t('action.seekForward5'), '前进 5 秒');
+assert.equal(t('replay.keyboardHint'), 'Space/K 播放或暂停 · 左右键 5 秒 · Home/End');
+assert.equal(t('replay.eventProgress', { current: 3, total: 8 }), '已回放 3 / 8 帧');
 assert.equal(t('session.status.error'), '异常');
 assert.equal(t('locale.en-US'), 'English');
 assert.equal(t('locale.zh-CN'), '简体中文');

@@ -19,6 +19,25 @@ export function shouldResetReplayTerminal(previousTime, nextTime, previousRecord
   return previousRecordId !== nextRecordId || Number(nextTime) < Number(previousTime);
 }
 
+export function seekReplayTime(currentTime, duration, offsetSeconds) {
+  const safeDuration = Math.max(0, Number(duration) || 0);
+  const nextTime = (Number(currentTime) || 0) + (Number(offsetSeconds) || 0);
+  return clamp(nextTime, 0, safeDuration);
+}
+
+export function replayPlaybackState({
+  duration = 0,
+  hasRecording = false,
+  playhead = 0,
+  playing = false,
+} = {}) {
+  if (!hasRecording) return 'unavailable';
+  if (playing) return 'playing';
+  const safeDuration = Math.max(0, Number(duration) || 0);
+  if (safeDuration > 0 && Number(playhead) >= safeDuration) return 'finished';
+  return 'paused';
+}
+
 function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
 }

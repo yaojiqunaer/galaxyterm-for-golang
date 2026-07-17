@@ -2626,6 +2626,7 @@ code {
 .audit-player-transport {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 2px;
   min-width: 0;
 }
@@ -2643,6 +2644,22 @@ code {
   font-variant-numeric: tabular-nums;
 }
 
+.audit-player-state {
+  flex: 0 0 auto;
+  margin-left: 6px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.audit-player-state.tone-playing {
+  color: var(--success);
+}
+
+.audit-player-state.tone-finished {
+  color: var(--accent);
+}
+
 .audit-player-time span,
 .audit-player-meta {
   color: var(--text-muted);
@@ -2655,9 +2672,15 @@ code {
 .audit-player-meta {
   display: flex;
   justify-content: space-between;
+  gap: 8px 16px;
   padding: 0 13px 9px;
   font-size: 11px;
   font-variant-numeric: tabular-nums;
+  flex-wrap: wrap;
+}
+
+.audit-player-keyboard-hint {
+  margin-left: auto;
 }
 
 .audit-timeline-section {

@@ -3,6 +3,8 @@ import '@xterm/xterm/css/xterm.css';
 import { Terminal } from '@xterm/xterm';
 import {
   CaretRightOutlined,
+  FastBackwardOutlined,
+  FastForwardOutlined,
   PauseOutlined,
   RedoOutlined,
   StepBackwardOutlined,
@@ -13,6 +15,8 @@ import { parseAsciinemaCast, resolveReplayEventTime } from '../auditLog.js';
 import {
   advanceReplayTime,
   findReplayEventCursor,
+  replayPlaybackState,
+  seekReplayTime,
   shouldResetReplayTerminal,
 } from '../replayTimeline.js';
 import { t } from '../i18n.js';
@@ -30,6 +34,13 @@ export default function AuditReplayPlayer({ record }) {
   const [playhead, setPlayhead] = useState(0);
   const [speed, setSpeed] = useState(1);
   const hasRecording = parsedCast.events.length > 0;
+  const currentEventCount = findReplayEventCursor(parsedCast.events, playhead, 0);
+  const playbackState = replayPlaybackState({
+    duration: parsedCast.duration,
+    hasRecording,
+    playhead,
+    playing,
+  });
 
   useEffect(() => {
     const terminal = new Terminal({
@@ -115,9 +126,55 @@ export default function AuditReplayPlayer({ record }) {
 
   const togglePlayback = () => {
     if (!hasRecording) return;
-    if (playhead >= parsedCast.duration) setPlayhead(0);
-    setPlaying((current) => !current);
+    setPlaying((current) => {
+      if (!current) {
+        setPlayhead((time) => (time >= parsedCast.duration ? 0 : time));
+      }
+      return !current;
+    });
   };
+
+  const nudgeReplay = (offset) => {
+    setPlayhead((current) => seekReplayTime(current, parsedCast.duration, offset));
+  };
+
+  useEffect(() => {
+    const handleReplayKeyDown = (event) => {
+      if (
+        event.defaultPrevented
+        || event.metaKey
+        || event.ctrlKey
+        || event.altKey
+        || isReplayControlTarget(event.target)
+      ) return;
+      if (event.code === 'Space' || event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        if (!event.repeat) togglePlayback();
+        return;
+      }
+      if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        nudgeReplay(-5);
+        return;
+      }
+      if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        nudgeReplay(5);
+        return;
+      }
+      if (event.key === 'Home') {
+        event.preventDefault();
+        seek(0);
+        return;
+      }
+      if (event.key === 'End') {
+        event.preventDefault();
+        seek(parsedCast.duration);
+      }
+    };
+    window.addEventListener('keydown', handleReplayKeyDown);
+    return () => window.removeEventListener('keydown', handleReplayKeyDown);
+  }, [hasRecording, parsedCast.duration]);
 
   return (
     <section className="audit-player" aria-label={t('section.recordingReplay')}>
@@ -152,12 +209,30 @@ export default function AuditReplayPlayer({ record }) {
               type="text"
             />
           </Tooltip>
+          <Tooltip title={t('action.seekBackward5')}>
+            <Button
+              aria-label={t('action.seekBackward5')}
+              disabled={!hasRecording}
+              icon={<FastBackwardOutlined />}
+              onClick={() => nudgeReplay(-5)}
+              type="text"
+            />
+          </Tooltip>
           <Tooltip title={t('action.previousEvent')}>
             <Button
               aria-label={t('action.previousEvent')}
               disabled={!hasRecording}
               icon={<StepBackwardOutlined />}
               onClick={() => seek(resolveReplayEventTime(parsedCast.events, playhead, 'previous'))}
+              type="text"
+            />
+          </Tooltip>
+          <Tooltip title={t('action.seekForward5')}>
+            <Button
+              aria-label={t('action.seekForward5')}
+              disabled={!hasRecording}
+              icon={<FastForwardOutlined />}
+              onClick={() => nudgeReplay(5)}
               type="text"
             />
           </Tooltip>
@@ -170,6 +245,12 @@ export default function AuditReplayPlayer({ record }) {
               type="text"
             />
           </Tooltip>
+          <span
+            aria-live="polite"
+            className={`audit-player-state tone-${playbackState}`}
+          >
+            {t(`replay.state.${playbackState}`)}
+          </span>
           <Text className="audit-player-time">
             <strong>{formatReplayTime(playhead)}</strong>
             <span>/ {formatReplayTime(parsedCast.duration)}</span>
@@ -196,7 +277,8 @@ export default function AuditReplayPlayer({ record }) {
       />
       <div className="audit-player-meta">
         <span>{`${normalizeDimension(parsedCast.header.width, 80)} x ${normalizeDimension(parsedCast.header.height, 24)}`}</span>
-        <span>{`${parsedCast.events.length} ${t('label.outputEvents')}`}</span>
+        <span>{t('replay.eventProgress', { current: currentEventCount, total: parsedCast.events.length })}</span>
+        <span className="audit-player-keyboard-hint">{t('replay.keyboardHint')}</span>
       </div>
     </section>
   );
@@ -213,6 +295,13 @@ function formatReplayTime(seconds = 0) {
   const remainingSeconds = Math.floor(safeSeconds % 60);
   const milliseconds = Math.floor((safeSeconds % 1) * 10);
   return `${minutes}:${String(remainingSeconds).padStart(2, '0')}.${milliseconds}`;
+}
+
+function isReplayControlTarget(target) {
+  if (target?.closest?.('.audit-replay-terminal')) return false;
+  return Boolean(target?.closest?.(
+    'button, input, textarea, select, [role="slider"], [role="radio"], [contenteditable="true"]',
+  ));
 }
 
 const replayTerminalTheme = {

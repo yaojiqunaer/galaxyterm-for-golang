@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import {
   advanceReplayTime,
   findReplayEventCursor,
+  replayPlaybackState,
+  seekReplayTime,
   shouldResetReplayTerminal,
 } from './replayTimeline.js';
 
@@ -25,5 +27,15 @@ assert.equal(findReplayEventCursor([], 10), 0);
 assert.equal(shouldResetReplayTerminal(2, 1.5, 'record-1', 'record-1'), true);
 assert.equal(shouldResetReplayTerminal(2, 2.5, 'record-1', 'record-1'), false);
 assert.equal(shouldResetReplayTerminal(0, 0, 'record-1', 'record-2'), true);
+
+assert.equal(seekReplayTime(2, 10, 5), 7);
+assert.equal(seekReplayTime(2, 10, -5), 0);
+assert.equal(seekReplayTime(9, 10, 5), 10);
+assert.equal(seekReplayTime(2, 0, 5), 0);
+
+assert.equal(replayPlaybackState({ hasRecording: false }), 'unavailable');
+assert.equal(replayPlaybackState({ duration: 8, hasRecording: true, playhead: 2, playing: true }), 'playing');
+assert.equal(replayPlaybackState({ duration: 8, hasRecording: true, playhead: 2, playing: false }), 'paused');
+assert.equal(replayPlaybackState({ duration: 8, hasRecording: true, playhead: 8, playing: false }), 'finished');
 
 console.log('replay timeline tests passed');
