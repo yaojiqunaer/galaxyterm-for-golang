@@ -415,6 +415,27 @@ assert.ok(
   'remote file rows must expose capability-driven actions, safe rename, and destructive confirmation',
 );
 assert.ok(
+  source.includes('const requestDangerousAction = ({')
+    && source.includes('if (settings.confirmDangerousActions === false) return onConfirm();')
+    && source.includes('const confirmDeleteAuditRecord = (record) => requestDangerousAction({')
+    && source.includes('const confirmClearAuditRecords = () => requestDangerousAction({')
+    && source.includes('const confirmUninstallExtension = (extension) => requestDangerousAction({')
+    && source.includes('const confirmDeleteExtensionSource = (source) => requestDangerousAction({')
+    && source.includes('const confirmDeleteQuickCommand = (command) => requestDangerousAction({')
+    && source.includes('const confirmStopTunnel = (tunnel, display) => requestDangerousAction({'),
+  'persistent data removal, extension uninstall, and tunnel stop must share the dangerous-action preference',
+);
+assert.ok(
+  source.includes('onClick={() => confirmDeleteAuditRecord(record)}')
+    && source.includes('onClick={confirmClearAuditRecords}')
+    && source.includes('onClick={() => confirmUninstallExtension(extension)}')
+    && source.includes('onClick={() => confirmDeleteExtensionSource(source)}')
+    && source.includes('onClick={() => confirmDeleteQuickCommand(item)}')
+    && source.includes('onClick={() => confirmStopTunnel(item, display)}')
+    && source.includes("{t('action.stop')}</Button>"),
+  'all destructive controls must call their contextual confirmation wrapper',
+);
+assert.ok(
   source.includes('buildRemoteFileView(fileEntries, { query: fileQuery, sortBy: fileSort })')
     && source.includes('ref={fileSearchRef}')
     && source.includes("selectedNav === 'files'")

@@ -468,6 +468,25 @@ function App() {
     });
   };
 
+  const requestDangerousAction = ({
+    actionKey = 'action.delete',
+    contentKey,
+    contentValues = {},
+    onConfirm,
+    titleKey,
+    titleValues = {},
+  }) => {
+    if (settings.confirmDangerousActions === false) return onConfirm();
+    return modalApi.confirm({
+      title: t(titleKey, titleValues),
+      content: t(contentKey, contentValues),
+      okButtonProps: { danger: true },
+      okText: t(actionKey),
+      cancelText: t('action.cancel'),
+      onOk: onConfirm,
+    });
+  };
+
   useEffect(() => () => {
     fileTransferCleanupRef.current?.();
     fileTransferCleanupRef.current = null;
@@ -1559,6 +1578,24 @@ function App() {
     messageApi.success(t('message.auditRecordsCleared'));
   };
 
+  const confirmDeleteAuditRecord = (record) => requestDangerousAction({
+    contentKey: 'confirm.deleteAuditRecordContent',
+    contentValues: {
+      count: record?.auditEvents?.length || 0,
+      name: record?.title || '-',
+    },
+    onConfirm: () => deleteAuditRecord(record.id),
+    titleKey: 'confirm.deleteAuditRecordTitle',
+  });
+
+  const confirmClearAuditRecords = () => requestDangerousAction({
+    actionKey: 'action.clear',
+    contentKey: 'confirm.clearAuditRecordsContent',
+    contentValues: { count: auditRecords.length },
+    onConfirm: clearAuditRecords,
+    titleKey: 'confirm.clearAuditRecordsTitle',
+  });
+
   const exportAuditRecord = (record, format = 'cast') => {
     if (format === 'cast') {
       downloadText(`${safeFileName(record.title)}-${timestampFilePart(new Date(record.endedAt))}.cast`, record.cast || '');
@@ -2026,6 +2063,16 @@ function App() {
     }
     messageApi.success(t('message.commandDeleted'));
   };
+
+  const confirmDeleteQuickCommand = (command) => requestDangerousAction({
+    contentKey: 'confirm.deleteQuickCommandContent',
+    contentValues: {
+      name: command?.name || '-',
+      provider: quickCommandProviderLabel(command?.providerType, providers),
+    },
+    onConfirm: () => deleteQuickCommand(command.id),
+    titleKey: 'confirm.deleteQuickCommandTitle',
+  });
 
   const editQuickCommand = (item) => {
     setEditingQuickCommandId(item.id);
@@ -2771,7 +2818,7 @@ function App() {
                       danger
                       icon={<DeleteOutlined />}
                       disabled={extensionRefreshingAll || sourceState.status === 'loading'}
-                      onClick={() => deleteExtensionSource(source.id)}
+                      onClick={() => confirmDeleteExtensionSource(source)}
                       aria-label={t('action.delete')}
                     />
                   </Tooltip>,
@@ -2839,7 +2886,7 @@ function App() {
                     {`${t('action.update')} ${extension.updateItem.manifest.version}`}
                   </Button>
                 ),
-                <Button key="uninstall" size="small" danger disabled={extensionOperationBusy} loading={extensionUninstallingId === extension.id} onClick={() => uninstallExtension(extension.id)}>{t('action.uninstall')}</Button>,
+                <Button key="uninstall" size="small" danger disabled={extensionOperationBusy} loading={extensionUninstallingId === extension.id} onClick={() => confirmUninstallExtension(extension)}>{t('action.uninstall')}</Button>,
               ].filter(Boolean)}
             >
               <List.Item.Meta
@@ -3022,6 +3069,16 @@ function App() {
     messageApi.success(t('message.extensionSourceDeleted'));
   };
 
+  const confirmDeleteExtensionSource = (source) => requestDangerousAction({
+    contentKey: 'confirm.deleteExtensionSourceContent',
+    contentValues: {
+      name: source?.name || '-',
+      url: source?.url || '-',
+    },
+    onConfirm: () => deleteExtensionSource(source.id),
+    titleKey: 'confirm.deleteExtensionSourceTitle',
+  });
+
   const toggleExtensionEnabled = (extensionId, enabled) => {
     setSettings((current) => {
       const disabledIds = new Set(current.disabledExtensionIds || []);
@@ -3101,6 +3158,17 @@ function App() {
       setExtensionUninstallingId('');
     }
   };
+
+  const confirmUninstallExtension = (extension) => requestDangerousAction({
+    actionKey: 'action.uninstall',
+    contentKey: 'confirm.uninstallExtensionContent',
+    contentValues: {
+      name: extension?.name || extension?.id || '-',
+      version: extension?.version || '-',
+    },
+    onConfirm: () => uninstallExtension(extension.id),
+    titleKey: 'confirm.uninstallExtensionTitle',
+  });
 
   const resolveSelectedSshProfile = async (profileId) => {
     if (!profileId) return null;
@@ -4224,6 +4292,17 @@ function App() {
     }
   };
 
+  const confirmStopTunnel = (tunnel, display) => requestDangerousAction({
+    actionKey: 'action.stop',
+    contentKey: 'confirm.stopTunnelContent',
+    contentValues: {
+      name: display?.name || tunnel?.name || '-',
+      route: (display?.route || '-').replace(' -> ', ' → '),
+    },
+    onConfirm: () => stopTunnel(tunnel.id),
+    titleKey: 'confirm.stopTunnelTitle',
+  });
+
   const renderTunnels = () => {
     const tunnelSummary = buildTunnelSummary(tunnels);
     const selectedTunnelConnection = buildSavedSshConnections(profiles)
@@ -4336,7 +4415,7 @@ function App() {
                 return (
                   <List.Item
                     className="tunnel-row"
-                    actions={[<Button key="stop" danger size="small" loading={tunnelBusy} onClick={() => stopTunnel(item.id)}>{t('action.delete')}</Button>]}
+                    actions={[<Button key="stop" danger size="small" icon={<StopOutlined />} loading={tunnelBusy} onClick={() => confirmStopTunnel(item, display)}>{t('action.stop')}</Button>]}
                   >
                     <List.Item.Meta
                       avatar={<span className="provider-icon"><ApiOutlined /></span>}
@@ -4372,7 +4451,7 @@ function App() {
         </div>
         <Space>
           <Button onClick={() => saveAuditRecord(activeKey)} disabled={!activeKey}>{t('action.saveAuditRecord')}</Button>
-          <Button danger onClick={clearAuditRecords} disabled={auditRecords.length === 0}>{t('action.clear')}</Button>
+          <Button danger onClick={confirmClearAuditRecords} disabled={auditRecords.length === 0}>{t('action.clear')}</Button>
         </Space>
       </div>
       <div className="audit-hint-strip">{t('settings.auditHint')}</div>
@@ -4417,7 +4496,7 @@ function App() {
                 <Button key="replay" size="small" onClick={() => openAuditReplay(record)}>{t('action.replay')}</Button>,
                 <Button key="cast" size="small" onClick={() => exportAuditRecord(record, 'cast')}>{t('action.exportCast')}</Button>,
                 <Button key="log" size="small" onClick={() => exportAuditRecord(record, 'log')}>{t('action.exportLog')}</Button>,
-                <Button key="delete" size="small" danger onClick={() => deleteAuditRecord(record.id)}>{t('action.delete')}</Button>,
+                <Button key="delete" size="small" danger onClick={() => confirmDeleteAuditRecord(record)}>{t('action.delete')}</Button>,
               ]}
             >
               <List.Item.Meta
@@ -5393,7 +5472,7 @@ function App() {
                   >
                     {t('action.copy')}
                   </Button>,
-                  <Button key="delete" size="small" danger onClick={() => deleteQuickCommand(item.id)}>{t('action.delete')}</Button>,
+                  <Button key="delete" size="small" danger onClick={() => confirmDeleteQuickCommand(item)}>{t('action.delete')}</Button>,
                 ]}
               >
                 <List.Item.Meta
