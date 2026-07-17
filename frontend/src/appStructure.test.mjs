@@ -132,6 +132,24 @@ assert.ok(
   'session management must use the compact toolbar action model',
 );
 assert.ok(
+  source.includes('hideAdd={false}')
+    && source.includes('addIcon={<PlusOutlined />}')
+    && source.includes("if (action === 'add') openDrawer();"),
+  'session tabs must expose a familiar new-terminal button through the existing drawer flow',
+);
+assert.ok(
+  source.includes('icon: sessionTabActionIcon(action.key)'),
+  'session toolbar overflow actions must use semantic icons, including reconnect',
+);
+assert.ok(
+  /\.terminal-tabs \.ant-tabs-nav-add\s*\{[\s\S]*?width:\s*32px;[\s\S]*?height:\s*32px;/.test(styles),
+  'the terminal tab add button must remain a stable compact icon target',
+);
+assert.ok(
+  /@media \(max-width: 1200px\)[\s\S]*?\.session-toolbar-context\s*\{[\s\S]*?display:\s*none[\s\S]*?\.session-toolbar-actions\s*\{[\s\S]*?border-left:\s*0/.test(styles),
+  'non-fullscreen session workspaces must prioritize tab titles over duplicated context',
+);
+assert.ok(
   source.includes('className="topbar-new-terminal"')
     && source.includes('className="command-palette-label"')
     && source.includes('className="command-palette-shortcut"'),

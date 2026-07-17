@@ -2227,7 +2227,8 @@ function App() {
         <Tabs
           className="terminal-tabs"
           type="editable-card"
-          hideAdd
+          hideAdd={false}
+          addIcon={<PlusOutlined />}
           activeKey={activeKey}
           onChange={setActiveKey}
           onEdit={(targetKey, action) => {
@@ -5885,12 +5886,14 @@ function SessionToolbarActions({ model, onAction }) {
     tabs: <CodeOutlined />,
   };
   const overflowItems = model.overflow.flatMap((action, index) => [
-    ...(index === 2 ? [{ key: 'danger-divider', type: 'divider' }] : []),
+    ...(action.danger && !model.overflow[index - 1]?.danger
+      ? [{ key: 'danger-divider', type: 'divider' }]
+      : []),
     {
       key: action.key,
       danger: action.danger,
       disabled: action.disabled,
-      icon: action.key === 'rename' ? <EditOutlined /> : <DeleteOutlined />,
+      icon: sessionTabActionIcon(action.key),
       label: t(action.labelKey),
     },
   ]);

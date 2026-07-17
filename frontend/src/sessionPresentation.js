@@ -109,6 +109,13 @@ export function buildSessionToolbarModel(options = {}) {
     ? options.terminalStatus
     : options.terminalStatus?.status;
   const canInterrupt = terminalStatus === 'busy' || terminalStatus === 'interrupting';
+  const reconnectPrimary = hasActiveSession
+    && (terminalStatus === 'error' || terminalStatus === 'closed');
+  const reconnectAction = {
+    key: 'reconnect',
+    labelKey: 'action.reconnect',
+    disabled: !hasActiveSession || canInterrupt || terminalStatus === 'connecting',
+  };
   const viewAction = options.view === 'grid'
     ? { key: 'tabs', labelKey: 'action.tabs', disabled: false }
     : { key: 'grid', labelKey: 'action.grid', disabled: false };
@@ -123,16 +130,13 @@ export function buildSessionToolbarModel(options = {}) {
       danger: true,
     });
   }
-  primary.push({
-    key: 'reconnect',
-    labelKey: 'action.reconnect',
-    disabled: !hasActiveSession || canInterrupt,
-  });
+  if (reconnectPrimary) primary.push(reconnectAction);
 
   return {
     primary,
     overflow: [
       { key: 'rename', labelKey: 'action.renameSession', disabled: !hasActiveSession },
+      ...(!reconnectPrimary ? [reconnectAction] : []),
       { key: 'closeClosed', labelKey: 'action.closeClosed', disabled: closedCount === 0 },
       {
         key: 'closeOthers',

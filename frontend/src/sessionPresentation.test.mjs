@@ -174,14 +174,15 @@ assert.deepEqual(buildSessionToolbarModel({
   canNavigate: true,
   closedCount: 2,
   sessionCount: 3,
+  terminalStatus: 'connected',
   view: 'tabs',
 }), {
   primary: [
     { key: 'grid', labelKey: 'action.grid', disabled: false },
-    { key: 'reconnect', labelKey: 'action.reconnect', disabled: false },
   ],
   overflow: [
     { key: 'rename', labelKey: 'action.renameSession', disabled: false },
+    { key: 'reconnect', labelKey: 'action.reconnect', disabled: false },
     { key: 'closeClosed', labelKey: 'action.closeClosed', disabled: false },
     { key: 'closeOthers', labelKey: 'action.closeOthers', disabled: false, danger: true },
     { key: 'closeCurrent', labelKey: 'action.closeSession', disabled: false, danger: true },
@@ -222,7 +223,40 @@ assert.deepEqual(buildSessionToolbarModel({
   view: 'tabs',
 }).primary, [
   { key: 'interrupt', labelKey: 'action.interruptCommand', disabled: false, danger: true },
+]);
+assert.deepEqual(buildSessionToolbarModel({
+  activeKey: 'running',
+  sessionCount: 1,
+  terminalStatus: 'busy',
+  view: 'tabs',
+}).overflow.slice(0, 2), [
+  { key: 'rename', labelKey: 'action.renameSession', disabled: false },
   { key: 'reconnect', labelKey: 'action.reconnect', disabled: true },
+]);
+
+assert.deepEqual(buildSessionToolbarModel({
+  activeKey: 'failed',
+  sessionCount: 1,
+  terminalStatus: { status: 'error' },
+  view: 'tabs',
+}), {
+  primary: [
+    { key: 'reconnect', labelKey: 'action.reconnect', disabled: false },
+  ],
+  overflow: [
+    { key: 'rename', labelKey: 'action.renameSession', disabled: false },
+    { key: 'closeClosed', labelKey: 'action.closeClosed', disabled: true },
+    { key: 'closeOthers', labelKey: 'action.closeOthers', disabled: true, danger: true },
+    { key: 'closeCurrent', labelKey: 'action.closeSession', disabled: false, danger: true },
+  ],
+});
+assert.deepEqual(buildSessionToolbarModel({
+  activeKey: 'closed',
+  sessionCount: 1,
+  terminalStatus: { status: 'closed' },
+  view: 'tabs',
+}).primary, [
+  { key: 'reconnect', labelKey: 'action.reconnect', disabled: false },
 ]);
 
 assert.deepEqual(buildSessionTabMenuModel({ sessionCount: 3 }), [
@@ -267,10 +301,10 @@ assert.deepEqual(buildSessionToolbarModel({
 }), {
   primary: [
     { key: 'tabs', labelKey: 'action.tabs', disabled: false },
-    { key: 'reconnect', labelKey: 'action.reconnect', disabled: true },
   ],
   overflow: [
     { key: 'rename', labelKey: 'action.renameSession', disabled: true },
+    { key: 'reconnect', labelKey: 'action.reconnect', disabled: true },
     { key: 'closeClosed', labelKey: 'action.closeClosed', disabled: true },
     { key: 'closeOthers', labelKey: 'action.closeOthers', disabled: true, danger: true },
     { key: 'closeCurrent', labelKey: 'action.closeSession', disabled: true, danger: true },
@@ -284,11 +318,10 @@ assert.deepEqual(buildSessionToolbarModel({
   sessionCount: 1,
   view: 'tabs',
 }), {
-  primary: [
-    { key: 'reconnect', labelKey: 'action.reconnect', disabled: false },
-  ],
+  primary: [],
   overflow: [
     { key: 'rename', labelKey: 'action.renameSession', disabled: false },
+    { key: 'reconnect', labelKey: 'action.reconnect', disabled: false },
     { key: 'closeClosed', labelKey: 'action.closeClosed', disabled: true },
     { key: 'closeOthers', labelKey: 'action.closeOthers', disabled: true, danger: true },
     { key: 'closeCurrent', labelKey: 'action.closeSession', disabled: false, danger: true },

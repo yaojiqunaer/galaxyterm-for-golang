@@ -709,6 +709,15 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   .topbar-utility-action {
     display: none;
   }
+
+  .session-toolbar-context {
+    display: none;
+  }
+
+  .session-toolbar-actions {
+    padding-left: 0;
+    border-left: 0;
+  }
 }
 
 .content-area {
@@ -898,6 +907,24 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   display: flex;
   align-items: center;
   padding-left: 6px;
+}
+
+.terminal-tabs .ant-tabs-nav-add {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  margin: 3px 4px 3px 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.terminal-tabs .ant-tabs-nav-add:hover,
+.terminal-tabs .ant-tabs-nav-add:focus-visible {
+  background: var(--accent-soft);
+  color: var(--accent);
 }
 
 .terminal-tabs .ant-tabs-tab {
