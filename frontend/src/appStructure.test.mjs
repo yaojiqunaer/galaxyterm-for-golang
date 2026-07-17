@@ -299,6 +299,33 @@ assert.ok(
   'recording playback state must remain compact and visually distinct',
 );
 assert.ok(
+  replaySource.includes('findActiveAuditEventIndex(')
+    && replaySource.includes('resolveAuditReplayTime(')
+    && replaySource.includes('auditTimelineRef')
+    && replaySource.includes("scrollIntoView({ block: 'nearest' })")
+    && replaySource.includes('aria-current={active ? \'true\' : undefined}')
+    && replaySource.includes('onClick={() => seek(item.replayTime)}')
+    && !source.includes('className="audit-timeline-section"'),
+  'audit events must be keyboard-accessible replay markers owned by the replay component',
+);
+assert.ok(
+  /\.audit-timeline-event-button\s*\{[\s\S]*?cursor:\s*pointer/.test(styles)
+    && /\.audit-timeline-event-button\.is-active\s*\{[\s\S]*?background:/.test(styles),
+  'linked audit events must have clear hover and current-playhead states',
+);
+assert.ok(
+  source.includes('const [replayExpanded, setReplayExpanded] = useState(false);')
+    && source.includes("width={screens.md === false || replayExpanded ? '100%' : 920}")
+    && source.includes("aria-label={t(replayExpanded ? 'action.collapseReplay' : 'action.expandReplay')}")
+    && source.includes('replayExpanded ? <FullscreenExitOutlined /> : <FullscreenOutlined />')
+    && source.includes('className={`audit-replay-drawer${replayExpanded ? \' is-expanded\' : \'\'}`}'),
+  'recording replay must expand to the full workspace and restore without leaving the drawer',
+);
+assert.ok(
+  /\.audit-replay-drawer\.is-expanded\s+\.audit-replay-stage\s*\{[\s\S]*?max-height:\s*72vh/.test(styles),
+  'expanded recording replay must use the additional vertical workspace',
+);
+assert.ok(
   viteConfig.includes("return 'xterm-runtime';")
     && viteConfig.indexOf("return 'xterm-runtime';") < viteConfig.indexOf("return 'vendor-runtime';"),
   'production chunking must keep xterm out of the eagerly preloaded vendor runtime',

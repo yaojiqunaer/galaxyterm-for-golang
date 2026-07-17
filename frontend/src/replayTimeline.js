@@ -38,6 +38,33 @@ export function replayPlaybackState({
   return 'paused';
 }
 
+export function resolveAuditReplayTime(eventAt, recordingStartedAt, duration) {
+  const eventTimestamp = Date.parse(String(eventAt || ''));
+  const startedTimestamp = Date.parse(String(recordingStartedAt || ''));
+  if (!Number.isFinite(eventTimestamp) || !Number.isFinite(startedTimestamp)) return null;
+  const safeDuration = Math.max(0, Number(duration) || 0);
+  return clamp((eventTimestamp - startedTimestamp) / 1000, 0, safeDuration);
+}
+
+export function findActiveAuditEventIndex(
+  events = [],
+  recordingStartedAt = '',
+  playhead = 0,
+  duration = 0,
+) {
+  const safePlayhead = Math.max(0, Number(playhead) || 0);
+  let activeIndex = -1;
+  let activeTime = -1;
+  events.forEach((event, index) => {
+    const replayTime = resolveAuditReplayTime(event?.at, recordingStartedAt, duration);
+    if (replayTime !== null && replayTime <= safePlayhead && replayTime >= activeTime) {
+      activeIndex = index;
+      activeTime = replayTime;
+    }
+  });
+  return activeIndex;
+}
+
 function clamp(value, minimum, maximum) {
   return Math.min(maximum, Math.max(minimum, value));
 }

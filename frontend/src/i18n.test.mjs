@@ -30,8 +30,12 @@ assert.equal(t('palette.reason.noWorkspaceSnapshot'), 'Save a workspace before r
 assert.equal(t('replay.state.playing'), 'Playing');
 assert.equal(t('action.seekBackward5'), 'Back 5 seconds');
 assert.equal(t('action.seekForward5'), 'Forward 5 seconds');
+assert.equal(t('action.expandReplay'), 'Expand replay');
+assert.equal(t('action.collapseReplay'), 'Restore replay');
 assert.equal(t('replay.keyboardHint'), 'Space/K play or pause · Left/Right 5s · Home/End');
 assert.equal(t('replay.eventProgress', { current: 3, total: 8 }), '3 / 8 output events');
+assert.equal(t('replay.seekEvent', { time: '0:05.0', type: 'command' }), 'Seek to 0:05.0: command');
+assert.equal(t('replay.eventUnavailable', { type: 'legacy' }), 'legacy is not linked to this recording');
 assert.equal(t('session.status.error'), 'Error');
 assert.equal(t('locale.en-US'), 'English');
 assert.equal(t('locale.zh-CN'), 'Simplified Chinese');
@@ -55,8 +59,12 @@ assert.equal(t('palette.reason.noWorkspaceSnapshot'), '请先保存工作区，�
 assert.equal(t('replay.state.playing'), '播放中');
 assert.equal(t('action.seekBackward5'), '后退 5 秒');
 assert.equal(t('action.seekForward5'), '前进 5 秒');
+assert.equal(t('action.expandReplay'), '展开回放');
+assert.equal(t('action.collapseReplay'), '还原回放');
 assert.equal(t('replay.keyboardHint'), 'Space/K 播放或暂停 · 左右键 5 秒 · Home/End');
 assert.equal(t('replay.eventProgress', { current: 3, total: 8 }), '已回放 3 / 8 帧');
+assert.equal(t('replay.seekEvent', { time: '0:05.0', type: 'command' }), '定位到 0:05.0：command');
+assert.equal(t('replay.eventUnavailable', { type: 'legacy' }), 'legacy 未关联到此录屏');
 assert.equal(t('session.status.error'), '异常');
 assert.equal(t('locale.en-US'), 'English');
 assert.equal(t('locale.zh-CN'), '简体中文');

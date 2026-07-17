@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import {
   advanceReplayTime,
+  findActiveAuditEventIndex,
   findReplayEventCursor,
   replayPlaybackState,
+  resolveAuditReplayTime,
   seekReplayTime,
   shouldResetReplayTerminal,
 } from './replayTimeline.js';
@@ -37,5 +39,22 @@ assert.equal(replayPlaybackState({ hasRecording: false }), 'unavailable');
 assert.equal(replayPlaybackState({ duration: 8, hasRecording: true, playhead: 2, playing: true }), 'playing');
 assert.equal(replayPlaybackState({ duration: 8, hasRecording: true, playhead: 2, playing: false }), 'paused');
 assert.equal(replayPlaybackState({ duration: 8, hasRecording: true, playhead: 8, playing: false }), 'finished');
+
+const recordingStartedAt = '2026-07-17T10:00:00.000Z';
+assert.equal(resolveAuditReplayTime('2026-07-17T10:00:05.250Z', recordingStartedAt, 12), 5.25);
+assert.equal(resolveAuditReplayTime('2026-07-17T09:59:58.000Z', recordingStartedAt, 12), 0);
+assert.equal(resolveAuditReplayTime('2026-07-17T10:00:20.000Z', recordingStartedAt, 12), 12);
+assert.equal(resolveAuditReplayTime('invalid', recordingStartedAt, 12), null);
+assert.equal(resolveAuditReplayTime('2026-07-17T10:00:01.000Z', '', 12), null);
+
+const auditEvents = [
+  { at: '2026-07-17T10:00:09.000Z' },
+  { at: '2026-07-17T10:00:02.000Z' },
+  { at: 'invalid' },
+  { at: '2026-07-17T10:00:05.000Z' },
+];
+assert.equal(findActiveAuditEventIndex(auditEvents, recordingStartedAt, 1, 12), -1);
+assert.equal(findActiveAuditEventIndex(auditEvents, recordingStartedAt, 6, 12), 3);
+assert.equal(findActiveAuditEventIndex(auditEvents, recordingStartedAt, 12, 12), 0);
 
 console.log('replay timeline tests passed');

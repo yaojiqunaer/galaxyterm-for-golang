@@ -382,6 +382,7 @@ function App() {
   const [recentConnections, setRecentConnections] = useState(() => loadRecentConnections());
   const [auditRecords, setAuditRecords] = useState(() => loadAuditRecords());
   const [replayRecord, setReplayRecord] = useState(null);
+  const [replayExpanded, setReplayExpanded] = useState(false);
   const [editingProfileId, setEditingProfileId] = useState('');
   const [newType, setNewType] = useState('local');
   const [fileEntries, setFileEntries] = useState([]);
@@ -1526,6 +1527,16 @@ function App() {
     return record;
   };
 
+  const openAuditReplay = (record) => {
+    setReplayRecord(record);
+    setReplayExpanded(false);
+  };
+
+  const closeAuditReplay = () => {
+    setReplayRecord(null);
+    setReplayExpanded(false);
+  };
+
   const deleteAuditRecord = (recordId) => {
     const persistence = persistAuditRecords(auditRecords.filter((record) => record.id !== recordId));
     setAuditRecords(persistence.records);
@@ -1533,7 +1544,7 @@ function App() {
       messageApi.error(t('message.auditStorageUpdateFailed'));
       return;
     }
-    if (replayRecord?.id === recordId) setReplayRecord(null);
+    if (replayRecord?.id === recordId) closeAuditReplay();
     messageApi.success(t('message.auditRecordDeleted'));
   };
 
@@ -1544,7 +1555,7 @@ function App() {
       messageApi.error(t('message.auditStorageUpdateFailed'));
       return;
     }
-    setReplayRecord(null);
+    closeAuditReplay();
     messageApi.success(t('message.auditRecordsCleared'));
   };
 
@@ -4403,7 +4414,7 @@ function App() {
           return (
             <List.Item
               actions={[
-                <Button key="replay" size="small" onClick={() => setReplayRecord(record)}>{t('action.replay')}</Button>,
+                <Button key="replay" size="small" onClick={() => openAuditReplay(record)}>{t('action.replay')}</Button>,
                 <Button key="cast" size="small" onClick={() => exportAuditRecord(record, 'cast')}>{t('action.exportCast')}</Button>,
                 <Button key="log" size="small" onClick={() => exportAuditRecord(record, 'log')}>{t('action.exportLog')}</Button>,
                 <Button key="delete" size="small" danger onClick={() => deleteAuditRecord(record.id)}>{t('action.delete')}</Button>,
@@ -4433,13 +4444,22 @@ function App() {
         }}
       />
       <Drawer
-        className="audit-replay-drawer"
+        className={`audit-replay-drawer${replayExpanded ? ' is-expanded' : ''}`}
         title={replayRecord ? `${t('action.replay')} · ${replayRecord.title}` : t('action.replay')}
-        width={screens.md === false ? '100%' : 920}
+        width={screens.md === false || replayExpanded ? '100%' : 920}
         open={!!replayRecord}
-        onClose={() => setReplayRecord(null)}
+        onClose={closeAuditReplay}
         extra={replayRecord && (
           <Space>
+            <Tooltip title={t(replayExpanded ? 'action.collapseReplay' : 'action.expandReplay')}>
+              <Button
+                aria-label={t(replayExpanded ? 'action.collapseReplay' : 'action.expandReplay')}
+                className="audit-drawer-expand"
+                icon={replayExpanded ? <FullscreenExitOutlined /> : <FullscreenOutlined />}
+                onClick={() => setReplayExpanded((current) => !current)}
+                type="text"
+              />
+            </Tooltip>
             <Button
               aria-label={t('action.exportCast')}
               className="audit-drawer-export"
@@ -4462,30 +4482,8 @@ function App() {
         {replayRecord && (
           <div className="audit-replay-content">
             <Suspense fallback={<ReplayLoadingState />}>
-              <AuditReplayPlayer record={replayRecord} />
+              <AuditReplayPlayer locale={locale} record={replayRecord} />
             </Suspense>
-            <div className="audit-timeline-section">
-              <div className="audit-timeline-heading">
-                <Text strong>{t('section.auditTimeline')}</Text>
-                <Text type="secondary">{replayRecord.auditEvents?.length || 0}</Text>
-              </div>
-              <List
-                className="audit-timeline-list"
-                size="small"
-                dataSource={replayRecord.auditEvents || []}
-                renderItem={(event) => (
-                  <List.Item>
-                    <span className="audit-timeline-event">
-                      <Text code>{event.type}</Text>
-                      <span>
-                        <Text>{event.detail || '-'}</Text>
-                        <Text type="secondary">{formatAuditTimestamp(event.at, locale)}</Text>
-                      </span>
-                    </span>
-                  </List.Item>
-                )}
-              />
-            </div>
           </div>
         )}
       </Drawer>
@@ -6601,15 +6599,6 @@ function formatReplayTime(seconds = 0) {
   const minutes = Math.floor(safeSeconds / 60);
   const remainingSeconds = Math.floor(safeSeconds % 60);
   return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`;
-}
-
-function formatAuditTimestamp(value = '', locale = currentLocale()) {
-  const timestamp = Date.parse(value);
-  if (!timestamp) return value || '-';
-  return new Date(timestamp).toLocaleString(locale, {
-    dateStyle: 'medium',
-    timeStyle: 'medium',
-  });
 }
 
 function formatProfileLastUsed(value = '') {

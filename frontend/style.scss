@@ -2592,6 +2592,10 @@ code {
   background: #0b1016;
 }
 
+.audit-replay-drawer.is-expanded .audit-replay-stage {
+  max-height: 72vh;
+}
+
 .audit-replay-terminal {
   min-width: 100%;
   min-height: 360px;
@@ -2704,25 +2708,72 @@ code {
   overflow: auto;
 }
 
-.audit-timeline-list .ant-list-item {
-  padding: 9px 13px;
-}
-
-.audit-timeline-event {
+.audit-timeline-event-button {
+  appearance: none;
   display: grid;
-  grid-template-columns: minmax(110px, auto) minmax(0, 1fr);
+  grid-template-columns: minmax(128px, auto) minmax(0, 1fr);
   align-items: start;
   gap: 12px;
   width: 100%;
+  padding: 9px 13px;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
 }
 
-.audit-timeline-event > span {
+.audit-timeline-event-button:last-child {
+  border-bottom: 0;
+}
+
+.audit-timeline-event-button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent-soft) 45%, transparent);
+}
+
+.audit-timeline-event-button:focus-visible {
+  outline: 0;
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
+.audit-timeline-event-button.is-active {
+  background: var(--accent-soft);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.audit-timeline-event-button:disabled {
+  cursor: default;
+  opacity: 0.62;
+}
+
+.audit-timeline-event-button > span {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
 
-.audit-timeline-event .ant-typography-secondary {
+.audit-timeline-event-time {
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.audit-timeline-event-time small,
+.audit-timeline-event-detail > span:last-child {
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audit-timeline-event-detail {
+  gap: 4px;
+}
+
+.audit-timeline-event-detail .ant-typography {
+  width: fit-content;
   margin-top: 2px;
   font-size: 11px;
 }
@@ -2767,6 +2818,10 @@ code {
     padding-inline: 0;
   }
 
+  .audit-drawer-expand.ant-btn {
+    display: none;
+  }
+
   .audit-drawer-export > span:not(.ant-btn-icon) {
     display: none;
   }
@@ -2777,7 +2832,7 @@ code {
     min-height: 300px;
   }
 
-  .audit-timeline-event {
+  .audit-timeline-event-button {
     grid-template-columns: 1fr;
     gap: 5px;
   }

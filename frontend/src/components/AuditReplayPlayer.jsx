@@ -14,8 +14,10 @@ import { Button, Segmented, Slider, Tooltip, Typography } from 'antd';
 import { parseAsciinemaCast, resolveReplayEventTime } from '../auditLog.js';
 import {
   advanceReplayTime,
+  findActiveAuditEventIndex,
   findReplayEventCursor,
   replayPlaybackState,
+  resolveAuditReplayTime,
   seekReplayTime,
   shouldResetReplayTerminal,
 } from '../replayTimeline.js';
@@ -24,17 +26,32 @@ import { t } from '../i18n.js';
 const { Text } = Typography;
 const playbackRates = [0.5, 1, 1.5, 2].map((value) => ({ label: `${value}x`, value }));
 
-export default function AuditReplayPlayer({ record }) {
+export default function AuditReplayPlayer({ locale = 'en-US', record }) {
   const parsedCast = useMemo(() => parseAsciinemaCast(record?.cast || ''), [record?.cast]);
   const terminalHostRef = useRef(null);
   const terminalRef = useRef(null);
+  const auditTimelineRef = useRef(null);
   const renderStateRef = useRef({ cursor: 0, recordId: '', time: 0 });
   const [rendererReady, setRendererReady] = useState(false);
   const [playing, setPlaying] = useState(false);
   const [playhead, setPlayhead] = useState(0);
   const [speed, setSpeed] = useState(1);
   const hasRecording = parsedCast.events.length > 0;
+  const auditEvents = record?.auditEvents || [];
+  const recordingStartedAt = resolveRecordingStartedAt(record, parsedCast.header);
+  const auditTimelineItems = useMemo(() => auditEvents.map((event) => ({
+    event,
+    replayTime: resolveAuditReplayTime(event?.at, recordingStartedAt, parsedCast.duration),
+  })), [auditEvents, parsedCast.duration, recordingStartedAt]);
   const currentEventCount = findReplayEventCursor(parsedCast.events, playhead, 0);
+  const activeAuditEventIndex = hasRecording
+    ? findActiveAuditEventIndex(
+      auditEvents,
+      recordingStartedAt,
+      playhead,
+      parsedCast.duration,
+    )
+    : -1;
   const playbackState = replayPlaybackState({
     duration: parsedCast.duration,
     hasRecording,
@@ -176,8 +193,16 @@ export default function AuditReplayPlayer({ record }) {
     return () => window.removeEventListener('keydown', handleReplayKeyDown);
   }, [hasRecording, parsedCast.duration]);
 
+  useEffect(() => {
+    if (!playing || activeAuditEventIndex < 0) return;
+    auditTimelineRef.current
+      ?.querySelector(`[data-audit-index="${activeAuditEventIndex}"]`)
+      ?.scrollIntoView({ block: 'nearest' });
+  }, [activeAuditEventIndex, playing]);
+
   return (
-    <section className="audit-player" aria-label={t('section.recordingReplay')}>
+    <>
+      <section className="audit-player" aria-label={t('section.recordingReplay')}>
       <div className="audit-replay-stage">
         <div className="audit-replay-terminal" ref={terminalHostRef} aria-label={t('label.recordingOutput')} />
         {!hasRecording && !record?.screen && (
@@ -280,7 +305,47 @@ export default function AuditReplayPlayer({ record }) {
         <span>{t('replay.eventProgress', { current: currentEventCount, total: parsedCast.events.length })}</span>
         <span className="audit-player-keyboard-hint">{t('replay.keyboardHint')}</span>
       </div>
-    </section>
+      </section>
+      {auditTimelineItems.length > 0 && (
+        <section className="audit-timeline-section" aria-label={t('section.auditTimeline')}>
+          <div className="audit-timeline-heading">
+            <Text strong>{t('section.auditTimeline')}</Text>
+            <Text type="secondary">{auditTimelineItems.length}</Text>
+          </div>
+          <div className="audit-timeline-list" ref={auditTimelineRef}>
+            {auditTimelineItems.map((item, index) => {
+              const active = index === activeAuditEventIndex;
+              const available = hasRecording && item.replayTime !== null;
+              const eventType = item.event?.type || '-';
+              const relativeTime = item.replayTime === null ? '--:--' : formatReplayTime(item.replayTime);
+              return (
+                <button
+                  aria-current={active ? 'true' : undefined}
+                  aria-label={available
+                    ? t('replay.seekEvent', { time: relativeTime, type: eventType })
+                    : t('replay.eventUnavailable', { type: eventType })}
+                  className={`audit-timeline-event-button${active ? ' is-active' : ''}`}
+                  data-audit-index={index}
+                  disabled={!available}
+                  key={item.event?.id || `${eventType}-${index}`}
+                  onClick={() => seek(item.replayTime)}
+                  type="button"
+                >
+                  <span className="audit-timeline-event-time">
+                    <strong>{relativeTime}</strong>
+                    <small>{formatAuditTimestamp(item.event?.at, locale)}</small>
+                  </span>
+                  <span className="audit-timeline-event-detail">
+                    <Text code>{eventType}</Text>
+                    <span title={item.event?.detail || ''}>{item.event?.detail || '-'}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+      )}
+    </>
   );
 }
 
@@ -295,6 +360,21 @@ function formatReplayTime(seconds = 0) {
   const remainingSeconds = Math.floor(safeSeconds % 60);
   const milliseconds = Math.floor((safeSeconds % 1) * 10);
   return `${minutes}:${String(remainingSeconds).padStart(2, '0')}.${milliseconds}`;
+}
+
+function formatAuditTimestamp(value = '', locale = 'en-US') {
+  const timestamp = Date.parse(value);
+  if (!Number.isFinite(timestamp)) return value || '-';
+  return new Date(timestamp).toLocaleString(locale, {
+    dateStyle: 'medium',
+    timeStyle: 'medium',
+  });
+}
+
+function resolveRecordingStartedAt(record, header) {
+  if (record?.startedAt) return record.startedAt;
+  const timestamp = Number(header?.timestamp);
+  return timestamp > 0 ? new Date(timestamp * 1000).toISOString() : '';
 }
 
 function isReplayControlTarget(target) {
