@@ -190,6 +190,31 @@ assert.ok(
   'topbar primary commands must expose responsive label hooks',
 );
 assert.ok(
+  source.includes("onClick={() => launchDefaultTerminal()}")
+    && source.includes('className="topbar-new-terminal-group"')
+    && source.includes('className="topbar-new-terminal-menu"')
+    && source.includes("aria-label={t('action.configureTerminal')}"),
+  'the topbar must pair one-click default terminal creation with an adjacent configuration menu',
+);
+assert.ok(
+  source.includes('buildDefaultTerminalLaunch({')
+    && source.includes('const launchDefaultTerminal = async (providerType = terminalDefaults.defaultProviderType) => {')
+    && source.includes("if (launch.kind === 'configure') {")
+    && source.includes('await startProfileRequests([launch.request]);')
+    && source.includes("showOperationError('message.terminalStartFailed', error")
+    && source.includes("if (configurableShortcutAction === 'newTerminal')")
+    && source.includes('launchDefaultTerminal();'),
+  'default terminal entry points must share one safe direct-launch plan with structured recovery',
+);
+assert.ok(
+  source.includes('onClick={() => launchDefaultTerminal(provider.type)}')
+    && source.includes('openDefaultTerminal={launchDefaultTerminal}')
+    && source.includes("onClick={() => openDefaultTerminal('local')}")
+    && source.includes("if (action === 'newLocalTerminal') launchDefaultTerminal('local');")
+    && source.includes("if (action === 'local') launchDefaultTerminal('local');"),
+  'sidebar, empty session, palette, and keyboard launch paths must stay behaviorally consistent',
+);
+assert.ok(
   /@media \(max-width: 1200px\)[\s\S]*?\.topbar-new-terminal[\s\S]*?\.command-palette-label/.test(styles),
   'narrow workspaces must collapse primary topbar labels without hiding their commands',
 );

@@ -10,6 +10,7 @@ import {
   buildConnectionProfileStatusSummary,
   buildConnectionProfileSubtitle,
   buildConnectionTransferActions,
+  buildDefaultTerminalLaunch,
   buildTerminalSubmitPlan,
   filterConnectionProfiles,
   filterRecentConnectionsByProviders,
@@ -47,6 +48,31 @@ assert.deepEqual(buildTerminalSubmitPlan({ action: 'save', intent: 'connection' 
 assert.deepEqual(buildTerminalSubmitPlan({ action: 'saveAndOpen', intent: 'edit' }), {
   openSession: true,
   persistProfile: true,
+});
+assert.deepEqual(buildDefaultTerminalLaunch({
+  providerName: 'Local Terminal',
+  providerType: 'local',
+  workingDirectory: '/Users/me/project',
+}), {
+  kind: 'open',
+  providerType: 'local',
+  request: {
+    auth: {},
+    config: { shell: '', workingDirectory: '/Users/me/project' },
+    displayName: 'Local Terminal',
+    group: '',
+    providerType: 'local',
+  },
+});
+assert.deepEqual(buildDefaultTerminalLaunch({ providerType: 'ssh' }), {
+  kind: 'configure',
+  providerType: 'ssh',
+  request: null,
+});
+assert.deepEqual(buildDefaultTerminalLaunch({ providerType: 'kubernetes' }), {
+  kind: 'configure',
+  providerType: 'kubernetes',
+  request: null,
 });
 
 assert.deepEqual(buildConnectionTransferActions({ profileCount: 0 }), [

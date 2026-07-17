@@ -99,6 +99,7 @@ import {
   buildConnectionProfileStatusSummary,
   buildConnectionProfileSubtitle,
   buildConnectionTransferActions,
+  buildDefaultTerminalLaunch,
   buildTerminalSubmitPlan,
   filterConnectionProfiles,
   filterRecentConnectionsByProviders,
@@ -625,7 +626,7 @@ function App() {
       const configurableShortcutAction = resolveConfigurableShortcutAction(event, settings);
       if (configurableShortcutAction === 'newTerminal') {
         event.preventDefault();
-        openDrawer();
+        launchDefaultTerminal();
         return;
       }
       if (configurableShortcutAction === 'quickCommands') {
@@ -721,7 +722,21 @@ function App() {
     };
     window.addEventListener('keydown', handleKeydown, true);
     return () => window.removeEventListener('keydown', handleKeydown, true);
-  }, [activeKey, closedSessions, selectedNav, sessions, settings.confirmDangerousActions, settings.shortcutBindings, settings.shortcutModifier, sidebarCompact]);
+  }, [
+    activeKey,
+    allProviders,
+    closedSessions,
+    installedExtensions,
+    selectedNav,
+    sessions,
+    settings.confirmDangerousActions,
+    settings.defaultProviderType,
+    settings.defaultWorkingDirectory,
+    settings.disabledExtensionIds,
+    settings.shortcutBindings,
+    settings.shortcutModifier,
+    sidebarCompact,
+  ]);
 
   useEffect(() => {
     if (!activeKey || selectedNav !== 'sessions') return undefined;
@@ -1107,6 +1122,26 @@ function App() {
     messageApi.success(createdSessions.length > 1
       ? `${t('message.batchSessionsStarted')}: ${createdSessions.length}`
       : t('terminal.status.connecting'));
+  };
+
+  const launchDefaultTerminal = async (providerType = terminalDefaults.defaultProviderType) => {
+    const provider = providers.find((item) => item.type === providerType) || fallbackProviders[0];
+    const launch = buildDefaultTerminalLaunch({
+      providerName: providerLabel(provider),
+      providerType,
+      workingDirectory: terminalDefaults.defaultWorkingDirectory,
+    });
+    if (launch.kind === 'configure') {
+      openDrawer(providerType);
+      return;
+    }
+    try {
+      await startProfileRequests([launch.request]);
+    } catch (error) {
+      showOperationError('message.terminalStartFailed', error, {
+        retry: () => launchDefaultTerminal(providerType),
+      });
+    }
   };
 
   const rememberClosedSessions = (closingSessions) => {
@@ -1805,7 +1840,7 @@ function App() {
   };
 
   const runConnectionPaletteAction = (action) => {
-    if (action === 'newLocalTerminal') openDrawer('local');
+    if (action === 'newLocalTerminal') launchDefaultTerminal('local');
     if (action === 'quickSsh') openDrawer('ssh');
     if (action === 'newConnection') openConnectionDrawer();
     if (action === 'importSshConfig') openSshConfigImporter();
@@ -2302,6 +2337,7 @@ function App() {
       return (
         <SessionEmptyPanel
           openConnections={() => setSelectedNav('connections')}
+          openDefaultTerminal={launchDefaultTerminal}
           openDrawer={openDrawer}
           openProfile={openProfile}
           openRecentConnection={openRecentConnection}
@@ -4723,7 +4759,7 @@ function App() {
 
   const runPaletteEmptyAction = (action) => {
     closePalette();
-    if (action === 'local') openDrawer('local');
+    if (action === 'local') launchDefaultTerminal('local');
     if (action === 'ssh') openDrawer('ssh');
     if (action === 'connections') setSelectedNav('connections');
   };
@@ -5024,7 +5060,7 @@ function App() {
                 size="small"
                 dataSource={providers}
                 renderItem={(provider) => (
-                  <List.Item className="provider-row" onClick={() => openDrawer(provider.type)}>
+                  <List.Item className="provider-row" onClick={() => launchDefaultTerminal(provider.type)}>
                     <Space>
                       <span className="provider-icon">{providerIcons[provider.type] || <CodeOutlined />}</span>
                       <span>{providerLabel(provider)}</span>
@@ -5121,17 +5157,37 @@ function App() {
                 />
               </Tooltip>
             )}
-            <Tooltip title={t('action.newTerminal')}>
-              <Button
-                aria-label={t('action.newTerminal')}
-                className="topbar-new-terminal"
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={() => openDrawer()}
+            <Space.Compact className="topbar-new-terminal-group">
+              <Tooltip title={t('action.newTerminal')}>
+                <Button
+                  aria-label={t('action.newTerminal')}
+                  className="topbar-new-terminal"
+                  type="primary"
+                  icon={<PlusOutlined />}
+                  onClick={() => launchDefaultTerminal()}
+                >
+                  <span className="topbar-button-label">{t('action.newTerminal')}</span>
+                </Button>
+              </Tooltip>
+              <Dropdown
+                menu={{
+                  items: providers.map((provider) => ({
+                    key: provider.type,
+                    icon: providerIcons[provider.type] || <CodeOutlined />,
+                    label: providerLabel(provider),
+                  })),
+                  onClick: ({ key }) => openDrawer(key),
+                }}
+                trigger={['click']}
               >
-                <span className="topbar-button-label">{t('action.newTerminal')}</span>
-              </Button>
-            </Tooltip>
+                <Button
+                  aria-label={t('action.configureTerminal')}
+                  className="topbar-new-terminal-menu"
+                  icon={<DownOutlined />}
+                  title={t('action.configureTerminal')}
+                />
+              </Dropdown>
+            </Space.Compact>
             <Button className="topbar-secondary-action" icon={<CloudServerOutlined />} onClick={() => openDrawer('ssh')}>
               {t('action.quickSsh')}
             </Button>
@@ -5788,6 +5844,7 @@ function WelcomePanel({ providers, openDrawer }) {
 
 function SessionEmptyPanel({
   openConnections,
+  openDefaultTerminal,
   openDrawer,
   openProfile,
   openRecentConnection,
@@ -5808,7 +5865,7 @@ function SessionEmptyPanel({
           <Text>{t('session.empty.description')}</Text>
         </div>
         <Space className="session-empty-actions" wrap>
-          <Button type="primary" icon={<LaptopOutlined />} onClick={() => openDrawer('local')}>
+          <Button type="primary" icon={<LaptopOutlined />} onClick={() => openDefaultTerminal('local')}>
             {t('provider.local.name')}
           </Button>
           <Button icon={<CloudServerOutlined />} onClick={() => openDrawer('ssh')}>

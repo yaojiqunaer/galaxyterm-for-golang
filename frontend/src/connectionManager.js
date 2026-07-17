@@ -15,6 +15,30 @@ export function buildTerminalSubmitPlan({ action = 'create', intent = 'session',
   };
 }
 
+export function buildDefaultTerminalLaunch({
+  providerName = 'Local Terminal',
+  providerType = 'local',
+  workingDirectory = '',
+} = {}) {
+  if (providerType !== 'local') {
+    return { kind: 'configure', providerType, request: null };
+  }
+  return {
+    kind: 'open',
+    providerType,
+    request: {
+      auth: {},
+      config: {
+        shell: '',
+        workingDirectory: String(workingDirectory || '').trim(),
+      },
+      displayName: providerName,
+      group: '',
+      providerType,
+    },
+  };
+}
+
 export function buildConnectionTransferActions({ profileCount = 0 } = {}) {
   return [
     { key: 'importSshConfig', labelKey: 'action.importSshConfig', disabled: false },

@@ -645,6 +645,16 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   flex: 0 0 32px;
 }
 
+.topbar-new-terminal-group {
+  flex: 0 0 auto;
+}
+
+.topbar-new-terminal-menu.ant-btn {
+  width: 28px;
+  min-width: 28px;
+  padding-inline: 0;
+}
+
 .topbar .command-palette-trigger {
   justify-content: flex-start;
   width: clamp(180px, 30vw, 440px);
