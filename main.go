@@ -85,7 +85,7 @@ func main() {
 		//CSSDragProperty: "--wails-draggable",
 		Bind: []interface{}{
 			session.NewAPI(sessionManager),
-			desktop.NewAPI(),
+			desktop.NewDesktopAPI(func() context.Context { return appCtx }),
 			fileAPI,
 			extensionAPI,
 			credentials.NewAPI(),

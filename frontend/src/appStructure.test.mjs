@@ -322,6 +322,13 @@ assert.ok(
   'extension mutations must expose precise busy state and prevent concurrent registry writes',
 );
 assert.ok(
+  source.includes('await DesktopAPI.SelectSSHConfig()')
+    && source.includes('setSshConfigContent(selection.content)')
+    && source.includes('loading={sshConfigLoading}')
+    && source.includes('className="ssh-config-import-editor"'),
+  'SSH Config import must combine a native file picker with editable preview before profile creation',
+);
+assert.ok(
   source.includes("selectedFileProvider.protocol === 'sftp'")
     && source.includes('resolveSelectedSshProfile(fileProfileId)'),
   'the SFTP extension must retain saved SSH profile reuse without making it a core protocol implementation',

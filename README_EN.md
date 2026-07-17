@@ -37,7 +37,7 @@ Reuse saved SSH connections for local port forwarding with password, private-key
 
 <details>
 <summary><b>🗂 Connection manager and system credentials</b></summary>
-Save non-sensitive SSH connection metadata such as name, group, host, port, username, auth type, and jump-host settings. New and edited connections can be saved without opening a terminal, or saved and opened immediately. Passwords, private keys, passphrases, and jump-host passwords can be stored in the system credential store; profile exports only keep credential references. The connection manager supports favorite-first sorting, group summaries, opening favorites, and opening a whole group at once.
+Save non-sensitive SSH connection metadata such as name, group, host, port, username, auth type, and jump-host settings. New and edited connections can be saved without opening a terminal, or saved and opened immediately. Passwords, private keys, passphrases, and jump-host passwords can be stored in the system credential store; profile exports only keep credential references. The connection manager supports favorite-first sorting, group summaries, opening favorites, and opening a whole group at once. It can also select and preview an OpenSSH Config file before importing profiles in bulk.
 </details>
 
 <details>

@@ -1,11 +1,24 @@
 package desktop
 
-import "strings"
+import (
+	"context"
+	"strings"
+)
 
-type API struct{}
+type API struct {
+	contextProvider func() context.Context
+	dialogs         desktopDialogs
+}
 
 func NewAPI() *API {
 	return &API{}
+}
+
+func NewDesktopAPI(contextProvider func() context.Context) *API {
+	return &API{
+		contextProvider: contextProvider,
+		dialogs:         wailsDesktopDialogs{},
+	}
 }
 
 func (api *API) SetWindowTheme(theme string) {

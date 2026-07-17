@@ -222,6 +222,7 @@ import {
 } from './listNavigation.js';
 import * as ExtensionsAPI from '../wailsjs/go/extensions/API.js';
 import * as FilesAPI from '../wailsjs/go/files/API.js';
+import * as DesktopAPI from '../wailsjs/go/desktop/API.js';
 import * as ThemeAPI from '../wailsjs/go/internal/Theme.js';
 import * as CredentialsAPI from '../wailsjs/go/credentials/API.js';
 import * as SessionAPI from '../wailsjs/go/session/API.js';
@@ -334,6 +335,7 @@ function App() {
   const [extensionSourceUrl, setExtensionSourceUrl] = useState('');
   const [sshConfigOpen, setSshConfigOpen] = useState(false);
   const [sshConfigContent, setSshConfigContent] = useState('');
+  const [sshConfigLoading, setSshConfigLoading] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [renamingSessionId, setRenamingSessionId] = useState('');
   const [renamingSessionName, setRenamingSessionName] = useState('');
@@ -1654,7 +1656,7 @@ function App() {
     if (action === 'newLocalTerminal') openDrawer('local');
     if (action === 'quickSsh') openDrawer('ssh');
     if (action === 'newConnection') openConnectionDrawer();
-    if (action === 'importSshConfig') setSshConfigOpen(true);
+    if (action === 'importSshConfig') openSshConfigImporter();
     if (action === 'importProfiles') profileImportRef.current?.click();
     if (action === 'exportProfiles') exportProfiles();
     if (action === 'openFavorites') openBatchProfiles({ favoritesOnly: true });
@@ -1765,7 +1767,7 @@ function App() {
   };
 
   const runConnectionTransferAction = (action) => {
-    if (action === 'importSshConfig') setSshConfigOpen(true);
+    if (action === 'importSshConfig') openSshConfigImporter();
     if (action === 'importProfiles') profileImportRef.current?.click();
     if (action === 'exportProfiles') exportProfiles();
   };
@@ -1782,6 +1784,25 @@ function App() {
     setSshConfigOpen(false);
     setSshConfigContent('');
     messageApi.success(t('message.sshConfigImported'));
+  };
+
+  const selectSshConfigFile = async () => {
+    setSshConfigLoading(true);
+    try {
+      const selection = await DesktopAPI.SelectSSHConfig();
+      if (!selection?.canceled && typeof selection?.content === 'string') {
+        setSshConfigContent(selection.content);
+      }
+    } catch (error) {
+      showOperationError('message.sshConfigReadFailed', error);
+    } finally {
+      setSshConfigLoading(false);
+    }
+  };
+
+  const openSshConfigImporter = () => {
+    setSshConfigOpen(true);
+    selectSshConfigFile();
   };
 
   const runQuickCommand = (command) => {
@@ -5334,7 +5355,12 @@ function App() {
         open={sshConfigOpen}
         destroyOnHidden
         onClose={() => setSshConfigOpen(false)}
-        extra={<Button type="primary" onClick={importSshConfigProfiles}>{t('action.importSshConfig')}</Button>}
+        extra={(
+          <Space>
+            <Button icon={<FolderOpenOutlined />} loading={sshConfigLoading} onClick={selectSshConfigFile}>{t('action.chooseFile')}</Button>
+            <Button type="primary" disabled={!sshConfigContent.trim()} onClick={importSshConfigProfiles}>{t('action.importSshConfig')}</Button>
+          </Space>
+        )}
       >
         <Alert type="info" showIcon message={t('settings.sshConfigImportHint')} />
         <Input.TextArea
