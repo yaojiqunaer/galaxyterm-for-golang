@@ -329,9 +329,7 @@ function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [commandsOpen, setCommandsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
-  const [extensionInstallOpen, setExtensionInstallOpen] = useState(false);
   const [extensionSourceOpen, setExtensionSourceOpen] = useState(false);
-  const [extensionPackagePath, setExtensionPackagePath] = useState('');
   const [extensionSourceName, setExtensionSourceName] = useState('');
   const [extensionSourceUrl, setExtensionSourceUrl] = useState('');
   const [sshConfigOpen, setSshConfigOpen] = useState(false);
@@ -381,9 +379,10 @@ function App() {
   const [fileProfileId, setFileProfileId] = useState('');
   const [testingConnection, setTestingConnection] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
-  const [extensionBusy, setExtensionBusy] = useState(false);
+  const [extensionOfflineInstalling, setExtensionOfflineInstalling] = useState(false);
   const [extensionRefreshingAll, setExtensionRefreshingAll] = useState(false);
   const [extensionInstallingId, setExtensionInstallingId] = useState('');
+  const [extensionUninstallingId, setExtensionUninstallingId] = useState('');
   const [tunnelBusy, setTunnelBusy] = useState(false);
   const [fileAuthType, setFileAuthType] = useState('password');
   const [tunnelAuthType, setTunnelAuthType] = useState('password');
@@ -407,6 +406,9 @@ function App() {
   const [commandForm] = Form.useForm();
   const watchedFilePath = Form.useWatch('path', fileForm);
   const pasteConfirmationPending = useRef(false);
+  const extensionOperationBusy = extensionOfflineInstalling
+    || Boolean(extensionInstallingId)
+    || Boolean(extensionUninstallingId);
 
   const showOperationError = (titleKey, error, options = {}) => {
     const model = buildOperationError(error, { scope: options.scope });
@@ -2586,7 +2588,7 @@ function App() {
         <Space>
           <Button
             icon={<ReloadOutlined />}
-            disabled={extensionSources.length === 0}
+            disabled={extensionSources.length === 0 || extensionOperationBusy}
             loading={extensionRefreshingAll}
             onClick={refreshAllExtensionSources}
           >
@@ -2594,9 +2596,9 @@ function App() {
           </Button>
           <Button
             icon={<FolderOpenOutlined />}
-            disabled={Boolean(extensionInstallingId)}
-            onClick={() => setExtensionInstallOpen(true)}
-            loading={extensionBusy}
+            disabled={extensionOperationBusy && !extensionOfflineInstalling}
+            onClick={installOfflineExtension}
+            loading={extensionOfflineInstalling}
           >
             {t('action.installOffline')}
           </Button>
@@ -2614,7 +2616,7 @@ function App() {
           <Text strong>{t('extension.coreTitle')}</Text>
           <Text type="secondary">{t('settings.coreOnly')}</Text>
         </div>
-        <Button icon={<FolderOpenOutlined />} disabled={Boolean(extensionInstallingId)} onClick={() => setExtensionInstallOpen(true)}>{t('action.installOffline')}</Button>
+        <Button icon={<FolderOpenOutlined />} loading={extensionOfflineInstalling} disabled={extensionOperationBusy && !extensionOfflineInstalling} onClick={installOfflineExtension}>{t('action.installOffline')}</Button>
       </div>
       <section className="extension-section">
         <div className="extension-section-head">
@@ -2705,6 +2707,7 @@ function App() {
                 <Switch
                   key="enabled"
                   checked={extension.enabled}
+                  disabled={extensionOperationBusy}
                   checkedChildren={t('label.enabled')}
                   unCheckedChildren={t('label.disabled')}
                   onChange={(checked) => toggleExtensionEnabled(extension.id, checked)}
@@ -2715,14 +2718,14 @@ function App() {
                     size="small"
                     type="primary"
                     icon={<ReloadOutlined />}
-                    disabled={Boolean(extensionInstallingId)}
+                    disabled={extensionOperationBusy}
                     loading={extensionInstallingId === extension.id}
                     onClick={() => installOnlineExtension(extension.updateItem)}
                   >
                     {`${t('action.update')} ${extension.updateItem.manifest.version}`}
                   </Button>
                 ),
-                <Button key="uninstall" size="small" danger disabled={Boolean(extensionInstallingId)} loading={extensionBusy} onClick={() => uninstallExtension(extension.id)}>{t('action.uninstall')}</Button>,
+                <Button key="uninstall" size="small" danger disabled={extensionOperationBusy} loading={extensionUninstallingId === extension.id} onClick={() => uninstallExtension(extension.id)}>{t('action.uninstall')}</Button>,
               ].filter(Boolean)}
             >
               <List.Item.Meta
@@ -2773,7 +2776,7 @@ function App() {
               className={`extension-card extension-card-${extension.status}`}
               key={`${extension.type}-${extension.status}`}
               type={action.enabled ? 'button' : undefined}
-              disabled={action.enabled && Boolean(extensionInstallingId)}
+              disabled={action.enabled && extensionOperationBusy}
               onClick={() => {
                 if (!action.enabled) return;
                 if (catalogItem) {
@@ -2922,18 +2925,12 @@ function App() {
   };
 
   const installOfflineExtension = async () => {
-    const packagePath = extensionPackagePath.trim();
-    if (!packagePath) {
-      messageApi.warning(t('validation.required'));
-      return;
-    }
-    setExtensionBusy(true);
+    setExtensionOfflineInstalling(true);
     try {
-      await ExtensionsAPI.InstallOffline(packagePath);
+      const result = await ExtensionsAPI.InstallOfflineFromDialog();
+      if (result?.canceled) return;
       const items = await ExtensionsAPI.ListInstalled();
       setInstalledExtensions(Array.isArray(items) ? items : []);
-      setExtensionInstallOpen(false);
-      setExtensionPackagePath('');
       messageApi.success(t('message.extensionInstalled'));
     } catch (error) {
       showOperationError('message.extensionInstallFailed', error, {
@@ -2941,7 +2938,7 @@ function App() {
         scope: 'extension',
       });
     } finally {
-      setExtensionBusy(false);
+      setExtensionOfflineInstalling(false);
     }
   };
 
@@ -2975,7 +2972,7 @@ function App() {
   };
 
   const uninstallExtension = async (extensionID) => {
-    setExtensionBusy(true);
+    setExtensionUninstallingId(extensionID);
     try {
       await ExtensionsAPI.Uninstall(extensionID);
       const items = await ExtensionsAPI.ListInstalled();
@@ -2987,7 +2984,7 @@ function App() {
         scope: 'extension',
       });
     } finally {
-      setExtensionBusy(false);
+      setExtensionUninstallingId('');
     }
   };
 
@@ -5302,25 +5299,6 @@ function App() {
         <Form layout="vertical" className="terminal-form">
           <Form.Item label={t('field.name')} required>
             <Input value={renamingSessionName} onChange={(event) => setRenamingSessionName(event.target.value)} />
-          </Form.Item>
-        </Form>
-      </Drawer>
-      <Drawer
-        title={t('drawer.installExtension')}
-        width={420}
-        open={extensionInstallOpen}
-        destroyOnHidden
-        onClose={() => setExtensionInstallOpen(false)}
-        extra={<Button type="primary" loading={extensionBusy} disabled={Boolean(extensionInstallingId)} onClick={installOfflineExtension}>{t('action.installOffline')}</Button>}
-      >
-        <Alert type="info" showIcon message={t('settings.extensionPackageHint')} />
-        <Form layout="vertical" className="terminal-form">
-          <Form.Item label={t('field.packagePath')} required>
-            <Input
-              value={extensionPackagePath}
-              onChange={(event) => setExtensionPackagePath(event.target.value)}
-              placeholder={t('placeholder.packagePath')}
-            />
           </Form.Item>
         </Form>
       </Drawer>

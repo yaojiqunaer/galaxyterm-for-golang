@@ -2,6 +2,7 @@ package extensions
 
 import (
 	"archive/zip"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -11,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 )
 
 const (
@@ -27,9 +29,12 @@ type FileProviderRuntime struct {
 }
 
 type API struct {
-	installed []Manifest
-	storePath string
-	client    *http.Client
+	mu              sync.RWMutex
+	installed       []Manifest
+	storePath       string
+	client          *http.Client
+	contextProvider func() context.Context
+	packageDialogs  packageDialogs
 }
 
 func NewAPI() *API {
@@ -47,6 +52,8 @@ func NewAPIWithStoreAndClient(storePath string, client *http.Client) *API {
 }
 
 func (api *API) ListInstalled() []Manifest {
+	api.mu.RLock()
+	defer api.mu.RUnlock()
 	return append([]Manifest(nil), api.installed...)
 }
 
@@ -58,11 +65,15 @@ func (api *API) RegisterInstalled(manifest Manifest) error {
 	if err := ValidateManifest(manifest); err != nil {
 		return err
 	}
+	api.mu.Lock()
+	defer api.mu.Unlock()
 	api.upsertInstalled(manifest)
 	return api.save()
 }
 
 func (api *API) InstallOffline(packagePath string) (Manifest, error) {
+	api.mu.Lock()
+	defer api.mu.Unlock()
 	manifest, err := ReadPackageManifest(packagePath)
 	if err != nil {
 		return Manifest{}, err
@@ -78,6 +89,8 @@ func (api *API) InstallOffline(packagePath string) (Manifest, error) {
 }
 
 func (api *API) Uninstall(extensionID string) error {
+	api.mu.Lock()
+	defer api.mu.Unlock()
 	var removed []Manifest
 	next := api.installed[:0]
 	for _, item := range api.installed {
@@ -95,6 +108,8 @@ func (api *API) Uninstall(extensionID string) error {
 }
 
 func (api *API) ResolveFileProvider(providerType string) (FileProviderRuntime, error) {
+	api.mu.RLock()
+	defer api.mu.RUnlock()
 	providerType = strings.TrimSpace(providerType)
 	for index := len(api.installed) - 1; index >= 0; index-- {
 		manifest := api.installed[index]

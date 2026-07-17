@@ -106,7 +106,7 @@ Packages in one directory must use `<extension-id>_<version>_<os>_<arch>.gtx`. E
 
 ## Offline Installation
 
-Download a `.gtx` package on a connected machine, transfer it to the target device, then choose Offline Install on the Extensions page and enter its absolute local path. Offline installation does not access extension sources and still verifies the manifest, checksum file, file count, extracted size, and archive paths.
+Download a `.gtx` package on a connected machine, transfer it to the target device, then choose Offline Install on the Extensions page and open the package with the native file picker. Canceling the picker leaves installed extensions unchanged. Offline installation does not access extension sources and still verifies the manifest, checksum file, file count, extracted size, and archive paths.
 
 Build the official SFTP extension with:
 

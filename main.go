@@ -47,7 +47,7 @@ func main() {
 	})
 	terminal.RegisterBuiltInProviders(sessionManager)
 	tunnelAPI := tunnel.NewAPI()
-	extensionAPI := extensions.NewAPI()
+	extensionAPI := extensions.NewDesktopAPI(func() context.Context { return appCtx })
 	fileAPI := files.NewDesktopAPI(extensionAPI, func() context.Context { return appCtx })
 
 	// Create application with options

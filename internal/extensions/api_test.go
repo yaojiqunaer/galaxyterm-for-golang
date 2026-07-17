@@ -3,6 +3,7 @@ package extensions
 import (
 	"archive/zip"
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/json"
 	"fmt"
@@ -11,8 +12,17 @@ import (
 	"runtime"
 	"sort"
 	"strings"
+	"sync"
 	"testing"
 )
+
+type stubPackageDialogs struct {
+	path string
+}
+
+func (dialogs stubPackageDialogs) OpenPackage(context.Context) (string, error) {
+	return dialogs.path, nil
+}
 
 func TestRegisterInstalledValidatesAndListsManifest(t *testing.T) {
 	api := NewAPIWithStore(filepath.Join(t.TempDir(), "installed.json"))
@@ -32,6 +42,34 @@ func TestRegisterInstalledValidatesAndListsManifest(t *testing.T) {
 	if len(installed) != 1 || installed[0].ID != manifest.ID {
 		t.Fatalf("installed = %#v, want one redis manifest", installed)
 	}
+}
+
+func TestRegistrySupportsConcurrentReadsAndWrites(t *testing.T) {
+	api := NewAPIWithStore("")
+	manifest := Manifest{
+		ID:         "galaxyterm-extension-redis",
+		Name:       "Redis",
+		Version:    "0.1.0",
+		APIVersion: "v1",
+		Providers:  []ProviderManifest{{Type: "redis"}},
+	}
+	var wait sync.WaitGroup
+	wait.Add(2)
+	go func() {
+		defer wait.Done()
+		for range 100 {
+			if err := api.RegisterInstalled(manifest); err != nil {
+				t.Errorf("RegisterInstalled returned error: %v", err)
+			}
+		}
+	}()
+	go func() {
+		defer wait.Done()
+		for range 100 {
+			_ = api.ListInstalled()
+		}
+	}()
+	wait.Wait()
 }
 
 func TestInstallOfflinePackageReadsManifest(t *testing.T) {
@@ -57,6 +95,35 @@ func TestInstallOfflinePackageReadsManifest(t *testing.T) {
 	items := api.ListInstalled()
 	if len(items) != 1 || items[0].Providers[0].Type != "kubernetes" {
 		t.Fatalf("installed items = %#v, want kubernetes provider", items)
+	}
+}
+
+func TestInstallOfflineFromDialogInstallsSelectedPackageAndHandlesCancel(t *testing.T) {
+	manifest := Manifest{
+		ID:         "galaxyterm-extension-sftp",
+		Name:       "SFTP",
+		Version:    "0.2.0",
+		APIVersion: "v1",
+		Providers:  []ProviderManifest{{Type: "sftp"}},
+	}
+	api := NewAPIWithStore(filepath.Join(t.TempDir(), "installed.json"))
+	api.contextProvider = func() context.Context { return context.Background() }
+	api.packageDialogs = stubPackageDialogs{path: writeGTXPackage(t, manifest)}
+
+	result, err := api.InstallOfflineFromDialog()
+	if err != nil {
+		t.Fatalf("InstallOfflineFromDialog returned error: %v", err)
+	}
+	if result.Canceled || result.Manifest.ID != manifest.ID || len(api.ListInstalled()) != 1 {
+		t.Fatalf("install result = %#v, installed = %#v", result, api.ListInstalled())
+	}
+
+	canceled := NewAPIWithStore(filepath.Join(t.TempDir(), "installed.json"))
+	canceled.contextProvider = func() context.Context { return context.Background() }
+	canceled.packageDialogs = stubPackageDialogs{}
+	result, err = canceled.InstallOfflineFromDialog()
+	if err != nil || !result.Canceled || len(canceled.ListInstalled()) != 0 {
+		t.Fatalf("canceled install = %#v, %v", result, err)
 	}
 }
 

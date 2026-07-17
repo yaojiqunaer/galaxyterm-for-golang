@@ -309,6 +309,19 @@ assert.ok(
   'narrow topbars must move duplicate utility actions into the discoverable workspace menu',
 );
 assert.ok(
+  source.includes('await ExtensionsAPI.InstallOfflineFromDialog()')
+    && !source.includes('extensionPackagePath')
+    && !source.includes("title={t('drawer.installExtension')}"),
+  'offline extension installation must use a native package picker instead of a manual absolute-path form',
+);
+assert.ok(
+  source.includes('const [extensionOfflineInstalling, setExtensionOfflineInstalling] = useState(false)')
+    && source.includes("const [extensionUninstallingId, setExtensionUninstallingId] = useState('')")
+    && source.includes('const extensionOperationBusy = extensionOfflineInstalling')
+    && source.includes('loading={extensionUninstallingId === extension.id}'),
+  'extension mutations must expose precise busy state and prevent concurrent registry writes',
+);
+assert.ok(
   source.includes("selectedFileProvider.protocol === 'sftp'")
     && source.includes('resolveSelectedSshProfile(fileProfileId)'),
   'the SFTP extension must retain saved SSH profile reuse without making it a core protocol implementation',
