@@ -211,10 +211,10 @@ import {
 import {
   buildConnectionActionPaletteItems,
   buildProfilePaletteItems,
-  buildPaletteSummary,
   buildSessionActionPaletteItems,
-  filterPaletteItems,
-  resolvePaletteIndex,
+  loadPaletteRecentIds,
+  persistPaletteRecentIds,
+  recordPaletteRecent,
 } from './paletteModel.js';
 import {
   buildCommandHistoryEntryResult,
@@ -273,6 +273,7 @@ import * as TerminalAPI from '../wailsjs/go/terminal/API.js';
 import * as TunnelAPI from '../wailsjs/go/tunnel/API.js';
 import * as runtime from '../wailsjs/runtime/runtime.js';
 import { availableLocales, currentLocale, setLocale, t } from './i18n.js';
+import CommandPalette from './components/CommandPalette.jsx';
 import SavedSSHProfileSelect from './components/SavedSSHProfileSelect.jsx';
 import FileProviderFormFields from './components/FileProviderFormFields.jsx';
 import OperationErrorDescription from './components/OperationErrorDescription.jsx';
@@ -398,8 +399,7 @@ function App() {
   const [focusMode, setFocusMode] = useState(false);
   const sidebarCompact = resolveSidebarCompact(settings.sidebarMode, screens.lg === false);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [paletteQuery, setPaletteQuery] = useState('');
-  const [paletteActiveIndex, setPaletteActiveIndex] = useState(-1);
+  const [paletteRecentIds, setPaletteRecentIds] = useState(() => loadPaletteRecentIds());
   const [selectedNav, setSelectedNav] = useState('connections');
   const [settingsSection, setSettingsSection] = useState('interface');
   const [sessionView, setSessionView] = useState('tabs');
@@ -536,7 +536,6 @@ function App() {
   }, []);
   const terminalRefs = useRef({});
   const terminalSearchRef = useRef(null);
-  const paletteInputRef = useRef(null);
   const fileSearchRef = useRef(null);
   const profileImportRef = useRef(null);
   const contentPageRef = useRef(null);
@@ -2374,12 +2373,14 @@ function App() {
   const runPaletteAction = (item) => {
     if (item.disabled) {
       messageApi.warning(item.reasonKey ? t(item.reasonKey) : t('message.providerUnavailable'));
-      return;
+      return false;
     }
+    const nextRecentIds = recordPaletteRecent(paletteRecentIds, item.id);
+    persistPaletteRecentIds(nextRecentIds);
+    setPaletteRecentIds(nextRecentIds);
     item.run();
     setPaletteOpen(false);
-    setPaletteQuery('');
-    setPaletteActiveIndex(-1);
+    return true;
   };
 
   const addQuickCommand = async () => {
@@ -5331,27 +5332,8 @@ function App() {
     workspaceActionState,
     commandPaletteShortcut,
   });
-  const visiblePaletteItems = filterPaletteItems(paletteItems, paletteQuery);
-  const displayedPaletteItems = visiblePaletteItems.slice(0, 12);
-  const paletteSummary = buildPaletteSummary(visiblePaletteItems);
-
-  useEffect(() => {
-    if (!paletteOpen) {
-      setPaletteActiveIndex(-1);
-      return;
-    }
-    setPaletteActiveIndex(displayedPaletteItems.length > 0 ? 0 : -1);
-  }, [paletteOpen, paletteQuery, displayedPaletteItems.length]);
-
   const closePalette = () => {
     setPaletteOpen(false);
-    setPaletteQuery('');
-    setPaletteActiveIndex(-1);
-  };
-
-  const runActivePaletteAction = () => {
-    const item = displayedPaletteItems[paletteActiveIndex] || displayedPaletteItems[0];
-    if (item) runPaletteAction(item);
   };
 
   const runPaletteEmptyAction = (action) => {
@@ -5359,33 +5341,6 @@ function App() {
     if (action === 'local') launchDefaultTerminal('local');
     if (action === 'ssh') openDrawer('ssh');
     if (action === 'connections') setSelectedNav('connections');
-  };
-
-  const handlePaletteKeyDown = (event) => {
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      setPaletteActiveIndex((current) => resolvePaletteIndex(displayedPaletteItems.length, current, 'next'));
-    }
-    if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      setPaletteActiveIndex((current) => resolvePaletteIndex(displayedPaletteItems.length, current, 'previous'));
-    }
-    if (event.key === 'Home') {
-      event.preventDefault();
-      setPaletteActiveIndex(resolvePaletteIndex(displayedPaletteItems.length, paletteActiveIndex, 'first'));
-    }
-    if (event.key === 'End') {
-      event.preventDefault();
-      setPaletteActiveIndex(resolvePaletteIndex(displayedPaletteItems.length, paletteActiveIndex, 'last'));
-    }
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      runActivePaletteAction();
-    }
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      closePalette();
-    }
   };
 
   const workspaceMenuActions = {
@@ -5992,83 +5947,14 @@ function App() {
 
       </Layout>
 
-      <Modal
-        title={t('drawer.commandPalette')}
+      <CommandPalette
+        items={paletteItems}
+        onClose={closePalette}
+        onEmptyAction={runPaletteEmptyAction}
+        onRun={runPaletteAction}
         open={paletteOpen}
-        footer={null}
-        width={620}
-        className="command-palette-modal"
-        onCancel={closePalette}
-        afterOpenChange={(open) => {
-          if (!open) return;
-          window.requestAnimationFrame(() => paletteInputRef.current?.focus({ cursor: 'all' }));
-        }}
-      >
-        <Input
-          autoFocus
-          ref={paletteInputRef}
-          value={paletteQuery}
-          onChange={(event) => setPaletteQuery(event.target.value)}
-          onKeyDown={handlePaletteKeyDown}
-          placeholder={t('placeholder.commandPalette')}
-        />
-        <div className="command-palette-summary">
-          <span>
-            <small>{t('metric.visibleResults')}</small>
-            <strong>{paletteSummary.total}</strong>
-          </span>
-          {paletteSummary.groups.slice(0, 5).map((group) => (
-            <span key={group.group}>
-              <small>{group.group}</small>
-              <strong>{group.count}</strong>
-            </span>
-          ))}
-        </div>
-        <List
-          className="command-palette-list"
-          dataSource={displayedPaletteItems}
-          locale={{
-            emptyText: (
-              <div className="palette-empty-state">
-                <strong>{t('palette.empty.title')}</strong>
-                <span>{t('palette.empty.description')}</span>
-                <Space wrap>
-                  <Button size="small" type="primary" onClick={() => runPaletteEmptyAction('local')}>{t('action.newTerminal')}</Button>
-                  <Button size="small" onClick={() => runPaletteEmptyAction('ssh')}>{t('action.quickSsh')}</Button>
-                  <Button size="small" onClick={() => runPaletteEmptyAction('connections')}>{t('nav.connections')}</Button>
-                </Space>
-              </div>
-            ),
-          }}
-          renderItem={(item, index) => (
-            <List.Item
-              className={[
-                'command-palette-row',
-                index === paletteActiveIndex ? 'active' : '',
-                item.disabled ? 'disabled' : '',
-              ].filter(Boolean).join(' ')}
-              onClick={() => runPaletteAction(item)}
-              onMouseEnter={() => setPaletteActiveIndex(index)}
-            >
-              <List.Item.Meta
-                avatar={<span className="provider-icon">{item.icon}</span>}
-                title={(
-                  <span className="command-palette-title">
-                    <strong>{item.title}</strong>
-                    <small>{item.group}</small>
-                  </span>
-                )}
-                description={(
-                  <span className="command-palette-description">
-                    <span>{item.description}</span>
-                    {item.disabled && item.reasonKey && <small>{t(item.reasonKey)}</small>}
-                  </span>
-                )}
-              />
-            </List.Item>
-          )}
-        />
-      </Modal>
+        recentIds={paletteRecentIds}
+      />
 
       <Drawer
         className="terminal-drawer"

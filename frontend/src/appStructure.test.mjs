@@ -8,6 +8,7 @@ const indexSource = await readFile(new URL('../index.html', import.meta.url), 'u
 const styles = await readFile(new URL('../style.scss', import.meta.url), 'utf8');
 const viteConfig = await readFile(new URL('../vite.config.js', import.meta.url), 'utf8');
 const replaySource = await readFile(new URL('./components/AuditReplayPlayer.jsx', import.meta.url), 'utf8');
+const commandPaletteSource = await readFile(new URL('./components/CommandPalette.jsx', import.meta.url), 'utf8');
 const terminalPaneSource = await readFile(new URL('./components/TerminalPane.jsx', import.meta.url), 'utf8');
 const savedSshProfileSource = await readFile(new URL('./components/SavedSSHProfileSelect.jsx', import.meta.url), 'utf8');
 const activeSessionDeclaration = source.indexOf('const activeSession =');
@@ -261,11 +262,22 @@ assert.ok(
   'default terminal entry points must share one safe direct-launch plan with structured recovery',
 );
 assert.ok(
-  source.includes('const paletteInputRef = useRef(null);')
-    && source.includes('afterOpenChange={(open) => {')
-    && source.includes('paletteInputRef.current?.focus({ cursor:')
-    && source.includes('ref={paletteInputRef}'),
-  'the command palette must restore input focus after its modal transition',
+  commandPaletteSource.includes('afterOpenChange={(nextOpen) => {')
+    && commandPaletteSource.includes("inputRef.current?.focus({ cursor: 'all' })")
+    && commandPaletteSource.includes('aria-activedescendant={activeItemId}')
+    && commandPaletteSource.includes('scrollIntoView?.({ block: \'nearest\' })')
+    && commandPaletteSource.includes('role="listbox"')
+    && commandPaletteSource.includes('role="option"'),
+  'the command palette must keep focus, selection, and active results synchronized for keyboard use',
+);
+assert.ok(
+  source.includes("import CommandPalette from './components/CommandPalette.jsx';")
+    && source.includes('<CommandPalette')
+    && source.includes('recentIds={paletteRecentIds}')
+    && source.includes('recordPaletteRecent(')
+    && source.includes('persistPaletteRecentIds(')
+    && !source.includes('className="command-palette-modal"'),
+  'the command palette must use a focused component with persisted recent actions',
 );
 assert.ok(
   source.includes('resolveTabSessionAction,')

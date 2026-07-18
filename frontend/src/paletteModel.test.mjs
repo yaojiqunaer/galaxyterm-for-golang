@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import * as paletteModel from './paletteModel.js';
 import {
   buildConnectionActionPaletteItems,
   buildProfilePaletteItems,
@@ -33,6 +34,39 @@ assert.deepEqual(filterPaletteItems(items, '').map((item) => item.title), ['Prod
 assert.deepEqual(filterPaletteItems(items, 'PROD').map((item) => item.title), ['Prod Web']);
 assert.deepEqual(filterPaletteItems(items, 'record').map((item) => item.title), ['Audit Logs']);
 assert.deepEqual(filterPaletteItems(items, 'kubernetes').map((item) => item.title), ['Deploy']);
+
+const rankedItems = [
+  { id: 'first', title: 'Open Settings', group: 'Navigation' },
+  { id: 'disabled', title: 'Open Session', group: 'Sessions', disabled: true },
+  { id: 'recent', title: 'Open Connections', group: 'Navigation' },
+];
+assert.deepEqual(
+  filterPaletteItems(rankedItems, '', { recentIds: ['recent', 'first'] }).map((item) => item.id),
+  ['recent', 'first', 'disabled'],
+);
+assert.deepEqual(
+  filterPaletteItems(rankedItems, 'open').map((item) => item.id),
+  ['first', 'recent', 'disabled'],
+);
+assert.deepEqual(
+  paletteModel.recordPaletteRecent?.(['profile:a', 'navigation:settings'], 'profile:b', 3),
+  ['profile:b', 'profile:a', 'navigation:settings'],
+);
+assert.deepEqual(
+  paletteModel.recordPaletteRecent?.(['profile:a', 'profile:b'], 'profile:b', 2),
+  ['profile:b', 'profile:a'],
+);
+assert.deepEqual(paletteModel.recordPaletteRecent?.(['profile:a'], '', 6), ['profile:a']);
+
+const paletteStorage = new Map();
+const storageAdapter = {
+  getItem: (key) => paletteStorage.get(key) ?? null,
+  setItem: (key, value) => paletteStorage.set(key, value),
+};
+paletteModel.persistPaletteRecentIds?.(['profile:a', 'profile:b'], storageAdapter);
+assert.deepEqual(paletteModel.loadPaletteRecentIds?.(storageAdapter), ['profile:a', 'profile:b']);
+paletteStorage.set(paletteModel.paletteRecentStorageKey, '{broken');
+assert.deepEqual(paletteModel.loadPaletteRecentIds?.(storageAdapter), []);
 
 assert.deepEqual(buildPaletteSummary(items), {
   total: 3,

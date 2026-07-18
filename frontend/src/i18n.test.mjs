@@ -27,6 +27,8 @@ assert.equal(t('session.empty.restoreAvailable', { count: 3, updatedAt: '12:00' 
 assert.equal(t('session.empty.restoreUnavailable'), 'No saved workspace is available yet');
 assert.equal(t('palette.reason.noWorkspaceSession'), 'Open at least one session before saving a workspace.');
 assert.equal(t('palette.reason.noWorkspaceSnapshot'), 'Save a workspace before restoring or clearing it.');
+assert.equal(t('palette.recentHint'), 'Recently used actions appear first');
+assert.equal(t('palette.keyboardHint'), '↑↓ select · Enter run · Esc close');
 assert.equal(t('replay.state.playing'), 'Playing');
 assert.equal(t('action.seekBackward5'), 'Back 5 seconds');
 assert.equal(t('action.seekForward5'), 'Forward 5 seconds');
@@ -104,6 +106,8 @@ assert.equal(t('session.empty.restoreAvailable', { count: 3, updatedAt: '12:00' 
 assert.equal(t('session.empty.restoreUnavailable'), '目前还没有可恢复的工作区');
 assert.equal(t('palette.reason.noWorkspaceSession'), '请先打开至少一个会话，再保存工作区。');
 assert.equal(t('palette.reason.noWorkspaceSnapshot'), '请先保存工作区，再执行恢复或清理。');
+assert.equal(t('palette.recentHint'), '最近使用的操作会优先显示');
+assert.equal(t('palette.keyboardHint'), '↑↓ 选择 · Enter 执行 · Esc 关闭');
 assert.equal(t('replay.state.playing'), '播放中');
 assert.equal(t('action.seekBackward5'), '后退 5 秒');
 assert.equal(t('action.seekForward5'), '前进 5 秒');

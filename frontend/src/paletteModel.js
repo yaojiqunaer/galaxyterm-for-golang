@@ -1,11 +1,61 @@
-export function filterPaletteItems(items = [], query = '') {
+export const paletteRecentStorageKey = 'galaxyterm.commandPalette.recent.v1';
+
+export function filterPaletteItems(items = [], query = '', options = {}) {
   const keywords = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
-  if (keywords.length === 0) return items;
+  const recentIds = normalizePaletteRecentIds(options.recentIds);
+  const recentOrder = new Map(recentIds.map((id, index) => [id, index]));
+  if (keywords.length === 0) {
+    return items
+      .map((item, index) => ({ item, index, recentIndex: recentOrder.get(item.id) }))
+      .sort((left, right) => {
+        const leftRecent = left.recentIndex ?? Number.POSITIVE_INFINITY;
+        const rightRecent = right.recentIndex ?? Number.POSITIVE_INFINITY;
+        const disabledDelta = Number(Boolean(left.item.disabled)) - Number(Boolean(right.item.disabled));
+        return disabledDelta || leftRecent - rightRecent || left.index - right.index;
+      })
+      .map((entry) => entry.item);
+  }
   return items
     .map((item, index) => ({ item, index, score: scorePaletteItem(item, keywords) }))
     .filter((entry) => entry.score < Number.POSITIVE_INFINITY)
-    .sort((left, right) => left.score - right.score || left.index - right.index)
+    .sort((left, right) => (
+      left.score - right.score
+      || Number(Boolean(left.item.disabled)) - Number(Boolean(right.item.disabled))
+      || left.index - right.index
+    ))
     .map((entry) => entry.item);
+}
+
+export function recordPaletteRecent(recentIds = [], itemId = '', limit = 8) {
+  const normalizedId = String(itemId || '').trim();
+  if (!normalizedId) return normalizePaletteRecentIds(recentIds, limit);
+  return normalizePaletteRecentIds([normalizedId, ...recentIds], limit);
+}
+
+export function loadPaletteRecentIds(storage = globalThis.localStorage) {
+  try {
+    return normalizePaletteRecentIds(JSON.parse(storage?.getItem(paletteRecentStorageKey) || '[]'));
+  } catch {
+    return [];
+  }
+}
+
+export function persistPaletteRecentIds(recentIds = [], storage = globalThis.localStorage) {
+  const normalized = normalizePaletteRecentIds(recentIds);
+  try {
+    storage?.setItem(paletteRecentStorageKey, JSON.stringify(normalized));
+  } catch {
+    // The command palette remains usable when local storage is unavailable.
+  }
+  return normalized;
+}
+
+function normalizePaletteRecentIds(recentIds = [], limit = 8) {
+  const capacity = Math.max(1, Number(limit) || 8);
+  return [...new Set((Array.isArray(recentIds) ? recentIds : [])
+    .map((id) => String(id || '').trim())
+    .filter(Boolean))]
+    .slice(0, capacity);
 }
 
 export function buildPaletteSummary(items = []) {
