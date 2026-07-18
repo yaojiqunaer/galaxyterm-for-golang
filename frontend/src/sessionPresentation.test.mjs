@@ -10,6 +10,7 @@ import {
   buildSessionTabMenuModel,
   buildSessionToolbarModel,
   buildSessionToolbarContext,
+  buildDesktopWindowTitle,
   countUnreadSessions,
   filterSessions,
   markSessionActivityRead,
@@ -213,6 +214,51 @@ assert.deepEqual(buildSessionToolbarContext({
   user: '',
 });
 assert.equal(buildSessionToolbarContext(null), null);
+
+assert.equal(buildDesktopWindowTitle(null, { appName: 'GalaxyTerm' }), 'GalaxyTerm');
+assert.equal(buildDesktopWindowTitle(null, {
+  appName: 'GalaxyTerm',
+  unreadCount: 3,
+}), '(3) GalaxyTerm');
+assert.equal(buildDesktopWindowTitle({
+  label: 'Production',
+  providerType: 'ssh',
+  request: {
+    config: { host: 'prod.example.com', port: 2222 },
+    auth: { username: 'root' },
+  },
+}, {
+  appName: 'GalaxyTerm',
+  providerName: 'SSH',
+  unreadCount: 2,
+}), '(2) Production · root@prod.example.com:2222 — GalaxyTerm');
+assert.equal(buildDesktopWindowTitle({
+  label: 'root@prod.example.com:2222',
+  providerType: 'ssh',
+  request: {
+    config: { host: 'prod.example.com', port: 2222 },
+    auth: { username: 'root' },
+  },
+}, { appName: 'GalaxyTerm' }), 'root@prod.example.com:2222 — GalaxyTerm');
+assert.equal(buildDesktopWindowTitle({
+  label: '  Local Terminal  ',
+  providerType: 'local',
+  config: { workingDirectory: '/Users/me/project' },
+}, {
+  appName: 'GalaxyTerm',
+  providerName: 'Local',
+}), 'Local Terminal · /Users/me/project — GalaxyTerm');
+const longWindowTitle = buildDesktopWindowTitle({
+  label: 'Production cluster with an intentionally very long descriptive session name',
+  providerType: 'ssh',
+  request: {
+    config: { host: 'an-extremely-long-production-hostname.example.internal', port: 2222 },
+    auth: { username: 'deployment-operator' },
+  },
+}, { appName: 'GalaxyTerm', maxLength: 72 });
+assert.equal(longWindowTitle.length <= 72, true);
+assert.equal(longWindowTitle.endsWith(' — GalaxyTerm'), true);
+assert.equal(longWindowTitle.includes('…'), true);
 
 assert.deepEqual(buildSessionToolbarModel({
   activeKey: 'running',

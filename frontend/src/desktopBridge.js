@@ -59,6 +59,22 @@ export function syncDesktopWindowTheme(appTheme = 'system') {
   return true;
 }
 
+export function syncDesktopWindowTitle(title, target = globalThis.document) {
+  const value = String(title || '').trim();
+  if (!value) return false;
+  if (target && 'title' in target) target.title = value;
+
+  const runtime = globalThis.window?.runtime;
+  const method = runtime?.WindowSetTitle;
+  if (typeof method !== 'function') return false;
+  try {
+    method.call(runtime, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function syncDesktopPlatform(target = globalThis.document?.documentElement) {
   const environment = globalThis.window?.runtime?.Environment;
   if (typeof environment !== 'function') {

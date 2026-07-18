@@ -118,6 +118,7 @@ import {
   buildSessionAuditSummary,
   buildSessionCloseConfirm,
   buildSessionContextFacts,
+  buildDesktopWindowTitle,
   buildSessionNavigationState,
   buildSessionTabMenuModel,
   buildSessionToolbarContext,
@@ -184,7 +185,12 @@ import {
   buildTerminalStatusFacts,
 } from './terminalStatus.js';
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
-import { hasWailsMethod, syncDesktopWindowTheme, writeClipboardText } from './desktopBridge.js';
+import {
+  hasWailsMethod,
+  syncDesktopWindowTheme,
+  syncDesktopWindowTitle,
+  writeClipboardText,
+} from './desktopBridge.js';
 import {
   buildConnectionActionPaletteItems,
   buildProfilePaletteItems,
@@ -542,7 +548,6 @@ function App() {
 
   useEffect(() => {
     document.documentElement.lang = locale;
-    document.title = t('app.title');
   }, [locale]);
 
   useEffect(() => {
@@ -776,6 +781,24 @@ function App() {
     installedExtensions,
     settings.disabledExtensionIds,
   ), [allProviders, installedExtensions, settings.disabledExtensionIds]);
+  const desktopWindowTitle = useMemo(() => {
+    const appName = t('app.title');
+    if (selectedNav !== 'sessions') {
+      return buildDesktopWindowTitle(null, { appName, unreadCount: unreadSessionCount });
+    }
+    return buildDesktopWindowTitle(activeSession, {
+      appName,
+      providerName: activeSession
+        ? providerTypeLabel(activeSession.providerType, providers)
+        : '',
+      unreadCount: unreadSessionCount,
+    });
+  }, [activeSession, locale, providers, selectedNav, unreadSessionCount]);
+
+  useEffect(() => {
+    syncDesktopWindowTitle(desktopWindowTitle);
+  }, [desktopWindowTitle]);
+
   const providerOptions = useMemo(() => providers.map((provider) => ({
     value: provider.type,
     label: (

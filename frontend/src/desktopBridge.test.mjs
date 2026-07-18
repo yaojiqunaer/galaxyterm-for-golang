@@ -5,6 +5,7 @@ import {
   clipboardUnavailableMessage,
   hasWailsMethod,
   readClipboardText,
+  syncDesktopWindowTitle,
   writeClipboardText,
 } from './desktopBridge.js';
 
@@ -21,9 +22,11 @@ assert.equal(
 );
 
 const originalWindow = globalThis.window;
+const originalDocument = globalThis.document;
 const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
 
 globalThis.window = {};
+globalThis.document = { title: '' };
 Object.defineProperty(globalThis, 'navigator', { configurable: true, value: {} });
 assert.equal(hasWailsMethod(['session', 'API', 'CreateSession']), false);
 const browserRoot = { dataset: {} };
@@ -33,6 +36,8 @@ await assert.rejects(
   () => callWails(['session', 'API', 'CreateSession'], { providerType: 'local' }),
   (error) => error.message === bridgeUnavailableMessage,
 );
+assert.equal(syncDesktopWindowTitle('Connections — GalaxyTerm'), false);
+assert.equal(globalThis.document.title, 'Connections — GalaxyTerm');
 await assert.rejects(
   () => readClipboardText(),
   (error) => error.message === clipboardUnavailableMessage,
@@ -52,6 +57,7 @@ assert.equal(hasWailsMethod(['session', 'API', 'CreateSession']), true);
 assert.equal(await callWails(['session', 'API', 'CreateSession'], { providerType: 'local' }), 'session:local');
 
 let desktopClipboard = '';
+const nativeWindowTitles = [];
 globalThis.window.runtime = {
   ClipboardGetText: () => desktopClipboard,
   ClipboardSetText: (text) => {
@@ -59,12 +65,18 @@ globalThis.window.runtime = {
     return true;
   },
   Environment: () => Promise.resolve({ platform: 'darwin' }),
+  WindowSetTitle: (title) => nativeWindowTitles.push(title),
 };
 const desktopRoot = { dataset: {} };
 assert.equal(await desktopBridge.syncDesktopPlatform(desktopRoot), 'darwin');
 assert.equal(desktopRoot.dataset.platform, 'darwin');
 assert.equal(await writeClipboardText('native text'), true);
 assert.equal(await readClipboardText(), 'native text');
+assert.equal(syncDesktopWindowTitle('Production · root@prod — GalaxyTerm'), true);
+assert.equal(globalThis.document.title, 'Production · root@prod — GalaxyTerm');
+assert.deepEqual(nativeWindowTitles, ['Production · root@prod — GalaxyTerm']);
+assert.equal(syncDesktopWindowTitle('   '), false);
+assert.deepEqual(nativeWindowTitles, ['Production · root@prod — GalaxyTerm']);
 
 const nativeThemeCalls = [];
 globalThis.window.go.desktop = {
@@ -101,5 +113,6 @@ await writeClipboardText('browser text');
 assert.equal(await readClipboardText(), 'browser text');
 
 globalThis.window = originalWindow;
+globalThis.document = originalDocument;
 if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator);
 if (!originalNavigator) delete globalThis.navigator;

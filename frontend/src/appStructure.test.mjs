@@ -12,12 +12,18 @@ const terminalPaneSource = await readFile(new URL('./components/TerminalPane.jsx
 const savedSshProfileSource = await readFile(new URL('./components/SavedSSHProfileSelect.jsx', import.meta.url), 'utf8');
 const activeSessionDeclaration = source.indexOf('const activeSession =');
 const firstActiveSessionUsage = source.indexOf('activeSession?.providerType');
+const providersDeclaration = source.indexOf('const providers =');
+const desktopWindowTitleDeclaration = source.indexOf('const desktopWindowTitle =');
 
 assert.notEqual(activeSessionDeclaration, -1, 'App must derive the active session');
 assert.notEqual(firstActiveSessionUsage, -1, 'App must use the active session provider scope');
 assert.ok(
   activeSessionDeclaration < firstActiveSessionUsage,
   'activeSession must be initialized before any render-time hook dependency reads it',
+);
+assert.ok(
+  providersDeclaration >= 0 && providersDeclaration < desktopWindowTitleDeclaration,
+  'providers must be initialized before the desktop window title derives its provider label',
 );
 
 assert.ok(
@@ -153,9 +159,10 @@ assert.ok(
 );
 assert.ok(
   source.includes('document.documentElement.lang = locale;')
-    && source.includes("document.title = t('app.title');")
+    && source.includes('buildDesktopWindowTitle(activeSession')
+    && source.includes('syncDesktopWindowTitle(desktopWindowTitle);')
     && source.includes("label: t(`locale.${locale}`, locale)"),
-  'runtime locale changes must update document metadata and present readable language names',
+  'runtime locale and active-session changes must update desktop metadata and present readable language names',
 );
 assert.ok(
   !source.includes('session-switcher-list') && !source.includes('session-filter-bar'),

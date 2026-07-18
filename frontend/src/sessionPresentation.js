@@ -170,6 +170,33 @@ export function buildSessionToolbarContext(session, options = {}) {
   };
 }
 
+export function buildDesktopWindowTitle(session, options = {}) {
+  const appName = String(options.appName || 'GalaxyTerm').trim() || 'GalaxyTerm';
+  const unreadCount = Math.max(0, Math.floor(Number(options.unreadCount) || 0));
+  const unreadPrefix = unreadCount > 0 ? `(${unreadCount}) ` : '';
+  if (!session) return `${unreadPrefix}${appName}`;
+
+  const context = buildSessionToolbarContext(session, options);
+  const label = String(
+    session.label
+      || session.request?.displayName
+      || context?.provider
+      || appName,
+  ).trim();
+  const identity = String(context?.identity || '').trim();
+  const parts = [label];
+  if (identity && identity.toLocaleLowerCase() !== label.toLocaleLowerCase()) parts.push(identity);
+
+  const suffix = ` — ${appName}`;
+  const contextTitle = `${unreadPrefix}${parts.filter(Boolean).join(' · ') || appName}`;
+  const maxLength = Math.max(suffix.length + 2, Number(options.maxLength) || 96);
+  if (contextTitle.length + suffix.length <= maxLength) return `${contextTitle}${suffix}`;
+
+  const availableLength = maxLength - suffix.length;
+  const truncatedContext = `${contextTitle.slice(0, Math.max(1, availableLength - 1)).trimEnd()}…`;
+  return `${truncatedContext}${suffix}`;
+}
+
 export function buildSessionTabMenuModel(options = {}) {
   const canCloseOthers = (Number(options.sessionCount) || 0) > 1;
   const actions = [
