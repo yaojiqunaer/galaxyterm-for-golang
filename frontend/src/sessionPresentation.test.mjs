@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   appendClosedSessions,
   buildSessionAuditSummary,
+  buildSessionClosePlan,
   buildSessionContextFacts,
   buildSessionCloseConfirm,
   buildSessionNavigationState,
@@ -25,6 +26,7 @@ import {
   sessionStatusTone,
   sessionSummary,
   takeClosedSession,
+  toggleSessionProtection,
 } from './sessionPresentation.js';
 
 assert.equal(sessionStatusTone({ status: 'connected' }), 'success');
@@ -183,6 +185,7 @@ assert.deepEqual(buildSessionToolbarModel({
   ],
   overflow: [
     { key: 'rename', labelKey: 'action.renameSession', disabled: false },
+    { key: 'protect', labelKey: 'action.protectSession', disabled: false },
     { key: 'reconnect', labelKey: 'action.reconnect', disabled: false },
     { key: 'closeClosed', labelKey: 'action.closeClosed', disabled: false },
     { key: 'closeOthers', labelKey: 'action.closeOthers', disabled: false, danger: true },
@@ -275,8 +278,9 @@ assert.deepEqual(buildSessionToolbarModel({
   sessionCount: 1,
   terminalStatus: 'busy',
   view: 'tabs',
-}).overflow.slice(0, 2), [
+}).overflow.slice(0, 3), [
   { key: 'rename', labelKey: 'action.renameSession', disabled: false },
+  { key: 'protect', labelKey: 'action.protectSession', disabled: false },
   { key: 'reconnect', labelKey: 'action.reconnect', disabled: true },
 ]);
 
@@ -291,6 +295,7 @@ assert.deepEqual(buildSessionToolbarModel({
   ],
   overflow: [
     { key: 'rename', labelKey: 'action.renameSession', disabled: false },
+    { key: 'protect', labelKey: 'action.protectSession', disabled: false },
     { key: 'closeClosed', labelKey: 'action.closeClosed', disabled: true },
     { key: 'closeOthers', labelKey: 'action.closeOthers', disabled: true, danger: true },
     { key: 'closeCurrent', labelKey: 'action.closeSession', disabled: false, danger: true },
@@ -307,6 +312,7 @@ assert.deepEqual(buildSessionToolbarModel({
 
 assert.deepEqual(buildSessionTabMenuModel({ sessionCount: 3 }), [
   { key: 'rename', labelKey: 'action.renameSession' },
+  { key: 'protect', labelKey: 'action.protectSession' },
   { key: 'reconnect', labelKey: 'action.reconnect' },
   { key: 'duplicate', labelKey: 'action.duplicate' },
   { key: 'closeOthers', labelKey: 'action.closeOthers', disabled: false, danger: true },
@@ -315,10 +321,24 @@ assert.deepEqual(buildSessionTabMenuModel({ sessionCount: 3 }), [
 
 assert.deepEqual(buildSessionTabMenuModel({ sessionCount: 1 }), [
   { key: 'rename', labelKey: 'action.renameSession' },
+  { key: 'protect', labelKey: 'action.protectSession' },
   { key: 'reconnect', labelKey: 'action.reconnect' },
   { key: 'duplicate', labelKey: 'action.duplicate' },
   { key: 'closeOthers', labelKey: 'action.closeOthers', disabled: true, danger: true },
   { key: 'closeCurrent', labelKey: 'action.closeSession', danger: true },
+]);
+
+assert.deepEqual(buildSessionTabMenuModel({
+  closableOtherCount: 0,
+  protected: true,
+  sessionCount: 3,
+}), [
+  { key: 'rename', labelKey: 'action.renameSession' },
+  { key: 'unprotect', labelKey: 'action.unprotectSession' },
+  { key: 'reconnect', labelKey: 'action.reconnect' },
+  { key: 'duplicate', labelKey: 'action.duplicate' },
+  { key: 'closeOthers', labelKey: 'action.closeOthers', disabled: true, danger: true },
+  { key: 'closeCurrent', labelKey: 'action.closeSession', disabled: true, danger: true },
 ]);
 
 assert.deepEqual(
@@ -350,6 +370,7 @@ assert.deepEqual(buildSessionToolbarModel({
   ],
   overflow: [
     { key: 'rename', labelKey: 'action.renameSession', disabled: true },
+    { key: 'protect', labelKey: 'action.protectSession', disabled: true },
     { key: 'reconnect', labelKey: 'action.reconnect', disabled: true },
     { key: 'closeClosed', labelKey: 'action.closeClosed', disabled: true },
     { key: 'closeOthers', labelKey: 'action.closeOthers', disabled: true, danger: true },
@@ -367,12 +388,29 @@ assert.deepEqual(buildSessionToolbarModel({
   primary: [],
   overflow: [
     { key: 'rename', labelKey: 'action.renameSession', disabled: false },
+    { key: 'protect', labelKey: 'action.protectSession', disabled: false },
     { key: 'reconnect', labelKey: 'action.reconnect', disabled: false },
     { key: 'closeClosed', labelKey: 'action.closeClosed', disabled: true },
     { key: 'closeOthers', labelKey: 'action.closeOthers', disabled: true, danger: true },
     { key: 'closeCurrent', labelKey: 'action.closeSession', disabled: false, danger: true },
   ],
 });
+
+assert.deepEqual(buildSessionToolbarModel({
+  activeKey: 'protected',
+  activeProtected: true,
+  closableOtherCount: 0,
+  closedCount: 0,
+  sessionCount: 2,
+  view: 'tabs',
+}).overflow, [
+  { key: 'rename', labelKey: 'action.renameSession', disabled: false },
+  { key: 'unprotect', labelKey: 'action.unprotectSession', disabled: false },
+  { key: 'reconnect', labelKey: 'action.reconnect', disabled: false },
+  { key: 'closeClosed', labelKey: 'action.closeClosed', disabled: true },
+  { key: 'closeOthers', labelKey: 'action.closeOthers', disabled: true, danger: true },
+  { key: 'closeCurrent', labelKey: 'action.closeSession', disabled: true, danger: true },
+]);
 
 assert.deepEqual(buildSessionContextFacts({
   label: 'Prod SSH',
@@ -547,6 +585,37 @@ assert.deepEqual(buildSessionCloseConfirm({
 
 assert.deepEqual(buildSessionCloseConfirm({ mode: 'closed', sessions: [] }), null);
 
+assert.deepEqual(buildSessionCloseConfirm({
+  mode: 'all',
+  protectedCount: 2,
+  sessions: [{ id: 's1' }],
+}), {
+  contentKey: 'confirm.closeAllSessionsProtectedContent',
+  contentValues: { count: 1, protectedCount: 2 },
+  okActionKey: 'action.closeAll',
+  titleKey: 'confirm.closeAllSessionsTitle',
+});
+assert.deepEqual(buildSessionCloseConfirm({
+  mode: 'others',
+  protectedCount: 1,
+  sessions: [{ id: 's2' }],
+}), {
+  contentKey: 'confirm.closeOtherSessionsProtectedContent',
+  contentValues: { count: 1, protectedCount: 1 },
+  okActionKey: 'action.closeOthers',
+  titleKey: 'confirm.closeOtherSessionsTitle',
+});
+assert.deepEqual(buildSessionCloseConfirm({
+  mode: 'closed',
+  protectedCount: 1,
+  sessions: [{ id: 's3', status: 'closed' }],
+}), {
+  contentKey: 'confirm.closeClosedSessionsProtectedContent',
+  contentValues: { count: 1, protectedCount: 1 },
+  okActionKey: 'action.closeClosed',
+  titleKey: 'confirm.closeClosedSessionsTitle',
+});
+
 assert.deepEqual(sessionTabDisplay({
   label: 'Local Terminal',
   providerType: 'local',
@@ -557,6 +626,7 @@ assert.deepEqual(sessionTabDisplay({
   statusLabel: 'connected',
   statusTone: 'success',
   title: 'Local Terminal',
+  protected: false,
   unread: false,
 });
 
@@ -570,8 +640,43 @@ assert.deepEqual(sessionTabDisplay({
   statusLabel: 'connected',
   statusTone: 'success',
   title: 'Build logs',
+  protected: false,
   unread: true,
 });
+
+assert.equal(sessionTabDisplay({ protected: true }).protected, true);
+
+const protectedSessions = [
+  { id: 'active', status: 'connected' },
+  { id: 'protected-running', protected: true, status: 'connected' },
+  { id: 'closed', status: 'closed' },
+  { id: 'protected-closed', protected: true, status: 'closed' },
+];
+assert.deepEqual(buildSessionClosePlan(protectedSessions), {
+  closingSessions: [protectedSessions[0], protectedSessions[2]],
+  protectedSessions: [protectedSessions[1], protectedSessions[3]],
+});
+assert.deepEqual(buildSessionClosePlan(protectedSessions, {
+  keepSessionId: 'active',
+  mode: 'others',
+}), {
+  closingSessions: [protectedSessions[2]],
+  protectedSessions: [protectedSessions[1], protectedSessions[3]],
+});
+assert.deepEqual(buildSessionClosePlan(protectedSessions, { mode: 'closed' }), {
+  closingSessions: [protectedSessions[2]],
+  protectedSessions: [protectedSessions[3]],
+});
+assert.deepEqual(toggleSessionProtection(protectedSessions, 'active'), [
+  { ...protectedSessions[0], protected: true },
+  ...protectedSessions.slice(1),
+]);
+assert.deepEqual(toggleSessionProtection(protectedSessions, 'protected-running'), [
+  protectedSessions[0],
+  { ...protectedSessions[1], protected: false },
+  ...protectedSessions.slice(2),
+]);
+assert.equal(toggleSessionProtection(protectedSessions, 'missing'), protectedSessions);
 
 const unreadActivity = recordSessionOutputActivity({}, {
   activeKey: 'session-1',

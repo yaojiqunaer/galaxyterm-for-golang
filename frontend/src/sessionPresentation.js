@@ -105,6 +105,10 @@ export function buildSessionToolbarModel(options = {}) {
   const hasActiveSession = Boolean(options.activeKey);
   const sessionCount = Number(options.sessionCount) || 0;
   const closedCount = Number(options.closedCount) || 0;
+  const closableOtherCount = options.closableOtherCount === undefined
+    ? Math.max(0, sessionCount - 1)
+    : Math.max(0, Number(options.closableOtherCount) || 0);
+  const activeProtected = Boolean(options.activeProtected);
   const terminalStatus = typeof options.terminalStatus === 'string'
     ? options.terminalStatus
     : options.terminalStatus?.status;
@@ -136,18 +140,23 @@ export function buildSessionToolbarModel(options = {}) {
     primary,
     overflow: [
       { key: 'rename', labelKey: 'action.renameSession', disabled: !hasActiveSession },
+      {
+        key: activeProtected ? 'unprotect' : 'protect',
+        labelKey: activeProtected ? 'action.unprotectSession' : 'action.protectSession',
+        disabled: !hasActiveSession,
+      },
       ...(!reconnectPrimary ? [reconnectAction] : []),
       { key: 'closeClosed', labelKey: 'action.closeClosed', disabled: closedCount === 0 },
       {
         key: 'closeOthers',
         labelKey: 'action.closeOthers',
-        disabled: !hasActiveSession || sessionCount <= 1,
+        disabled: !hasActiveSession || closableOtherCount <= 0,
         danger: true,
       },
       {
         key: 'closeCurrent',
         labelKey: 'action.closeSession',
-        disabled: !hasActiveSession,
+        disabled: !hasActiveSession || activeProtected,
         danger: true,
       },
     ],
@@ -198,9 +207,16 @@ export function buildDesktopWindowTitle(session, options = {}) {
 }
 
 export function buildSessionTabMenuModel(options = {}) {
-  const canCloseOthers = (Number(options.sessionCount) || 0) > 1;
+  const sessionCount = Number(options.sessionCount) || 0;
+  const closableOtherCount = options.closableOtherCount === undefined
+    ? Math.max(0, sessionCount - 1)
+    : Math.max(0, Number(options.closableOtherCount) || 0);
   const actions = [
     { key: 'rename', labelKey: 'action.renameSession' },
+    {
+      key: options.protected ? 'unprotect' : 'protect',
+      labelKey: options.protected ? 'action.unprotectSession' : 'action.protectSession',
+    },
     { key: 'reconnect', labelKey: 'action.reconnect' },
     { key: 'duplicate', labelKey: 'action.duplicate' },
   ];
@@ -215,7 +231,7 @@ export function buildSessionTabMenuModel(options = {}) {
       {
         key: 'moveRight',
         labelKey: 'action.moveSessionRight',
-        disabled: options.sessionIndex >= (Number(options.sessionCount) || 0) - 1,
+        disabled: options.sessionIndex >= sessionCount - 1,
       },
     );
   }
@@ -223,10 +239,15 @@ export function buildSessionTabMenuModel(options = {}) {
     {
       key: 'closeOthers',
       labelKey: 'action.closeOthers',
-      disabled: !canCloseOthers,
+      disabled: closableOtherCount <= 0,
       danger: true,
     },
-    { key: 'closeCurrent', labelKey: 'action.closeSession', danger: true },
+    {
+      key: 'closeCurrent',
+      labelKey: 'action.closeSession',
+      ...(options.protected ? { disabled: true } : {}),
+      danger: true,
+    },
   );
   return actions;
 }
@@ -328,28 +349,39 @@ export function buildSessionCloseConfirm(target) {
       titleKey: 'confirm.closeAllSessionsTitle',
     };
   }
-  if (target?.mode === 'others') {
+  if (target?.mode === 'all' || target?.mode === 'others' || target?.mode === 'closed') {
     const sessions = target.sessions || [];
     if (sessions.length === 0) return null;
+    const protectedCount = Math.max(0, Number(target.protectedCount) || 0);
+    const mode = target.mode;
+    const config = mode === 'others'
+      ? {
+        contentKey: 'confirm.closeOtherSessionsContent',
+        protectedContentKey: 'confirm.closeOtherSessionsProtectedContent',
+        okActionKey: 'action.closeOthers',
+        titleKey: 'confirm.closeOtherSessionsTitle',
+      }
+      : mode === 'closed'
+        ? {
+          contentKey: 'confirm.closeClosedSessionsContent',
+          protectedContentKey: 'confirm.closeClosedSessionsProtectedContent',
+          okActionKey: 'action.closeClosed',
+          titleKey: 'confirm.closeClosedSessionsTitle',
+        }
+        : {
+          contentKey: 'confirm.closeAllSessionsContent',
+          protectedContentKey: 'confirm.closeAllSessionsProtectedContent',
+          okActionKey: 'action.closeAll',
+          titleKey: 'confirm.closeAllSessionsTitle',
+        };
     return {
-      contentKey: 'confirm.closeOtherSessionsContent',
+      contentKey: protectedCount > 0 ? config.protectedContentKey : config.contentKey,
       contentValues: {
         count: sessions.length,
+        ...(protectedCount > 0 ? { protectedCount } : {}),
       },
-      okActionKey: 'action.closeOthers',
-      titleKey: 'confirm.closeOtherSessionsTitle',
-    };
-  }
-  if (target?.mode === 'closed') {
-    const sessions = target.sessions || [];
-    if (sessions.length === 0) return null;
-    return {
-      contentKey: 'confirm.closeClosedSessionsContent',
-      contentValues: {
-        count: sessions.length,
-      },
-      okActionKey: 'action.closeClosed',
-      titleKey: 'confirm.closeClosedSessionsTitle',
+      okActionKey: config.okActionKey,
+      titleKey: config.titleKey,
     };
   }
   if (!target) return null;
@@ -365,6 +397,26 @@ export function buildSessionCloseConfirm(target) {
   };
 }
 
+export function buildSessionClosePlan(sessions = [], options = {}) {
+  const mode = options.mode === 'others' || options.mode === 'closed' ? options.mode : 'all';
+  const candidates = sessions.filter((session) => {
+    if (mode === 'others') return session.id !== options.keepSessionId;
+    if (mode === 'closed') return sessionStatusLabel(session) === 'closed';
+    return true;
+  });
+  return {
+    closingSessions: candidates.filter((session) => !session.protected),
+    protectedSessions: candidates.filter((session) => Boolean(session.protected)),
+  };
+}
+
+export function toggleSessionProtection(sessions = [], sessionId = '') {
+  if (!sessions.some((session) => session.id === sessionId)) return sessions;
+  return sessions.map((session) => (
+    session.id === sessionId ? { ...session, protected: !session.protected } : session
+  ));
+}
+
 export function sessionTabDisplay(session = {}, active = false, options = {}) {
   return {
     active,
@@ -372,6 +424,7 @@ export function sessionTabDisplay(session = {}, active = false, options = {}) {
     statusLabel: sessionStatusLabel(session),
     statusTone: sessionStatusTone(session),
     title: session.label || session.displayName || session.providerType || 'Terminal',
+    protected: Boolean(session.protected),
     unread: Boolean(options.unread) && !active,
   };
 }

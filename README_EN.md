@@ -55,6 +55,11 @@ Saved and exported audit records and recordings redact common passwords, tokens,
 Interactive terminals show the current command, live duration, and execution state. Running commands can receive a standard PTY interrupt from the toolbar, terminal status bar, or `Ctrl+C`. A real exit code is shown when the shell exposes OSC 133 integration, while common shell, PowerShell, MySQL, Redis, and PostgreSQL prompts are recognized as command completion.
 </details>
 
+<details>
+<summary><b>Multi-session protection and workspace continuity</b></summary>
+Protect individual terminal tabs to show a lock indicator, hide the tab close button, and keep them open when closing all, other, or disconnected sessions. Protection is saved and restored with workspace snapshots. Navigating among Connections, Files, Audit, and Settings keeps terminal instances mounted; a session ends only when its tab is explicitly closed.
+</details>
+
 ## Architecture
 
 The core contains the local terminal, SSH, session management, shared file workspace, credentials, and extension host. Terminal and file-protocol extensions declare `providers` and `fileProviders` separately and can be installed online from GitHub Releases or offline from `.gtx` packages. File providers advertise capabilities such as `list`, `read`, `write`, `upload`, `download`, `mkdir`, `rename`, and `delete`, then contribute connection forms through `configFields` and `authFields`; the workspace does not need protocol-specific UI code and only exposes fields and operations supported by the active provider.

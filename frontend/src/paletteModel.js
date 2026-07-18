@@ -55,7 +55,11 @@ export function buildProfilePaletteItems({
 
 export function buildSessionActionPaletteItems({
   activeSessionId = '',
+  activeSessionProtected = false,
   canNavigate = false,
+  closableClosedCount,
+  closableOtherCount,
+  closableSessionCount,
   closedSessionCount = 0,
   groupLabel = 'Session Actions',
   labels = {},
@@ -63,6 +67,15 @@ export function buildSessionActionPaletteItems({
   runAction = () => {},
   sessionCount = 0,
 } = {}) {
+  const resolvedClosableClosedCount = Number.isFinite(Number(closableClosedCount))
+    ? Math.max(0, Number(closableClosedCount))
+    : closedSessionCount;
+  const resolvedClosableOtherCount = Number.isFinite(Number(closableOtherCount))
+    ? Math.max(0, Number(closableOtherCount))
+    : Math.max(0, sessionCount - 1);
+  const resolvedClosableSessionCount = Number.isFinite(Number(closableSessionCount))
+    ? Math.max(0, Number(closableSessionCount))
+    : sessionCount;
   return [
     sessionActionItem('previousSession', {
       disabled: !canNavigate,
@@ -91,6 +104,13 @@ export function buildSessionActionPaletteItems({
       activeSessionId,
       groupLabel,
       keywords: 'rename session tab title',
+      labels,
+      runAction,
+    })),
+    sessionActionItem(activeSessionProtected ? 'unprotectSession' : 'protectSession', activeSessionActionOptions({
+      activeSessionId,
+      groupLabel,
+      keywords: 'protect lock keep session tab open',
       labels,
       runAction,
     })),
@@ -123,13 +143,16 @@ export function buildSessionActionPaletteItems({
       labels,
       runAction,
     })),
-    sessionActionItem('closeSession', activeSessionActionOptions({
-      activeSessionId,
+    sessionActionItem('closeSession', {
+      disabled: !activeSessionId || activeSessionProtected,
       groupLabel,
       keywords: 'close current session tab',
       labels,
+      reasonKey: !activeSessionId
+        ? 'palette.reason.noActiveSession'
+        : activeSessionProtected ? 'palette.reason.protectedSession' : '',
       runAction,
-    })),
+    }),
     restorableSessionCount > 0 && sessionActionItem('restoreClosed', {
       groupLabel,
       keywords: 'reopen restore recently closed session tab',
@@ -137,27 +160,35 @@ export function buildSessionActionPaletteItems({
       runAction,
     }),
     sessionActionItem('closeClosed', {
-      disabled: closedSessionCount <= 0,
+      disabled: resolvedClosableClosedCount <= 0,
       groupLabel,
       keywords: 'close closed sessions cleanup clear tabs',
       labels,
-      reasonKey: closedSessionCount > 0 ? '' : 'palette.reason.noClosedSession',
+      reasonKey: closedSessionCount <= 0
+        ? 'palette.reason.noClosedSession'
+        : resolvedClosableClosedCount <= 0 ? 'palette.reason.noClosableSession' : '',
       runAction,
     }),
     sessionActionItem('closeOthers', {
-      disabled: !activeSessionId || sessionCount <= 1,
+      disabled: !activeSessionId || resolvedClosableOtherCount <= 0,
       groupLabel,
       keywords: 'close other sessions tabs cleanup',
       labels,
-      reasonKey: !activeSessionId ? 'palette.reason.noActiveSession' : 'palette.reason.noOtherSession',
+      reasonKey: !activeSessionId
+        ? 'palette.reason.noActiveSession'
+        : sessionCount <= 1
+          ? 'palette.reason.noOtherSession'
+          : resolvedClosableOtherCount <= 0 ? 'palette.reason.noClosableSession' : '',
       runAction,
     }),
     sessionActionItem('closeAll', {
-      disabled: sessionCount <= 0,
+      disabled: resolvedClosableSessionCount <= 0,
       groupLabel,
       keywords: 'close all sessions tabs cleanup',
       labels,
-      reasonKey: sessionCount > 0 ? '' : 'palette.reason.noSession',
+      reasonKey: sessionCount <= 0
+        ? 'palette.reason.noSession'
+        : resolvedClosableSessionCount <= 0 ? 'palette.reason.noClosableSession' : '',
       runAction,
     }),
     sessionActionItem('commandHistory', {

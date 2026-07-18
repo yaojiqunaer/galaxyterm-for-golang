@@ -54,6 +54,11 @@
   交互式终端会展示当前命令、实时耗时和运行状态；运行期间可通过工具栏、中断按钮或 `Ctrl+C` 发送标准 PTY 中断。Shell 提供 OSC 133 集成时会同时展示真实退出码，常见 Shell、PowerShell、MySQL、Redis 和 PostgreSQL 提示符可用于识别命令完成。
 </details>
 
+<details>
+  <summary><b>多会话保护与工作区连续性</b></summary>
+  每个终端标签可独立保护，受保护会话会显示锁标识、隐藏标签关闭按钮，并在“关闭全部”“关闭其他”和“关闭已关闭会话”时保持打开。保护状态会随工作区快照保存和恢复；在连接、文件、审计或设置页面之间切换不会卸载终端，只有明确关闭标签才会结束对应会话。
+</details>
+
 ## 架构
 
 核心程序只保留本地终端、SSH、会话管理、通用文件工作区、凭据和扩展宿主。终端扩展与文件协议扩展分别声明 `providers` 和 `fileProviders`，可通过 GitHub Releases 在线获取或使用 `.gtx` 包离线安装。文件协议扩展支持按能力声明 `list`、`read`、`write`、`upload`、`download`、`mkdir`、`rename`、`delete` 等操作，并通过 `configFields`、`authFields` 贡献连接表单；界面无需识别具体协议，只展示当前 Provider 实际支持的字段和命令。

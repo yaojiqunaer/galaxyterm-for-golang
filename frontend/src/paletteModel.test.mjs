@@ -116,11 +116,13 @@ const sessionActionItems = buildSessionActionPaletteItems({
     exportTranscript: 'Export Terminal Output',
     nextSession: 'Next Session',
     previousSession: 'Previous Session',
+    protectSession: 'Protect Session',
     quickCommands: 'Quick Commands',
     reconnect: 'Reconnect',
     restoreClosed: 'Reopen Closed Session',
     renameSession: 'Rename Session',
     saveAudit: 'Save Audit Record',
+    unprotectSession: 'Remove Protection',
   },
   runAction: () => {},
   sessionCount: 3,
@@ -136,6 +138,7 @@ assert.deepEqual(sessionActionItems.map((item) => ({
   { disabled: false, id: 'session-action:nextSession', title: 'Next Session' },
   { disabled: false, id: 'session-action:reconnect', title: 'Reconnect' },
   { disabled: false, id: 'session-action:renameSession', title: 'Rename Session' },
+  { disabled: false, id: 'session-action:protectSession', title: 'Protect Session' },
   { disabled: false, id: 'session-action:clearTerminal', title: 'Clear Terminal' },
   { disabled: false, id: 'session-action:copyTranscript', title: 'Copy Terminal Output' },
   { disabled: false, id: 'session-action:exportTranscript', title: 'Export Terminal Output' },
@@ -164,10 +167,12 @@ assert.deepEqual(buildSessionActionPaletteItems({
     exportTranscript: 'Export Terminal Output',
     nextSession: 'Next Session',
     previousSession: 'Previous Session',
+    protectSession: 'Protect Session',
     quickCommands: 'Quick Commands',
     reconnect: 'Reconnect',
     renameSession: 'Rename Session',
     saveAudit: 'Save Audit Record',
+    unprotectSession: 'Remove Protection',
   },
   runAction: () => {},
   sessionCount: 0,
@@ -181,6 +186,7 @@ assert.deepEqual(buildSessionActionPaletteItems({
   { disabled: true, id: 'session-action:nextSession', reasonKey: 'palette.reason.noAdjacentSession' },
   { disabled: true, id: 'session-action:reconnect', reasonKey: 'palette.reason.noActiveSession' },
   { disabled: true, id: 'session-action:renameSession', reasonKey: 'palette.reason.noActiveSession' },
+  { disabled: true, id: 'session-action:protectSession', reasonKey: 'palette.reason.noActiveSession' },
   { disabled: true, id: 'session-action:clearTerminal', reasonKey: 'palette.reason.noActiveSession' },
   { disabled: true, id: 'session-action:copyTranscript', reasonKey: 'palette.reason.noActiveSession' },
   { disabled: true, id: 'session-action:exportTranscript', reasonKey: 'palette.reason.noActiveSession' },
@@ -192,6 +198,38 @@ assert.deepEqual(buildSessionActionPaletteItems({
   { disabled: false, id: 'session-action:commandHistory', reasonKey: '' },
   { disabled: false, id: 'session-action:quickCommands', reasonKey: '' },
 ]);
+
+const protectedSessionActions = buildSessionActionPaletteItems({
+  activeSessionId: 'protected',
+  activeSessionProtected: true,
+  canNavigate: true,
+  closableClosedCount: 0,
+  closableOtherCount: 0,
+  closableSessionCount: 0,
+  closedSessionCount: 1,
+  labels: {
+    closeAll: 'Close All Sessions',
+    closeClosed: 'Close Closed Sessions',
+    closeSession: 'Close Session',
+    closeOthers: 'Close Other Sessions',
+    protectSession: 'Protect Session',
+    unprotectSession: 'Remove Protection',
+  },
+  sessionCount: 2,
+});
+assert.deepEqual(
+  protectedSessionActions
+    .filter((item) => ['unprotectSession', 'closeSession', 'closeClosed', 'closeOthers', 'closeAll']
+      .some((action) => item.id === `session-action:${action}`))
+    .map((item) => ({ disabled: item.disabled, id: item.id, reasonKey: item.reasonKey })),
+  [
+    { disabled: false, id: 'session-action:unprotectSession', reasonKey: '' },
+    { disabled: true, id: 'session-action:closeSession', reasonKey: 'palette.reason.protectedSession' },
+    { disabled: true, id: 'session-action:closeClosed', reasonKey: 'palette.reason.noClosableSession' },
+    { disabled: true, id: 'session-action:closeOthers', reasonKey: 'palette.reason.noClosableSession' },
+    { disabled: true, id: 'session-action:closeAll', reasonKey: 'palette.reason.noClosableSession' },
+  ],
+);
 
 assert.deepEqual(filterPaletteItems(sessionActionItems, 'history').map((item) => item.id), ['session-action:commandHistory']);
 assert.deepEqual(filterPaletteItems(sessionActionItems, 'audit').map((item) => item.id), ['session-action:saveAudit']);

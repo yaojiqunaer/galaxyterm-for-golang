@@ -1022,6 +1022,16 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   white-space: nowrap;
 }
 
+.session-protection-icon {
+  flex: 0 0 auto;
+  color: var(--accent);
+  font-size: 12px;
+}
+
+.tooltip-button-wrapper {
+  display: inline-flex;
+}
+
 .session-tab-label.unread .session-tab-title {
   color: var(--terminal-text);
   font-weight: 650;

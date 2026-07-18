@@ -455,6 +455,17 @@ assert.ok(
   'the configured close shortcut must close the active terminal only inside the session workspace',
 );
 assert.ok(
+  source.includes('const sessionClosePlans = useMemo(() => ({')
+    && source.includes("buildSessionClosePlan(sessions, { mode: 'closed' })")
+    && source.includes("buildSessionClosePlan(sessions, { keepSessionId: activeKey, mode: 'others' })")
+    && source.includes('closable: !session.protected')
+    && source.includes('protected: Boolean(session.protected)')
+    && source.includes('toggleSessionProtection(current, sessionId)')
+    && source.includes('display.protected &&')
+    && /\.session-protection-icon\s*\{/.test(styles),
+  'protected sessions must stay visible, resist close actions, and survive workspace snapshots',
+);
+assert.ok(
   source.includes('restorableSessionCount: closedSessions.length')
     && source.includes("if (action === 'restoreClosed') restoreLastClosedSession();"),
   'the command palette must expose recently closed session recovery when available',

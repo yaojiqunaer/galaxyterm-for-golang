@@ -61,6 +61,7 @@ import {
   QuestionCircleOutlined,
   LaptopOutlined,
   LeftOutlined,
+  LockOutlined,
   MinusOutlined,
   MoreOutlined,
   PlusOutlined,
@@ -74,6 +75,7 @@ import {
   ThunderboltOutlined,
   UpOutlined,
   UploadOutlined,
+  UnlockOutlined,
   VideoCameraOutlined,
 } from '@ant-design/icons';
 import {
@@ -116,6 +118,7 @@ import {
   appendClosedSessions,
   buildSessionAttentionSummary,
   buildSessionAuditSummary,
+  buildSessionClosePlan,
   buildSessionCloseConfirm,
   buildSessionContextFacts,
   buildDesktopWindowTitle,
@@ -137,6 +140,7 @@ import {
   sessionSummary,
   synchronizeSessionTerminalStatus,
   takeClosedSession,
+  toggleSessionProtection,
 } from './sessionPresentation.js';
 import {
   buildAppearanceSummary,
@@ -545,6 +549,11 @@ function App() {
     [sessionActivity],
   );
   const unreadSessionCount = sessionAttentionSummary.total;
+  const sessionClosePlans = useMemo(() => ({
+    all: buildSessionClosePlan(sessions),
+    closed: buildSessionClosePlan(sessions, { mode: 'closed' }),
+    others: buildSessionClosePlan(sessions, { keepSessionId: activeKey, mode: 'others' }),
+  }), [activeKey, sessions]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
@@ -1239,6 +1248,7 @@ function App() {
       id,
       backendSessionId: '',
       label: `${session.label} Copy`,
+      protected: false,
       status: 'connecting',
       startedAt: new Date().toISOString(),
       auditEvents: [],
@@ -1248,25 +1258,37 @@ function App() {
     setSelectedNav('sessions');
   };
 
+  const closeSessionSet = (closingSessions = []) => {
+    if (closingSessions.length === 0) return;
+    const closingSessionIds = new Set(closingSessions.map((session) => session.id));
+    closingSessions.forEach((session) => saveAuditRecord(session.id));
+    rememberClosedSessions(closingSessions);
+    const remainingSessions = sessions.filter((session) => !closingSessionIds.has(session.id));
+    setSessions((current) => current.filter((session) => !closingSessionIds.has(session.id)));
+    if (closingSessionIds.has(activeKey)) setActiveKey(remainingSessions[0]?.id || '');
+    if (remainingSessions.length === 0) setFocusMode(false);
+    terminalRefs.current = Object.fromEntries(
+      Object.entries(terminalRefs.current).filter(([sessionId]) => !closingSessionIds.has(sessionId)),
+    );
+  };
+
   const removeSession = (targetKey) => {
     const closingSession = sessions.find((session) => session.id === targetKey);
-    saveAuditRecord(targetKey);
-    if (closingSession) rememberClosedSessions([closingSession]);
-    setSessions((current) => {
-      const next = current.filter((item) => item.id !== targetKey);
-      if (activeKey === targetKey) {
-        setActiveKey(next[0]?.id || '');
-      }
-      return next;
-    });
+    if (!closingSession || closingSession.protected) return;
+    closeSessionSet([closingSession]);
   };
 
   const confirmRemoveSession = (targetKey) => {
+    const session = sessions.find((item) => item.id === targetKey);
+    if (!session) return;
+    if (session.protected) {
+      messageApi.info(t('palette.reason.protectedSession'));
+      return;
+    }
     if (settings.confirmDangerousActions === false) {
       removeSession(targetKey);
       return;
     }
-    const session = sessions.find((item) => item.id === targetKey);
     const confirm = buildSessionCloseConfirm(session);
     if (!confirm) return;
     modalApi.confirm({
@@ -1279,49 +1301,30 @@ function App() {
     });
   };
 
-  const closeAllSessions = () => {
-    sessions.forEach((session) => saveAuditRecord(session.id));
-    rememberClosedSessions(sessions);
-    setSessions([]);
-    setActiveKey('');
-    setFocusMode(false);
-    terminalRefs.current = {};
-  };
+  const closeAllSessions = () => closeSessionSet(sessionClosePlans.all.closingSessions);
 
-  const closeOtherSessions = (keepSessionId = activeKey) => {
-    if (!keepSessionId) return;
-    const closingSessions = sessions.filter((session) => session.id !== keepSessionId);
-    closingSessions.forEach((session) => saveAuditRecord(session.id));
-    rememberClosedSessions(closingSessions);
-    setSessions((current) => current.filter((session) => session.id === keepSessionId));
-    setActiveKey(keepSessionId);
-    terminalRefs.current = Object.fromEntries(
-      Object.entries(terminalRefs.current).filter(([sessionId]) => sessionId === keepSessionId),
-    );
-  };
+  const closeClosedSessions = () => closeSessionSet(sessionClosePlans.closed.closingSessions);
 
-  const closeClosedSessions = () => {
-    const closingSessions = sessions.filter((session) => sessionStatusLabel(session) === 'closed');
-    closingSessions.forEach((session) => saveAuditRecord(session.id));
-    rememberClosedSessions(closingSessions);
-    const closingSessionIds = new Set(closingSessions.map((session) => session.id));
-    setSessions((current) => current.filter((session) => !closingSessionIds.has(session.id)));
-    if (closingSessionIds.has(activeKey)) {
-      const nextActive = sessions.find((session) => !closingSessionIds.has(session.id));
-      setActiveKey(nextActive?.id || '');
+  const stopProtectedOnlyClose = (plan) => {
+    if (plan.closingSessions.length > 0) return false;
+    if (plan.protectedSessions.length > 0) {
+      messageApi.info(t('message.protectedSessionsRemain', { count: plan.protectedSessions.length }));
     }
-    terminalRefs.current = Object.fromEntries(
-      Object.entries(terminalRefs.current).filter(([sessionId]) => !closingSessionIds.has(sessionId)),
-    );
+    return true;
   };
 
   const confirmCloseClosedSessions = () => {
-    const closingSessions = sessions.filter((session) => sessionStatusLabel(session) === 'closed');
+    const plan = sessionClosePlans.closed;
+    if (stopProtectedOnlyClose(plan)) return;
     if (settings.confirmDangerousActions === false) {
       closeClosedSessions();
       return;
     }
-    const confirm = buildSessionCloseConfirm({ mode: 'closed', sessions: closingSessions });
+    const confirm = buildSessionCloseConfirm({
+      mode: 'closed',
+      protectedCount: plan.protectedSessions.length,
+      sessions: plan.closingSessions,
+    });
     if (!confirm) return;
     modalApi.confirm({
       title: t(confirm.titleKey),
@@ -1334,12 +1337,19 @@ function App() {
   };
 
   const confirmCloseOtherSessions = (keepSessionId = activeKey) => {
-    const closingSessions = sessions.filter((session) => session.id !== keepSessionId);
+    const plan = keepSessionId === activeKey
+      ? sessionClosePlans.others
+      : buildSessionClosePlan(sessions, { keepSessionId, mode: 'others' });
+    if (stopProtectedOnlyClose(plan)) return;
     if (settings.confirmDangerousActions === false) {
-      closeOtherSessions(keepSessionId);
+      closeSessionSet(plan.closingSessions);
       return;
     }
-    const confirm = buildSessionCloseConfirm({ mode: 'others', sessions: closingSessions });
+    const confirm = buildSessionCloseConfirm({
+      mode: 'others',
+      protectedCount: plan.protectedSessions.length,
+      sessions: plan.closingSessions,
+    });
     if (!confirm) return;
     modalApi.confirm({
       title: t(confirm.titleKey),
@@ -1347,16 +1357,22 @@ function App() {
       okButtonProps: { danger: true },
       okText: t(confirm.okActionKey),
       cancelText: t('action.cancel'),
-      onOk: () => closeOtherSessions(keepSessionId),
+      onOk: () => closeSessionSet(plan.closingSessions),
     });
   };
 
   const confirmCloseAllSessions = () => {
+    const plan = sessionClosePlans.all;
+    if (stopProtectedOnlyClose(plan)) return;
     if (settings.confirmDangerousActions === false) {
       closeAllSessions();
       return;
     }
-    const confirm = buildSessionCloseConfirm(sessions);
+    const confirm = buildSessionCloseConfirm({
+      mode: 'all',
+      protectedCount: plan.protectedSessions.length,
+      sessions: plan.closingSessions,
+    });
     if (!confirm) return;
     modalApi.confirm({
       title: t(confirm.titleKey),
@@ -1393,6 +1409,16 @@ function App() {
     setRenamingSessionId('');
     setRenamingSessionName('');
     messageApi.success(t('message.sessionRenamed'));
+  };
+
+  const toggleProtectedSession = (sessionId = activeKey) => {
+    const session = sessions.find((item) => item.id === sessionId);
+    if (!session) {
+      messageApi.warning(t('message.noActiveSession'));
+      return;
+    }
+    setSessions((current) => toggleSessionProtection(current, sessionId));
+    messageApi.success(t(session.protected ? 'message.sessionUnprotected' : 'message.sessionProtected'));
   };
 
   const reconnectSession = (sessionId = activeKey) => {
@@ -1846,6 +1872,7 @@ function App() {
     if (action === 'nextSession') switchSession('next');
     if (action === 'reconnect') reconnectSession();
     if (action === 'renameSession') openRenameSession();
+    if (action === 'protectSession' || action === 'unprotectSession') toggleProtectedSession();
     if (action === 'clearTerminal') clearActiveTerminal();
     if (action === 'copyTranscript') copyTerminalTranscript();
     if (action === 'exportTranscript') exportTerminalTranscript();
@@ -2275,6 +2302,7 @@ function App() {
 
   const runSessionTabAction = (action, session) => {
     if (action === 'rename') openRenameSession(session);
+    if (action === 'protect' || action === 'unprotect') toggleProtectedSession(session.id);
     if (action === 'reconnect') reconnectSession(session.id);
     if (action === 'duplicate') duplicateSession(session);
     if (action === 'moveLeft') setSessions((current) => moveSessionInOrder(current, session.id, 'previous'));
@@ -2283,7 +2311,13 @@ function App() {
     if (action === 'closeCurrent') confirmRemoveSession(session.id);
   };
   const items = sessions.map((session, sessionIndex) => {
+    const closeOtherPlan = buildSessionClosePlan(sessions, {
+      keepSessionId: session.id,
+      mode: 'others',
+    });
     const tabMenuItems = buildSessionTabMenuModel({
+      closableOtherCount: closeOtherPlan.closingSessions.length,
+      protected: session.protected,
       sessionCount: sessions.length,
       sessionIndex,
     }).flatMap((action) => [
@@ -2351,7 +2385,7 @@ function App() {
           </span>
         </Dropdown>
       ),
-      closable: true,
+      closable: !session.protected,
     };
   });
 
@@ -2374,8 +2408,10 @@ function App() {
     }
     const sessionToolbarModel = buildSessionToolbarModel({
       activeKey,
+      activeProtected: activeSession?.protected,
       canNavigate: sessionNavigationState.canNavigate,
-      closedCount: currentSessionSummary.closed,
+      closableOtherCount: sessionClosePlans.others.closingSessions.length,
+      closedCount: sessionClosePlans.closed.closingSessions.length,
       sessionCount: sessions.length,
       terminalStatus: activeTerminalStatus,
       view: sessionView,
@@ -2391,6 +2427,7 @@ function App() {
       if (action === 'interrupt') interruptSession();
       if (action === 'reconnect') reconnectSession();
       if (action === 'rename') openRenameSession();
+      if (action === 'protect' || action === 'unprotect') toggleProtectedSession();
       if (action === 'closeClosed') confirmCloseClosedSessions();
       if (action === 'closeOthers') confirmCloseOtherSessions();
       if (action === 'closeCurrent') confirmRemoveSession(activeKey);
@@ -2437,6 +2474,15 @@ function App() {
                     unread={sessionActivity[session.id]?.unread}
                   />
                   <Space size={2}>
+                    <Tooltip title={t(session.protected ? 'action.unprotectSession' : 'action.protectSession')}>
+                      <Button
+                        aria-label={t(session.protected ? 'action.unprotectSession' : 'action.protectSession')}
+                        size="small"
+                        type="text"
+                        icon={session.protected ? <UnlockOutlined /> : <LockOutlined />}
+                        onClick={() => toggleProtectedSession(session.id)}
+                      />
+                    </Tooltip>
                     <Tooltip title={t('action.renameSession')}>
                       <Button
                         aria-label={t('action.renameSession')}
@@ -2464,15 +2510,18 @@ function App() {
                         onClick={() => duplicateSession(session)}
                       />
                     </Tooltip>
-                    <Tooltip title={t('action.closeSession')}>
-                      <Button
-                        aria-label={t('action.closeSession')}
-                        danger
-                        size="small"
-                        type="text"
-                        icon={<DeleteOutlined />}
-                        onClick={() => confirmRemoveSession(session.id)}
-                      />
+                    <Tooltip title={t(session.protected ? 'palette.reason.protectedSession' : 'action.closeSession')}>
+                      <span className="tooltip-button-wrapper">
+                        <Button
+                          aria-label={t('action.closeSession')}
+                          danger
+                          disabled={session.protected}
+                          size="small"
+                          type="text"
+                          icon={<DeleteOutlined />}
+                          onClick={() => confirmRemoveSession(session.id)}
+                        />
+                      </span>
                     </Tooltip>
                   </Space>
                 </div>
@@ -4731,7 +4780,11 @@ function App() {
   };
   const paletteItems = buildPaletteItems({
     activeSessionId: activeKey,
+    activeSessionProtected: Boolean(activeSession?.protected),
     canNavigateSessions: sessionNavigationState.canNavigate,
+    closableClosedCount: sessionClosePlans.closed.closingSessions.length,
+    closableOtherCount: sessionClosePlans.others.closingSessions.length,
+    closableSessionCount: sessionClosePlans.all.closingSessions.length,
     closedSessionCount: currentSessionSummary.closed,
     restorableSessionCount: closedSessions.length,
     favoriteConnectionCount: profiles.filter((profile) => profile.favorite).length,
@@ -4866,6 +4919,8 @@ function App() {
     previousSession: () => switchSession('previous'),
     nextSession: () => switchSession('next'),
     rename: () => openRenameSession(),
+    protect: () => toggleProtectedSession(),
+    unprotect: () => toggleProtectedSession(),
     reconnect: () => reconnectSession(),
     closeClosed: confirmCloseClosedSessions,
     closeOthers: confirmCloseOtherSessions,
@@ -4964,6 +5019,11 @@ function App() {
       label: t('action.renameSession'),
     },
     activeKey && {
+      key: activeSession?.protected ? 'unprotect' : 'protect',
+      icon: activeSession?.protected ? <UnlockOutlined /> : <LockOutlined />,
+      label: t(activeSession?.protected ? 'action.unprotectSession' : 'action.protectSession'),
+    },
+    activeKey && {
       key: 'reconnect',
       icon: <ReloadOutlined />,
       label: t('action.reconnect'),
@@ -4972,18 +5032,20 @@ function App() {
       key: 'closeClosed',
       icon: <DeleteOutlined />,
       label: t('action.closeClosed'),
+      disabled: sessionClosePlans.closed.closingSessions.length === 0,
     },
     activeKey && sessions.length > 1 && {
       key: 'closeOthers',
       icon: <DeleteOutlined />,
       label: t('action.closeOthers'),
+      disabled: sessionClosePlans.others.closingSessions.length === 0,
       danger: true,
     },
     {
       key: 'closeAll',
       icon: <DeleteOutlined />,
       label: t('action.closeAll'),
-      disabled: sessions.length === 0,
+      disabled: sessionClosePlans.all.closingSessions.length === 0,
       danger: true,
     },
   ].filter(Boolean);
@@ -6164,6 +6226,13 @@ function SessionTabLabel({ active = false, activityKind = 'output', session, unr
       <span className="session-status-dot" />
       {providerIcons[display.iconType] || <CodeOutlined />}
       <span className="session-tab-title">{display.title}</span>
+      {display.protected && (
+        <LockOutlined
+          aria-label={t('action.protectSession')}
+          className="session-protection-icon"
+          title={t('action.protectSession')}
+        />
+      )}
       {display.unread && (
         <span
           aria-label={activityLabel}
@@ -6178,6 +6247,8 @@ function SessionTabLabel({ active = false, activityKind = 'output', session, unr
 
 function sessionTabActionIcon(action) {
   if (action === 'rename') return <EditOutlined />;
+  if (action === 'protect') return <LockOutlined />;
+  if (action === 'unprotect') return <UnlockOutlined />;
   if (action === 'reconnect') return <ReloadOutlined />;
   if (action === 'duplicate') return <CopyOutlined />;
   if (action === 'moveLeft') return <LeftOutlined />;
@@ -6205,6 +6276,13 @@ function SessionSidebarLabel({ activityKind = 'output', session, unread = false 
         <span>{session.label}</span>
         <small>{t(`session.status.${sessionStatusLabel(session)}`)}</small>
       </span>
+      {session.protected && (
+        <LockOutlined
+          aria-label={t('action.protectSession')}
+          className="session-protection-icon"
+          title={t('action.protectSession')}
+        />
+      )}
       {unread && (
         <span
           aria-label={activityLabel}
@@ -6731,7 +6809,11 @@ function buildPaletteItems(actions) {
 
   const sessionActionItems = buildSessionActionPaletteItems({
     activeSessionId: actions.activeSessionId,
+    activeSessionProtected: actions.activeSessionProtected,
     canNavigate: actions.canNavigateSessions,
+    closableClosedCount: actions.closableClosedCount,
+    closableOtherCount: actions.closableOtherCount,
+    closableSessionCount: actions.closableSessionCount,
     closedSessionCount: actions.closedSessionCount,
     restorableSessionCount: actions.restorableSessionCount,
     groupLabel: t('palette.group.sessionActions'),
@@ -6746,11 +6828,13 @@ function buildPaletteItems(actions) {
       exportTranscript: t('action.exportTranscript'),
       nextSession: t('action.nextSession'),
       previousSession: t('action.previousSession'),
+      protectSession: t('action.protectSession'),
       quickCommands: t('action.commands'),
       reconnect: t('action.reconnect'),
       restoreClosed: t('action.restoreClosedSession'),
       renameSession: t('action.renameSession'),
       saveAudit: t('action.saveAuditRecord'),
+      unprotectSession: t('action.unprotectSession'),
     },
     runAction: actions.runSessionAction,
     sessionCount: actions.sessionCount,
@@ -7135,6 +7219,7 @@ function buildWorkspaceSnapshot(sessions, activeKey, sessionView) {
     sessions: sessions.map((session) => ({
       id: session.id,
       label: session.label,
+      protected: Boolean(session.protected),
       providerType: session.providerType,
       request: sanitizeRequest(session.request),
     })),
