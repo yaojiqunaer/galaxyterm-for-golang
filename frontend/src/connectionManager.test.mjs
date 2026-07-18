@@ -145,9 +145,46 @@ assert.deepEqual(groups[0].profiles.map((profile) => profile.id), ['prod-db', 'p
 assert.deepEqual(buildConnectionGroupNav(profiles), [
   { credentialCount: 1, favoriteCount: 2, key: 'all', total: 3, type: 'all' },
   { credentialCount: 1, favoriteCount: 2, key: 'favorites', total: 2, type: 'favorites' },
-  { credentialCount: 1, favoriteCount: 1, key: 'Production', total: 2, type: 'group' },
-  { credentialCount: 0, favoriteCount: 1, key: '__ungrouped__', total: 1, type: 'group' },
+  { credentialCount: 1, favoriteCount: 1, groupKey: 'Production', key: 'group:Production', total: 2, type: 'group' },
+  { credentialCount: 0, favoriteCount: 1, groupKey: '__ungrouped__', key: 'group:__ungrouped__', total: 1, type: 'group' },
 ]);
+
+assert.equal(connectionManager.buildConnectionGroupFilter?.('Production'), 'group:Production');
+assert.equal(connectionManager.buildConnectionGroupFilter?.('all'), 'group:all');
+assert.deepEqual(connectionManager.resolveConnectionGroupFilter?.('group:all'), {
+  group: 'all',
+  type: 'group',
+});
+assert.deepEqual(connectionManager.resolveConnectionGroupFilter?.('favorites'), {
+  group: '',
+  type: 'favorites',
+});
+assert.deepEqual(
+  filterConnectionProfiles([
+    ...profiles,
+    { id: 'reserved-all', displayName: 'Reserved all', group: 'all', providerType: 'ssh' },
+  ], { group: 'group:all' }).map((profile) => profile.id),
+  ['reserved-all'],
+);
+
+const renamedGroup = connectionManager.renameConnectionGroup?.(profiles, 'Production', 'Critical');
+assert.equal(renamedGroup?.changedCount, 2);
+assert.deepEqual(renamedGroup?.profiles.map((profile) => [profile.id, profile.group]), [
+  ['prod-db', 'Critical'],
+  ['prod-web', 'Critical'],
+  ['dev-shell', ''],
+]);
+assert.equal(renamedGroup?.profiles[2], profiles[2]);
+
+const movedProfile = connectionManager.moveConnectionProfilesToGroup?.(profiles, ['dev-shell'], 'Production');
+assert.equal(movedProfile?.changedCount, 1);
+assert.equal(movedProfile?.profiles.find((profile) => profile.id === 'dev-shell')?.group, 'Production');
+assert.equal(movedProfile?.profiles.find((profile) => profile.id === 'prod-db'), profiles[0]);
+
+const removedGroup = connectionManager.removeConnectionGroup?.(profiles, 'Production');
+assert.equal(removedGroup?.changedCount, 2);
+assert.deepEqual(removedGroup?.profiles.map((profile) => profile.group), ['', '', '']);
+assert.equal(removedGroup?.profiles.length, profiles.length);
 
 assert.deepEqual(
   selectBatchProfiles(profiles, { favoritesOnly: true }).map((profile) => profile.id),

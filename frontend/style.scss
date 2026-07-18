@@ -305,6 +305,10 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
 
 [data-density='compact'] .connection-group-nav-item {
   min-height: 30px;
+}
+
+[data-density='compact'] .connection-group-nav-activate {
+  min-height: 30px;
   padding: 5px 8px;
 }
 
@@ -1998,21 +2002,65 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
 .connection-group-nav-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   min-height: 34px;
-  padding: 7px 9px;
-  border: 0;
   border-radius: 6px;
   background: transparent;
   color: var(--text);
-  text-align: left;
-  cursor: pointer;
 }
 
 .connection-group-nav-item:hover,
 .connection-group-nav-item.active {
   background: var(--accent-soft);
   color: var(--accent);
+}
+
+.connection-group-nav-activate {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 0;
+  flex: 1;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.connection-group-nav-menu {
+  display: inline-grid;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  place-items: center;
+  flex: 0 0 auto;
+  margin-right: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  opacity: 0;
+  transition: background 100ms ease, opacity 100ms ease;
+}
+
+.connection-group-nav-item:hover .connection-group-nav-menu,
+.connection-group-nav-item:focus-within .connection-group-nav-menu,
+.connection-group-nav-item.active .connection-group-nav-menu {
+  opacity: 1;
+}
+
+.connection-group-nav-menu:hover,
+.connection-group-nav-menu:focus-visible {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.connection-group-nav-activate:focus-visible,
+.connection-group-nav-menu:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
 }
 
 .connection-group-nav-item strong {
@@ -2043,6 +2091,18 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
 .connection-group-nav-item:hover .connection-group-nav-label small {
   color: inherit;
   opacity: 0.78;
+}
+
+.connection-group-dialog-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (hover: none) {
+  .connection-group-nav-menu {
+    opacity: 1;
+  }
 }
 
 .connection-list-panel {

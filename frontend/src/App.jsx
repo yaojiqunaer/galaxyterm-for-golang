@@ -92,7 +92,9 @@ import {
   summarizeWorkspace,
 } from './workspaceInsights.js';
 import {
+  buildConnectionGroupFilter,
   buildConnectionGroupNav,
+  buildConnectionGroups,
   buildConnectionEmptyState,
   buildConnectionProfileBadges,
   buildConnectionProfileFacts,
@@ -106,6 +108,10 @@ import {
   filterConnectionProfiles,
   filterRecentConnectionsByProviders,
   isProfileProviderAvailable,
+  moveConnectionProfilesToGroup,
+  removeConnectionGroup,
+  renameConnectionGroup,
+  resolveConnectionGroupFilter,
   resolveProfileSaveDefault,
   resolveSelectedProfileId,
   selectBatchProfiles,
@@ -274,6 +280,7 @@ import * as TunnelAPI from '../wailsjs/go/tunnel/API.js';
 import * as runtime from '../wailsjs/runtime/runtime.js';
 import { availableLocales, currentLocale, setLocale, t } from './i18n.js';
 import CommandPalette from './components/CommandPalette.jsx';
+import ConnectionGroupDialog from './components/ConnectionGroupDialog.jsx';
 import SavedSSHProfileSelect from './components/SavedSSHProfileSelect.jsx';
 import FileProviderFormFields from './components/FileProviderFormFields.jsx';
 import OperationErrorDescription from './components/OperationErrorDescription.jsx';
@@ -409,6 +416,7 @@ function App() {
   const [profileSort, setProfileSort] = useState('favorites');
   const [selectedProfileId, setSelectedProfileId] = useState('');
   const [connectionDetailProfileId, setConnectionDetailProfileId] = useState('');
+  const [connectionGroupEditor, setConnectionGroupEditor] = useState(null);
   const [auditQuery, setAuditQuery] = useState('');
   const [auditProviderFilter, setAuditProviderFilter] = useState('all');
   const [workspaceSummary, setWorkspaceSummary] = useState(() => loadWorkspaceSummary());
@@ -979,6 +987,21 @@ function App() {
   };
 
   const connectionGroupNav = useMemo(() => buildConnectionGroupNav(profiles), [profiles]);
+  const connectionGroupNames = useMemo(() => buildConnectionGroups(profiles)
+    .map((group) => group.key)
+    .filter((group) => group !== ungroupedKey), [profiles]);
+  const resolvedGroupQuery = resolveConnectionGroupFilter(groupQuery);
+  const activeConnectionGroup = connectionGroupNav.find((item) => item.key === groupQuery) || {
+    ...resolvedGroupQuery,
+    groupKey: resolvedGroupQuery.group,
+    key: groupQuery,
+  };
+
+  useEffect(() => {
+    if (connectionGroupNav.some((item) => item.key === groupQuery)) return;
+    setGroupQuery('all');
+  }, [connectionGroupNav, groupQuery]);
+
   const workspaceInsights = useMemo(() => summarizeWorkspace({
     auditRecords,
     installedExtensions,
@@ -1125,7 +1148,12 @@ function App() {
     }
   }, [newType, providers]);
 
-  const openDrawer = (type = terminalDefaults.defaultProviderType, profile = null, intent = 'session') => {
+  const openDrawer = (
+    type = terminalDefaults.defaultProviderType,
+    profile = null,
+    intent = 'session',
+    initialGroup = '',
+  ) => {
     const providerType = profile?.providerType || type;
     const resolvedIntent = profile ? 'edit' : intent;
     if (resolvedIntent !== 'session') {
@@ -1136,7 +1164,7 @@ function App() {
     setTerminalDrawerIntent(resolvedIntent);
     form.setFieldsValue({
       displayName: profile?.displayName || '',
-      group: profile?.group || '',
+      group: profile?.group || initialGroup,
       host: profile?.config?.host || '',
       port: profile?.config?.port || 22,
       username: profile?.auth?.username || '',
@@ -1159,7 +1187,10 @@ function App() {
     setDrawerOpen(true);
   };
 
-  const openConnectionDrawer = (type = terminalDefaults.defaultProviderType) => openDrawer(type, null, 'connection');
+  const openConnectionDrawer = (
+    type = terminalDefaults.defaultProviderType,
+    group = '',
+  ) => openDrawer(type, null, 'connection', group);
 
   const openExtensionsForProvider = (providerType = '') => {
     setExtensionQuery(String(providerType || '').trim());
@@ -2134,34 +2165,166 @@ function App() {
     });
   };
 
+  const commitConnectionGroupChange = (result, messageKey, values = {}) => {
+    if (!result || result.changedCount <= 0) {
+      messageApi.info(t('message.connectionGroupUnchanged'));
+      return false;
+    }
+    persistProfiles(result.profiles);
+    setProfiles(result.profiles);
+    messageApi.success(t(messageKey, { count: result.changedCount, ...values }));
+    return true;
+  };
+
+  const moveProfileToGroup = (profile, targetGroup) => {
+    const result = moveConnectionProfilesToGroup(profiles, [profile.id], targetGroup);
+    commitConnectionGroupChange(result, 'message.connectionMovedToGroup', {
+      name: groupLabel(result.targetGroup || ungroupedKey),
+    });
+  };
+
+  const openNewGroupForProfile = (profile) => setConnectionGroupEditor({
+    affectedCount: 1,
+    mode: 'move',
+    profileId: profile.id,
+    profileName: profile.displayName,
+  });
+
+  const openRenameConnectionGroup = (item) => setConnectionGroupEditor({
+    affectedCount: item.total,
+    mode: 'rename',
+    sourceGroup: item.groupKey,
+  });
+
+  const saveConnectionGroupEdit = (targetGroup) => {
+    if (!connectionGroupEditor) return;
+    if (connectionGroupEditor.mode === 'rename') {
+      const result = renameConnectionGroup(
+        profiles,
+        connectionGroupEditor.sourceGroup,
+        targetGroup,
+      );
+      if (commitConnectionGroupChange(result, 'message.connectionGroupRenamed', {
+        name: targetGroup,
+      })) {
+        setGroupQuery(buildConnectionGroupFilter(targetGroup));
+      }
+    } else {
+      const profile = profiles.find((item) => item.id === connectionGroupEditor.profileId);
+      if (profile) moveProfileToGroup(profile, targetGroup);
+    }
+    setConnectionGroupEditor(null);
+  };
+
+  const confirmRemoveConnectionGroup = (item) => requestDangerousAction({
+    actionKey: 'action.removeGroup',
+    contentKey: 'confirm.removeConnectionGroupContent',
+    contentValues: {
+      count: item.total,
+      name: groupLabel(item.groupKey),
+    },
+    onConfirm: () => {
+      const result = removeConnectionGroup(profiles, item.groupKey);
+      if (commitConnectionGroupChange(result, 'message.connectionGroupRemoved', {
+        name: groupLabel(item.groupKey),
+      })) {
+        setGroupQuery(buildConnectionGroupFilter(ungroupedKey));
+      }
+    },
+    titleKey: 'confirm.removeConnectionGroupTitle',
+    titleValues: { name: groupLabel(item.groupKey) },
+  });
+
   const runProfileAction = (action, profile) => {
     if (action === 'connect') runConnectionProfileNewAction(profile);
     if (action === 'edit') openProfileEditor(profile);
     if (action === 'rename') openProfileEditor(profile);
     if (action === 'duplicate') duplicateProfile(profile);
     if (action === 'favorite' || action === 'unfavorite') toggleProfileFavorite(profile.id);
+    if (action === 'moveGroup:new') openNewGroupForProfile(profile);
+    if (action.startsWith('moveGroup:group:')) {
+      const groupFilter = action.slice('moveGroup:'.length);
+      moveProfileToGroup(profile, resolveConnectionGroupFilter(groupFilter).group);
+    }
     if (action === 'delete') confirmDeleteProfile(profile);
   };
 
   const buildConnectionProfileActionMenu = (profile) => {
     const primaryAction = connectionProfileLaunchModel(profile).primary;
+    const currentGroup = profile.group || ungroupedKey;
+    const groupTargets = [...connectionGroupNames, ungroupedKey]
+      .filter((group) => group !== currentGroup)
+      .map((group) => ({
+        key: `moveGroup:${buildConnectionGroupFilter(group)}`,
+        label: groupLabel(group),
+      }));
+    const items = profileActionModel(profile)
+      .filter((action) => action !== 'connect' || primaryAction.action === 'focus')
+      .map((action) => ({
+        key: action,
+        danger: action === 'delete',
+        icon: connectionProfileActionIcon(action),
+        label: t(action === 'connect'
+          ? profile.kind === 'file' ? 'action.openFiles' : 'action.newTerminal'
+          : `profile.action.${action}`),
+      }));
+    const deleteIndex = items.findIndex((item) => item.key === 'delete');
+    items.splice(deleteIndex < 0 ? items.length : deleteIndex, 0,
+      { type: 'divider' },
+      {
+        key: 'moveGroup',
+        icon: <FolderOpenOutlined />,
+        label: t('action.moveToGroup'),
+        children: [
+          ...groupTargets,
+          ...(groupTargets.length > 0 ? [{ type: 'divider' }] : []),
+          { key: 'moveGroup:new', icon: <PlusOutlined />, label: t('action.newGroup') },
+        ],
+      });
     return {
-      items: profileActionModel(profile)
-        .filter((action) => action !== 'connect' || primaryAction.action === 'focus')
-        .map((action) => ({
-          key: action,
-          danger: action === 'delete',
-          icon: connectionProfileActionIcon(action),
-          label: t(action === 'connect'
-            ? profile.kind === 'file' ? 'action.openFiles' : 'action.newTerminal'
-            : `profile.action.${action}`),
-        })),
+      items,
       onClick: ({ domEvent, key }) => {
         domEvent?.stopPropagation();
         runProfileAction(key, profile);
       },
     };
   };
+
+  const buildConnectionGroupActionMenu = (item) => ({
+    items: [
+      {
+        key: 'openGroup',
+        disabled: selectBatchProfiles(profiles, {
+          availableProviders: providers,
+          group: item.key,
+        }).length === 0,
+        icon: <ThunderboltOutlined />,
+        label: t('action.openGroup'),
+      },
+      {
+        key: 'newConnection',
+        icon: <PlusOutlined />,
+        label: t('action.newConnectionInGroup'),
+      },
+      ...(item.groupKey !== ungroupedKey ? [
+        { type: 'divider' },
+        { key: 'renameGroup', icon: <EditOutlined />, label: t('action.renameGroup') },
+        { key: 'removeGroup', danger: true, icon: <DeleteOutlined />, label: t('action.removeGroup') },
+      ] : []),
+    ],
+    onClick: ({ domEvent, key }) => {
+      domEvent?.stopPropagation();
+      if (key === 'openGroup') openBatchProfiles({ group: item.key });
+      if (key === 'newConnection') {
+        openConnectionDrawer(
+          terminalDefaults.defaultProviderType,
+          item.groupKey === ungroupedKey ? '' : item.groupKey,
+        );
+      }
+      if (key === 'renameGroup') openRenameConnectionGroup(item);
+      if (key === 'removeGroup') confirmRemoveConnectionGroup(item);
+    },
+  });
 
   const clearProfileFilters = () => {
     setProfileQuery('');
@@ -2849,34 +3012,56 @@ function App() {
             />
           </div>
           <div className="connection-group-nav">
-            {connectionGroupNav.map((item) => (
-              <button
-                key={item.key}
-                className={groupQuery === item.key ? 'connection-group-nav-item active' : 'connection-group-nav-item'}
-                type="button"
-                onClick={() => setGroupQuery(item.key)}
-              >
-                <span className="connection-group-nav-label">
-                  <span>{connectionGroupLabel(item)}</span>
-                  {(item.favoriteCount > 0 || item.credentialCount > 0) && (
-                    <small>
-                      {[
-                        item.favoriteCount > 0 ? `${t('label.favorite')}: ${item.favoriteCount}` : '',
-                        item.credentialCount > 0 ? `${t('label.credentialSaved')}: ${item.credentialCount}` : '',
-                      ].filter(Boolean).join(' · ')}
-                    </small>
+            {connectionGroupNav.map((item) => {
+              const row = (
+                <div className={groupQuery === item.key ? 'connection-group-nav-item active' : 'connection-group-nav-item'}>
+                  <button
+                    aria-current={groupQuery === item.key ? 'page' : undefined}
+                    className="connection-group-nav-activate"
+                    type="button"
+                    onClick={() => setGroupQuery(item.key)}
+                  >
+                    <span className="connection-group-nav-label">
+                      <span>{connectionGroupLabel(item)}</span>
+                      {(item.favoriteCount > 0 || item.credentialCount > 0) && (
+                        <small>
+                          {[
+                            item.favoriteCount > 0 ? `${t('label.favorite')}: ${item.favoriteCount}` : '',
+                            item.credentialCount > 0 ? `${t('label.credentialSaved')}: ${item.credentialCount}` : '',
+                          ].filter(Boolean).join(' · ')}
+                        </small>
+                      )}
+                    </span>
+                    <strong>{item.total}</strong>
+                  </button>
+                  {item.type === 'group' && (
+                    <Dropdown menu={buildConnectionGroupActionMenu(item)} trigger={['click']}>
+                      <button
+                        aria-label={t('action.manageGroup')}
+                        className="connection-group-nav-menu"
+                        title={t('action.manageGroup')}
+                        type="button"
+                        onClick={(event) => event.stopPropagation()}
+                      >
+                        <MoreOutlined />
+                      </button>
+                    </Dropdown>
                   )}
-                </span>
-                <strong>{item.total}</strong>
-              </button>
-            ))}
+                </div>
+              );
+              return item.type === 'group' ? (
+                <Dropdown key={item.key} menu={buildConnectionGroupActionMenu(item)} trigger={['contextMenu']}>
+                  {row}
+                </Dropdown>
+              ) : <React.Fragment key={item.key}>{row}</React.Fragment>;
+            })}
           </div>
         </aside>
 
         <section className="connection-list-panel">
           <div className="connection-list-header">
             <div>
-              <Title level={4}>{connectionGroupLabel(connectionGroupNav.find((item) => item.key === groupQuery) || { key: groupQuery, type: 'group' })}</Title>
+              <Title level={4}>{connectionGroupLabel(activeConnectionGroup)}</Title>
               <Text type="secondary">{`${t('metric.visibleConnections')}: ${visibleProfiles.length}`}</Text>
             </div>
             <Space wrap>
@@ -5956,6 +6141,13 @@ function App() {
         recentIds={paletteRecentIds}
       />
 
+      <ConnectionGroupDialog
+        editor={connectionGroupEditor}
+        existingGroups={connectionGroupNames}
+        onCancel={() => setConnectionGroupEditor(null)}
+        onSubmit={saveConnectionGroupEdit}
+      />
+
       <Drawer
         className="terminal-drawer"
         title={t(terminalDrawerIntent === 'edit'
@@ -7649,7 +7841,7 @@ function runTerminalRecoveryAction(key, actions) {
 function connectionGroupLabel(item) {
   if (item?.type === 'all' || item?.key === 'all') return t('group.all');
   if (item?.type === 'favorites' || item?.key === 'favorites') return t('group.favorites');
-  return groupLabel(item?.key || ungroupedKey);
+  return groupLabel(item?.groupKey || ungroupedKey);
 }
 
 function parseCredentialRef(value) {

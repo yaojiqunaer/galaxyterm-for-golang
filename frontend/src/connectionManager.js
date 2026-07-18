@@ -1,4 +1,24 @@
 export const ungroupedKey = '__ungrouped__';
+const groupFilterPrefix = 'group:';
+
+export function buildConnectionGroupFilter(group = ungroupedKey) {
+  const groupKey = String(group || ungroupedKey).trim() || ungroupedKey;
+  return `${groupFilterPrefix}${encodeURIComponent(groupKey)}`;
+}
+
+export function resolveConnectionGroupFilter(filter = 'all') {
+  if (filter === 'all') return { group: '', type: 'all' };
+  if (filter === 'favorites') return { group: '', type: 'favorites' };
+  if (String(filter).startsWith(groupFilterPrefix)) {
+    const value = String(filter).slice(groupFilterPrefix.length);
+    try {
+      return { group: decodeURIComponent(value) || ungroupedKey, type: 'group' };
+    } catch {
+      return { group: value || ungroupedKey, type: 'group' };
+    }
+  }
+  return { group: String(filter || ungroupedKey), type: 'group' };
+}
 
 export function resolveProfileSaveDefault({ intent = 'session', profile = null } = {}) {
   return Boolean(profile || intent === 'connection');
@@ -98,11 +118,39 @@ export function buildConnectionGroupNav(profiles = []) {
     }) => ({
       credentialCount,
       favoriteCount,
-      key,
+      groupKey: key,
+      key: buildConnectionGroupFilter(key),
       total,
       type: 'group',
     })),
   ];
+}
+
+export function renameConnectionGroup(profiles = [], sourceGroup = '', targetGroup = '') {
+  const sourceKey = normalizeConnectionGroupKey(sourceGroup);
+  const target = normalizeConnectionGroupName(targetGroup);
+  return updateConnectionProfileGroups(profiles, {
+    matches: (profile) => normalizeConnectionGroupKey(profile.group) === sourceKey,
+    targetGroup: target,
+  });
+}
+
+export function moveConnectionProfilesToGroup(profiles = [], profileIds = [], targetGroup = '') {
+  const ids = new Set((Array.isArray(profileIds) ? profileIds : [profileIds]).filter(Boolean));
+  const target = normalizeConnectionGroupName(targetGroup);
+  return updateConnectionProfileGroups(profiles, {
+    matches: (profile) => ids.has(profile.id),
+    targetGroup: target,
+  });
+}
+
+export function removeConnectionGroup(profiles = [], sourceGroup = '') {
+  return renameConnectionGroup(profiles, sourceGroup, '');
+}
+
+export function normalizeConnectionGroupName(group = '') {
+  const normalized = String(group || '').trim().slice(0, 80);
+  return normalized === ungroupedKey ? '' : normalized;
 }
 
 export function selectBatchProfiles(
@@ -115,6 +163,7 @@ export function selectBatchProfiles(
     sortBy = 'favorites',
   } = {},
 ) {
+  const groupFilter = resolveConnectionGroupFilter(group);
   const availableProviderTypes = Array.isArray(availableProviders)
     ? new Set(availableProviders.map((provider) => provider.type).filter(Boolean))
     : null;
@@ -124,7 +173,9 @@ export function selectBatchProfiles(
     const matchesProvider = providerType === 'all' || profile.providerType === providerType;
     const matchesAvailableProvider = !availableProviderTypes || availableProviderTypes.has(profile.providerType);
     const profileGroup = profile.group || ungroupedKey;
-    const matchesGroup = group === 'all' || profileGroup === group;
+    const matchesGroup = groupFilter.type === 'all'
+      || (groupFilter.type === 'favorites' && profile.favorite)
+      || (groupFilter.type === 'group' && profileGroup === groupFilter.group);
     return matchesFavorite && matchesProvider && matchesAvailableProvider && matchesGroup;
   }), sortBy);
 }
@@ -137,12 +188,13 @@ export function filterConnectionProfiles(
     query = '',
   } = {},
 ) {
+  const groupFilter = resolveConnectionGroupFilter(group);
   const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
   return profiles.filter((profile) => {
     const profileGroup = profile.group || ungroupedKey;
-    const groupMatched = group === 'all'
-      || (group === 'favorites' && profile.favorite)
-      || profileGroup === group;
+    const groupMatched = groupFilter.type === 'all'
+      || (groupFilter.type === 'favorites' && profile.favorite)
+      || profileGroup === groupFilter.group;
     if (!groupMatched) return false;
     if (providerType !== 'all' && profile.providerType !== providerType) return false;
     if (tokens.length === 0) return true;
@@ -159,6 +211,24 @@ export function filterConnectionProfiles(
     ].filter(Boolean).join(' ').toLowerCase();
     return tokens.every((token) => searchable.includes(token));
   });
+}
+
+function normalizeConnectionGroupKey(group = '') {
+  return normalizeConnectionGroupName(group) || ungroupedKey;
+}
+
+function updateConnectionProfileGroups(profiles, { matches, targetGroup }) {
+  let changedCount = 0;
+  const nextProfiles = profiles.map((profile) => {
+    if (!matches(profile) || normalizeConnectionGroupName(profile.group) === targetGroup) return profile;
+    changedCount += 1;
+    return { ...profile, group: targetGroup };
+  });
+  return {
+    changedCount,
+    profiles: changedCount > 0 ? nextProfiles : profiles,
+    targetGroup,
+  };
 }
 
 export function buildConnectionEmptyState({

@@ -9,6 +9,7 @@ const styles = await readFile(new URL('../style.scss', import.meta.url), 'utf8')
 const viteConfig = await readFile(new URL('../vite.config.js', import.meta.url), 'utf8');
 const replaySource = await readFile(new URL('./components/AuditReplayPlayer.jsx', import.meta.url), 'utf8');
 const commandPaletteSource = await readFile(new URL('./components/CommandPalette.jsx', import.meta.url), 'utf8');
+const connectionGroupDialogSource = await readFile(new URL('./components/ConnectionGroupDialog.jsx', import.meta.url), 'utf8').catch(() => '');
 const terminalPaneSource = await readFile(new URL('./components/TerminalPane.jsx', import.meta.url), 'utf8');
 const savedSshProfileSource = await readFile(new URL('./components/SavedSSHProfileSelect.jsx', import.meta.url), 'utf8');
 const activeSessionDeclaration = source.indexOf('const activeSession =');
@@ -208,6 +209,19 @@ assert.ok(
     && source.includes('className="quick-profile-menu"')
     && /className="quick-profile-activate"[\s\S]*?onClick=\{\(\) => runConnectionProfilePrimaryAction\(profile\)\}/.test(source),
   'quick terminals and saved connections must expose native keyboard actions and the shared profile menu',
+);
+assert.ok(
+  source.includes("import ConnectionGroupDialog from './components/ConnectionGroupDialog.jsx';")
+    && source.includes('<ConnectionGroupDialog')
+    && source.includes('buildConnectionGroupFilter(')
+    && source.includes('resolveConnectionGroupFilter(')
+    && source.includes("key: 'moveGroup'")
+    && source.includes('className="connection-group-nav-activate"')
+    && source.includes('className="connection-group-nav-menu"')
+    && source.includes("trigger={['contextMenu']}")
+    && connectionGroupDialogSource.includes('maxLength={80}')
+    && connectionGroupDialogSource.includes("t('connection.group.mergeHint'"),
+  'connection groups must support collision-safe filters, profile moves, and discoverable management actions',
 );
 assert.ok(
   source.includes('const buildSessionActionMenu = (session) => {')
@@ -718,7 +732,10 @@ assert.ok(
   'file providers must be directly discoverable from the command palette without entering a terminal-only drawer',
 );
 assert.ok(
-  source.includes("const openConnectionDrawer = (type = terminalDefaults.defaultProviderType) => openDrawer(type, null, 'connection');")
+  source.includes('const openConnectionDrawer = (')
+    && source.includes("group = '',")
+    && source.includes("openDrawer(type, null, 'connection', group)")
+    && source.includes("group: profile?.group || initialGroup")
     && source.includes('saveProfile: resolveProfileSaveDefault({ intent, profile })')
     && source.includes("terminalDrawerIntent === 'session'")
     && source.includes("terminalDrawerIntent === 'edit'"),
