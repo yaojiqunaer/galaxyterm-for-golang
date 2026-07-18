@@ -233,6 +233,17 @@ assert.ok(
   'command palette session rows must show the real localized lifecycle state',
 );
 assert.ok(
+  source.includes("const [extensionQuery, setExtensionQuery] = useState('');")
+    && source.includes("const [extensionScope, setExtensionScope] = useState('all');")
+    && source.includes('const visibleExtensionWorkspace = useMemo(() => filterExtensionWorkspace({')
+    && source.includes("if (primaryAction.action === 'findExtension')")
+    && source.includes('openExtensionsForProvider(profile.providerType);')
+    && source.includes('runUnavailableProfile: (profile) => actions.openExtensionsForProvider(profile.providerType)')
+    && source.includes('value={extensionQuery}')
+    && source.includes('value={extensionScope}'),
+  'extension discovery must be searchable and unavailable connections must lead to their provider',
+);
+assert.ok(
   source.includes('onClick={() => launchDefaultTerminal(provider.type)}')
     && source.includes('openDefaultTerminal={launchDefaultTerminal}')
     && source.includes("onClick={() => openDefaultTerminal('local')}")

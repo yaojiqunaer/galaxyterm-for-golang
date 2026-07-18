@@ -9,6 +9,7 @@ import {
   compareExtensionVersions,
   findCatalogItemForType,
   findExtensionUpdate,
+  filterExtensionWorkspace,
   filterProvidersByDisabledExtensions,
   fileProviderSupports,
 } from './extensionPresentation.js';
@@ -217,3 +218,36 @@ assert.equal(compareExtensionVersions('1.0.0-beta.1', '1.0.0'), -1);
 assert.equal(compareExtensionVersions('1.0.0', '1.0.0'), 0);
 assert.equal(findExtensionUpdate({ id: 'galaxyterm-extension-sftp', version: '0.2.0' }, remoteCatalog)?.manifest.version, '0.3.0');
 assert.equal(findExtensionUpdate({ id: 'galaxyterm-extension-sftp', version: '0.3.0' }, remoteCatalog), null);
+
+const extensionWorkspace = {
+  catalog: [
+    { type: 'ftp', name: 'FTP', status: 'planned', capabilities: ['list', 'download'] },
+    { type: 'redis', name: 'Redis', status: 'installed', capabilities: ['stream'] },
+  ],
+  installed: buildInstalledExtensionRows(installedExtensions),
+  sources: [
+    { id: 'official', name: 'Official GitHub', url: 'https://github.com/example/galaxyterm-extensions' },
+  ],
+};
+
+assert.deepEqual(filterExtensionWorkspace(extensionWorkspace, { query: 's3 write' }), {
+  catalog: [],
+  hasFilters: true,
+  installed: [buildInstalledExtensionRows(installedExtensions)[2]],
+  sources: [],
+  total: 1,
+});
+assert.deepEqual(filterExtensionWorkspace(extensionWorkspace, { query: 'github' }).sources, extensionWorkspace.sources);
+assert.deepEqual(filterExtensionWorkspace({
+  ...extensionWorkspace,
+  sources: [{ ...extensionWorkspace.sources[0], status: 'error' }],
+}, { query: 'error' }).sources.map((source) => source.id), ['official']);
+assert.deepEqual(filterExtensionWorkspace(extensionWorkspace, { scope: 'available' }), {
+  catalog: [extensionWorkspace.catalog[0]],
+  hasFilters: true,
+  installed: [],
+  sources: [],
+  total: 1,
+});
+assert.deepEqual(filterExtensionWorkspace(extensionWorkspace, { scope: 'installed' }).installed, extensionWorkspace.installed);
+assert.deepEqual(filterExtensionWorkspace(extensionWorkspace, { scope: 'sources' }).sources, extensionWorkspace.sources);

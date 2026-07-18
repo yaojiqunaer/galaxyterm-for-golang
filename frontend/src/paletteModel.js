@@ -32,23 +32,25 @@ export function buildProfilePaletteItems({
   profiles = [],
   providers = [],
   runProfile = () => {},
+  runUnavailableProfile,
   subtitleForProfile = () => '',
 } = {}) {
   const providerTypes = new Set(providers.map((provider) => provider.type).filter(Boolean));
   return profiles.map((profile) => {
     const providerAvailable = providerTypes.has(profile.providerType);
+    const providerRecoverable = !providerAvailable && typeof runUnavailableProfile === 'function';
     const description = subtitleForProfile(profile);
     return {
-      disabled: !providerAvailable,
+      disabled: !providerAvailable && !providerRecoverable,
       group: groupLabel,
       id: `profile:${profile.id}`,
       icon: iconForProfile(profile),
       keywords: `${profile.displayName || ''} ${profile.group || ''} ${description}`,
       profile,
-      reasonKey: providerAvailable ? '' : 'palette.reason.providerUnavailable',
+      reasonKey: providerAvailable || providerRecoverable ? '' : 'palette.reason.providerUnavailable',
       title: profile.displayName || profile.providerType || '',
       description,
-      run: () => runProfile(profile),
+      run: () => (providerAvailable ? runProfile(profile) : runUnavailableProfile?.(profile)),
     };
   });
 }

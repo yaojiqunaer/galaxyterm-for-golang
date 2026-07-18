@@ -66,6 +66,17 @@ assert.deepEqual(profilePaletteItems.map((item) => ({
   { disabled: true, id: 'profile:mysql-prod', reasonKey: 'palette.reason.providerUnavailable' },
 ]);
 
+let recoveredProviderType = '';
+const recoverableProfileItem = buildProfilePaletteItems({
+  profiles: [{ id: 'mysql-prod', providerType: 'mysql', displayName: 'Prod MySQL' }],
+  providers: [{ type: 'ssh' }],
+  runUnavailableProfile: (profile) => { recoveredProviderType = profile.providerType; },
+})[0];
+assert.equal(recoverableProfileItem.disabled, false);
+assert.equal(recoverableProfileItem.reasonKey, '');
+recoverableProfileItem.run();
+assert.equal(recoveredProviderType, 'mysql');
+
 assert.deepEqual(filterPaletteItems([
   {
     title: 'Audit Logs',

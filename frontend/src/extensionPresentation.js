@@ -163,6 +163,56 @@ export function buildInstalledExtensionRows(installedExtensions = [], disabledEx
   });
 }
 
+export function filterExtensionWorkspace(
+  { catalog = [], installed = [], sources = [] } = {},
+  { query = '', scope = 'all' } = {},
+) {
+  const normalizedScope = ['all', 'available', 'installed', 'sources'].includes(scope) ? scope : 'all';
+  const tokens = String(query || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const matches = (item, kind) => tokens.every((token) => extensionSearchText(item, kind).includes(token));
+  const visibleCatalog = normalizedScope === 'all' || normalizedScope === 'available'
+    ? catalog.filter((item) => normalizedScope !== 'available' || item.status === 'planned')
+      .filter((item) => matches(item, 'catalog'))
+    : [];
+  const visibleInstalled = normalizedScope === 'all' || normalizedScope === 'installed'
+    ? installed.filter((item) => matches(item, 'installed'))
+    : [];
+  const visibleSources = normalizedScope === 'all' || normalizedScope === 'sources'
+    ? sources.filter((item) => matches(item, 'source'))
+    : [];
+  return {
+    catalog: visibleCatalog,
+    hasFilters: tokens.length > 0 || normalizedScope !== 'all',
+    installed: visibleInstalled,
+    sources: visibleSources,
+    total: visibleCatalog.length + visibleInstalled.length + visibleSources.length,
+  };
+}
+
+function extensionSearchText(item = {}, kind = '') {
+  const providerDetails = [
+    ...(item.providers || []),
+    ...(item.fileProviders || []),
+  ].flatMap((provider) => (
+    typeof provider === 'string'
+      ? [provider]
+      : [provider?.type, ...(provider?.capabilities || [])]
+  ));
+  return [
+    kind,
+    item.id,
+    item.name,
+    item.nameKey,
+    item.type,
+    item.status,
+    item.version,
+    item.url,
+    item.enabled === false ? 'disabled' : item.enabled === true ? 'enabled' : '',
+    ...(item.capabilities || []),
+    ...providerDetails,
+  ].filter(Boolean).join(' ').toLowerCase();
+}
+
 export function filterProvidersByDisabledExtensions(
   providers = [],
   installedExtensions = [],

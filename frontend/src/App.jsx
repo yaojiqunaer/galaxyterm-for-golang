@@ -231,6 +231,7 @@ import {
   buildInstalledExtensionRows,
   findCatalogItemForType,
   findExtensionUpdate,
+  filterExtensionWorkspace,
   filterProvidersByDisabledExtensions,
   fileProviderSupports,
 } from './extensionPresentation.js';
@@ -370,6 +371,8 @@ function App() {
   const [extensionSourceOpen, setExtensionSourceOpen] = useState(false);
   const [extensionSourceName, setExtensionSourceName] = useState('');
   const [extensionSourceUrl, setExtensionSourceUrl] = useState('');
+  const [extensionQuery, setExtensionQuery] = useState('');
+  const [extensionScope, setExtensionScope] = useState('all');
   const [sshConfigOpen, setSshConfigOpen] = useState(false);
   const [sshConfigContent, setSshConfigContent] = useState('');
   const [sshConfigLoading, setSshConfigLoading] = useState(false);
@@ -979,6 +982,24 @@ function App() {
       updateItem: findExtensionUpdate(extension, remoteExtensionCatalog),
     }))
   ), [installedExtensions, remoteExtensionCatalog, settings.disabledExtensionIds]);
+  const visibleExtensionWorkspace = useMemo(() => filterExtensionWorkspace({
+    catalog: extensionCatalog,
+    installed: installedExtensionRows,
+    sources: extensionSources.map((source) => ({
+      ...source,
+      status: extensionSourceStates[source.id]?.status || 'idle',
+    })),
+  }, {
+    query: extensionQuery,
+    scope: extensionScope,
+  }), [
+    extensionCatalog,
+    extensionQuery,
+    extensionScope,
+    extensionSourceStates,
+    extensionSources,
+    installedExtensionRows,
+  ]);
   const fileProviders = useMemo(() => (
     buildEnabledFileProviders(installedExtensions, settings.disabledExtensionIds)
   ), [installedExtensions, settings.disabledExtensionIds]);
@@ -1082,6 +1103,17 @@ function App() {
   };
 
   const openConnectionDrawer = (type = terminalDefaults.defaultProviderType) => openDrawer(type, null, 'connection');
+
+  const openExtensionsForProvider = (providerType = '') => {
+    setExtensionQuery(String(providerType || '').trim());
+    setExtensionScope('all');
+    setSelectedNav('extensions');
+  };
+
+  const clearExtensionFilters = () => {
+    setExtensionQuery('');
+    setExtensionScope('all');
+  };
 
   const createSession = async (action = 'create') => {
     const values = await form.validateFields();
@@ -1856,7 +1888,7 @@ function App() {
   const openRecentConnection = async (connection) => {
     const providerType = connection.providerType || connection.request?.providerType;
     if (!providers.some((provider) => provider.type === providerType)) {
-      messageApi.warning(t('message.providerUnavailable'));
+      openExtensionsForProvider(providerType);
       return;
     }
     try {
@@ -1887,6 +1919,10 @@ function App() {
     const primaryAction = buildConnectionProfilePrimaryAction({ providerAvailable, sessionInfo });
     if (primaryAction.disabled) {
       messageApi.warning(primaryAction.reasonKey ? t(primaryAction.reasonKey) : t('message.providerUnavailable'));
+      return;
+    }
+    if (primaryAction.action === 'findExtension') {
+      openExtensionsForProvider(profile.providerType);
       return;
     }
     if (primaryAction.action === 'focus') {
@@ -2595,6 +2631,7 @@ function App() {
       openProfileEditor={openProfileEditor}
       duplicateProfile={duplicateProfile}
       focusProfileSession={focusProfileSession}
+      openExtensionsForProvider={openExtensionsForProvider}
       profileSessionSummary={profileSessionSummary}
       toggleProfileFavorite={toggleProfileFavorite}
       confirmDeleteProfile={confirmDeleteProfile}
@@ -2865,7 +2902,7 @@ function App() {
                   aria-selected={(compactConnectionDetail ? explicitlySelectedProfile?.id : selectedProfile?.id) === profile.id}
                   tabIndex={-1}
                   onClick={() => setSelectedProfileId(profile.id)}
-                  onDoubleClick={() => openProfile(profile)}
+                  onDoubleClick={() => runConnectionProfilePrimaryAction(profile)}
                   onKeyDown={(event) => {
                     if (event.key === 'Enter') {
                       event.preventDefault();
@@ -2931,7 +2968,11 @@ function App() {
     </div>
   );
 
-  const renderExtensions = () => (
+  const renderExtensions = () => {
+    const showSources = !visibleExtensionWorkspace.hasFilters || visibleExtensionWorkspace.sources.length > 0;
+    const showInstalled = !visibleExtensionWorkspace.hasFilters || visibleExtensionWorkspace.installed.length > 0;
+    const showCatalog = !visibleExtensionWorkspace.hasFilters || visibleExtensionWorkspace.catalog.length > 0;
+    return (
     <div className="workspace-page extensions-page">
       <div className="page-header">
         <div>
@@ -2971,6 +3012,44 @@ function App() {
         </div>
         <Button icon={<FolderOpenOutlined />} loading={extensionOfflineInstalling} disabled={extensionOperationBusy && !extensionOfflineInstalling} onClick={installOfflineExtension}>{t('action.installOffline')}</Button>
       </div>
+      <div className="extension-discovery-toolbar">
+        <Input.Search
+          allowClear
+          className="extension-search"
+          placeholder={t('placeholder.searchExtensions')}
+          value={extensionQuery}
+          onChange={(event) => setExtensionQuery(event.target.value)}
+        />
+        <Segmented
+          className="extension-scope-filter"
+          value={extensionScope}
+          onChange={setExtensionScope}
+          options={[
+            { label: t('filter.allExtensions'), value: 'all' },
+            { label: t('filter.availableExtensions'), value: 'available' },
+            { label: t('filter.installedExtensions'), value: 'installed' },
+            { label: t('filter.extensionSources'), value: 'sources' },
+          ]}
+        />
+        <Text type="secondary" className="extension-result-count">
+          {t('extension.searchResult', { count: visibleExtensionWorkspace.total })}
+        </Text>
+        {visibleExtensionWorkspace.hasFilters && (
+          <Button size="small" type="text" icon={<ClearOutlined />} onClick={clearExtensionFilters}>
+            {t('action.clearFilters')}
+          </Button>
+        )}
+      </div>
+      {visibleExtensionWorkspace.hasFilters && visibleExtensionWorkspace.total === 0 && (
+        <Empty
+          className="extension-search-empty"
+          image={Empty.PRESENTED_IMAGE_SIMPLE}
+          description={t('empty.noMatchingExtensions')}
+        >
+          <Button size="small" onClick={clearExtensionFilters}>{t('action.clearFilters')}</Button>
+        </Empty>
+      )}
+      {showSources && (
       <section className="extension-section">
         <div className="extension-section-head">
           <div>
@@ -2981,7 +3060,7 @@ function App() {
         </div>
         <List
           className="profile-list installed-extension-list"
-          dataSource={extensionSources}
+          dataSource={visibleExtensionWorkspace.sources}
           locale={{
             emptyText: (
               <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noExtensionSources')}>
@@ -3043,6 +3122,8 @@ function App() {
           }}
         />
       </section>
+      )}
+      {showInstalled && (
       <section className="extension-section">
         <div className="extension-section-head">
           <div>
@@ -3052,7 +3133,7 @@ function App() {
         </div>
         <List
           className="profile-list installed-extension-list"
-          dataSource={installedExtensionRows}
+          dataSource={visibleExtensionWorkspace.installed}
           locale={{ emptyText: t('empty.noInstalledExtensions') }}
           renderItem={(extension) => (
             <List.Item
@@ -3111,6 +3192,8 @@ function App() {
           )}
         />
       </section>
+      )}
+      {showCatalog && (
       <section className="extension-section">
         <div className="extension-section-head">
           <div>
@@ -3119,7 +3202,7 @@ function App() {
           </div>
         </div>
       <div className="extension-grid">
-        {extensionCatalog.map((extension) => {
+        {visibleExtensionWorkspace.catalog.map((extension) => {
           const catalogItem = findCatalogItemForType(remoteExtensionCatalog, extension.type);
           const action = buildExtensionAction(extension, catalogItem);
           const facts = buildExtensionCardFacts(extension);
@@ -3163,8 +3246,10 @@ function App() {
         })}
       </div>
       </section>
+      )}
     </div>
-  );
+    );
+  };
 
   const refreshExtensionSource = async (source, { announce = true } = {}) => {
     setExtensionSourceStates((current) => ({
@@ -4850,6 +4935,7 @@ function App() {
     setSelectedNav,
     activateSession,
     openDrawer,
+    openExtensionsForProvider,
     openProfile,
     runQuickCommand,
     runConnectionAction: runConnectionPaletteAction,
@@ -6196,6 +6282,7 @@ function ConnectionProfilePreview({
   confirmDeleteProfile,
   duplicateProfile,
   focusProfileSession,
+  openExtensionsForProvider,
   openProfile,
   openProfileEditor,
   profile,
@@ -6226,6 +6313,10 @@ function ConnectionProfilePreview({
           type="primary"
           disabled={primaryAction.disabled}
           onClick={() => {
+            if (primaryAction.action === 'findExtension') {
+              openExtensionsForProvider(profile.providerType);
+              return;
+            }
             if (primaryAction.action === 'focus') {
               focusProfileSession(profile);
               return;
@@ -6864,6 +6955,7 @@ function buildPaletteItems(actions) {
     profiles: actions.profiles,
     providers: actions.providers,
     runProfile: actions.openProfile,
+    runUnavailableProfile: (profile) => actions.openExtensionsForProvider(profile.providerType),
     subtitleForProfile: buildConnectionProfileSubtitle,
   });
 

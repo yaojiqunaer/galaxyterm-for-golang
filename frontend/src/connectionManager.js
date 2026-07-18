@@ -343,11 +343,19 @@ export function buildConnectionProfilePrimaryAction({
       reasonKey: '',
     };
   }
+  if (!providerAvailable) {
+    return {
+      action: 'findExtension',
+      disabled: false,
+      labelKey: 'action.findExtension',
+      reasonKey: '',
+    };
+  }
   return {
     action: 'connect',
-    disabled: !providerAvailable,
+    disabled: false,
     labelKey: 'action.connect',
-    reasonKey: providerAvailable ? '' : 'palette.reason.providerUnavailable',
+    reasonKey: '',
   };
 }
 

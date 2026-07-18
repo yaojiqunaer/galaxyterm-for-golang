@@ -353,10 +353,19 @@ assert.deepEqual(buildConnectionProfilePrimaryAction({
   providerAvailable: false,
   sessionInfo: { activeCount: 0, focusSessionId: '' },
 }), {
-  action: 'connect',
-  disabled: true,
-  labelKey: 'action.connect',
-  reasonKey: 'palette.reason.providerUnavailable',
+  action: 'findExtension',
+  disabled: false,
+  labelKey: 'action.findExtension',
+  reasonKey: '',
+});
+assert.deepEqual(buildConnectionProfilePrimaryAction({
+  providerAvailable: false,
+  sessionInfo: { activeCount: 1, focusSessionId: 'existing-session' },
+}), {
+  action: 'focus',
+  disabled: false,
+  labelKey: 'action.focusSession',
+  reasonKey: '',
 });
 assert.deepEqual(buildConnectionProfileStatusSummary({
   providerAvailable: true,

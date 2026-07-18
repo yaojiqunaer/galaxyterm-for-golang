@@ -44,6 +44,8 @@ assert.equal(t('settings.sidebarModeHint'), 'Auto collapses the sidebar when the
 assert.equal(t('placeholder.defaultWorkingDirectory'), 'For example /Users/me/project; blank uses your home directory');
 assert.equal(t('action.configureTerminal'), 'Configure terminal');
 assert.equal(t('action.copySessionTarget'), 'Copy session target');
+assert.equal(t('action.findExtension'), 'Find extension');
+assert.equal(t('placeholder.searchExtensions'), 'Search extensions, providers, or capabilities');
 assert.equal(t('action.protectSession'), 'Protect session');
 assert.equal(t('action.unprotectSession'), 'Remove session protection');
 assert.equal(t('palette.reason.protectedSession'), 'Remove session protection before closing it.');
@@ -97,6 +99,8 @@ assert.equal(t('settings.sidebarModeHint'), '自动模式会在窗口较窄时�
 assert.equal(t('placeholder.defaultWorkingDirectory'), '例如 /Users/me/project；留空使用用户主目录');
 assert.equal(t('action.configureTerminal'), '配置终端');
 assert.equal(t('action.copySessionTarget'), '复制会话目标');
+assert.equal(t('action.findExtension'), '查找扩展');
+assert.equal(t('placeholder.searchExtensions'), '搜索扩展、Provider 或能力');
 assert.equal(t('action.protectSession'), '保护会话');
 assert.equal(t('action.unprotectSession'), '取消会话保护');
 assert.equal(t('palette.reason.protectedSession'), '请先取消会话保护，再关闭该会话。');

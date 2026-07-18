@@ -2920,6 +2920,39 @@ code {
   font-size: 12px;
 }
 
+.extension-discovery-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.extension-search {
+  width: min(360px, 38vw);
+  min-width: 220px;
+}
+
+.extension-scope-filter {
+  flex: 0 0 auto;
+}
+
+.extension-result-count {
+  margin-left: auto;
+  white-space: nowrap;
+}
+
+.extension-search-empty {
+  margin: 0;
+  padding: 34px 16px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
 .extension-section {
   overflow: hidden;
 }
@@ -2979,6 +3012,20 @@ code {
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 10px;
   padding: 12px;
+}
+
+@media (max-width: 980px) {
+  .extension-discovery-toolbar {
+    flex-wrap: wrap;
+  }
+
+  .extension-search {
+    width: 100%;
+  }
+
+  .extension-result-count {
+    margin-left: 0;
+  }
 }
 
 .extension-card {

@@ -41,6 +41,8 @@ https://github.com/<owner>/<repo>/releases/latest/download/galaxyterm-index.json
 
 刷新扩展源后，GalaxyTerm 只展示适配当前操作系统和 CPU 架构的扩展。点击在线安装或更新时，客户端会限制下载大小、校验索引中的 SHA-256、读取包内 `manifest.json`，再执行与离线安装相同的清单、路径和包内校验。
 
+扩展页可按名称、扩展 ID、终端 Provider、文件 Provider、能力或扩展源状态搜索，并可切换“全部”“可安装”“已安装”“扩展源”范围。保存连接引用了尚未安装或已停用的 Provider 时，连接主操作会显示“查找扩展”，进入扩展页后自动以该 Provider 类型过滤；启用或安装完成后可直接返回连接页面使用原配置。
+
 ## Release 索引
 
 每个 Release 上传 `.gtx` 包和名为 `galaxyterm-index.json` 的索引。相对 URL 会以索引地址为基准解析，适合把索引与安装包放在同一个 GitHub Release：

@@ -41,6 +41,8 @@ https://github.com/<owner>/<repo>/releases/latest/download/galaxyterm-index.json
 
 After refreshing a source, GalaxyTerm only shows extensions compatible with the current operating system and CPU architecture. Online installation and updates enforce download size limits, verify the index SHA-256, read the package `manifest.json`, and then run the same manifest, path, and package integrity checks used by offline installation.
 
+The Extensions page searches by name, extension ID, terminal provider, file provider, capability, or source status, with All, Available, Installed, and Sources scopes. When a saved connection references a missing or disabled provider, its primary action becomes Find extension and opens this page filtered by that provider type. After installing or enabling it, the original connection configuration remains ready to use.
+
 ## Release Index
 
 Upload `.gtx` packages and an index named `galaxyterm-index.json` to each Release. Relative URLs resolve against the index location, so the index and packages can be assets of the same GitHub Release:
