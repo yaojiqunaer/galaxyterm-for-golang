@@ -844,6 +844,21 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   white-space: nowrap;
 }
 
+.session-toolbar-context-copy.ant-btn {
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0;
+  flex: 0 0 auto;
+  color: var(--muted);
+}
+
+.session-toolbar-context-copy.ant-btn:hover,
+.session-toolbar-context-copy.ant-btn:focus-visible {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 .session-toolbar-actions {
   flex: 0 0 auto;
   gap: 4px;

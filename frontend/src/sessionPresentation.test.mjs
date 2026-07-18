@@ -4,6 +4,8 @@ import {
   buildSessionAuditSummary,
   buildSessionClosePlan,
   buildSessionContextFacts,
+  buildSessionDisplayLabels,
+  buildSessionIdentityDisplay,
   buildSessionCloseConfirm,
   buildSessionNavigationState,
   buildSessionAttentionSummary,
@@ -218,6 +220,55 @@ assert.deepEqual(buildSessionToolbarContext({
 });
 assert.equal(buildSessionToolbarContext(null), null);
 
+const duplicateSessionLabels = buildSessionDisplayLabels([
+  { id: 'local-1', label: 'Local Terminal', providerType: 'local' },
+  { id: 'prod', label: 'Production', providerType: 'ssh' },
+  { id: 'local-2', label: 'Local Terminal', providerType: 'local' },
+]);
+assert.deepEqual(duplicateSessionLabels, {
+  'local-1': 'Local Terminal 1',
+  prod: 'Production',
+  'local-2': 'Local Terminal 2',
+});
+assert.deepEqual(buildSessionDisplayLabels([
+  { id: 'one', label: '  Build  ' },
+  { id: 'two', label: 'build' },
+]), {
+  one: 'Build 1',
+  two: 'build 2',
+});
+assert.deepEqual(buildSessionDisplayLabels([{ id: 'fallback', providerType: 'redis' }]), {
+  fallback: 'redis',
+});
+assert.deepEqual(buildSessionIdentityDisplay({
+  label: 'Production',
+  providerType: 'ssh',
+  request: {
+    config: { host: 'prod.example.com', port: 2222 },
+    auth: { username: 'root', password: 'secret' },
+  },
+}, {
+  displayName: 'Production 2',
+  providerName: 'SSH',
+  statusName: 'Connected',
+}), {
+  copyValue: 'root@prod.example.com:2222',
+  displayName: 'Production 2',
+  identity: 'root@prod.example.com:2222',
+  provider: 'SSH',
+  tooltip: 'Production 2 · root@prod.example.com:2222 · Connected',
+});
+assert.deepEqual(buildSessionIdentityDisplay({
+  label: 'Plugin session',
+  providerType: 'custom',
+}, { providerName: 'Custom' }), {
+  copyValue: '',
+  displayName: 'Plugin session',
+  identity: '',
+  provider: 'Custom',
+  tooltip: 'Plugin session · Custom · connecting',
+});
+
 assert.equal(buildDesktopWindowTitle(null, { appName: 'GalaxyTerm' }), 'GalaxyTerm');
 assert.equal(buildDesktopWindowTitle(null, {
   appName: 'GalaxyTerm',
@@ -232,9 +283,10 @@ assert.equal(buildDesktopWindowTitle({
   },
 }, {
   appName: 'GalaxyTerm',
+  displayName: 'Production 2',
   providerName: 'SSH',
   unreadCount: 2,
-}), '(2) Production · root@prod.example.com:2222 — GalaxyTerm');
+}), '(2) Production 2 · root@prod.example.com:2222 — GalaxyTerm');
 assert.equal(buildDesktopWindowTitle({
   label: 'root@prod.example.com:2222',
   providerType: 'ssh',
@@ -327,6 +379,17 @@ assert.deepEqual(buildSessionTabMenuModel({ sessionCount: 1 }), [
   { key: 'closeOthers', labelKey: 'action.closeOthers', disabled: true, danger: true },
   { key: 'closeCurrent', labelKey: 'action.closeSession', danger: true },
 ]);
+
+assert.deepEqual(
+  buildSessionTabMenuModel({ hasTarget: true, sessionCount: 1 })
+    .find((action) => action.key === 'copyTarget'),
+  { key: 'copyTarget', labelKey: 'action.copySessionTarget', disabled: false },
+);
+assert.deepEqual(
+  buildSessionTabMenuModel({ hasTarget: false, sessionCount: 1 })
+    .find((action) => action.key === 'copyTarget'),
+  { key: 'copyTarget', labelKey: 'action.copySessionTarget', disabled: true },
+);
 
 assert.deepEqual(buildSessionTabMenuModel({
   closableOtherCount: 0,
@@ -643,6 +706,10 @@ assert.deepEqual(sessionTabDisplay({
   protected: false,
   unread: true,
 });
+
+assert.equal(sessionTabDisplay({ label: 'Local Terminal' }, false, {
+  displayName: 'Local Terminal 2',
+}).title, 'Local Terminal 2');
 
 assert.equal(sessionTabDisplay({ protected: true }).protected, true);
 

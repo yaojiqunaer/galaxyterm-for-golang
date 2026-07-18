@@ -179,6 +179,48 @@ export function buildSessionToolbarContext(session, options = {}) {
   };
 }
 
+export function buildSessionDisplayLabels(sessions = []) {
+  const entries = sessions.map((session) => {
+    const label = String(
+      session.label || session.displayName || session.providerType || 'Terminal',
+    ).trim() || 'Terminal';
+    return { id: session.id, label, normalized: label.toLowerCase() };
+  });
+  const totals = entries.reduce((counts, entry) => (
+    counts.set(entry.normalized, (counts.get(entry.normalized) || 0) + 1)
+  ), new Map());
+  const occurrences = new Map();
+  return Object.fromEntries(entries.map((entry) => {
+    const ordinal = (occurrences.get(entry.normalized) || 0) + 1;
+    occurrences.set(entry.normalized, ordinal);
+    const displayName = totals.get(entry.normalized) > 1 ? `${entry.label} ${ordinal}` : entry.label;
+    return [entry.id, displayName];
+  }));
+}
+
+export function buildSessionIdentityDisplay(session, options = {}) {
+  if (!session) return null;
+  const context = buildSessionToolbarContext(session, options);
+  const displayName = String(
+    options.displayName
+      || session.label
+      || session.displayName
+      || context.provider
+      || 'Terminal',
+  ).trim();
+  const identity = String(context.identity || '').trim();
+  const provider = String(context.provider || '').trim();
+  const statusName = String(options.statusName || sessionStatusLabel(session)).trim();
+  const detail = identity || provider;
+  return {
+    copyValue: identity,
+    displayName,
+    identity,
+    provider,
+    tooltip: [displayName, detail, statusName].filter(Boolean).join(' · '),
+  };
+}
+
 export function buildDesktopWindowTitle(session, options = {}) {
   const appName = String(options.appName || 'GalaxyTerm').trim() || 'GalaxyTerm';
   const unreadCount = Math.max(0, Math.floor(Number(options.unreadCount) || 0));
@@ -187,7 +229,8 @@ export function buildDesktopWindowTitle(session, options = {}) {
 
   const context = buildSessionToolbarContext(session, options);
   const label = String(
-    session.label
+    options.displayName
+      || session.label
       || session.request?.displayName
       || context?.provider
       || appName,
@@ -220,6 +263,13 @@ export function buildSessionTabMenuModel(options = {}) {
     { key: 'reconnect', labelKey: 'action.reconnect' },
     { key: 'duplicate', labelKey: 'action.duplicate' },
   ];
+  if (Object.prototype.hasOwnProperty.call(options, 'hasTarget')) {
+    actions.push({
+      key: 'copyTarget',
+      labelKey: 'action.copySessionTarget',
+      disabled: !options.hasTarget,
+    });
+  }
   if (Number.isInteger(options.sessionIndex)) {
     actions.push(
       {
@@ -423,7 +473,7 @@ export function sessionTabDisplay(session = {}, active = false, options = {}) {
     iconType: session.providerType || 'terminal',
     statusLabel: sessionStatusLabel(session),
     statusTone: sessionStatusTone(session),
-    title: session.label || session.displayName || session.providerType || 'Terminal',
+    title: options.displayName || session.label || session.displayName || session.providerType || 'Terminal',
     protected: Boolean(session.protected),
     unread: Boolean(options.unread) && !active,
   };

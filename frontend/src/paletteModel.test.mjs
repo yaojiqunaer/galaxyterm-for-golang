@@ -102,6 +102,7 @@ assert.deepEqual(filterPaletteItems([
 ], 'prod ssh').map((item) => item.title), ['Production SSH', 'Audit Logs']);
 
 const sessionActionItems = buildSessionActionPaletteItems({
+  activeSessionHasTarget: true,
   activeSessionId: 's1',
   canNavigate: true,
   groupLabel: 'Session Actions',
@@ -113,6 +114,7 @@ const sessionActionItems = buildSessionActionPaletteItems({
     closeOthers: 'Close Other Sessions',
     commandHistory: 'Command History',
     copyTranscript: 'Copy Terminal Output',
+    copySessionTarget: 'Copy Session Target',
     exportTranscript: 'Export Terminal Output',
     nextSession: 'Next Session',
     previousSession: 'Previous Session',
@@ -139,6 +141,7 @@ assert.deepEqual(sessionActionItems.map((item) => ({
   { disabled: false, id: 'session-action:reconnect', title: 'Reconnect' },
   { disabled: false, id: 'session-action:renameSession', title: 'Rename Session' },
   { disabled: false, id: 'session-action:protectSession', title: 'Protect Session' },
+  { disabled: false, id: 'session-action:copySessionTarget', title: 'Copy Session Target' },
   { disabled: false, id: 'session-action:clearTerminal', title: 'Clear Terminal' },
   { disabled: false, id: 'session-action:copyTranscript', title: 'Copy Terminal Output' },
   { disabled: false, id: 'session-action:exportTranscript', title: 'Export Terminal Output' },
@@ -164,6 +167,7 @@ assert.deepEqual(buildSessionActionPaletteItems({
     closeOthers: 'Close Other Sessions',
     commandHistory: 'Command History',
     copyTranscript: 'Copy Terminal Output',
+    copySessionTarget: 'Copy Session Target',
     exportTranscript: 'Export Terminal Output',
     nextSession: 'Next Session',
     previousSession: 'Previous Session',
@@ -187,6 +191,7 @@ assert.deepEqual(buildSessionActionPaletteItems({
   { disabled: true, id: 'session-action:reconnect', reasonKey: 'palette.reason.noActiveSession' },
   { disabled: true, id: 'session-action:renameSession', reasonKey: 'palette.reason.noActiveSession' },
   { disabled: true, id: 'session-action:protectSession', reasonKey: 'palette.reason.noActiveSession' },
+  { disabled: true, id: 'session-action:copySessionTarget', reasonKey: 'palette.reason.noActiveSession' },
   { disabled: true, id: 'session-action:clearTerminal', reasonKey: 'palette.reason.noActiveSession' },
   { disabled: true, id: 'session-action:copyTranscript', reasonKey: 'palette.reason.noActiveSession' },
   { disabled: true, id: 'session-action:exportTranscript', reasonKey: 'palette.reason.noActiveSession' },
@@ -233,6 +238,11 @@ assert.deepEqual(
 
 assert.deepEqual(filterPaletteItems(sessionActionItems, 'history').map((item) => item.id), ['session-action:commandHistory']);
 assert.deepEqual(filterPaletteItems(sessionActionItems, 'audit').map((item) => item.id), ['session-action:saveAudit']);
+assert.deepEqual(filterPaletteItems(sessionActionItems, 'copy target').map((item) => item.id), ['session-action:copySessionTarget']);
+const unavailableCopyTargetAction = buildSessionActionPaletteItems({ activeSessionId: 's1' })
+  .find((item) => item.id === 'session-action:copySessionTarget');
+assert.equal(unavailableCopyTargetAction.disabled, true);
+assert.equal(unavailableCopyTargetAction.reasonKey, 'palette.reason.noSessionTarget');
 assert.deepEqual(filterPaletteItems(sessionActionItems, 'close closed').map((item) => item.id), [
   'session-action:closeClosed',
   'session-action:restoreClosed',

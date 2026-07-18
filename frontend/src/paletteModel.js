@@ -54,6 +54,7 @@ export function buildProfilePaletteItems({
 }
 
 export function buildSessionActionPaletteItems({
+  activeSessionHasTarget = false,
   activeSessionId = '',
   activeSessionProtected = false,
   canNavigate = false,
@@ -114,6 +115,16 @@ export function buildSessionActionPaletteItems({
       labels,
       runAction,
     })),
+    sessionActionItem('copySessionTarget', {
+      disabled: !activeSessionId || !activeSessionHasTarget,
+      groupLabel,
+      keywords: 'copy target address host user endpoint working directory',
+      labels,
+      reasonKey: !activeSessionId
+        ? 'palette.reason.noActiveSession'
+        : activeSessionHasTarget ? '' : 'palette.reason.noSessionTarget',
+      runAction,
+    }),
     sessionActionItem('clearTerminal', {
       disabled: !activeSessionId,
       groupLabel,

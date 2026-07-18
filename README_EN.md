@@ -57,7 +57,7 @@ Interactive terminals show the current command, live duration, and execution sta
 
 <details>
 <summary><b>Multi-session protection and workspace continuity</b></summary>
-Protect individual terminal tabs to show a lock indicator, hide the tab close button, and keep them open when closing all, other, or disconnected sessions. Protection is saved and restored with workspace snapshots. Navigating among Connections, Files, Audit, and Settings keeps terminal instances mounted; a session ends only when its tab is explicitly closed.
+Protect individual terminal tabs to show a lock indicator, hide the tab close button, and keep them open when closing all, other, or disconnected sessions. Protection is saved and restored with workspace snapshots. Navigating among Connections, Files, Audit, and Settings keeps terminal instances mounted; a session ends only when its tab is explicitly closed. Duplicate session names receive stable display ordinals across tabs, the sidebar, window title, and command palette. A safe copy-target action exposes only `user@host:port` or the local working directory from the session toolbar, menus, and command palette; credentials never enter the clipboard.
 </details>
 
 ## Architecture

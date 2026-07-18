@@ -466,6 +466,20 @@ assert.ok(
   'protected sessions must stay visible, resist close actions, and survive workspace snapshots',
 );
 assert.ok(
+  source.includes('const sessionDisplayLabels = useMemo(() => buildSessionDisplayLabels(sessions), [sessions]);')
+    && source.includes('const sessionIdentityDisplays = useMemo(() => Object.fromEntries(')
+    && source.includes('displayName: sessionDisplayLabels[activeSession.id]')
+    && source.includes('displayName={sessionDisplayLabels[session.id]}')
+    && source.includes('identityDisplay={sessionIdentityDisplays[session.id]}')
+    && source.includes('onCopyTarget={() => copySessionTarget(activeSession)}')
+    && source.includes("if (action === 'copyTarget') copySessionTarget(session);")
+    && source.includes("if (action === 'copySessionTarget') copySessionTarget();")
+    && source.includes("copyTarget: () => copySessionTarget(),")
+    && source.includes('activeSessionHasTarget: Boolean(sessionIdentityDisplays[activeKey]?.copyValue)')
+    && /\.session-toolbar-context-copy\.ant-btn\s*\{/.test(styles),
+  'all session surfaces must share disambiguated names and one safe copy-target action',
+);
+assert.ok(
   source.includes('restorableSessionCount: closedSessions.length')
     && source.includes("if (action === 'restoreClosed') restoreLastClosedSession();"),
   'the command palette must expose recently closed session recovery when available',

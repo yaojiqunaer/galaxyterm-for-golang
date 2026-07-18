@@ -122,6 +122,8 @@ import {
   buildSessionCloseConfirm,
   buildSessionContextFacts,
   buildDesktopWindowTitle,
+  buildSessionDisplayLabels,
+  buildSessionIdentityDisplay,
   buildSessionNavigationState,
   buildSessionTabMenuModel,
   buildSessionToolbarContext,
@@ -549,6 +551,7 @@ function App() {
     [sessionActivity],
   );
   const unreadSessionCount = sessionAttentionSummary.total;
+  const sessionDisplayLabels = useMemo(() => buildSessionDisplayLabels(sessions), [sessions]);
   const sessionClosePlans = useMemo(() => ({
     all: buildSessionClosePlan(sessions),
     closed: buildSessionClosePlan(sessions, { mode: 'closed' }),
@@ -790,6 +793,13 @@ function App() {
     installedExtensions,
     settings.disabledExtensionIds,
   ), [allProviders, installedExtensions, settings.disabledExtensionIds]);
+  const sessionIdentityDisplays = useMemo(() => Object.fromEntries(
+    sessions.map((session) => [session.id, buildSessionIdentityDisplay(session, {
+      displayName: sessionDisplayLabels[session.id],
+      providerName: providerTypeLabel(session.providerType, providers),
+      statusName: t(`session.status.${sessionStatusLabel(session)}`),
+    })]),
+  ), [locale, providers, sessionDisplayLabels, sessions]);
   const desktopWindowTitle = useMemo(() => {
     const appName = t('app.title');
     if (selectedNav !== 'sessions') {
@@ -797,12 +807,13 @@ function App() {
     }
     return buildDesktopWindowTitle(activeSession, {
       appName,
+      displayName: sessionDisplayLabels[activeSession.id],
       providerName: activeSession
         ? providerTypeLabel(activeSession.providerType, providers)
         : '',
       unreadCount: unreadSessionCount,
     });
-  }, [activeSession, locale, providers, selectedNav, unreadSessionCount]);
+  }, [activeSession, locale, providers, selectedNav, sessionDisplayLabels, unreadSessionCount]);
 
   useEffect(() => {
     syncDesktopWindowTitle(desktopWindowTitle);
@@ -1480,6 +1491,20 @@ function App() {
     }
   };
 
+  const copySessionTarget = async (session = activeSession) => {
+    const identityDisplay = session ? sessionIdentityDisplays[session.id] : null;
+    if (!identityDisplay?.copyValue) {
+      messageApi.info(t('palette.reason.noSessionTarget'));
+      return;
+    }
+    try {
+      await writeClipboardText(identityDisplay.copyValue);
+      messageApi.success(t('message.sessionTargetCopied'));
+    } catch (error) {
+      messageApi.error(`${t('message.clipboardFailed')}: ${error}`);
+    }
+  };
+
   const confirmTerminalPaste = (risk) => {
     if (!risk || settings.confirmDangerousActions === false) return Promise.resolve(true);
     if (pasteConfirmationPending.current) return Promise.resolve(false);
@@ -1873,6 +1898,7 @@ function App() {
     if (action === 'reconnect') reconnectSession();
     if (action === 'renameSession') openRenameSession();
     if (action === 'protectSession' || action === 'unprotectSession') toggleProtectedSession();
+    if (action === 'copySessionTarget') copySessionTarget();
     if (action === 'clearTerminal') clearActiveTerminal();
     if (action === 'copyTranscript') copyTerminalTranscript();
     if (action === 'exportTranscript') exportTerminalTranscript();
@@ -2303,6 +2329,7 @@ function App() {
   const runSessionTabAction = (action, session) => {
     if (action === 'rename') openRenameSession(session);
     if (action === 'protect' || action === 'unprotect') toggleProtectedSession(session.id);
+    if (action === 'copyTarget') copySessionTarget(session);
     if (action === 'reconnect') reconnectSession(session.id);
     if (action === 'duplicate') duplicateSession(session);
     if (action === 'moveLeft') setSessions((current) => moveSessionInOrder(current, session.id, 'previous'));
@@ -2311,12 +2338,14 @@ function App() {
     if (action === 'closeCurrent') confirmRemoveSession(session.id);
   };
   const items = sessions.map((session, sessionIndex) => {
+    const identityDisplay = sessionIdentityDisplays[session.id];
     const closeOtherPlan = buildSessionClosePlan(sessions, {
       keepSessionId: session.id,
       mode: 'others',
     });
     const tabMenuItems = buildSessionTabMenuModel({
       closableOtherCount: closeOtherPlan.closingSessions.length,
+      hasTarget: Boolean(identityDisplay?.copyValue),
       protected: session.protected,
       sessionCount: sessions.length,
       sessionIndex,
@@ -2379,6 +2408,8 @@ function App() {
             <SessionTabLabel
               active={session.id === activeKey}
               activityKind={sessionActivity[session.id]?.kind}
+              displayName={sessionDisplayLabels[session.id]}
+              identityDisplay={identityDisplay}
               session={session}
               unread={sessionActivity[session.id]?.unread}
             />
@@ -2434,7 +2465,12 @@ function App() {
     };
     const sessionToolbarActions = (
       <div className="session-tab-extra">
-        {sessionToolbarContext && <SessionToolbarContext model={sessionToolbarContext} />}
+        {sessionToolbarContext && (
+          <SessionToolbarContext
+            model={sessionToolbarContext}
+            onCopyTarget={() => copySessionTarget(activeSession)}
+          />
+        )}
         <SessionToolbarActions model={sessionToolbarModel} onAction={runSessionToolbarAction} />
       </div>
     );
@@ -2470,6 +2506,8 @@ function App() {
                   <SessionTabLabel
                     active={session.id === activeKey}
                     activityKind={sessionActivity[session.id]?.kind}
+                    displayName={sessionDisplayLabels[session.id]}
+                    identityDisplay={sessionIdentityDisplays[session.id]}
                     session={session}
                     unread={sessionActivity[session.id]?.unread}
                   />
@@ -4780,6 +4818,7 @@ function App() {
   };
   const paletteItems = buildPaletteItems({
     activeSessionId: activeKey,
+    activeSessionHasTarget: Boolean(sessionIdentityDisplays[activeKey]?.copyValue),
     activeSessionProtected: Boolean(activeSession?.protected),
     canNavigateSessions: sessionNavigationState.canNavigate,
     closableClosedCount: sessionClosePlans.closed.closingSessions.length,
@@ -4793,6 +4832,7 @@ function App() {
     quickCommandProviderType: activeSession?.providerType || 'all',
     providers,
     sessions,
+    sessionDisplayLabels,
     sessionCount: sessions.length,
     setSelectedNav,
     activateSession,
@@ -4902,6 +4942,7 @@ function App() {
     view: () => setSessionView(sessionView === 'tabs' ? 'grid' : 'tabs'),
     focus: () => setFocusMode((current) => !current),
     copy: copyTerminalSelection,
+    copyTarget: () => copySessionTarget(),
     paste: pasteClipboardToTerminal,
     clear: clearActiveTerminal,
     reset: resetActiveTerminal,
@@ -4955,6 +4996,12 @@ function App() {
       key: 'paste',
       icon: <CopyOutlined />,
       label: t('action.pasteClipboard'),
+    },
+    activeKey && {
+      key: 'copyTarget',
+      icon: <CopyOutlined />,
+      label: t('action.copySessionTarget'),
+      disabled: !sessionIdentityDisplays[activeKey]?.copyValue,
     },
     activeKey && {
       key: 'clear',
@@ -5212,6 +5259,8 @@ function App() {
                       >
                         <SessionSidebarLabel
                           activityKind={sessionActivity[session.id]?.kind}
+                          displayName={sessionDisplayLabels[session.id]}
+                          identityDisplay={sessionIdentityDisplays[session.id]}
                           session={session}
                           unread={sessionActivity[session.id]?.unread}
                         />
@@ -6216,13 +6265,23 @@ function ConnectionProfilePreview({
   );
 }
 
-function SessionTabLabel({ active = false, activityKind = 'output', session, unread = false }) {
-  const display = sessionTabDisplay(session, active, { unread });
+function SessionTabLabel({
+  active = false,
+  activityKind = 'output',
+  displayName = '',
+  identityDisplay = null,
+  session,
+  unread = false,
+}) {
+  const display = sessionTabDisplay(session, active, { displayName, unread });
   const activityLabel = activityKind === 'error'
     ? t('session.activity.error')
     : t('session.activity.unread');
   return (
-    <span className={`tab-label session-tab-label tone-${display.statusTone}${display.active ? ' active' : ''}${display.unread ? ' unread' : ''}`}>
+    <span
+      className={`tab-label session-tab-label tone-${display.statusTone}${display.active ? ' active' : ''}${display.unread ? ' unread' : ''}`}
+      title={identityDisplay?.tooltip || display.title}
+    >
       <span className="session-status-dot" />
       {providerIcons[display.iconType] || <CodeOutlined />}
       <span className="session-tab-title">{display.title}</span>
@@ -6250,7 +6309,7 @@ function sessionTabActionIcon(action) {
   if (action === 'protect') return <LockOutlined />;
   if (action === 'unprotect') return <UnlockOutlined />;
   if (action === 'reconnect') return <ReloadOutlined />;
-  if (action === 'duplicate') return <CopyOutlined />;
+  if (action === 'duplicate' || action === 'copyTarget') return <CopyOutlined />;
   if (action === 'moveLeft') return <LeftOutlined />;
   if (action === 'moveRight') return <RightOutlined />;
   return <DeleteOutlined />;
@@ -6264,16 +6323,22 @@ function remoteFileActionIcon(action) {
   return <DeleteOutlined />;
 }
 
-function SessionSidebarLabel({ activityKind = 'output', session, unread = false }) {
+function SessionSidebarLabel({
+  activityKind = 'output',
+  displayName = '',
+  identityDisplay = null,
+  session,
+  unread = false,
+}) {
   const tone = sessionStatusTone(session);
   const activityLabel = activityKind === 'error'
     ? t('session.activity.error')
     : t('session.activity.unread');
   return (
-    <span className={`session-sidebar-label tone-${tone}`}>
+    <span className={`session-sidebar-label tone-${tone}`} title={identityDisplay?.tooltip || displayName || session.label}>
       <span className="session-status-dot" />
       <span className="session-sidebar-main">
-        <span>{session.label}</span>
+        <span>{displayName || session.label}</span>
         <small>{t(`session.status.${sessionStatusLabel(session)}`)}</small>
       </span>
       {session.protected && (
@@ -6354,7 +6419,7 @@ function SessionToolbarActions({ model, onAction }) {
   );
 }
 
-function SessionToolbarContext({ model }) {
+function SessionToolbarContext({ model, onCopyTarget }) {
   return (
     <div
       aria-label={t('session.context.summary', model)}
@@ -6366,6 +6431,18 @@ function SessionToolbarContext({ model }) {
       </span>
       <span className="session-toolbar-context-provider">{model.provider}</span>
       {model.identity && <strong>{model.identity}</strong>}
+      {model.identity && onCopyTarget && (
+        <Tooltip title={t('action.copySessionTarget')}>
+          <Button
+            aria-label={t('action.copySessionTarget')}
+            className="session-toolbar-context-copy"
+            icon={<CopyOutlined />}
+            size="small"
+            type="text"
+            onClick={onCopyTarget}
+          />
+        </Tooltip>
+      )}
     </div>
   );
 }
@@ -6800,14 +6877,15 @@ function buildPaletteItems(actions) {
   const sessionItems = actions.sessions.map((session, index) => ({
     id: `session:${session.id}`,
     group: t('palette.group.sessions'),
-    title: session.label,
+    title: actions.sessionDisplayLabels?.[session.id] || session.label,
     description: `${sessionStatusLabel(session.status)} · ${profileDescription(profileFromRequest(session.request))}`,
     icon: providerIcons[session.providerType] || <CodeOutlined />,
-    keywords: `${session.label} ${session.providerType} ${session.status} ${index + 1}`,
+    keywords: `${actions.sessionDisplayLabels?.[session.id] || ''} ${session.label} ${session.providerType} ${session.status} ${index + 1}`,
     run: () => actions.activateSession(session.id),
   }));
 
   const sessionActionItems = buildSessionActionPaletteItems({
+    activeSessionHasTarget: actions.activeSessionHasTarget,
     activeSessionId: actions.activeSessionId,
     activeSessionProtected: actions.activeSessionProtected,
     canNavigate: actions.canNavigateSessions,
@@ -6825,6 +6903,7 @@ function buildPaletteItems(actions) {
       closeOthers: t('action.closeOthers'),
       commandHistory: t('action.commandHistory'),
       copyTranscript: t('action.copyTranscript'),
+      copySessionTarget: t('action.copySessionTarget'),
       exportTranscript: t('action.exportTranscript'),
       nextSession: t('action.nextSession'),
       previousSession: t('action.previousSession'),
