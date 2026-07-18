@@ -125,10 +125,10 @@ import {
   buildSessionDisplayLabels,
   buildSessionIdentityDisplay,
   buildSessionNavigationState,
+  buildSessionSidebarState,
   buildSessionTabMenuModel,
   buildSessionToolbarContext,
   buildSessionToolbarModel,
-  filterSessions,
   markSessionActivityRead,
   moveSessionInOrder,
   profileActionModel,
@@ -392,6 +392,7 @@ function App() {
   const [renamingSessionId, setRenamingSessionId] = useState('');
   const [renamingSessionName, setRenamingSessionName] = useState('');
   const [terminalSearch, setTerminalSearch] = useState('');
+  const [sidebarSessionQuery, setSidebarSessionQuery] = useState('');
   const [terminalStatuses, setTerminalStatuses] = useState({});
   const [sessionActivity, setSessionActivity] = useState({});
   const [focusMode, setFocusMode] = useState(false);
@@ -1085,10 +1086,11 @@ function App() {
   const sessionNavigationState = useMemo(() => (
     buildSessionNavigationState(sessions, activeKey)
   ), [activeKey, sessions]);
-  const sidebarSessions = useMemo(() => filterSessions(sessions, {
+  const sidebarSessionState = useMemo(() => buildSessionSidebarState(sessions, {
     activeKey,
-    status: 'active',
-  }), [activeKey, sessions]);
+    query: sidebarSessionQuery,
+  }), [activeKey, sessions, sidebarSessionQuery]);
+  const sidebarSessions = sidebarSessionState.sessions;
   const sessionIds = useMemo(() => sessions.map((session) => session.id), [sessions]);
   const visibleQuickCommands = useMemo(() => filterQuickCommands(quickCommands, commandQuery, {
     favoriteOnly: commandScope === 'favorites',
@@ -2498,13 +2500,14 @@ function App() {
     if (action === 'closeOthers') confirmCloseOtherSessions(session.id);
     if (action === 'closeCurrent') confirmRemoveSession(session.id);
   };
-  const items = sessions.map((session, sessionIndex) => {
+  const buildSessionActionMenu = (session) => {
+    const sessionIndex = sessions.findIndex((item) => item.id === session.id);
     const identityDisplay = sessionIdentityDisplays[session.id];
     const closeOtherPlan = buildSessionClosePlan(sessions, {
       keepSessionId: session.id,
       mode: 'others',
     });
-    const tabMenuItems = buildSessionTabMenuModel({
+    const menuItems = buildSessionTabMenuModel({
       closableOtherCount: closeOtherPlan.closingSessions.length,
       hasTarget: Boolean(identityDisplay?.copyValue),
       protected: session.protected,
@@ -2523,44 +2526,60 @@ function App() {
       },
     ]);
     return {
+      items: menuItems,
+      onClick: ({ domEvent, key }) => {
+        domEvent?.stopPropagation();
+        runSessionTabAction(key, session);
+      },
+    };
+  };
+  const beginSessionDrag = (event, sessionId) => {
+    draggedSessionIdRef.current = sessionId;
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', sessionId);
+    event.currentTarget.classList.add('dragging');
+  };
+  const endSessionDrag = (event) => {
+    draggedSessionIdRef.current = '';
+    event.currentTarget.classList.remove('dragging');
+  };
+  const allowSessionDrop = (event) => {
+    if (!draggedSessionIdRef.current) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+  };
+  const dropSessionAt = (event, targetId, axis = 'x') => {
+    event.preventDefault();
+    const sourceId = draggedSessionIdRef.current || event.dataTransfer.getData('text/plain');
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const pointer = axis === 'y' ? event.clientY : event.clientX;
+    const midpoint = axis === 'y'
+      ? bounds.top + bounds.height / 2
+      : bounds.left + bounds.width / 2;
+    setSessions((current) => reorderSessions(
+      current,
+      sourceId,
+      targetId,
+      pointer >= midpoint ? 'after' : 'before',
+    ));
+    draggedSessionIdRef.current = '';
+  };
+  const items = sessions.map((session) => {
+    const identityDisplay = sessionIdentityDisplays[session.id];
+    return {
       key: session.id,
       label: (
         <Dropdown
-          menu={{
-            items: tabMenuItems,
-            onClick: ({ domEvent, key }) => {
-              domEvent?.stopPropagation();
-              runSessionTabAction(key, session);
-            },
-          }}
+          menu={buildSessionActionMenu(session)}
           trigger={['contextMenu']}
         >
           <span
             className="session-tab-context-trigger"
             draggable={sessions.length > 1}
-            onDragEnd={(event) => {
-              draggedSessionIdRef.current = '';
-              event.currentTarget.classList.remove('dragging');
-            }}
-            onDragOver={(event) => {
-              if (!draggedSessionIdRef.current) return;
-              event.preventDefault();
-              event.dataTransfer.dropEffect = 'move';
-            }}
-            onDragStart={(event) => {
-              draggedSessionIdRef.current = session.id;
-              event.dataTransfer.effectAllowed = 'move';
-              event.dataTransfer.setData('text/plain', session.id);
-              event.currentTarget.classList.add('dragging');
-            }}
-            onDrop={(event) => {
-              event.preventDefault();
-              const sourceId = draggedSessionIdRef.current || event.dataTransfer.getData('text/plain');
-              const bounds = event.currentTarget.getBoundingClientRect();
-              const position = event.clientX >= bounds.left + bounds.width / 2 ? 'after' : 'before';
-              setSessions((current) => reorderSessions(current, sourceId, session.id, position));
-              draggedSessionIdRef.current = '';
-            }}
+            onDragEnd={endSessionDrag}
+            onDragOver={allowSessionDrop}
+            onDragStart={(event) => beginSessionDrag(event, session.id)}
+            onDrop={(event) => dropSessionAt(event, session.id)}
             onDoubleClick={(event) => {
               event.stopPropagation();
               openRenameSession(session);
@@ -5653,8 +5672,44 @@ function App() {
                 <span>{t('section.activeSessions')}</span>
                 {sessions.length > 0 && <Text code>{numberedSessionShortcut}</Text>}
               </div>
+              {sidebarSessionState.showSearch && (
+                <div className="sidebar-session-filter">
+                  <Input.Search
+                    allowClear
+                    aria-label={t('placeholder.searchSessions')}
+                    placeholder={t('placeholder.searchSessions')}
+                    size="small"
+                    value={sidebarSessionQuery}
+                    onChange={(event) => setSidebarSessionQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Escape' || !sidebarSessionQuery) return;
+                      event.preventDefault();
+                      setSidebarSessionQuery('');
+                    }}
+                    onSearch={(query) => {
+                      if (!String(query).trim() || sidebarSessions.length === 0) return;
+                      activateSession(sidebarSessions[0].id);
+                    }}
+                  />
+                  {sidebarSessionState.filtered && (
+                    <Text type="secondary">
+                      {t('session.filterSummary', {
+                        count: sidebarSessionState.visible,
+                        total: sidebarSessionState.total,
+                      })}
+                    </Text>
+                  )}
+                </div>
+              )}
               {sidebarSessions.length === 0 ? (
-                <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noSessions')} />
+                <Empty
+                  image={Empty.PRESENTED_IMAGE_SIMPLE}
+                  description={t(sidebarSessionState.filtered ? 'empty.noSessionMatches' : 'empty.noSessions')}
+                >
+                  {sidebarSessionState.filtered && (
+                    <Button size="small" onClick={() => setSidebarSessionQuery('')}>{t('action.clearFilters')}</Button>
+                  )}
+                </Empty>
               ) : (
                 <List
                   size="small"
@@ -5662,19 +5717,48 @@ function App() {
                   renderItem={(session) => {
                     const shortcutNumber = resolveSessionShortcutNumber(sessionIds, session.id);
                     return (
-                      <List.Item
-                        className={session.id === activeKey ? 'session-row active' : 'session-row'}
-                        onClick={() => activateSession(session.id)}
+                      <Dropdown
+                        menu={buildSessionActionMenu(session)}
+                        trigger={['contextMenu']}
                       >
-                        <SessionSidebarLabel
-                          activityKind={sessionActivity[session.id]?.kind}
-                          displayName={sessionDisplayLabels[session.id]}
-                          identityDisplay={sessionIdentityDisplays[session.id]}
-                          session={session}
-                          unread={sessionActivity[session.id]?.unread}
-                        />
-                        {shortcutNumber && <Text code>{shortcutNumber}</Text>}
-                      </List.Item>
+                        <List.Item
+                          className={session.id === activeKey ? 'session-row active' : 'session-row'}
+                          draggable={sessions.length > 1 && !sidebarSessionState.filtered}
+                          onDragEnd={endSessionDrag}
+                          onDragOver={allowSessionDrop}
+                          onDragStart={(event) => beginSessionDrag(event, session.id)}
+                          onDrop={(event) => dropSessionAt(event, session.id, 'y')}
+                        >
+                          <button
+                            aria-current={session.id === activeKey ? 'page' : undefined}
+                            aria-label={sessionDisplayLabels[session.id] || session.label}
+                            className="session-row-activate"
+                            type="button"
+                            onClick={() => activateSession(session.id)}
+                          >
+                            <SessionSidebarLabel
+                              activityKind={sessionActivity[session.id]?.kind}
+                              displayName={sessionDisplayLabels[session.id]}
+                              identityDisplay={sessionIdentityDisplays[session.id]}
+                              session={session}
+                              unread={sessionActivity[session.id]?.unread}
+                            />
+                          </button>
+                          <span className="session-row-trailing">
+                            {shortcutNumber && <Text className="session-row-shortcut" code>{shortcutNumber}</Text>}
+                            <Dropdown menu={buildSessionActionMenu(session)} trigger={['click']}>
+                              <Button
+                                aria-label={t('action.sessionActions')}
+                                className="session-row-menu"
+                                icon={<MoreOutlined />}
+                                size="small"
+                                type="text"
+                                onClick={(event) => event.stopPropagation()}
+                              />
+                            </Dropdown>
+                          </span>
+                        </List.Item>
+                      </Dropdown>
                     );
                   }}
                 />
@@ -6758,15 +6842,17 @@ function SessionSidebarLabel({
   unread = false,
 }) {
   const tone = sessionStatusTone(session);
+  const statusLabel = t(`session.status.${sessionStatusLabel(session)}`);
   const activityLabel = activityKind === 'error'
     ? t('session.activity.error')
     : t('session.activity.unread');
+  const detail = identityDisplay?.identity || identityDisplay?.provider || statusLabel;
   return (
     <span className={`session-sidebar-label tone-${tone}`} title={identityDisplay?.tooltip || displayName || session.label}>
-      <span className="session-status-dot" />
+      <span aria-label={statusLabel} className="session-status-dot" role="img" title={statusLabel} />
       <span className="session-sidebar-main">
         <span>{displayName || session.label}</span>
-        <small>{t(`session.status.${sessionStatusLabel(session)}`)}</small>
+        <small>{detail}</small>
       </span>
       {session.protected && (
         <LockOutlined

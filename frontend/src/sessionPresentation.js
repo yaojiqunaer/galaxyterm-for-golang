@@ -378,14 +378,36 @@ export function filterSessions(sessions = [], options = {}) {
     ? options.status
     : 'all';
 
-  return [...sessions]
+  const filtered = [...sessions]
     .filter((session) => matchesSessionStatus(session, status))
-    .filter((session) => matchesSessionQuery(session, queryTokens))
-    .sort((left, right) => {
-      if (left.id === options.activeKey) return -1;
-      if (right.id === options.activeKey) return 1;
-      return 0;
-    });
+    .filter((session) => matchesSessionQuery(session, queryTokens));
+  if (options.prioritizeActive === false) return filtered;
+  return filtered.sort((left, right) => {
+    if (left.id === options.activeKey) return -1;
+    if (right.id === options.activeKey) return 1;
+    return 0;
+  });
+}
+
+export function buildSessionSidebarState(sessions = [], options = {}) {
+  const query = String(options.query || '').trim();
+  const activeSessions = filterSessions(sessions, {
+    activeKey: options.activeKey,
+    prioritizeActive: false,
+    query,
+    status: 'active',
+  });
+  const total = filterSessions(sessions, {
+    prioritizeActive: false,
+    status: 'active',
+  }).length;
+  return {
+    filtered: query.length > 0,
+    sessions: activeSessions,
+    showSearch: total >= 4 || query.length > 0,
+    total,
+    visible: activeSessions.length,
+  };
 }
 
 export function buildSessionCloseConfirm(target) {
@@ -584,15 +606,19 @@ function matchesSessionStatus(session, status) {
 
 function matchesSessionQuery(session = {}, queryTokens = []) {
   if (queryTokens.length === 0) return true;
+  const config = { ...(session.config || {}), ...(session.request?.config || {}) };
+  const auth = { ...(session.auth || {}), ...(session.request?.auth || {}) };
   const searchText = [
     session.id,
     session.label,
     session.displayName,
     session.providerType,
     session.status,
-    session.config?.host,
-    session.config?.username,
-    session.config?.workingDirectory,
+    config.host,
+    config.username,
+    auth.username,
+    config.workingDirectory,
+    config.cwd,
   ].filter(Boolean).join(' ').toLowerCase();
   return queryTokens.every((token) => searchText.includes(token));
 }

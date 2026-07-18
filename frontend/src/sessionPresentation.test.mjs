@@ -9,6 +9,7 @@ import {
   buildSessionCloseConfirm,
   buildSessionNavigationState,
   buildSessionAttentionSummary,
+  buildSessionSidebarState,
   buildSessionStatusFacts,
   buildSessionTabMenuModel,
   buildSessionToolbarModel,
@@ -603,6 +604,46 @@ assert.deepEqual(filterSessions(sessionFilterFixture, {
   query: '',
   status: 'closed',
 }).map((session) => session.id), ['3']);
+
+assert.deepEqual(filterSessions(sessionFilterFixture, {
+  activeKey: '2',
+  prioritizeActive: false,
+  query: '',
+  status: 'active',
+}).map((session) => session.id), ['1', '2']);
+
+const sidebarState = buildSessionSidebarState([
+  ...sessionFilterFixture,
+  { id: '4', label: 'Docker Logs', providerType: 'docker', status: 'connected', request: { config: { host: 'node-1' } } },
+  { id: '5', label: 'K8s Pods', providerType: 'kubernetes', status: 'connected', request: { config: { host: 'cluster-prod' } } },
+], {
+  activeKey: '4',
+  query: 'prod ssh',
+});
+assert.deepEqual(sidebarState.sessions.map((session) => session.id), ['1']);
+assert.deepEqual({
+  filtered: sidebarState.filtered,
+  showSearch: sidebarState.showSearch,
+  total: sidebarState.total,
+  visible: sidebarState.visible,
+}, {
+  filtered: true,
+  showSearch: true,
+  total: 4,
+  visible: 1,
+});
+
+assert.equal(buildSessionSidebarState(sessionFilterFixture).showSearch, false);
+assert.deepEqual(buildSessionSidebarState([
+  ...sessionFilterFixture,
+  {
+    id: '4',
+    label: 'Docker Logs',
+    providerType: 'docker',
+    status: 'connected',
+    request: { auth: { username: 'operator' }, config: { host: 'node-1' } },
+  },
+], { query: 'node-1 operator' }).sessions.map((session) => session.id), ['4']);
 
 assert.deepEqual(buildSessionCloseConfirm({
   label: 'Prod Shell',

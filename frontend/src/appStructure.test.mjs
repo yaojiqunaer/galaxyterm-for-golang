@@ -173,6 +173,24 @@ assert.ok(
   'session management must use the compact toolbar action model',
 );
 assert.ok(
+  source.includes("const [sidebarSessionQuery, setSidebarSessionQuery] = useState('');")
+    && source.includes('buildSessionSidebarState(sessions, {')
+    && source.includes('allowClear')
+    && source.includes("placeholder={t('placeholder.searchSessions')}")
+    && source.includes('activateSession(sidebarSessions[0].id);'),
+  'the active-session sidebar must provide compact search without changing session lifetime',
+);
+assert.ok(
+  source.includes('const buildSessionActionMenu = (session) => {')
+    && source.match(/menu=\{buildSessionActionMenu\(session\)\}/g)?.length >= 2
+    && source.includes("aria-label={t('action.sessionActions')}")
+    && source.includes("aria-current={session.id === activeKey ? 'page' : undefined}")
+    && source.includes('className="session-row-activate"')
+    && source.includes("onDrop={(event) => dropSessionAt(event, session.id, 'y')}")
+    && source.includes('const detail = identityDisplay?.identity || identityDisplay?.provider || statusLabel;'),
+  'session tabs and sidebar rows must share one discoverable management menu',
+);
+assert.ok(
   source.includes('hideAdd={false}')
     && source.includes('addIcon={<PlusOutlined />}')
     && source.includes("if (action === 'add') openDrawer();"),
