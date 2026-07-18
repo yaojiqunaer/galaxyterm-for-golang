@@ -43,6 +43,8 @@ After refreshing a source, GalaxyTerm only shows extensions compatible with the 
 
 The Extensions page searches by name, extension ID, terminal provider, file provider, capability, or source status, with All, Available, Installed, and Sources scopes. When a saved connection references a missing or disabled provider, its primary action becomes Find extension and opens this page filtered by that provider type. After installing or enabling it, the original connection configuration remains ready to use.
 
+Installed extensions show how many saved connections and active sessions currently use their providers. Disabling an extension in use presents the exact impact first. Existing terminal sessions remain open, but new sessions cannot start until the extension is enabled again. Uninstall confirmation repeats the connection and session impact because active sessions may be interrupted; saved connections are retained and become usable again after reinstalling the same provider.
+
 ## Release Index
 
 Upload `.gtx` packages and an index named `galaxyterm-index.json` to each Release. Relative URLs resolve against the index location, so the index and packages can be assets of the same GitHub Release:

@@ -43,6 +43,8 @@ https://github.com/<owner>/<repo>/releases/latest/download/galaxyterm-index.json
 
 扩展页可按名称、扩展 ID、终端 Provider、文件 Provider、能力或扩展源状态搜索，并可切换“全部”“可安装”“已安装”“扩展源”范围。保存连接引用了尚未安装或已停用的 Provider 时，连接主操作会显示“查找扩展”，进入扩展页后自动以该 Provider 类型过滤；启用或安装完成后可直接返回连接页面使用原配置。
 
+已安装扩展会显示当前引用它的保存连接数和活动会话数。停用一个正在使用的扩展前会明确提示影响范围；已有终端会话保持打开，但重新启用前不能创建新会话。卸载扩展时会再次提示连接和会话影响，活动会话可能中断；保存连接不会被删除，重新安装相同 Provider 后仍可继续使用。
+
 ## Release 索引
 
 每个 Release 上传 `.gtx` 包和名为 `galaxyterm-index.json` 的索引。相对 URL 会以索引地址为基准解析，适合把索引与安装包放在同一个 GitHub Release：

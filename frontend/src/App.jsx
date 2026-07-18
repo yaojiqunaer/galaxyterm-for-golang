@@ -228,6 +228,7 @@ import {
   buildExtensionAction,
   buildExtensionCardFacts,
   buildExtensionSummary,
+  buildExtensionUsageImpact,
   buildInstalledExtensionRows,
   findCatalogItemForType,
   findExtensionUpdate,
@@ -982,6 +983,12 @@ function App() {
       updateItem: findExtensionUpdate(extension, remoteExtensionCatalog),
     }))
   ), [installedExtensions, remoteExtensionCatalog, settings.disabledExtensionIds]);
+  const extensionUsageById = useMemo(() => Object.fromEntries(
+    installedExtensionRows.map((extension) => [
+      extension.id,
+      buildExtensionUsageImpact(extension, { profiles, sessions }),
+    ]),
+  ), [installedExtensionRows, profiles, sessions]);
   const visibleExtensionWorkspace = useMemo(() => filterExtensionWorkspace({
     catalog: extensionCatalog,
     installed: installedExtensionRows,
@@ -3135,7 +3142,13 @@ function App() {
           className="profile-list installed-extension-list"
           dataSource={visibleExtensionWorkspace.installed}
           locale={{ emptyText: t('empty.noInstalledExtensions') }}
-          renderItem={(extension) => (
+          renderItem={(extension) => {
+            const impact = extensionUsageById[extension.id] || {
+              activeSessions: 0,
+              hasImpact: false,
+              savedConnections: 0,
+            };
+            return (
             <List.Item
               actions={[
                 <Switch
@@ -3144,7 +3157,7 @@ function App() {
                   disabled={extensionOperationBusy}
                   checkedChildren={t('label.enabled')}
                   unCheckedChildren={t('label.disabled')}
-                  onChange={(checked) => toggleExtensionEnabled(extension.id, checked)}
+                  onChange={(checked) => confirmToggleExtensionEnabled(extension, checked)}
                 />,
                 extension.updateItem && (
                   <Button
@@ -3177,6 +3190,16 @@ function App() {
                   <span className="installed-extension-description">
                     <span>{extension.id}</span>
                     <span className="connection-profile-badges">
+                      {impact.savedConnections > 0 && (
+                        <span className="connection-profile-badge tone-info">
+                          {t('extension.usage.connections', { count: impact.savedConnections })}
+                        </span>
+                      )}
+                      {impact.activeSessions > 0 && (
+                        <span className="connection-profile-badge tone-warning">
+                          {t('extension.usage.sessions', { count: impact.activeSessions })}
+                        </span>
+                      )}
                       {extension.providers.map((provider) => <span key={provider} className="connection-profile-badge tone-info">{provider}</span>)}
                       {extension.fileProviders.map((provider) => (
                         <span key={`file-${provider}`} className="connection-profile-badge tone-success" title={t('extension.fileProvider')}>
@@ -3189,7 +3212,8 @@ function App() {
                 )}
               />
             </List.Item>
-          )}
+            );
+          }}
         />
       </section>
       )}
@@ -3372,6 +3396,30 @@ function App() {
     messageApi.success(enabled ? t('message.extensionEnabled') : t('message.extensionDisabled'));
   };
 
+  const confirmToggleExtensionEnabled = (extension, enabled) => {
+    if (enabled) {
+      toggleExtensionEnabled(extension.id, true);
+      return;
+    }
+    const impact = extensionUsageById[extension.id] || buildExtensionUsageImpact(extension);
+    if (!impact.hasImpact) {
+      toggleExtensionEnabled(extension.id, false);
+      return;
+    }
+    requestDangerousAction({
+      actionKey: 'action.disable',
+      contentKey: 'confirm.disableExtensionImpactContent',
+      contentValues: {
+        connectionCount: impact.savedConnections,
+        name: extension.name || extension.id,
+        sessionCount: impact.activeSessions,
+      },
+      onConfirm: () => toggleExtensionEnabled(extension.id, false),
+      titleKey: 'confirm.disableExtensionTitle',
+      titleValues: { name: extension.name || extension.id },
+    });
+  };
+
   const installOfflineExtension = async () => {
     setExtensionOfflineInstalling(true);
     try {
@@ -3436,16 +3484,21 @@ function App() {
     }
   };
 
-  const confirmUninstallExtension = (extension) => requestDangerousAction({
-    actionKey: 'action.uninstall',
-    contentKey: 'confirm.uninstallExtensionContent',
-    contentValues: {
-      name: extension?.name || extension?.id || '-',
-      version: extension?.version || '-',
-    },
-    onConfirm: () => uninstallExtension(extension.id),
-    titleKey: 'confirm.uninstallExtensionTitle',
-  });
+  const confirmUninstallExtension = (extension) => {
+    const impact = extensionUsageById[extension.id] || buildExtensionUsageImpact(extension);
+    return requestDangerousAction({
+      actionKey: 'action.uninstall',
+      contentKey: impact.hasImpact ? 'confirm.uninstallExtensionImpactContent' : 'confirm.uninstallExtensionContent',
+      contentValues: {
+        connectionCount: impact.savedConnections,
+        name: extension?.name || extension?.id || '-',
+        sessionCount: impact.activeSessions,
+        version: extension?.version || '-',
+      },
+      onConfirm: () => uninstallExtension(extension.id),
+      titleKey: 'confirm.uninstallExtensionTitle',
+    });
+  };
 
   const resolveSelectedSshProfile = async (profileId) => {
     if (!profileId) return null;

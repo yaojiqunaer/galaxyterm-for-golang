@@ -5,6 +5,7 @@ import {
   buildExtensionAction,
   buildExtensionCardFacts,
   buildExtensionSummary,
+  buildExtensionUsageImpact,
   buildInstalledExtensionRows,
   compareExtensionVersions,
   findCatalogItemForType,
@@ -182,6 +183,28 @@ assert.deepEqual(buildInstalledExtensionRows(installedExtensions, ['galaxyterm-e
     capabilities: ['list', 'read', 'write'],
   },
 ]);
+
+assert.deepEqual(buildExtensionUsageImpact(installedExtensions[0], {
+  profiles: [
+    { id: 'mysql-primary', providerType: 'mysql' },
+    { id: 'mysql-replica', providerType: 'mysql' },
+    { id: 'ssh-prod', providerType: 'ssh' },
+  ],
+  sessions: [
+    { id: 'mysql-1', providerType: 'mysql', status: 'connected' },
+    { id: 'mysql-closed', providerType: 'mysql', status: 'closed' },
+    { id: 'ssh-1', providerType: 'ssh', status: 'connected' },
+  ],
+}), {
+  activeSessions: 1,
+  hasImpact: true,
+  savedConnections: 2,
+});
+assert.deepEqual(buildExtensionUsageImpact(installedExtensions[2]), {
+  activeSessions: 0,
+  hasImpact: false,
+  savedConnections: 0,
+});
 
 assert.deepEqual(filterProvidersByDisabledExtensions(providers, installedExtensions, [
   'galaxyterm-extension-mysql',

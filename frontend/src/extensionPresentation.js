@@ -163,6 +163,22 @@ export function buildInstalledExtensionRows(installedExtensions = [], disabledEx
   });
 }
 
+export function buildExtensionUsageImpact(extension = {}, { profiles = [], sessions = [] } = {}) {
+  const providerTypes = new Set((extension.providers || [])
+    .map((provider) => (typeof provider === 'string' ? provider : provider?.type))
+    .filter(Boolean));
+  const savedConnections = profiles.filter((profile) => providerTypes.has(profile.providerType)).length;
+  const activeSessions = sessions.filter((session) => (
+    session.status !== 'closed'
+    && providerTypes.has(session.providerType || session.request?.providerType)
+  )).length;
+  return {
+    activeSessions,
+    hasImpact: savedConnections > 0 || activeSessions > 0,
+    savedConnections,
+  };
+}
+
 export function filterExtensionWorkspace(
   { catalog = [], installed = [], sources = [] } = {},
   { query = '', scope = 'all' } = {},

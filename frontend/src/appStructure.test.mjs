@@ -244,6 +244,14 @@ assert.ok(
   'extension discovery must be searchable and unavailable connections must lead to their provider',
 );
 assert.ok(
+  source.includes('const extensionUsageById = useMemo(() => Object.fromEntries(')
+    && source.includes('buildExtensionUsageImpact(extension, { profiles, sessions })')
+    && source.includes('confirmToggleExtensionEnabled(extension, checked)')
+    && source.includes("contentKey: 'confirm.disableExtensionImpactContent'")
+    && source.includes("impact.hasImpact ? 'confirm.uninstallExtensionImpactContent' : 'confirm.uninstallExtensionContent'"),
+  'extension disable and uninstall actions must expose their saved-connection and active-session impact',
+);
+assert.ok(
   source.includes('onClick={() => launchDefaultTerminal(provider.type)}')
     && source.includes('openDefaultTerminal={launchDefaultTerminal}')
     && source.includes("onClick={() => openDefaultTerminal('local')}")
@@ -561,7 +569,8 @@ assert.ok(
     && source.includes('if (settings.confirmDangerousActions === false) return onConfirm();')
     && source.includes('const confirmDeleteAuditRecord = (record) => requestDangerousAction({')
     && source.includes('const confirmClearAuditRecords = () => requestDangerousAction({')
-    && source.includes('const confirmUninstallExtension = (extension) => requestDangerousAction({')
+    && source.includes('const confirmUninstallExtension = (extension) => {')
+    && source.includes('return requestDangerousAction({')
     && source.includes('const confirmDeleteExtensionSource = (source) => requestDangerousAction({')
     && source.includes('const confirmDeleteQuickCommand = (command) => requestDangerousAction({')
     && source.includes('const confirmStopTunnel = (tunnel, display) => requestDangerousAction({'),

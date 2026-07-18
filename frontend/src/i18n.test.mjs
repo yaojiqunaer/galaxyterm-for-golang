@@ -45,6 +45,7 @@ assert.equal(t('placeholder.defaultWorkingDirectory'), 'For example /Users/me/pr
 assert.equal(t('action.configureTerminal'), 'Configure terminal');
 assert.equal(t('action.copySessionTarget'), 'Copy session target');
 assert.equal(t('action.findExtension'), 'Find extension');
+assert.equal(t('action.disable'), 'Disable');
 assert.equal(t('placeholder.searchExtensions'), 'Search extensions, providers, or capabilities');
 assert.equal(t('action.protectSession'), 'Protect session');
 assert.equal(t('action.unprotectSession'), 'Remove session protection');
@@ -56,6 +57,19 @@ assert.equal(t('message.terminalStartFailed'), 'Failed to start terminal');
 assert.equal(t('confirm.deleteAuditRecordTitle'), 'Delete this recording?');
 assert.equal(t('confirm.clearAuditRecordsContent', { count: 12 }), 'All 12 recordings and their audit events will be permanently removed.');
 assert.equal(t('confirm.uninstallExtensionContent', { name: 'SFTP', version: '1.2.0' }), 'SFTP 1.2.0 and its providers will be removed. Saved connections are kept.');
+assert.equal(t('confirm.disableExtensionTitle', { name: 'SFTP' }), 'Disable SFTP?');
+assert.equal(t('confirm.disableExtensionImpactContent', {
+  connectionCount: 2,
+  name: 'SFTP',
+  sessionCount: 1,
+}), 'Affected: 2 saved connections and 1 active sessions. Existing sessions stay open, but new sessions cannot start until SFTP is enabled again.');
+assert.equal(t('confirm.uninstallExtensionImpactContent', {
+  connectionCount: 2,
+  name: 'SFTP',
+  sessionCount: 1,
+  version: '1.2.0',
+}), 'Removing SFTP 1.2.0 affects 2 saved connections and 1 active sessions. Active sessions may be interrupted; saved connections remain but cannot reopen until the provider is installed again.');
+assert.equal(t('extension.usage.connections', { count: 2 }), '2 connections');
 assert.equal(t('confirm.deleteExtensionSourceContent', { name: 'Official', url: 'https://example.com/index.json' }), 'Official · https://example.com/index.json. Installed extensions are not removed.');
 assert.equal(t('confirm.stopTunnelContent', { name: 'Database', route: '127.0.0.1:3307 → mysql:3306' }), 'Database · 127.0.0.1:3307 → mysql:3306. Connections using this tunnel will be interrupted.');
 assert.equal(t('replay.keyboardHint'), 'Space/K play or pause · Left/Right 5s · Home/End');
@@ -100,6 +114,7 @@ assert.equal(t('placeholder.defaultWorkingDirectory'), '例如 /Users/me/project
 assert.equal(t('action.configureTerminal'), '配置终端');
 assert.equal(t('action.copySessionTarget'), '复制会话目标');
 assert.equal(t('action.findExtension'), '查找扩展');
+assert.equal(t('action.disable'), '停用');
 assert.equal(t('placeholder.searchExtensions'), '搜索扩展、Provider 或能力');
 assert.equal(t('action.protectSession'), '保护会话');
 assert.equal(t('action.unprotectSession'), '取消会话保护');
@@ -111,6 +126,19 @@ assert.equal(t('message.terminalStartFailed'), '启动终端失败');
 assert.equal(t('confirm.deleteAuditRecordTitle'), '删除这条录屏？');
 assert.equal(t('confirm.clearAuditRecordsContent', { count: 12 }), '将永久删除全部 12 条录屏及其审计事件。');
 assert.equal(t('confirm.uninstallExtensionContent', { name: 'SFTP', version: '1.2.0' }), '将移除 SFTP 1.2.0 及其提供的终端类型；已保存连接会保留。');
+assert.equal(t('confirm.disableExtensionTitle', { name: 'SFTP' }), '停用 SFTP？');
+assert.equal(t('confirm.disableExtensionImpactContent', {
+  connectionCount: 2,
+  name: 'SFTP',
+  sessionCount: 1,
+}), '将影响 2 个保存连接和 1 个活动会话。已有会话保持打开，但重新启用 SFTP 前无法创建新会话。');
+assert.equal(t('confirm.uninstallExtensionImpactContent', {
+  connectionCount: 2,
+  name: 'SFTP',
+  sessionCount: 1,
+  version: '1.2.0',
+}), '卸载 SFTP 1.2.0 将影响 2 个保存连接和 1 个活动会话。活动会话可能中断；保存连接会保留，但重新安装 Provider 前无法再次打开。');
+assert.equal(t('extension.usage.connections', { count: 2 }), '2 个连接');
 assert.equal(t('confirm.deleteExtensionSourceContent', { name: '官方源', url: 'https://example.com/index.json' }), '官方源 · https://example.com/index.json。已安装扩展不会被删除。');
 assert.equal(t('confirm.stopTunnelContent', { name: '数据库', route: '127.0.0.1:3307 → mysql:3306' }), '数据库 · 127.0.0.1:3307 → mysql:3306。正在使用此隧道的连接会中断。');
 assert.equal(t('replay.keyboardHint'), 'Space/K 播放或暂停 · 左右键 5 秒 · Home/End');
