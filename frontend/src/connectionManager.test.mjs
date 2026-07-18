@@ -118,6 +118,17 @@ const profiles = [
   },
 ];
 
+const fileProfile = {
+  id: 's3-assets',
+  kind: 'file',
+  providerType: 's3',
+  displayName: 'Production assets',
+  group: 'Production',
+  filePath: '/releases',
+  config: { endpoint: 'https://objects.example.com', bucket: 'assets' },
+  auth: { credentialRef: { id: 's3-assets', providerType: 's3', fields: ['accessKey', 'secretKey'] } },
+};
+
 const groups = buildConnectionGroups(profiles);
 assert.deepEqual(groups.map((group) => ({
   credentialCount: group.credentialCount,
@@ -164,6 +175,12 @@ assert.deepEqual(
   }).map((profile) => profile.id),
   ['prod-db'],
 );
+assert.deepEqual(
+  selectBatchProfiles([...profiles, fileProfile], {
+    availableProviders: [{ type: 'ssh' }, { type: 'local' }, { type: 's3' }],
+  }).map((profile) => profile.id),
+  ['dev-shell', 'prod-db', 'prod-web'],
+);
 
 assert.deepEqual(
   filterConnectionProfiles(profiles, { query: 'prod deploy' }).map((profile) => profile.id),
@@ -184,6 +201,10 @@ assert.deepEqual(
 assert.deepEqual(
   filterConnectionProfiles(profiles, { query: 'prod missing' }).map((profile) => profile.id),
   [],
+);
+assert.deepEqual(
+  filterConnectionProfiles([...profiles, fileProfile], { query: 'objects releases' }).map((profile) => profile.id),
+  ['s3-assets'],
 );
 
 assert.deepEqual(buildConnectionEmptyState({
@@ -246,9 +267,15 @@ assert.deepEqual(buildConnectionProfileBadges(profiles[2], { activeCount: 0 }, {
   { key: 'favorite', tone: 'warning', value: true },
   { key: 'providerUnavailable', tone: 'warning', value: true },
 ]);
+assert.deepEqual(buildConnectionProfileBadges(fileProfile, { activeCount: 0 }), [
+  { key: 'group', tone: 'default', value: 'Production' },
+  { key: 'fileWorkspace', tone: 'info', value: true },
+  { key: 'credential', tone: 'info', value: true },
+]);
 
 assert.equal(isProfileProviderAvailable(profiles[0], [{ type: 'ssh' }, { type: 'local' }]), true);
 assert.equal(isProfileProviderAvailable(profiles[0], [{ type: 'local' }]), false);
+assert.equal(isProfileProviderAvailable(fileProfile, [{ type: 's3' }]), true);
 
 assert.deepEqual(filterRecentConnectionsByProviders([
   { id: 'recent-ssh', providerType: 'ssh' },
@@ -329,6 +356,12 @@ assert.deepEqual(buildConnectionProfileFacts({ providerType: 'local', config: {}
   { key: 'shell', value: 'Default shell' },
   { key: 'lastUsed', value: '' },
 ]);
+assert.deepEqual(buildConnectionProfileFacts(fileProfile), [
+  { key: 'endpoint', value: 'https://objects.example.com' },
+  { key: 'path', value: '/releases' },
+  { key: 'lastUsed', value: '' },
+]);
+assert.equal(buildConnectionProfileSubtitle(fileProfile), 'https://objects.example.com · /releases');
 assert.deepEqual(buildConnectionProfileHints({ activeCount: 0 }), ['enterOpen', 'doubleClickOpen']);
 assert.deepEqual(buildConnectionProfileHints({ activeCount: 2 }), ['focusOpenSession', 'enterOpen', 'doubleClickOpen']);
 assert.deepEqual(buildConnectionProfilePrimaryAction({
@@ -338,6 +371,15 @@ assert.deepEqual(buildConnectionProfilePrimaryAction({
   action: 'focus',
   disabled: false,
   labelKey: 'action.focusSession',
+  reasonKey: '',
+});
+assert.deepEqual(buildConnectionProfilePrimaryAction({
+  profileKind: 'file',
+  providerAvailable: true,
+}), {
+  action: 'openFiles',
+  disabled: false,
+  labelKey: 'action.openFiles',
   reasonKey: '',
 });
 assert.deepEqual(buildConnectionProfilePrimaryAction({
@@ -382,6 +424,15 @@ assert.deepEqual(buildConnectionProfileStatusSummary({
 }), {
   descriptionKey: 'connection.status.ready.description',
   titleKey: 'connection.status.ready.title',
+  tone: 'info',
+  values: {},
+});
+assert.deepEqual(buildConnectionProfileStatusSummary({
+  profileKind: 'file',
+  providerAvailable: true,
+}), {
+  descriptionKey: 'connection.status.fileReady.description',
+  titleKey: 'connection.status.fileReady.title',
   tone: 'info',
   values: {},
 });

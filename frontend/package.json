@@ -11,6 +11,7 @@
     "test:audit": "node src/auditLog.test.mjs",
     "test:command-history": "node src/commandHistory.test.mjs",
     "test:connections": "node src/connectionManager.test.mjs",
+    "test:connection-profiles": "node src/connectionProfiles.test.mjs",
     "test:desktop-bridge": "node src/desktopBridge.test.mjs",
     "test:extensions": "node src/extensionPresentation.test.mjs",
     "test:extension-sources": "node src/extensionSources.test.mjs",

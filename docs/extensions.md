@@ -45,6 +45,8 @@ https://github.com/<owner>/<repo>/releases/latest/download/galaxyterm-index.json
 
 已安装扩展会显示当前引用它的保存连接数和活动会话数。停用一个正在使用的扩展前会明确提示影响范围；已有终端会话保持打开，但重新启用前不能创建新会话。卸载扩展时会再次提示连接和会话影响，活动会话可能中断；保存连接不会被删除，重新安装相同 Provider 后仍可继续使用。
 
+非 SFTP 文件 Provider 的当前位置可保存为文件连接，并与终端连接一起出现在连接管理、分组、收藏、搜索和命令面板中。`configFields` 保存到连接档案，`authFields` 只写入系统凭据库；连接导入和导出都会移除凭据引用，避免在另一台设备上误显示为“凭据已保存”。未保存凭据的文件连接打开后会停留在认证表单，由用户输入一次性凭据。
+
 ## Release 索引
 
 每个 Release 上传 `.gtx` 包和名为 `galaxyterm-index.json` 的索引。相对 URL 会以索引地址为基准解析，适合把索引与安装包放在同一个 GitHub Release：

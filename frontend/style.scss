@@ -1949,6 +1949,7 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
 }
 
 .connection-provider-filter {
+  width: 156px;
   max-width: 100%;
 }
 
@@ -3183,6 +3184,15 @@ code {
 
 .remote-context-form .ant-form-item {
   flex: 1;
+  margin-bottom: 10px;
+}
+
+.file-connection-select {
+  min-width: 0;
+  flex: 1;
+}
+
+.remote-context-form .ant-alert {
   margin-bottom: 10px;
 }
 

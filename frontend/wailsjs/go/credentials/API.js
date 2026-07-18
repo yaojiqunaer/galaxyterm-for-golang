@@ -13,3 +13,15 @@ export function DeleteSSHCredential(arg1) {
 export function ResolveSSHRequest(arg1) {
   return callWails(['credentials', 'API', 'ResolveSSHRequest'], arg1);
 }
+
+export function SaveProviderCredential(arg1) {
+  return callWails(['credentials', 'API', 'SaveProviderCredential'], arg1);
+}
+
+export function ResolveProviderCredential(arg1) {
+  return callWails(['credentials', 'API', 'ResolveProviderCredential'], arg1);
+}
+
+export function DeleteProviderCredential(arg1) {
+  return callWails(['credentials', 'API', 'DeleteProviderCredential'], arg1);
+}

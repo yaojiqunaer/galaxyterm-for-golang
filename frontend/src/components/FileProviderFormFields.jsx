@@ -47,13 +47,13 @@ function ProviderField({ field, section }) {
   );
 }
 
-export default function FileProviderFormFields({ provider }) {
+export default function FileProviderFormFields({ hideAuthFields = false, provider }) {
   return (
     <>
       {(provider?.configFields || []).map((field) => (
         <ProviderField field={field} key={`config-${field.key}`} section="config" />
       ))}
-      {(provider?.authFields || []).map((field) => (
+      {!hideAuthFields && (provider?.authFields || []).map((field) => (
         <ProviderField field={field} key={`auth-${field.key}`} section="auth" />
       ))}
     </>

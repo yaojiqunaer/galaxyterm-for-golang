@@ -119,6 +119,7 @@ export function selectBatchProfiles(
     ? new Set(availableProviders.map((provider) => provider.type).filter(Boolean))
     : null;
   return sortConnectionProfiles(profiles.filter((profile) => {
+    if (profile.kind === 'file') return false;
     const matchesFavorite = !favoritesOnly || profile.favorite;
     const matchesProvider = providerType === 'all' || profile.providerType === providerType;
     const matchesAvailableProvider = !availableProviderTypes || availableProviderTypes.has(profile.providerType);
@@ -152,6 +153,8 @@ export function filterConnectionProfiles(
       profile.config?.host,
       profile.config?.shell,
       profile.config?.workingDirectory,
+      profile.filePath,
+      ...Object.values(profile.config || {}),
       profile.auth?.username,
     ].filter(Boolean).join(' ').toLowerCase();
     return tokens.every((token) => searchable.includes(token));
@@ -255,6 +258,11 @@ export function buildConnectionProfileBadges(profile = {}, sessionInfo = {}, opt
       tone: 'default',
       value: profile.group || ungroupedKey,
     },
+    profile.kind === 'file' && {
+      key: 'fileWorkspace',
+      tone: 'info',
+      value: true,
+    },
     sessionInfo.activeCount > 0 && {
       key: 'sessions',
       tone: 'success',
@@ -306,6 +314,13 @@ export function buildConnectionProfileFacts(profile = {}, { defaultShellLabel = 
       profile.config?.jumpHost && { key: 'jumpHost', value: profile.config.jumpHost },
     ].filter(Boolean);
   }
+  if (profile.kind === 'file') {
+    return [
+      { key: 'endpoint', value: fileConnectionEndpoint(profile) },
+      { key: 'path', value: profile.filePath || '.' },
+      { key: 'lastUsed', value: profile.lastUsedAt || '' },
+    ];
+  }
   return [
     { key: 'shell', value: profile.config?.shell || defaultShellLabel },
     profile.config?.workingDirectory && { key: 'workingDirectory', value: profile.config.workingDirectory },
@@ -320,6 +335,9 @@ export function buildConnectionProfileSubtitle(profile = {}, { defaultShellLabel
     const username = profile.auth?.username;
     return `${username ? `${username}@` : ''}${host}:${port}`;
   }
+  if (profile.kind === 'file') {
+    return `${fileConnectionEndpoint(profile)} · ${profile.filePath || '.'}`;
+  }
   return profile.config?.shell || defaultShellLabel;
 }
 
@@ -332,6 +350,7 @@ export function buildConnectionProfileHints(sessionInfo = {}) {
 }
 
 export function buildConnectionProfilePrimaryAction({
+  profileKind = 'terminal',
   providerAvailable = true,
   sessionInfo = {},
 } = {}) {
@@ -351,6 +370,14 @@ export function buildConnectionProfilePrimaryAction({
       reasonKey: '',
     };
   }
+  if (profileKind === 'file') {
+    return {
+      action: 'openFiles',
+      disabled: false,
+      labelKey: 'action.openFiles',
+      reasonKey: '',
+    };
+  }
   return {
     action: 'connect',
     disabled: false,
@@ -360,6 +387,7 @@ export function buildConnectionProfilePrimaryAction({
 }
 
 export function buildConnectionProfileStatusSummary({
+  profileKind = 'terminal',
   providerAvailable = true,
   sessionInfo = {},
 } = {}) {
@@ -379,12 +407,30 @@ export function buildConnectionProfileStatusSummary({
       values: { count: sessionInfo.activeCount },
     };
   }
+  if (profileKind === 'file') {
+    return {
+      descriptionKey: 'connection.status.fileReady.description',
+      titleKey: 'connection.status.fileReady.title',
+      tone: 'info',
+      values: {},
+    };
+  }
   return {
     descriptionKey: 'connection.status.ready.description',
     titleKey: 'connection.status.ready.title',
     tone: 'info',
     values: {},
   };
+}
+
+function fileConnectionEndpoint(profile = {}) {
+  const config = profile.config || {};
+  return config.endpoint
+    || config.host
+    || config.bucket
+    || Object.values(config).find((value) => typeof value === 'string' && value.trim())
+    || profile.providerType
+    || '-';
 }
 
 function compareText(left = '', right = '') {

@@ -164,7 +164,7 @@ export function buildInstalledExtensionRows(installedExtensions = [], disabledEx
 }
 
 export function buildExtensionUsageImpact(extension = {}, { profiles = [], sessions = [] } = {}) {
-  const providerTypes = new Set((extension.providers || [])
+  const providerTypes = new Set([...(extension.providers || []), ...(extension.fileProviders || [])]
     .map((provider) => (typeof provider === 'string' ? provider : provider?.type))
     .filter(Boolean));
   const savedConnections = profiles.filter((profile) => providerTypes.has(profile.providerType)).length;

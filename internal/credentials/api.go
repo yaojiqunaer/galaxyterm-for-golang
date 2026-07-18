@@ -1,13 +1,19 @@
 package credentials
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
+	"sort"
 
 	"galaxyterm/internal/session"
 )
 
 const serviceName = "GalaxyTerm"
+
+var credentialIdentifierPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$`)
+var credentialFieldPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9._-]{0,63}$`)
 
 type API struct {
 	store Store
@@ -33,6 +39,23 @@ type SSHCredentialRef struct {
 	HasPrivateKey   bool   `json:"hasPrivateKey"`
 	HasPassphrase   bool   `json:"hasPassphrase"`
 	HasJumpPassword bool   `json:"hasJumpPassword"`
+}
+
+type SaveProviderCredentialRequest struct {
+	ID             string                 `json:"id"`
+	ProviderType   string                 `json:"providerType"`
+	PreviousFields []string               `json:"previousFields,omitempty"`
+	Values         map[string]interface{} `json:"values"`
+}
+
+type ResolveProviderCredentialRequest struct {
+	Auth map[string]interface{} `json:"auth"`
+}
+
+type ProviderCredentialRef struct {
+	ID           string   `json:"id"`
+	ProviderType string   `json:"providerType"`
+	Fields       []string `json:"fields"`
 }
 
 func NewAPI() *API {
@@ -121,6 +144,113 @@ func (api *API) ResolveSSHRequest(req session.CreateSessionRequest) (session.Cre
 	return req, nil
 }
 
+func (api *API) SaveProviderCredential(req SaveProviderCredentialRequest) (ProviderCredentialRef, error) {
+	if !credentialIdentifierPattern.MatchString(req.ID) {
+		return ProviderCredentialRef{}, errors.New("invalid credential id")
+	}
+	if !credentialIdentifierPattern.MatchString(req.ProviderType) {
+		return ProviderCredentialRef{}, errors.New("invalid credential provider type")
+	}
+	encodedValues := make(map[string]string, len(req.Values))
+	for field, value := range req.Values {
+		if !credentialFieldPattern.MatchString(field) {
+			return ProviderCredentialRef{}, fmt.Errorf("invalid credential field: %s", field)
+		}
+		encoded, keep, err := encodeProviderCredentialValue(value)
+		if err != nil {
+			return ProviderCredentialRef{}, fmt.Errorf("invalid credential field %s: %w", field, err)
+		}
+		if keep {
+			encodedValues[field] = encoded
+		}
+	}
+	ref := ProviderCredentialRef{ID: req.ID, ProviderType: req.ProviderType, Fields: []string{}}
+	for field, encoded := range encodedValues {
+		if err := api.store.Set(serviceName, providerSecretKey(req.ProviderType, req.ID, field), encoded); err != nil {
+			return ProviderCredentialRef{}, err
+		}
+		ref.Fields = append(ref.Fields, field)
+	}
+	sort.Strings(ref.Fields)
+	activeFields := make(map[string]struct{}, len(ref.Fields))
+	for _, field := range ref.Fields {
+		activeFields[field] = struct{}{}
+	}
+	for _, field := range req.PreviousFields {
+		if !credentialFieldPattern.MatchString(field) {
+			continue
+		}
+		if _, keep := activeFields[field]; keep {
+			continue
+		}
+		if err := api.store.Delete(serviceName, providerSecretKey(req.ProviderType, req.ID, field)); err != nil && !errors.Is(err, ErrNotFound) {
+			return ProviderCredentialRef{}, err
+		}
+	}
+	return ref, nil
+}
+
+func (api *API) ResolveProviderCredential(req ResolveProviderCredentialRequest) (map[string]interface{}, error) {
+	auth := copyMap(req.Auth)
+	delete(auth, "credentialRef")
+	ref, ok := providerCredentialRef(req.Auth["credentialRef"])
+	if !ok || ref.ID == "" || ref.ProviderType == "" {
+		return auth, nil
+	}
+	if err := validateProviderCredentialRef(ref); err != nil {
+		return nil, err
+	}
+	for _, field := range ref.Fields {
+		value, err := api.store.Get(serviceName, providerSecretKey(ref.ProviderType, ref.ID, field))
+		if errors.Is(err, ErrNotFound) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		var decoded interface{}
+		if err := json.Unmarshal([]byte(value), &decoded); err != nil {
+			return nil, fmt.Errorf("decode credential field %s: %w", field, err)
+		}
+		auth[field] = decoded
+	}
+	return auth, nil
+}
+
+func (api *API) DeleteProviderCredential(ref ProviderCredentialRef) error {
+	if ref.ID == "" || ref.ProviderType == "" {
+		return nil
+	}
+	if err := validateProviderCredentialRef(ref); err != nil {
+		return err
+	}
+	var result error
+	for _, field := range ref.Fields {
+		if err := api.store.Delete(serviceName, providerSecretKey(ref.ProviderType, ref.ID, field)); err != nil && !errors.Is(err, ErrNotFound) {
+			result = errors.Join(result, err)
+		}
+	}
+	return result
+}
+
+func validateProviderCredentialRef(ref ProviderCredentialRef) error {
+	if !credentialIdentifierPattern.MatchString(ref.ID) {
+		return errors.New("invalid credential id")
+	}
+	if !credentialIdentifierPattern.MatchString(ref.ProviderType) {
+		return errors.New("invalid credential provider type")
+	}
+	if len(ref.Fields) > 128 {
+		return errors.New("too many credential fields")
+	}
+	for _, field := range ref.Fields {
+		if !credentialFieldPattern.MatchString(field) {
+			return fmt.Errorf("invalid credential field: %s", field)
+		}
+	}
+	return nil
+}
+
 func (api *API) setOrDelete(key string, value string) error {
 	if value == "" {
 		if err := api.store.Delete(serviceName, key); err != nil && !errors.Is(err, ErrNotFound) {
@@ -158,6 +288,49 @@ func copyMap(source map[string]interface{}) map[string]interface{} {
 
 func secretKey(id string, field string) string {
 	return fmt.Sprintf("ssh:%s:%s", id, field)
+}
+
+func providerSecretKey(providerType string, id string, field string) string {
+	return fmt.Sprintf("provider:%s:%s:%s", providerType, id, field)
+}
+
+func providerCredentialRef(value interface{}) (ProviderCredentialRef, bool) {
+	switch typed := value.(type) {
+	case ProviderCredentialRef:
+		return typed, true
+	case map[string]interface{}:
+		fields, _ := typed["fields"].([]string)
+		if rawFields, ok := typed["fields"].([]interface{}); ok {
+			fields = make([]string, 0, len(rawFields))
+			for _, field := range rawFields {
+				if text, ok := field.(string); ok {
+					fields = append(fields, text)
+				}
+			}
+		}
+		return ProviderCredentialRef{
+			ID:           stringFromMap(typed, "id"),
+			ProviderType: stringFromMap(typed, "providerType"),
+			Fields:       fields,
+		}, true
+	default:
+		return ProviderCredentialRef{}, false
+	}
+}
+
+func encodeProviderCredentialValue(value interface{}) (string, bool, error) {
+	if value == nil || value == "" {
+		return "", false, nil
+	}
+	switch value.(type) {
+	case string, bool, float32, float64,
+		int, int8, int16, int32, int64,
+		uint, uint8, uint16, uint32, uint64:
+		encoded, err := json.Marshal(value)
+		return string(encoded), true, err
+	default:
+		return "", false, errors.New("only scalar values are supported")
+	}
 }
 
 func stringFromMap(values map[string]interface{}, key string) string {

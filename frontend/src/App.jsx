@@ -170,6 +170,11 @@ import {
   updateShortcutBinding,
 } from './settingsPresentation.js';
 import {
+  buildFileConnectionFormValues,
+  buildFileConnectionProfile,
+  buildFileConnectionRequest,
+  buildFileProviderAuthValues,
+  buildFileProviderConfigValues,
   buildRemoteFileActions,
   buildRemoteFileBreadcrumbs,
   buildRemoteFileView,
@@ -184,6 +189,12 @@ import {
   readableBytes,
   updateFileTransferProgress,
 } from './remoteWorkspace.js';
+import {
+  buildConnectionProfilesExport,
+  createProfileID,
+  normalizeImportedConnectionProfile,
+  normalizeStoredConnectionProfile,
+} from './connectionProfiles.js';
 import {
   buildTerminalControlActions,
   buildTerminalErrorDetail,
@@ -280,7 +291,7 @@ const commandHistoryStorageKey = 'galaxyterm.commandHistory';
 const recentConnectionStorageKey = 'galaxyterm.recentConnections';
 const auditRecordStorageKey = 'galaxyterm.auditRecords';
 const extensionSourceStorageKey = 'galaxyterm.extensionSources';
-const profileSchemaVersion = 1;
+const profileSchemaVersion = 2;
 
 const defaultSettings = {
   appTheme: 'dark',
@@ -419,6 +430,8 @@ function App() {
   const [fileSort, setFileSort] = useState('name');
   const [fileProviderType, setFileProviderType] = useState('');
   const [fileProfileId, setFileProfileId] = useState('');
+  const [fileConnectionProfileId, setFileConnectionProfileId] = useState('');
+  const [fileCredentialEditing, setFileCredentialEditing] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [creatingSession, setCreatingSession] = useState(false);
   const [extensionOfflineInstalling, setExtensionOfflineInstalling] = useState(false);
@@ -876,6 +889,19 @@ function App() {
     .find((row) => row.action === 'commandPalette')?.shortcut || `${shortcutLabel} + P`;
   const numberedSessionShortcut = `${shortcutLabel} + 1..9`;
 
+  const fileProviders = useMemo(() => (
+    buildEnabledFileProviders(installedExtensions, settings.disabledExtensionIds)
+  ), [installedExtensions, settings.disabledExtensionIds]);
+  const connectionProviders = useMemo(() => [
+    ...providers,
+    ...fileProviders
+      .filter((provider) => !providers.some((item) => item.type === provider.type))
+      .map((provider) => ({
+        ...provider,
+        category: 'file-extension',
+        name: provider.extensionName || provider.type,
+      })),
+  ], [fileProviders, providers]);
   const selectedProvider = providers.find((item) => item.type === newType) || providers[0] || fallbackProviders[0];
   const profileSessionSummary = useMemo(() => summarizeProfileSessions(profiles, sessions), [profiles, sessions]);
   const visibleProfiles = useMemo(
@@ -895,8 +921,8 @@ function App() {
     hasFilters: !!hasProfileFilters,
   }), [hasProfileFilters, profiles.length, visibleProfiles.length]);
   const sidebarQuickProfiles = useMemo(
-    () => sortSidebarProfiles(profiles, 5, { availableProviders: providers }),
-    [profiles, providers],
+    () => sortSidebarProfiles(profiles, 5, { availableProviders: connectionProviders }),
+    [connectionProviders, profiles],
   );
   const visibleRecentConnections = useMemo(
     () => filterRecentConnectionsByProviders(recentConnections, providers, profiles),
@@ -947,11 +973,11 @@ function App() {
     auditRecords,
     installedExtensions,
     profiles,
-    providers,
+    providers: connectionProviders,
     recentConnections,
     sessions,
     tunnels,
-  }), [auditRecords, installedExtensions, profiles, providers, recentConnections, sessions, tunnels]);
+  }), [auditRecords, connectionProviders, installedExtensions, profiles, recentConnections, sessions, tunnels]);
   const extensionCatalog = useMemo(() => {
     const discoveredExtensions = remoteExtensionCatalog.flatMap((item) => [
       ...(item.manifest?.providers || []),
@@ -1007,12 +1033,15 @@ function App() {
     extensionSources,
     installedExtensionRows,
   ]);
-  const fileProviders = useMemo(() => (
-    buildEnabledFileProviders(installedExtensions, settings.disabledExtensionIds)
-  ), [installedExtensions, settings.disabledExtensionIds]);
   const selectedFileProvider = fileProviders.find((provider) => provider.type === fileProviderType)
     || fileProviders[0]
     || null;
+  const fileConnectionProfiles = useMemo(() => profiles.filter((profile) => (
+    profile.kind === 'file' && profile.providerType === selectedFileProvider?.type
+  )), [profiles, selectedFileProvider?.type]);
+  const selectedFileConnectionProfile = fileConnectionProfiles.find((profile) => (
+    profile.id === fileConnectionProfileId
+  )) || null;
 
   useEffect(() => {
     const nextType = selectedFileProvider?.type || '';
@@ -1026,12 +1055,19 @@ function App() {
   useEffect(() => {
     const nextProvider = selectedFileProvider;
     if (!nextProvider) return;
+    const savedProfile = selectedFileConnectionProfile?.providerType === nextProvider.type
+      ? selectedFileConnectionProfile
+      : null;
     const values = nextProvider.protocol === 'sftp'
       ? { config: {}, auth: {} }
-      : buildFileProviderFormValues(nextProvider);
-    fileForm.setFieldValue('config', values.config);
-    fileForm.setFieldValue('auth', values.auth);
-  }, [fileForm, selectedFileProvider?.type]);
+      : savedProfile
+        ? buildFileConnectionFormValues(nextProvider, savedProfile)
+        : { ...buildFileProviderFormValues(nextProvider), displayName: '', group: '', path: '.', rememberCredential: false };
+    fileForm.setFieldValue('auth', {});
+    fileForm.setFieldsValue(values);
+    setFileCredentialEditing(false);
+    if (fileConnectionProfileId && !savedProfile) setFileConnectionProfileId('');
+  }, [fileConnectionProfileId, fileForm, selectedFileConnectionProfile, selectedFileProvider?.type]);
   const auditProviderOptions = useMemo(() => [
     { value: 'all', label: t('filter.allProviders') },
     ...Array.from(new Set(auditRecords.map((record) => record.providerType || 'terminal')))
@@ -1115,6 +1151,14 @@ function App() {
     setExtensionQuery(String(providerType || '').trim());
     setExtensionScope('all');
     setSelectedNav('extensions');
+  };
+
+  const openFileProvider = (providerType = '') => {
+    setFileProviderType(providerType);
+    setFileConnectionProfileId('');
+    setFileCredentialEditing(false);
+    setFileEntries([]);
+    setSelectedNav('files');
   };
 
   const clearExtensionFilters = () => {
@@ -1866,19 +1910,77 @@ function App() {
   };
 
   const deleteProfile = async (profileId) => {
+    const profile = profiles.find((item) => item.id === profileId);
     const nextProfiles = profiles.filter((profile) => profile.id !== profileId);
     persistProfiles(nextProfiles);
     setProfiles(nextProfiles);
     try {
-      await CredentialsAPI.DeleteSSHCredential(profileId);
+      if (profile?.kind === 'file' && profile.auth?.credentialRef) {
+        await CredentialsAPI.DeleteProviderCredential(profile.auth.credentialRef);
+      } else {
+        await CredentialsAPI.DeleteSSHCredential(profileId);
+      }
     } catch {
       // Profiles remain removable even if the OS credential store is unavailable.
     }
     messageApi.success(t('message.profileDeleted'));
   };
 
+  const resolveStoredProviderCredential = async (profile) => {
+    const ref = profile?.auth?.credentialRef;
+    if (!ref) return { auth: {}, complete: true };
+    const auth = await CredentialsAPI.ResolveProviderCredential({ auth: profile.auth });
+    const complete = (ref.fields || []).every((field) => Object.prototype.hasOwnProperty.call(auth, field));
+    return { auth, complete };
+  };
+
+  const openFileConnectionProfile = async (profile, { load = true } = {}) => {
+    const provider = fileProviders.find((item) => item.type === profile.providerType);
+    if (!provider) {
+      openExtensionsForProvider(profile.providerType);
+      return;
+    }
+    setSelectedNav('files');
+    setFileProviderType(provider.type);
+    setFileConnectionProfileId(profile.id);
+    setFileCredentialEditing(false);
+    setFileEntries([]);
+    fileForm.setFieldValue('auth', {});
+    fileForm.setFieldsValue(buildFileConnectionFormValues(provider, profile));
+    if (!load) return;
+    if (!profile.auth?.credentialRef && provider.authFields?.some((field) => field.required)) {
+      setFileCredentialEditing(true);
+      messageApi.info(t('message.fileCredentialRequired'));
+      return;
+    }
+    setFileLoading(true);
+    try {
+      const credential = await resolveStoredProviderCredential(profile);
+      if (!credential.complete) {
+        setFileCredentialEditing(true);
+        messageApi.info(t('message.fileCredentialUnavailable'));
+        return;
+      }
+      const auth = credential.auth;
+      const request = buildFileConnectionRequest(profile, auth);
+      const entries = await FilesAPI.List(request);
+      setFileEntries(Array.isArray(entries) ? entries : []);
+      markProfilesUsed([profile.id]);
+    } catch (error) {
+      showOperationError('message.fileListFailed', error, {
+        retry: () => openFileConnectionProfile(profile),
+      });
+    } finally {
+      setFileLoading(false);
+    }
+  };
+
   const openProfile = async (profile) => {
-    if (!isProfileProviderAvailable(profile, providers)) {
+    if (profile.kind === 'file') {
+      await openFileConnectionProfile(profile);
+      return;
+    }
+    if (!isProfileProviderAvailable(profile, connectionProviders)) {
       messageApi.warning(t('message.providerUnavailable'));
       return;
     }
@@ -1908,6 +2010,10 @@ function App() {
   };
 
   const openProfileEditor = (profile) => {
+    if (profile.kind === 'file') {
+      openFileConnectionProfile(profile, { load: false });
+      return;
+    }
     openDrawer(profile.providerType, profile);
   };
 
@@ -1922,8 +2028,12 @@ function App() {
 
   const runConnectionProfilePrimaryAction = (profile) => {
     const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
-    const providerAvailable = isProfileProviderAvailable(profile, providers);
-    const primaryAction = buildConnectionProfilePrimaryAction({ providerAvailable, sessionInfo });
+    const providerAvailable = isProfileProviderAvailable(profile, connectionProviders);
+    const primaryAction = buildConnectionProfilePrimaryAction({
+      profileKind: profile.kind,
+      providerAvailable,
+      sessionInfo,
+    });
     if (primaryAction.disabled) {
       messageApi.warning(primaryAction.reasonKey ? t(primaryAction.reasonKey) : t('message.providerUnavailable'));
       return;
@@ -2059,12 +2169,7 @@ function App() {
   };
 
   const exportProfiles = () => {
-    downloadJson('galaxyterm-profiles.json', {
-      version: profileSchemaVersion,
-      exportedAt: new Date().toISOString(),
-      secrets: 'omitted',
-      profiles: profiles.map((profile) => sanitizeProfile(profile)),
-    });
+    downloadJson('galaxyterm-profiles.json', buildConnectionProfilesExport(profiles));
   };
 
   const importProfiles = async (event) => {
@@ -2075,7 +2180,7 @@ function App() {
       const payload = JSON.parse(await file.text());
       const incoming = Array.isArray(payload) ? payload : payload.profiles;
       if (!Array.isArray(incoming)) throw new Error('invalid profiles');
-      const normalized = incoming.map(normalizeImportedProfile).filter(Boolean);
+      const normalized = incoming.map(normalizeImportedConnectionProfile).filter(Boolean);
       const nextProfiles = mergeProfiles(profiles, normalized);
       persistProfiles(nextProfiles);
       setProfiles(nextProfiles);
@@ -2633,7 +2738,7 @@ function App() {
   const renderConnectionProfilePreview = (profile) => profile ? (
     <ConnectionProfilePreview
       profile={profile}
-      providers={providers}
+      providers={connectionProviders}
       openProfile={openProfile}
       openProfileEditor={openProfileEditor}
       duplicateProfile={duplicateProfile}
@@ -2720,7 +2825,9 @@ function App() {
                   ...(groupQuery === 'favorites' ? { favoritesOnly: true } : { group: groupQuery }),
                   providerType: providerFilter,
                 })}
-                disabled={visibleProfiles.length === 0}
+                disabled={!visibleProfiles.some((profile) => (
+                  profile.kind !== 'file' && isProfileProviderAvailable(profile, providers)
+                ))}
               >
                 {groupQuery === 'all' ? t('action.openAll') : t('action.openGroup')}
               </Button>
@@ -2764,13 +2871,13 @@ function App() {
               onChange={(event) => setProfileQuery(event.target.value)}
               placeholder={t('placeholder.searchConnections')}
             />
-            <Segmented
+            <Select
               className="connection-provider-filter"
               value={providerFilter}
               onChange={setProviderFilter}
               options={[
                 { label: t('filter.allProviders'), value: 'all' },
-                ...providers.map((provider) => ({
+                ...connectionProviders.map((provider) => ({
                   label: providerLabel(provider),
                   value: provider.type,
                 })),
@@ -2856,8 +2963,12 @@ function App() {
               onKeyDown={handleConnectionListKeyDown}
               renderItem={(profile) => {
                 const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
-                const providerAvailable = isProfileProviderAvailable(profile, providers);
-                const primaryAction = buildConnectionProfilePrimaryAction({ providerAvailable, sessionInfo });
+                const providerAvailable = isProfileProviderAvailable(profile, connectionProviders);
+                const primaryAction = buildConnectionProfilePrimaryAction({
+                  profileKind: profile.kind,
+                  providerAvailable,
+                  sessionInfo,
+                });
                 const actions = [
                   <Button key="primary" size="small" type="primary" onClick={(event) => {
                     event.stopPropagation();
@@ -2873,7 +2984,9 @@ function App() {
                             .map((action) => ({
                               key: action,
                               danger: action === 'delete',
-                              label: t(`profile.action.${action}`),
+                              label: t(action === 'connect' && profile.kind === 'file'
+                                ? 'action.openFiles'
+                                : `profile.action.${action}`),
                             })),
                           onClick: ({ domEvent, key }) => {
                             domEvent.stopPropagation();
@@ -3530,6 +3643,88 @@ function App() {
     setFileEntries([]);
   };
 
+  const selectFileConnectionProfile = (profileId) => {
+    setFileConnectionProfileId(profileId || '');
+    setFileCredentialEditing(false);
+    setFileEntries([]);
+  };
+
+  const resetFileConnectionProfile = () => {
+    setFileConnectionProfileId('');
+    setFileCredentialEditing(false);
+    setFileEntries([]);
+    if (!selectedFileProvider || selectedFileProvider.protocol === 'sftp') return;
+    fileForm.setFieldValue('auth', {});
+    fileForm.setFieldsValue({
+      ...buildFileProviderFormValues(selectedFileProvider),
+      displayName: '',
+      group: '',
+      path: '.',
+      rememberCredential: false,
+    });
+  };
+
+  const saveFileConnectionProfile = async () => {
+    if (!selectedFileProvider || selectedFileProvider.protocol === 'sftp') return;
+    const draft = fileForm.getFieldsValue(true);
+    const fieldsToValidate = [
+      'displayName',
+      'group',
+      'path',
+      ...selectedFileProvider.configFields.map((field) => ['config', field.key]),
+      ...(draft.rememberCredential
+        ? selectedFileProvider.authFields.map((field) => ['auth', field.key])
+        : []),
+    ];
+    try {
+      await fileForm.validateFields(fieldsToValidate);
+    } catch {
+      return;
+    }
+    const values = fileForm.getFieldsValue(true);
+    const displayName = String(values.displayName || '').trim();
+    if (!displayName) {
+      messageApi.warning(t('validation.connectionNameRequired'));
+      return;
+    }
+    const existing = selectedFileConnectionProfile;
+    const profileId = existing?.id || createProfileID();
+    const credentialValues = buildFileProviderAuthValues(selectedFileProvider, values.auth || {});
+    let credentialRef = existing?.auth?.credentialRef || null;
+    try {
+      if (values.rememberCredential && Object.keys(credentialValues).length > 0) {
+        credentialRef = await CredentialsAPI.SaveProviderCredential({
+          id: profileId,
+          previousFields: existing?.auth?.credentialRef?.fields || [],
+          providerType: selectedFileProvider.type,
+          values: credentialValues,
+        });
+      }
+      if (!values.rememberCredential && credentialRef) {
+        await CredentialsAPI.DeleteProviderCredential(credentialRef);
+        credentialRef = null;
+      }
+      const profile = buildFileConnectionProfile(selectedFileProvider, {
+        ...values,
+        displayName,
+      }, {
+        credentialRef,
+        id: profileId,
+        profile: existing,
+      });
+      const nextProfiles = existing
+        ? profiles.map((item) => (item.id === existing.id ? profile : item))
+        : [...profiles, profile];
+      persistProfiles(nextProfiles);
+      setProfiles(nextProfiles);
+      setFileConnectionProfileId(profile.id);
+      setFileCredentialEditing(false);
+      messageApi.success(t('message.fileConnectionSaved'));
+    } catch (error) {
+      showOperationError('message.credentialFailed', error, { retry: saveFileConnectionProfile });
+    }
+  };
+
   const selectTunnelSshProfile = (profileId) => {
     if (!profileId) {
       setTunnelProfileId('');
@@ -3578,10 +3773,20 @@ function App() {
     if (!selectedFileProvider) throw new Error(t('file.noProviderHint'));
     const values = fileForm.getFieldsValue(true);
     if (selectedFileProvider.protocol !== 'sftp') {
+      const enteredAuth = buildFileProviderAuthValues(selectedFileProvider, values.auth || {});
+      let auth = enteredAuth;
+      if (Object.keys(auth).length === 0 && selectedFileConnectionProfile?.auth?.credentialRef) {
+        const credential = await resolveStoredProviderCredential(selectedFileConnectionProfile);
+        if (!credential.complete) {
+          setFileCredentialEditing(true);
+          throw new Error(t('message.fileCredentialUnavailable'));
+        }
+        auth = credential.auth;
+      }
       return {
         providerType: selectedFileProvider.type,
-        config: values.config || {},
-        auth: values.auth || {},
+        config: buildFileProviderConfigValues(selectedFileProvider, values.config || {}),
+        auth,
         path: overridePath || values.path || '.',
       };
     }
@@ -3931,6 +4136,8 @@ function App() {
                   }))}
                   onChange={(providerType) => {
                     setFileProviderType(providerType);
+                    setFileConnectionProfileId('');
+                    setFileCredentialEditing(false);
                     setFileEntries([]);
                     setFileQuery('');
                     fileForm.setFieldValue('path', '.');
@@ -3987,7 +4194,54 @@ function App() {
               )}
                 </>
               ) : (
-                <FileProviderFormFields provider={selectedFileProvider} />
+                <>
+                  <Form.Item label={t('field.savedConnection')}>
+                    <Space.Compact block>
+                      <Select
+                        allowClear
+                        className="file-connection-select"
+                        onChange={selectFileConnectionProfile}
+                        options={fileConnectionProfiles.map((profile) => ({
+                          label: profile.displayName,
+                          value: profile.id,
+                        }))}
+                        placeholder={t('placeholder.selectSavedConnection')}
+                        value={fileConnectionProfileId || undefined}
+                      />
+                      <Tooltip title={t('action.newConnection')}>
+                        <Button
+                          aria-label={t('action.newConnection')}
+                          icon={<PlusOutlined />}
+                          onClick={resetFileConnectionProfile}
+                        />
+                      </Tooltip>
+                    </Space.Compact>
+                  </Form.Item>
+                  <Form.Item name="displayName" label={t('field.name')}>
+                    <Input placeholder={t('placeholder.connectionName')} />
+                  </Form.Item>
+                  <Form.Item name="group" label={t('field.group')}>
+                    <Input placeholder={t('placeholder.group')} />
+                  </Form.Item>
+                  <FileProviderFormFields
+                    hideAuthFields={!!selectedFileConnectionProfile?.auth?.credentialRef && !fileCredentialEditing}
+                    provider={selectedFileProvider}
+                  />
+                  {!!selectedFileConnectionProfile?.auth?.credentialRef && !fileCredentialEditing && (
+                    <Alert
+                      action={<Button size="small" onClick={() => setFileCredentialEditing(true)}>{t('action.updateCredential')}</Button>}
+                      message={t('file.savedCredentialActive')}
+                      showIcon
+                      type="success"
+                    />
+                  )}
+                  <Form.Item name="rememberCredential" valuePropName="checked">
+                    <Checkbox>{t('field.rememberCredential')}</Checkbox>
+                  </Form.Item>
+                  <Button block icon={<SaveOutlined />} onClick={saveFileConnectionProfile}>
+                    {selectedFileConnectionProfile ? t('action.updateConnection') : t('action.saveConnection')}
+                  </Button>
+                </>
               )}
               <Form.Item name="path" label={t('field.path')}>
                 <Input />
@@ -4978,10 +5232,12 @@ function App() {
     closedSessionCount: currentSessionSummary.closed,
     restorableSessionCount: closedSessions.length,
     favoriteConnectionCount: profiles.filter((profile) => profile.favorite).length,
+    fileProviders,
     profiles,
     quickCommands,
     quickCommandProviderType: activeSession?.providerType || 'all',
-    providers,
+    providers: connectionProviders,
+    terminalProviders: providers,
     sessions,
     sessionDisplayLabels,
     sessionCount: sessions.length,
@@ -4989,6 +5245,7 @@ function App() {
     activateSession,
     openDrawer,
     openExtensionsForProvider,
+    openFileProvider,
     openProfile,
     runQuickCommand,
     runConnectionAction: runConnectionPaletteAction,
@@ -6348,8 +6605,16 @@ function ConnectionProfilePreview({
   const badges = buildConnectionProfileBadges(profile, sessionInfo, { providerAvailable });
   const facts = buildConnectionProfileFacts(profile, { defaultShellLabel: t('label.defaultShell') });
   const hints = buildConnectionProfileHints(sessionInfo);
-  const primaryAction = buildConnectionProfilePrimaryAction({ providerAvailable, sessionInfo });
-  const statusSummary = buildConnectionProfileStatusSummary({ providerAvailable, sessionInfo });
+  const primaryAction = buildConnectionProfilePrimaryAction({
+    profileKind: profile.kind,
+    providerAvailable,
+    sessionInfo,
+  });
+  const statusSummary = buildConnectionProfileStatusSummary({
+    profileKind: profile.kind,
+    providerAvailable,
+    sessionInfo,
+  });
   return (
     <div className="connection-profile-preview">
       <div className="connection-profile-hero">
@@ -6773,7 +7038,9 @@ function loadProfiles() {
     const parsed = JSON.parse(raw || '[]');
     const profiles = Array.isArray(parsed) ? parsed : parsed.profiles;
     if (!Array.isArray(profiles)) return [];
-    return profiles.map(normalizeImportedProfile).filter(Boolean);
+    return profiles
+      .filter((profile) => profile?.providerType && profile?.displayName)
+      .map((profile) => normalizeStoredConnectionProfile(profile));
   } catch {
     return [];
   }
@@ -6782,36 +7049,8 @@ function loadProfiles() {
 function persistProfiles(profiles) {
   localStorage.setItem(profileStorageKey, JSON.stringify({
     version: profileSchemaVersion,
-    profiles: profiles.map((profile) => sanitizeProfile(profile)),
+    profiles: profiles.map((profile) => normalizeStoredConnectionProfile(profile)),
   }));
-}
-
-function sanitizeProfile(profile) {
-  return {
-    id: profile.id || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`),
-    providerType: profile.providerType,
-    displayName: profile.displayName,
-    group: profile.group || '',
-    config: { ...(profile.config || {}) },
-    favorite: !!profile.favorite,
-    lastUsedAt: profile.lastUsedAt || '',
-    auth: {
-      username: profile.auth?.username || '',
-      authType: profile.auth?.authType || 'password',
-      jumpUsername: profile.auth?.jumpUsername || '',
-      credentialRef: profile.auth?.credentialRef || null,
-    },
-  };
-}
-
-function normalizeImportedProfile(profile) {
-  if (!profile || !profile.providerType || !profile.displayName) return null;
-  return sanitizeProfile({
-    ...profile,
-    id: profile.id || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`),
-    config: profile.config || {},
-    auth: profile.auth || {},
-  });
 }
 
 function mergeProfiles(currentProfiles, importedProfiles) {
@@ -6819,7 +7058,7 @@ function mergeProfiles(currentProfiles, importedProfiles) {
   const nextProfiles = [...currentProfiles];
   importedProfiles.forEach((profile) => {
     const nextProfile = existingIds.has(profile.id)
-      ? { ...profile, id: crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}` }
+      ? { ...profile, id: createProfileID() }
       : profile;
     existingIds.add(nextProfile.id);
     nextProfiles.push(nextProfile);
@@ -6992,7 +7231,7 @@ function buildPaletteItems(actions) {
     run: () => actions.setSelectedNav(key),
   }));
 
-  const providerItems = actions.providers.map((provider) => ({
+  const providerItems = actions.terminalProviders.map((provider) => ({
     id: `provider:${provider.type}`,
     group: t('palette.group.providers'),
     title: providerLabel(provider),
@@ -7000,6 +7239,15 @@ function buildPaletteItems(actions) {
     icon: providerIcons[provider.type] || <CodeOutlined />,
     keywords: `${provider.type} ${providerLabel(provider)}`,
     run: () => actions.openDrawer(provider.type),
+  }));
+  const fileProviderItems = actions.fileProviders.map((provider) => ({
+    id: `file-provider:${provider.type}`,
+    group: t('palette.group.providers'),
+    title: providerLabel(provider),
+    description: `${t('nav.files')} · ${provider.protocol || provider.type}`,
+    icon: providerIcons[provider.type] || <FolderOpenOutlined />,
+    keywords: `${provider.type} ${provider.protocol || ''} ${providerLabel(provider)} ${t('nav.files')}`,
+    run: () => actions.openFileProvider(provider.type),
   }));
 
   const profileItems = buildProfilePaletteItems({
@@ -7146,7 +7394,7 @@ function buildPaletteItems(actions) {
     },
   ];
 
-  return [...navigation, ...connectionActionItems, ...sessionActionItems, ...sessionItems, ...providerItems, ...profileItems, ...quickCommandItems, ...workspaceItems];
+  return [...navigation, ...connectionActionItems, ...sessionActionItems, ...sessionItems, ...providerItems, ...fileProviderItems, ...profileItems, ...quickCommandItems, ...workspaceItems];
 }
 
 function downloadJson(fileName, payload) {
@@ -7229,12 +7477,15 @@ function connectionProfileBadgeLabel(badge) {
   if (badge.key === 'sessions') return `${t('label.openSessions')}: ${badge.value}`;
   if (badge.key === 'favorite') return t('label.favorite');
   if (badge.key === 'credential') return t('label.credentialSaved');
+  if (badge.key === 'fileWorkspace') return t('label.fileConnection');
   if (badge.key === 'providerUnavailable') return t('label.providerUnavailable');
   return String(badge.value || badge.key);
 }
 
 function connectionProfileFactLabel(key) {
   if (key === 'host') return t('field.host');
+  if (key === 'endpoint') return t('field.endpoint');
+  if (key === 'path') return t('field.path');
   if (key === 'port') return t('field.port');
   if (key === 'username') return t('field.username');
   if (key === 'shell') return t('field.shell');
@@ -7387,6 +7638,7 @@ function profileDescription(profile) {
   if (profile.providerType === 'ssh') {
     return `${profile.auth?.username || '-'}@${profile.config?.host || '-'}:${profile.config?.port || 22}`;
   }
+  if (profile.kind === 'file') return buildConnectionProfileSubtitle(profile);
   return profile.config?.shell || t('label.defaultShell');
 }
 

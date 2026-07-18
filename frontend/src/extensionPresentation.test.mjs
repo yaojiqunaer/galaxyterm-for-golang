@@ -200,10 +200,12 @@ assert.deepEqual(buildExtensionUsageImpact(installedExtensions[0], {
   hasImpact: true,
   savedConnections: 2,
 });
-assert.deepEqual(buildExtensionUsageImpact(installedExtensions[2]), {
+assert.deepEqual(buildExtensionUsageImpact(installedExtensions[2], {
+  profiles: [{ id: 's3-assets', kind: 'file', providerType: 's3' }],
+}), {
   activeSessions: 0,
-  hasImpact: false,
-  savedConnections: 0,
+  hasImpact: true,
+  savedConnections: 1,
 });
 
 assert.deepEqual(filterProvidersByDisabledExtensions(providers, installedExtensions, [

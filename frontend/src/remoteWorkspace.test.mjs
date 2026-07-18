@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
 import {
+  buildFileConnectionFormValues,
+  buildFileConnectionProfile,
+  buildFileConnectionRequest,
+  buildFileProviderAuthValues,
+  buildFileProviderConfigValues,
   buildRemoteFileActions,
   buildRemoteFileBreadcrumbs,
   buildRemoteFileView,
@@ -13,6 +18,75 @@ import {
   buildTunnelDisplay,
   buildTunnelSummary,
 } from './remoteWorkspace.js';
+
+const s3Provider = {
+  type: 's3',
+  configFields: [
+    { key: 'endpoint', type: 'string', default: 'https://s3.amazonaws.com' },
+    { key: 'bucket', type: 'string' },
+  ],
+  authFields: [
+    { key: 'accessKey', type: 'string' },
+    { key: 'secretKey', type: 'password' },
+  ],
+};
+const s3CredentialRef = {
+  id: 's3-production',
+  providerType: 's3',
+  fields: ['accessKey', 'secretKey'],
+};
+const s3Profile = buildFileConnectionProfile(s3Provider, {
+  displayName: 'Production assets',
+  group: 'Production',
+  path: '/releases',
+  config: { endpoint: 'https://objects.example.com', bucket: 'assets' },
+  auth: { accessKey: 'AKIAEXAMPLE', secretKey: 'secret', ignored: 'value' },
+}, { id: 's3-production', credentialRef: s3CredentialRef });
+assert.deepEqual(s3Profile, {
+  id: 's3-production',
+  kind: 'file',
+  providerType: 's3',
+  displayName: 'Production assets',
+  group: 'Production',
+  filePath: '/releases',
+  config: { endpoint: 'https://objects.example.com', bucket: 'assets' },
+  favorite: false,
+  lastUsedAt: '',
+  auth: { credentialRef: s3CredentialRef },
+});
+assert.deepEqual(buildFileProviderAuthValues(s3Provider, {
+  accessKey: 'AKIAEXAMPLE',
+  secretKey: 'secret',
+  ignored: 'value',
+}), {
+  accessKey: 'AKIAEXAMPLE',
+  secretKey: 'secret',
+});
+assert.deepEqual(buildFileProviderConfigValues(s3Provider, {
+  endpoint: 'https://objects.example.com',
+  bucket: 'assets',
+  staleFtpHost: 'must-not-cross-provider-boundaries',
+}), {
+  endpoint: 'https://objects.example.com',
+  bucket: 'assets',
+});
+assert.deepEqual(buildFileConnectionFormValues(s3Provider, s3Profile), {
+  displayName: 'Production assets',
+  group: 'Production',
+  path: '/releases',
+  config: { endpoint: 'https://objects.example.com', bucket: 'assets' },
+  auth: {},
+  rememberCredential: true,
+});
+assert.deepEqual(buildFileConnectionRequest(s3Profile, {
+  accessKey: 'AKIAEXAMPLE',
+  secretKey: 'secret',
+}), {
+  providerType: 's3',
+  path: '/releases',
+  config: { endpoint: 'https://objects.example.com', bucket: 'assets' },
+  auth: { accessKey: 'AKIAEXAMPLE', secretKey: 'secret' },
+});
 
 const savedConnections = buildSavedSshConnections([
   {

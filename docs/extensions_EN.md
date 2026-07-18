@@ -45,6 +45,8 @@ The Extensions page searches by name, extension ID, terminal provider, file prov
 
 Installed extensions show how many saved connections and active sessions currently use their providers. Disabling an extension in use presents the exact impact first. Existing terminal sessions remain open, but new sessions cannot start until the extension is enabled again. Uninstall confirmation repeats the connection and session impact because active sessions may be interrupted; saved connections are retained and become usable again after reinstalling the same provider.
 
+The current location of a non-SFTP file provider can be saved as a file connection and appears alongside terminal connections in groups, favorites, search, and the command palette. `configFields` are stored in the profile, while `authFields` are written only to the system credential store. Import and export remove credential references so another device never presents an unavailable secret as saved. Opening a file connection without a stored credential stops at its authentication form for one-time input.
+
 ## Release Index
 
 Upload `.gtx` packages and an index named `galaxyterm-index.json` to each Release. Relative URLs resolve against the index location, so the index and packages can be assets of the same GitHub Release:

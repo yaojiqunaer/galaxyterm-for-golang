@@ -637,11 +637,27 @@ assert.ok(
   'the SFTP extension must retain saved SSH profile reuse without making it a core protocol implementation',
 );
 assert.ok(
-  source.includes('<FileProviderFormFields provider={selectedFileProvider} />')
+  source.includes('<FileProviderFormFields')
+    && source.includes('provider={selectedFileProvider}')
     && source.includes('buildFileProviderFormValues(nextProvider)')
-    && source.includes('config: values.config || {}')
-    && source.includes('auth: values.auth || {}'),
+    && source.includes('buildFileProviderConfigValues(selectedFileProvider, values.config || {})')
+    && source.includes('buildFileProviderAuthValues(selectedFileProvider, values.auth || {})'),
   'non-SFTP file providers must contribute connection fields without protocol-specific core UI changes',
+);
+assert.ok(
+  source.includes('const saveFileConnectionProfile = async () =>')
+    && source.includes('await CredentialsAPI.SaveProviderCredential({')
+    && source.includes('const resolveStoredProviderCredential = async (profile) =>')
+    && source.includes('await CredentialsAPI.ResolveProviderCredential({ auth: profile.auth })')
+    && source.includes("profile.kind === 'file'")
+    && source.includes('openFileConnectionProfile(profile)'),
+  'file-provider profiles must be reusable from connection management without persisting plugin secrets in profile data',
+);
+assert.ok(
+  source.includes('const openFileProvider = (providerType = \'\') =>')
+    && source.includes('const fileProviderItems = actions.fileProviders.map((provider) => ({')
+    && source.includes('run: () => actions.openFileProvider(provider.type)'),
+  'file providers must be directly discoverable from the command palette without entering a terminal-only drawer',
 );
 assert.ok(
   source.includes("const openConnectionDrawer = (type = terminalDefaults.defaultProviderType) => openDrawer(type, null, 'connection');")

@@ -58,6 +58,59 @@ export function buildSshConnectionAuth(fields = {}, resolvedProfileRequest = nul
   };
 }
 
+export function buildFileProviderAuthValues(provider = {}, auth = {}) {
+  return Object.fromEntries((provider.authFields || [])
+    .map((field) => [field.key, auth[field.key]])
+    .filter(([, value]) => value !== undefined && value !== null && value !== ''));
+}
+
+export function buildFileProviderConfigValues(provider = {}, config = {}) {
+  return Object.fromEntries((provider.configFields || [])
+    .map((field) => [field.key, config[field.key]])
+    .filter(([, value]) => value !== undefined && value !== null && value !== ''));
+}
+
+export function buildFileConnectionProfile(provider = {}, values = {}, options = {}) {
+  const existing = options.profile || {};
+  const config = buildFileProviderConfigValues(provider, values.config || {});
+  return {
+    id: options.id || existing.id || createConnectionID(),
+    kind: 'file',
+    providerType: provider.type,
+    displayName: String(values.displayName || '').trim(),
+    group: String(values.group || '').trim(),
+    filePath: String(values.path || '.').trim() || '.',
+    config,
+    favorite: !!existing.favorite,
+    lastUsedAt: existing.lastUsedAt || '',
+    auth: { credentialRef: options.credentialRef || existing.auth?.credentialRef || null },
+  };
+}
+
+export function buildFileConnectionFormValues(provider = {}, profile = null) {
+  const config = Object.fromEntries((provider.configFields || []).map((field) => [
+    field.key,
+    profile?.config?.[field.key] ?? field.default ?? (field.type === 'boolean' ? false : undefined),
+  ]).filter(([, value]) => value !== undefined));
+  return {
+    displayName: profile?.displayName || '',
+    group: profile?.group || '',
+    path: profile?.filePath || '.',
+    config,
+    auth: {},
+    rememberCredential: !!profile?.auth?.credentialRef,
+  };
+}
+
+export function buildFileConnectionRequest(profile = {}, auth = {}) {
+  return {
+    providerType: profile.providerType,
+    path: profile.filePath || '.',
+    config: { ...(profile.config || {}) },
+    auth: { ...auth },
+  };
+}
+
 export function readableBytes(bytes) {
   if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
   let value = bytes;
@@ -73,6 +126,10 @@ export function readableBytes(bytes) {
 export function createFileTransferID(randomUUID = globalThis.crypto?.randomUUID?.bind(globalThis.crypto)) {
   if (typeof randomUUID === 'function') return randomUUID();
   return `transfer-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function createConnectionID() {
+  return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random()}`;
 }
 
 export function updateFileTransferProgress(current, event = {}) {

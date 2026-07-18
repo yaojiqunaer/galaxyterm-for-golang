@@ -1,6 +1,8 @@
 package credentials
 
 import (
+	"errors"
+	"reflect"
 	"testing"
 
 	"galaxyterm/internal/session"
@@ -56,5 +58,95 @@ func TestSaveResolveAndDeleteSSHCredential(t *testing.T) {
 	}
 	if _, ok := resolved.Auth["password"]; ok {
 		t.Fatalf("deleted password should not be resolved: %+v", resolved.Auth)
+	}
+}
+
+func TestSaveResolveAndDeleteProviderCredential(t *testing.T) {
+	store := newMemoryStore()
+	api := NewAPIWithStore(store)
+
+	ref, err := api.SaveProviderCredential(SaveProviderCredentialRequest{
+		ID:           "s3-production",
+		ProviderType: "s3",
+		Values: map[string]interface{}{
+			"accessKey": "AKIAEXAMPLE",
+			"secretKey": "secret",
+			"pathStyle": true,
+		},
+	})
+	if err != nil {
+		t.Fatalf("SaveProviderCredential returned error: %v", err)
+	}
+	if ref.ID != "s3-production" || ref.ProviderType != "s3" {
+		t.Fatalf("unexpected ref: %+v", ref)
+	}
+	if !reflect.DeepEqual(ref.Fields, []string{"accessKey", "pathStyle", "secretKey"}) {
+		t.Fatalf("unexpected credential fields: %+v", ref.Fields)
+	}
+
+	resolved, err := api.ResolveProviderCredential(ResolveProviderCredentialRequest{
+		Auth: map[string]interface{}{"credentialRef": ref},
+	})
+	if err != nil {
+		t.Fatalf("ResolveProviderCredential returned error: %v", err)
+	}
+	if resolved["accessKey"] != "AKIAEXAMPLE" || resolved["secretKey"] != "secret" || resolved["pathStyle"] != true {
+		t.Fatalf("credential values not resolved: %+v", resolved)
+	}
+	if _, ok := resolved["credentialRef"]; ok {
+		t.Fatalf("credential reference must not be sent to a provider: %+v", resolved)
+	}
+	updatedRef, err := api.SaveProviderCredential(SaveProviderCredentialRequest{
+		ID:             ref.ID,
+		ProviderType:   ref.ProviderType,
+		PreviousFields: ref.Fields,
+		Values:         map[string]interface{}{"accessKey": "UPDATED"},
+	})
+	if err != nil {
+		t.Fatalf("updating provider credential returned error: %v", err)
+	}
+	if !reflect.DeepEqual(updatedRef.Fields, []string{"accessKey"}) {
+		t.Fatalf("unexpected updated fields: %+v", updatedRef.Fields)
+	}
+	if _, err := store.Get(serviceName, providerSecretKey(ref.ProviderType, ref.ID, "secretKey")); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("removed credential field must be deleted, got: %v", err)
+	}
+	ref = updatedRef
+
+	if err := api.DeleteProviderCredential(ref); err != nil {
+		t.Fatalf("DeleteProviderCredential returned error: %v", err)
+	}
+	resolved, err = api.ResolveProviderCredential(ResolveProviderCredentialRequest{
+		Auth: map[string]interface{}{"credentialRef": ref},
+	})
+	if err != nil {
+		t.Fatalf("ResolveProviderCredential after delete returned error: %v", err)
+	}
+	if len(resolved) != 0 {
+		t.Fatalf("deleted values should not be resolved: %+v", resolved)
+	}
+}
+
+func TestSaveProviderCredentialRejectsUnsafeIdentity(t *testing.T) {
+	api := NewAPIWithStore(newMemoryStore())
+	_, err := api.SaveProviderCredential(SaveProviderCredentialRequest{
+		ID:           "profile-1",
+		ProviderType: "../../s3",
+		Values:       map[string]interface{}{"secretKey": "secret"},
+	})
+	if err == nil {
+		t.Fatal("expected unsafe provider type to be rejected")
+	}
+	_, err = api.ResolveProviderCredential(ResolveProviderCredentialRequest{
+		Auth: map[string]interface{}{
+			"credentialRef": map[string]interface{}{
+				"id":           "profile-1",
+				"providerType": "s3:another-profile",
+				"fields":       []interface{}{"secretKey"},
+			},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected unsafe stored credential reference to be rejected")
 	}
 }
