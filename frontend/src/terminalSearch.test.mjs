@@ -9,15 +9,41 @@ assert.equal(
 );
 
 const {
+  defaultTerminalSearchPreferences,
   emptyTerminalSearchResult,
   hasTerminalSearchKeywordChanged,
+  invalidTerminalSearchResult,
   normalizeTerminalSearchResult,
   resolveTerminalSearchKeyAction,
+  terminalSearchRequestKey,
+  validateTerminalSearchQuery,
 } = searchModule;
 
 assert.equal(typeof hasTerminalSearchKeywordChanged, 'function');
 assert.equal(hasTerminalSearchKeywordChanged('error', ' error '), false);
 assert.equal(hasTerminalSearchKeywordChanged('error', 'warning'), true);
+assert.deepEqual(defaultTerminalSearchPreferences, {
+  caseSensitive: false,
+  regex: false,
+  wholeWord: false,
+});
+assert.equal(
+  terminalSearchRequestKey(' error ', defaultTerminalSearchPreferences),
+  terminalSearchRequestKey('error', defaultTerminalSearchPreferences),
+);
+assert.notEqual(
+  terminalSearchRequestKey('error', defaultTerminalSearchPreferences),
+  terminalSearchRequestKey('error', { ...defaultTerminalSearchPreferences, caseSensitive: true }),
+);
+assert.equal(validateTerminalSearchQuery('err(or', { regex: true }), 'invalid');
+assert.equal(validateTerminalSearchQuery('err(or', { regex: false }), 'valid');
+assert.equal(validateTerminalSearchQuery('  ', { regex: true }), 'empty');
+assert.deepEqual(invalidTerminalSearchResult, {
+  current: 0,
+  limited: false,
+  status: 'invalid',
+  total: 0,
+});
 
 assert.deepEqual(
   normalizeTerminalSearchResult({ resultCount: 8, resultIndex: 2 }, 'error'),

@@ -1,8 +1,10 @@
-import React, { forwardRef, useEffect, useImperativeHandle, useRef } from 'react';
+import React, { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import '@xterm/xterm/css/xterm.css';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { SearchAddon } from '@xterm/addon-search';
+import { WebLinksAddon } from '@xterm/addon-web-links';
+import { DownOutlined } from '@ant-design/icons';
 import * as runtime from '../../wailsjs/runtime/runtime.js';
 import * as SessionAPI from '../../wailsjs/go/session/API.js';
 import * as Theme from '../../wailsjs/go/internal/Theme.js';
@@ -16,6 +18,11 @@ import {
   terminalOutputIndicatesPrompt,
 } from '../terminalExecution.js';
 import { terminalSearchOptions } from '../terminalSearch.js';
+import {
+  isTerminalViewportAtBottom,
+  normalizeTerminalExternalLink,
+  shouldActivateTerminalLink,
+} from '../terminalInteraction.js';
 
 function TerminalPane({
   request,
@@ -44,6 +51,7 @@ function TerminalPane({
   const durationTimer = useRef(null);
   const lastActivityNotificationAt = useRef(null);
   const pasteConfirmationPending = useRef(false);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const callbacksRef = useRef({
     onAuditEvent,
     onCommandSubmitted,
@@ -151,6 +159,17 @@ function TerminalPane({
     return allowed;
   };
 
+  const syncTerminalViewportState = (viewportY = term.current?.buffer?.active?.viewportY) => {
+    const baseY = term.current?.buffer?.active?.baseY;
+    setShowScrollToBottom(!isTerminalViewportAtBottom(viewportY, baseY));
+  };
+
+  const scrollTerminalToBottom = () => {
+    term.current?.scrollToBottom();
+    setShowScrollToBottom(false);
+    term.current?.focus();
+  };
+
   useImperativeHandle(ref, () => ({
     fit: () => {
       fitAddon.current?.fit();
@@ -196,6 +215,7 @@ function TerminalPane({
       term.current?.reset();
       term.current?.focus();
     },
+    scrollToBottom: scrollTerminalToBottom,
     copyTranscript: async () => {
       const text = terminalBufferText(term.current);
       if (text) await writeClipboardText(text);
@@ -235,6 +255,7 @@ function TerminalPane({
     let cleanupError = null;
     let cleanupExit = null;
     let searchResultsDisposable = null;
+    let scrollDisposable = null;
 
     async function initTerminal() {
       const terminalTheme = await resolveTerminalTheme(settings);
@@ -256,10 +277,22 @@ function TerminalPane({
 
       fitAddon.current = new FitAddon();
       searchAddon.current = new SearchAddon();
+      const webLinksAddon = new WebLinksAddon((event, uri) => {
+        if (!shouldActivateTerminalLink(event)) return;
+        const safeUri = normalizeTerminalExternalLink(uri);
+        if (!safeUri) return;
+        event.preventDefault?.();
+        runtime.BrowserOpenURL(safeUri);
+        callbacksRef.current.onAuditEvent?.({ type: 'terminal.link.open' });
+      });
       term.current.loadAddon(fitAddon.current);
       term.current.loadAddon(searchAddon.current);
+      term.current.loadAddon(webLinksAddon);
       searchResultsDisposable = searchAddon.current.onDidChangeResults((result) => {
         callbacksRef.current.onSearchResultsChange?.(result);
+      });
+      scrollDisposable = term.current.onScroll((viewportY) => {
+        syncTerminalViewportState(viewportY);
       });
       term.current.open(containerRef.current);
       emitStatus({ status: 'connecting' });
@@ -305,7 +338,7 @@ function TerminalPane({
             status: lastCommand.current ? 'idle' : 'connected',
           });
         }
-        term.current?.write(data);
+        term.current?.write(data, syncTerminalViewportState);
       });
       cleanupError = runtime.EventsOn(`terminal:error:${createdSessionId}`, (event) => {
         stopDurationTicker();
@@ -318,7 +351,7 @@ function TerminalPane({
           status: 'error',
         });
         callbacksRef.current.onAuditEvent?.({ detail: message, type: 'session.error' });
-        term.current?.writeln(`\r\n${message}`);
+        term.current?.writeln(`\r\n${message}`, syncTerminalViewportState);
       });
       cleanupExit = runtime.EventsOn(`terminal:exit:${createdSessionId}`, () => {
         stopDurationTicker();
@@ -329,7 +362,7 @@ function TerminalPane({
           status: 'closed',
         });
         callbacksRef.current.onAuditEvent?.({ type: 'session.closed' });
-        term.current?.writeln(`\r\n${t('terminal.status.closed')}`);
+        term.current?.writeln(`\r\n${t('terminal.status.closed')}`, syncTerminalViewportState);
         callbacksRef.current.onSessionClosed?.(createdSessionId);
       });
 
@@ -393,6 +426,7 @@ function TerminalPane({
       cleanupError?.();
       cleanupExit?.();
       searchResultsDisposable?.dispose();
+      scrollDisposable?.dispose();
       cleanupWindow?.();
       observer?.disconnect();
       if (sessionId.current) {
@@ -423,7 +457,22 @@ function TerminalPane({
     };
   }, [settings?.terminalTheme, settings?.appTheme]);
 
-  return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
+  return (
+    <div className="terminal-pane-root">
+      <div ref={containerRef} className="terminal-xterm-host" />
+      {showScrollToBottom && (
+        <button
+          type="button"
+          aria-label={t('action.scrollToBottom')}
+          className="terminal-scroll-bottom"
+          title={t('terminal.scrollToBottomHint')}
+          onClick={scrollTerminalToBottom}
+        >
+          <DownOutlined />
+        </button>
+      )}
+    </div>
+  );
 }
 
 async function resolveTerminalTheme(settings = {}) {

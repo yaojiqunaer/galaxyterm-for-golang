@@ -62,7 +62,7 @@ Interactive terminals show the current command, live duration, and execution sta
 
 <details>
 <summary><b>Terminal output search</b></summary>
-Typing a query highlights matches immediately and shows the active position and total count, with explicit no-match feedback. Press `Enter` for the next match, `Shift+Enter` for the previous match, or `Esc` to clear search and return focus to the terminal. The active query is reapplied when switching sessions, new output refreshes matches automatically, and results remain isolated per session.
+Typing a query highlights matches immediately and shows the active position and total count. Match case, whole word, and regular-expression modes are available, while invalid expressions are reported without interrupting the terminal. Press `Enter` for the next match, `Shift+Enter` for the previous match, or `Esc` to clear search and return focus to the terminal. The active query is reapplied when switching sessions, new output refreshes matches automatically, and results remain isolated per session. A compact control returns a scrolled terminal to the latest output. HTTP(S) links require a `Cmd`-click or `Ctrl`-click before GalaxyTerm opens them in the system browser, preventing accidental activation and unsafe schemes.
 </details>
 
 <details>

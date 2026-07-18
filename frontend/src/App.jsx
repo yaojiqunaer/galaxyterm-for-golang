@@ -295,9 +295,13 @@ import OperationErrorDescription from './components/OperationErrorDescription.js
 import TerminalSearchControl from './components/TerminalSearchControl.jsx';
 import { buildOperationError } from './operationFeedback.js';
 import {
+  defaultTerminalSearchPreferences,
   emptyTerminalSearchResult,
-  hasTerminalSearchKeywordChanged,
+  invalidTerminalSearchResult,
+  normalizeTerminalSearchPreferences,
   normalizeTerminalSearchResult,
+  terminalSearchRequestKey,
+  validateTerminalSearchQuery,
 } from './terminalSearch.js';
 
 const TerminalPane = lazy(() => import('./components/TerminalPane.jsx'));
@@ -413,6 +417,7 @@ function App() {
   const [renamingSessionId, setRenamingSessionId] = useState('');
   const [renamingSessionName, setRenamingSessionName] = useState('');
   const [terminalSearch, setTerminalSearch] = useState('');
+  const [terminalSearchPreferences, setTerminalSearchPreferences] = useState(defaultTerminalSearchPreferences);
   const [terminalSearchResults, setTerminalSearchResults] = useState({});
   const [sidebarSessionQuery, setSidebarSessionQuery] = useState('');
   const [terminalStatuses, setTerminalStatuses] = useState({});
@@ -592,17 +597,31 @@ function App() {
     focusTerminalSession(activeKey);
   };
   const updateTerminalSearchResult = (sessionId, result) => {
-    const query = terminalSearch.trim();
-    if (!sessionId || terminalSearchQueriesRef.current[sessionId] !== query) return;
+    const requestKey = terminalSearchRequestKey(terminalSearch, terminalSearchPreferences);
+    if (!sessionId || terminalSearchQueriesRef.current[sessionId] !== requestKey) return;
     setTerminalSearchResults((current) => ({
       ...current,
-      [sessionId]: normalizeTerminalSearchResult(result, query),
+      [sessionId]: normalizeTerminalSearchResult(result, terminalSearch),
     }));
   };
   const updateTerminalSearchQuery = (query) => {
-    const keywordChanged = hasTerminalSearchKeywordChanged(terminalSearch, query);
+    const requestChanged = terminalSearchRequestKey(terminalSearch, terminalSearchPreferences)
+      !== terminalSearchRequestKey(query, terminalSearchPreferences);
     setTerminalSearch(query);
-    if (!keywordChanged) return;
+    if (!requestChanged) return;
+    delete terminalSearchQueriesRef.current[activeKey];
+    setTerminalSearchResults((current) => ({
+      ...current,
+      [activeKey]: emptyTerminalSearchResult,
+    }));
+  };
+  const updateTerminalSearchPreferences = (preferences) => {
+    const nextPreferences = normalizeTerminalSearchPreferences(preferences);
+    const requestChanged = terminalSearchRequestKey(terminalSearch, terminalSearchPreferences)
+      !== terminalSearchRequestKey(terminalSearch, nextPreferences);
+    setTerminalSearchPreferences(nextPreferences);
+    if (!requestChanged) return;
+    delete terminalSearchQueriesRef.current[activeKey];
     setTerminalSearchResults((current) => ({
       ...current,
       [activeKey]: emptyTerminalSearchResult,
@@ -610,7 +629,8 @@ function App() {
   };
   const activeSession = sessions.find((session) => session.id === activeKey);
   const activeTerminalStatus = terminalStatuses[activeKey] || {};
-  const activeTerminalSearchResult = terminalSearchQueriesRef.current[activeKey] === terminalSearch.trim()
+  const activeTerminalSearchRequestKey = terminalSearchRequestKey(terminalSearch, terminalSearchPreferences);
+  const activeTerminalSearchResult = terminalSearchQueriesRef.current[activeKey] === activeTerminalSearchRequestKey
     ? terminalSearchResults[activeKey] || emptyTerminalSearchResult
     : emptyTerminalSearchResult;
   const visibleSessionIds = useMemo(() => {
@@ -868,19 +888,35 @@ function App() {
   useEffect(() => {
     if (!activeKey || selectedNav !== 'sessions') return undefined;
     const keyword = terminalSearch.trim();
-    if (!keyword) {
+    const validation = validateTerminalSearchQuery(keyword, terminalSearchPreferences);
+    if (validation === 'empty') {
+      const hadSearch = Boolean(terminalSearchQueriesRef.current[activeKey]);
       delete terminalSearchQueriesRef.current[activeKey];
-      terminalRefs.current[activeKey]?.clearSearch?.();
+      if (hadSearch) terminalRefs.current[activeKey]?.clearSearch?.();
       return undefined;
     }
-    if (terminalSearchQueriesRef.current[activeKey] === keyword) return undefined;
+    const requestKey = terminalSearchRequestKey(terminalSearch, terminalSearchPreferences);
+    if (terminalSearchQueriesRef.current[activeKey] === requestKey) return undefined;
+    if (validation === 'invalid') {
+      delete terminalSearchQueriesRef.current[activeKey];
+      terminalRefs.current[activeKey]?.clearSearch?.();
+      terminalSearchQueriesRef.current[activeKey] = requestKey;
+      setTerminalSearchResults((current) => ({
+        ...current,
+        [activeKey]: invalidTerminalSearchResult,
+      }));
+      return undefined;
+    }
     const frame = window.requestAnimationFrame(() => {
-      terminalSearchQueriesRef.current[activeKey] = keyword;
-      const searchResult = terminalRefs.current[activeKey]?.findNext?.(keyword, { incremental: true });
+      terminalSearchQueriesRef.current[activeKey] = requestKey;
+      const searchResult = terminalRefs.current[activeKey]?.findNext?.(keyword, {
+        ...terminalSearchPreferences,
+        incremental: true,
+      });
       if (searchResult === undefined) delete terminalSearchQueriesRef.current[activeKey];
     });
     return () => window.cancelAnimationFrame(frame);
-  }, [activeKey, activeTerminalStatus.status, selectedNav, terminalSearch]);
+  }, [activeKey, activeTerminalStatus.status, selectedNav, terminalSearch, terminalSearchPreferences]);
 
   useEffect(() => {
     setSessionActivity((current) => visibleSessionIds.reduce(
@@ -1691,13 +1727,15 @@ function App() {
       messageApi.warning(t('message.noActiveSession'));
       return;
     }
-    terminalSearchQueriesRef.current[activeKey] = keyword;
+    if (validateTerminalSearchQuery(keyword, terminalSearchPreferences) !== 'valid') return;
+    const requestKey = terminalSearchRequestKey(terminalSearch, terminalSearchPreferences);
+    terminalSearchQueriesRef.current[activeKey] = requestKey;
     if (direction === 'previous') {
-      const searchResult = activeTerminal.findPrevious?.(keyword);
+      const searchResult = activeTerminal.findPrevious?.(keyword, terminalSearchPreferences);
       if (searchResult === undefined) delete terminalSearchQueriesRef.current[activeKey];
       return;
     }
-    const searchResult = activeTerminal.findNext?.(keyword);
+    const searchResult = activeTerminal.findNext?.(keyword, terminalSearchPreferences);
     if (searchResult === undefined) delete terminalSearchQueriesRef.current[activeKey];
   };
 
@@ -6216,10 +6254,12 @@ function App() {
                 ref={terminalSearchRef}
                 query={terminalSearch}
                 result={activeTerminalSearchResult}
+                preferences={terminalSearchPreferences}
                 onChange={updateTerminalSearchQuery}
                 onClose={closeTerminalSearch}
                 onFindPrevious={() => findInTerminal('previous')}
                 onFindNext={() => findInTerminal('next')}
+                onPreferencesChange={updateTerminalSearchPreferences}
               />
             )}
             <Tooltip title={t('action.language')}>

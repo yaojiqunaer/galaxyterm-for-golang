@@ -525,7 +525,7 @@ assert.ok(
   'terminal search must keep result state per session and reapply the query after session changes',
 );
 assert.ok(
-  source.includes('terminalSearchQueriesRef.current[activeKey] === keyword')
+  source.includes('terminalSearchQueriesRef.current[activeKey] === requestKey')
     && source.includes('if (searchResult === undefined)')
     && source.includes('delete terminalSearchQueriesRef.current[activeKey]'),
   'terminal search must not advance again on unrelated status changes and must retry when xterm is not ready',
@@ -535,6 +535,22 @@ assert.ok(
     && terminalPaneSource.includes('onSearchResultsChange')
     && terminalPaneSource.includes('terminalSearchOptions'),
   'terminal panes must expose xterm result changes and search with decorations enabled',
+);
+assert.ok(
+  source.includes('terminalSearchRequestKey(terminalSearch, terminalSearchPreferences)')
+    && source.includes('validateTerminalSearchQuery(keyword, terminalSearchPreferences)')
+    && terminalSearchControlSource.includes('<Popover')
+    && terminalSearchControlSource.includes('<Checkbox'),
+  'terminal search must isolate option-aware requests and expose compact case, word, and regex controls',
+);
+assert.ok(
+  terminalPaneSource.includes("import { WebLinksAddon } from '@xterm/addon-web-links';")
+    && terminalPaneSource.includes('if (!shouldActivateTerminalLink(event)) return;')
+    && terminalPaneSource.includes('runtime.BrowserOpenURL(safeUri)')
+    && terminalPaneSource.includes('term.current.onScroll')
+    && terminalPaneSource.includes('term.current?.scrollToBottom()')
+    && terminalPaneSource.includes('className="terminal-scroll-bottom"'),
+  'terminal panes must safely open modifier-clicked web links and offer recovery from historical scrolling',
 );
 assert.ok(
   terminalSearchControlSource.includes('aria-live="polite"')

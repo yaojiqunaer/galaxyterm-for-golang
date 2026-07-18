@@ -27,6 +27,7 @@
     "test:sessions": "node src/sessionPresentation.test.mjs",
     "test:terminal-status": "node src/terminalStatus.test.mjs",
     "test:terminal-search": "node src/terminalSearch.test.mjs",
+    "test:terminal-interaction": "node src/terminalInteraction.test.mjs",
     "test:terminal-execution": "node src/terminalExecution.test.mjs",
     "test:workspace": "node src/workspaceState.test.mjs",
     "test:ssh-config": "node src/sshConfigProfiles.test.mjs"
@@ -35,6 +36,7 @@
     "@ant-design/icons": "^6.0.0",
     "@xterm/addon-fit": "^0.10.0",
     "@xterm/addon-search": "^0.16.0",
+    "@xterm/addon-web-links": "^0.11.0",
     "@xterm/xterm": "^5.5.0",
     "antd": "^5.26.6",
     "normalize.css": "^8.0.1",

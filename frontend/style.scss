@@ -819,7 +819,7 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
 .topbar-actions .terminal-search-control {
   display: flex;
   align-items: center;
-  width: clamp(230px, 27vw, 340px);
+  width: clamp(250px, 29vw, 380px);
   height: 32px;
   overflow: hidden;
   border: 1px solid var(--border);
@@ -873,6 +873,11 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   color: color-mix(in srgb, #d9902f 76%, var(--muted));
 }
 
+.terminal-search-control.is-invalid .terminal-search-result {
+  min-width: 48px;
+  color: var(--danger);
+}
+
 .terminal-search-navigation {
   display: flex;
   flex: 0 0 auto;
@@ -894,6 +899,25 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
 .topbar-actions .terminal-search-navigation .ant-btn:not(:disabled):hover {
   color: var(--accent);
   background: var(--accent-soft);
+}
+
+.topbar-actions .terminal-search-navigation .ant-btn.is-active {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.terminal-search-options {
+  display: flex;
+  min-width: 170px;
+  flex-direction: column;
+  gap: 10px;
+  padding: 2px;
+}
+
+.terminal-search-options .ant-checkbox-wrapper {
+  margin-inline-start: 0;
+  color: var(--text);
+  font-size: 12px;
 }
 
 @media (max-width: 1180px) {
@@ -944,7 +968,7 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   }
 
   .topbar-actions .terminal-search-control {
-    width: clamp(210px, 34vw, 300px);
+    width: clamp(230px, 36vw, 330px);
   }
 
   .topbar-utility-action {
@@ -1449,6 +1473,52 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   min-height: 0;
 }
 
+.terminal-pane-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--terminal-bg);
+}
+
+.terminal-xterm-host {
+  width: 100%;
+  height: 100%;
+}
+
+.terminal-scroll-bottom {
+  position: absolute;
+  right: 16px;
+  bottom: 14px;
+  z-index: 4;
+  display: inline-flex;
+  width: 30px;
+  height: 30px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--accent) 52%, var(--terminal-border));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--terminal-chrome) 92%, var(--accent));
+  box-shadow: 0 6px 18px color-mix(in srgb, #000 36%, transparent);
+  color: var(--accent);
+  cursor: pointer;
+  transition: border-color 120ms ease, background-color 120ms ease, transform 120ms ease;
+}
+
+.terminal-scroll-bottom:hover,
+.terminal-scroll-bottom:focus-visible {
+  border-color: var(--accent);
+  background: var(--terminal-chrome-soft);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.terminal-scroll-bottom:active {
+  transform: translateY(0);
+}
+
 .terminal-loading-state {
   display: flex;
   width: 100%;
@@ -1479,6 +1549,10 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
 @media (prefers-reduced-motion: reduce) {
   .terminal-loading-spinner {
     animation: none;
+  }
+
+  .terminal-scroll-bottom {
+    transition: none;
   }
 }
 
