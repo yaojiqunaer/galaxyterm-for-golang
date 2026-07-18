@@ -40,6 +40,23 @@ assert.ok(
     && !source.includes("<Button size=\"small\" icon={<MoreOutlined />} onClick={(event) => event.stopPropagation()}>{t('action.manage')}</Button>"),
   'compact connection lists must expose an icon menu without keeping an invisible default selection',
 );
+assert.ok(
+  source.includes("const [connectionDetailProfileId, setConnectionDetailProfileId] = useState('');")
+    && source.includes('const connectionDetailProfile = visibleProfiles.find((profile) => profile.id === connectionDetailProfileId) || null;')
+    && source.includes("if (!compactConnectionDetail || selectedNav !== 'connections'")
+    && source.includes('Boolean(connectionDetailProfile)')
+    && source.includes('renderConnectionProfilePreview(connectionDetailProfile)'),
+  'compact connection details must not reuse keyboard selection as drawer visibility state',
+);
+assert.ok(
+  source.includes('const runConnectionProfileNewAction = (profile) => {')
+    && source.includes('if (event.shiftKey) runConnectionProfileNewAction(selectedProfile);')
+    && /const handleConnectionListKeyDown = \(event\) => \{\s*if \(isInteractiveControl\(event\.target\)\) return;/.test(source)
+    && /onDoubleClick=\{\(event\) => \{\s*if \(isInteractiveControl\(event\.target\)\) return;\s*runConnectionProfileNewAction\(profile\);/.test(source)
+    && source.includes("if (action === 'connect') runConnectionProfileNewAction(profile);")
+    && source.includes('buildConnectionProfileLaunchModel({'),
+  'connection double-click and Shift+Enter must explicitly open a new target instead of refocusing an existing session',
+);
 
 assert.ok(
   /\.connection-groups-panel,\s*\.connection-detail-panel\s*\{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*12px;/.test(styles)
@@ -50,7 +67,9 @@ assert.ok(
 
 assert.ok(
   source.includes("action !== 'connect' || primaryAction.action === 'focus'")
-    && /primaryAction\.action === 'focus'\s*&&\s*\([\s\S]*?openProfile\(profile\)[\s\S]*?action\.newTerminal/.test(source),
+    && source.includes('launchModel.secondary && (')
+    && source.includes('runConnectionProfileLaunchAction(launchModel.secondary, profile)')
+    && source.includes("? 'action.newTerminal'"),
   'profiles with active sessions must expose both focus-existing and open-new actions',
 );
 
@@ -254,7 +273,7 @@ assert.ok(
   source.includes("const [extensionQuery, setExtensionQuery] = useState('');")
     && source.includes("const [extensionScope, setExtensionScope] = useState('all');")
     && source.includes('const visibleExtensionWorkspace = useMemo(() => filterExtensionWorkspace({')
-    && source.includes("if (primaryAction.action === 'findExtension')")
+    && source.includes("if (action.action === 'findExtension')")
     && source.includes('openExtensionsForProvider(profile.providerType);')
     && source.includes('runUnavailableProfile: (profile) => actions.openExtensionsForProvider(profile.providerType)')
     && source.includes('value={extensionQuery}')
@@ -796,7 +815,7 @@ assert.ok(
   'save-and-open must use a visible command label instead of an ambiguous icon-only action',
 );
 assert.ok(
-  source.includes("if (resolvedIntent !== 'session') setSelectedProfileId('');"),
+  /if \(resolvedIntent !== 'session'\) \{[\s\S]*?setSelectedProfileId\(''\);[\s\S]*?setConnectionDetailProfileId\(''\);[\s\S]*?\}/.test(source),
   'opening a connection editor must dismiss the compact connection detail drawer',
 );
 

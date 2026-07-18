@@ -344,8 +344,8 @@ export function buildConnectionProfileSubtitle(profile = {}, { defaultShellLabel
 export function buildConnectionProfileHints(sessionInfo = {}) {
   return [
     sessionInfo.activeCount > 0 && 'focusOpenSession',
+    sessionInfo.activeCount > 0 && 'secondaryOpenNew',
     'enterOpen',
-    'doubleClickOpen',
   ].filter(Boolean);
 }
 
@@ -383,6 +383,31 @@ export function buildConnectionProfilePrimaryAction({
     disabled: false,
     labelKey: 'action.connect',
     reasonKey: '',
+  };
+}
+
+export function buildConnectionProfileLaunchModel(options = {}) {
+  const primary = buildConnectionProfilePrimaryAction(options);
+  if (primary.action !== 'focus') return { primary, secondary: null };
+  if (options.providerAvailable === false) {
+    return {
+      primary,
+      secondary: {
+        action: 'findExtension',
+        disabled: false,
+        labelKey: 'action.findExtension',
+        reasonKey: '',
+      },
+    };
+  }
+  return {
+    primary,
+    secondary: {
+      action: options.profileKind === 'file' ? 'openFiles' : 'connect',
+      disabled: false,
+      labelKey: options.profileKind === 'file' ? 'action.openFiles' : 'action.newTerminal',
+      reasonKey: '',
+    },
   };
 }
 

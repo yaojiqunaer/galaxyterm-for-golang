@@ -6,6 +6,7 @@ import {
   buildConnectionProfileBadges,
   buildConnectionProfileFacts,
   buildConnectionProfileHints,
+  buildConnectionProfileLaunchModel,
   buildConnectionProfilePrimaryAction,
   buildConnectionProfileStatusSummary,
   buildConnectionProfileSubtitle,
@@ -362,8 +363,12 @@ assert.deepEqual(buildConnectionProfileFacts(fileProfile), [
   { key: 'lastUsed', value: '' },
 ]);
 assert.equal(buildConnectionProfileSubtitle(fileProfile), 'https://objects.example.com · /releases');
-assert.deepEqual(buildConnectionProfileHints({ activeCount: 0 }), ['enterOpen', 'doubleClickOpen']);
-assert.deepEqual(buildConnectionProfileHints({ activeCount: 2 }), ['focusOpenSession', 'enterOpen', 'doubleClickOpen']);
+assert.deepEqual(buildConnectionProfileHints({ activeCount: 0 }), ['enterOpen']);
+assert.deepEqual(buildConnectionProfileHints({ activeCount: 2 }), [
+  'focusOpenSession',
+  'secondaryOpenNew',
+  'enterOpen',
+]);
 assert.deepEqual(buildConnectionProfilePrimaryAction({
   providerAvailable: true,
   sessionInfo: { activeCount: 2, focusSessionId: 's1' },
@@ -409,6 +414,44 @@ assert.deepEqual(buildConnectionProfilePrimaryAction({
   labelKey: 'action.focusSession',
   reasonKey: '',
 });
+assert.deepEqual(buildConnectionProfileLaunchModel({
+  providerAvailable: true,
+  sessionInfo: { activeCount: 2, focusSessionId: 's1' },
+}), {
+  primary: {
+    action: 'focus',
+    disabled: false,
+    labelKey: 'action.focusSession',
+    reasonKey: '',
+  },
+  secondary: {
+    action: 'connect',
+    disabled: false,
+    labelKey: 'action.newTerminal',
+    reasonKey: '',
+  },
+});
+assert.deepEqual(buildConnectionProfileLaunchModel({
+  providerAvailable: false,
+  sessionInfo: { activeCount: 1, focusSessionId: 'existing-session' },
+}), {
+  primary: {
+    action: 'focus',
+    disabled: false,
+    labelKey: 'action.focusSession',
+    reasonKey: '',
+  },
+  secondary: {
+    action: 'findExtension',
+    disabled: false,
+    labelKey: 'action.findExtension',
+    reasonKey: '',
+  },
+});
+assert.equal(buildConnectionProfileLaunchModel({
+  providerAvailable: true,
+  sessionInfo: { activeCount: 0, focusSessionId: '' },
+}).secondary, null);
 assert.deepEqual(buildConnectionProfileStatusSummary({
   providerAvailable: true,
   sessionInfo: { activeCount: 2, focusSessionId: 's1' },

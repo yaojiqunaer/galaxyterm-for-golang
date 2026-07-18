@@ -97,7 +97,7 @@ import {
   buildConnectionProfileBadges,
   buildConnectionProfileFacts,
   buildConnectionProfileHints,
-  buildConnectionProfilePrimaryAction,
+  buildConnectionProfileLaunchModel,
   buildConnectionProfileStatusSummary,
   buildConnectionProfileSubtitle,
   buildConnectionTransferActions,
@@ -408,6 +408,7 @@ function App() {
   const [providerFilter, setProviderFilter] = useState('all');
   const [profileSort, setProfileSort] = useState('favorites');
   const [selectedProfileId, setSelectedProfileId] = useState('');
+  const [connectionDetailProfileId, setConnectionDetailProfileId] = useState('');
   const [auditQuery, setAuditQuery] = useState('');
   const [auditProviderFilter, setAuditProviderFilter] = useState('all');
   const [workspaceSummary, setWorkspaceSummary] = useState(() => loadWorkspaceSummary());
@@ -915,6 +916,7 @@ function App() {
   );
   const explicitlySelectedProfile = visibleProfiles.find((profile) => profile.id === selectedProfileId) || null;
   const selectedProfile = explicitlySelectedProfile || (compactConnectionDetail ? null : visibleProfiles[0] || null);
+  const connectionDetailProfile = visibleProfiles.find((profile) => profile.id === connectionDetailProfileId) || null;
   const hasProfileFilters = profileQuery.trim() || groupQuery !== 'all' || providerFilter !== 'all' || profileSort !== 'favorites';
   const connectionEmptyState = useMemo(() => buildConnectionEmptyState({
     profileCount: profiles.length,
@@ -939,6 +941,12 @@ function App() {
     }
   }, [compactConnectionDetail, selectedProfileId, visibleProfiles]);
 
+  useEffect(() => {
+    if (!compactConnectionDetail || selectedNav !== 'connections' || !connectionDetailProfile) {
+      setConnectionDetailProfileId('');
+    }
+  }, [compactConnectionDetail, connectionDetailProfile, selectedNav]);
+
   const moveSelectedProfile = (action) => {
     const currentIndex = visibleProfiles.findIndex((profile) => profile.id === selectedProfile?.id);
     const nextIndex = resolveListIndex(visibleProfiles.length, currentIndex, action);
@@ -947,6 +955,7 @@ function App() {
   };
 
   const handleConnectionListKeyDown = (event) => {
+    if (isInteractiveControl(event.target)) return;
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       moveSelectedProfile('next');
@@ -965,7 +974,8 @@ function App() {
     }
     if (event.key === 'Enter' && selectedProfile) {
       event.preventDefault();
-      runConnectionProfilePrimaryAction(selectedProfile);
+      if (event.shiftKey) runConnectionProfileNewAction(selectedProfile);
+      else runConnectionProfilePrimaryAction(selectedProfile);
     }
   };
 
@@ -1119,7 +1129,10 @@ function App() {
   const openDrawer = (type = terminalDefaults.defaultProviderType, profile = null, intent = 'session') => {
     const providerType = profile?.providerType || type;
     const resolvedIntent = profile ? 'edit' : intent;
-    if (resolvedIntent !== 'session') setSelectedProfileId('');
+    if (resolvedIntent !== 'session') {
+      setSelectedProfileId('');
+      setConnectionDetailProfileId('');
+    }
     setNewType(providerType);
     setTerminalDrawerIntent(resolvedIntent);
     form.setFieldsValue({
@@ -2028,27 +2041,40 @@ function App() {
     activateSession(summary.focusSessionId);
   };
 
-  const runConnectionProfilePrimaryAction = (profile) => {
+  const connectionProfileLaunchModel = (profile) => {
     const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
     const providerAvailable = isProfileProviderAvailable(profile, connectionProviders);
-    const primaryAction = buildConnectionProfilePrimaryAction({
+    return buildConnectionProfileLaunchModel({
       profileKind: profile.kind,
       providerAvailable,
       sessionInfo,
     });
-    if (primaryAction.disabled) {
-      messageApi.warning(primaryAction.reasonKey ? t(primaryAction.reasonKey) : t('message.providerUnavailable'));
+  };
+
+  const runConnectionProfileLaunchAction = (action, profile) => {
+    if (!action) return;
+    if (action.disabled) {
+      messageApi.warning(action.reasonKey ? t(action.reasonKey) : t('message.providerUnavailable'));
       return;
     }
-    if (primaryAction.action === 'findExtension') {
+    if (action.action === 'findExtension') {
       openExtensionsForProvider(profile.providerType);
       return;
     }
-    if (primaryAction.action === 'focus') {
+    if (action.action === 'focus') {
       focusProfileSession(profile);
       return;
     }
     openProfile(profile);
+  };
+
+  const runConnectionProfilePrimaryAction = (profile) => {
+    runConnectionProfileLaunchAction(connectionProfileLaunchModel(profile).primary, profile);
+  };
+
+  const runConnectionProfileNewAction = (profile) => {
+    const launchModel = connectionProfileLaunchModel(profile);
+    runConnectionProfileLaunchAction(launchModel.secondary || launchModel.primary, profile);
   };
 
   const switchSession = (direction) => {
@@ -2110,7 +2136,7 @@ function App() {
   };
 
   const runProfileAction = (action, profile) => {
-    if (action === 'connect') openProfile(profile);
+    if (action === 'connect') runConnectionProfileNewAction(profile);
     if (action === 'edit') openProfileEditor(profile);
     if (action === 'rename') openProfileEditor(profile);
     if (action === 'duplicate') duplicateProfile(profile);
@@ -2758,12 +2784,10 @@ function App() {
     <ConnectionProfilePreview
       profile={profile}
       providers={connectionProviders}
-      openProfile={openProfile}
       openProfileEditor={openProfileEditor}
       duplicateProfile={duplicateProfile}
-      focusProfileSession={focusProfileSession}
-      openExtensionsForProvider={openExtensionsForProvider}
       profileSessionSummary={profileSessionSummary}
+      runConnectionProfileLaunchAction={runConnectionProfileLaunchAction}
       toggleProfileFavorite={toggleProfileFavorite}
       confirmDeleteProfile={confirmDeleteProfile}
     />
@@ -2975,24 +2999,45 @@ function App() {
             </Empty>
           ) : (
             <List
+              aria-activedescendant={selectedProfile
+                ? `connection-profile-option-${visibleProfiles.findIndex((profile) => profile.id === selectedProfile.id)}`
+                : undefined}
               className="profile-list connection-profile-list"
               dataSource={visibleProfiles}
               role="listbox"
               tabIndex={0}
               onKeyDown={handleConnectionListKeyDown}
-              renderItem={(profile) => {
+              renderItem={(profile, profileIndex) => {
                 const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
                 const providerAvailable = isProfileProviderAvailable(profile, connectionProviders);
-                const primaryAction = buildConnectionProfilePrimaryAction({
+                const launchModel = buildConnectionProfileLaunchModel({
                   profileKind: profile.kind,
                   providerAvailable,
                   sessionInfo,
                 });
+                const primaryAction = launchModel.primary;
                 const actions = [
                   <Button key="primary" size="small" type="primary" onClick={(event) => {
                     event.stopPropagation();
                     runConnectionProfilePrimaryAction(profile);
                   }} disabled={primaryAction.disabled}>{t(primaryAction.labelKey)}</Button>,
+                  launchModel.secondary && (
+                    <Tooltip key="secondary" title={t(launchModel.secondary.labelKey)}>
+                      <Button
+                        aria-label={t(launchModel.secondary.labelKey)}
+                        icon={launchModel.secondary.action === 'findExtension'
+                          ? <AppstoreAddOutlined />
+                          : launchModel.secondary.action === 'openFiles'
+                            ? <FolderOpenOutlined />
+                            : <PlusOutlined />}
+                        size="small"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          runConnectionProfileLaunchAction(launchModel.secondary, profile);
+                        }}
+                      />
+                    </Tooltip>
+                  ),
                   <Tooltip key="manage" title={t('action.manage')}>
                     <span className="tooltip-dropdown-trigger">
                       <Dropdown
@@ -3005,6 +3050,8 @@ function App() {
                               danger: action === 'delete',
                               label: t(action === 'connect' && profile.kind === 'file'
                                 ? 'action.openFiles'
+                                : action === 'connect'
+                                  ? 'action.newTerminal'
                                 : `profile.action.${action}`),
                             })),
                           onClick: ({ domEvent, key }) => {
@@ -3037,22 +3084,19 @@ function App() {
                 return (
                 <List.Item
                   className={(compactConnectionDetail ? explicitlySelectedProfile?.id : selectedProfile?.id) === profile.id ? 'connection-profile-row active' : 'connection-profile-row'}
+                  id={`connection-profile-option-${profileIndex}`}
                   role="option"
                   aria-selected={(compactConnectionDetail ? explicitlySelectedProfile?.id : selectedProfile?.id) === profile.id}
                   tabIndex={-1}
-                  onClick={() => setSelectedProfileId(profile.id)}
-                  onDoubleClick={() => runConnectionProfilePrimaryAction(profile)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter') {
-                      event.preventDefault();
-                      runConnectionProfilePrimaryAction(profile);
-                    }
-                    if (event.key === ' ') {
-                      event.preventDefault();
-                      setSelectedProfileId(profile.id);
-                    }
+                  onClick={() => {
+                    setSelectedProfileId(profile.id);
+                    if (compactConnectionDetail) setConnectionDetailProfileId(profile.id);
                   }}
-                  actions={actions}
+                  onDoubleClick={(event) => {
+                    if (isInteractiveControl(event.target)) return;
+                    runConnectionProfileNewAction(profile);
+                  }}
+                  actions={actions.filter(Boolean)}
                 >
                   <List.Item.Meta
                     avatar={<span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>}
@@ -3097,12 +3141,12 @@ function App() {
       </div>
       <Drawer
         className="connection-detail-drawer"
-        open={selectedNav === 'connections' && compactConnectionDetail && Boolean(explicitlySelectedProfile)}
+        open={selectedNav === 'connections' && compactConnectionDetail && Boolean(connectionDetailProfile)}
         title={t('section.connectionDetails')}
         width={380}
-        onClose={() => setSelectedProfileId('')}
+        onClose={() => setConnectionDetailProfileId('')}
       >
-        {renderConnectionProfilePreview(explicitlySelectedProfile)}
+        {renderConnectionProfilePreview(connectionDetailProfile)}
       </Drawer>
     </div>
   );
@@ -6675,13 +6719,11 @@ function WorkspaceActionButton({ action, children, ...buttonProps }) {
 function ConnectionProfilePreview({
   confirmDeleteProfile,
   duplicateProfile,
-  focusProfileSession,
-  openExtensionsForProvider,
-  openProfile,
   openProfileEditor,
   profile,
   profileSessionSummary,
   providers,
+  runConnectionProfileLaunchAction,
   toggleProfileFavorite,
 }) {
   const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
@@ -6689,11 +6731,12 @@ function ConnectionProfilePreview({
   const badges = buildConnectionProfileBadges(profile, sessionInfo, { providerAvailable });
   const facts = buildConnectionProfileFacts(profile, { defaultShellLabel: t('label.defaultShell') });
   const hints = buildConnectionProfileHints(sessionInfo);
-  const primaryAction = buildConnectionProfilePrimaryAction({
+  const launchModel = buildConnectionProfileLaunchModel({
     profileKind: profile.kind,
     providerAvailable,
     sessionInfo,
   });
+  const primaryAction = launchModel.primary;
   const statusSummary = buildConnectionProfileStatusSummary({
     profileKind: profile.kind,
     providerAvailable,
@@ -6714,23 +6757,21 @@ function ConnectionProfilePreview({
           size="small"
           type="primary"
           disabled={primaryAction.disabled}
-          onClick={() => {
-            if (primaryAction.action === 'findExtension') {
-              openExtensionsForProvider(profile.providerType);
-              return;
-            }
-            if (primaryAction.action === 'focus') {
-              focusProfileSession(profile);
-              return;
-            }
-            openProfile(profile);
-          }}
+          onClick={() => runConnectionProfileLaunchAction(primaryAction, profile)}
         >
           {t(primaryAction.labelKey)}
         </Button>
-        {primaryAction.action === 'focus' && (
-          <Button size="small" icon={<PlusOutlined />} onClick={() => openProfile(profile)}>
-            {t('action.newTerminal')}
+        {launchModel.secondary && (
+          <Button
+            size="small"
+            icon={launchModel.secondary.action === 'findExtension'
+              ? <AppstoreAddOutlined />
+              : launchModel.secondary.action === 'openFiles'
+                ? <FolderOpenOutlined />
+                : <PlusOutlined />}
+            onClick={() => runConnectionProfileLaunchAction(launchModel.secondary, profile)}
+          >
+            {t(launchModel.secondary.labelKey)}
           </Button>
         )}
         <Button size="small" icon={<EditOutlined />} onClick={() => openProfileEditor(profile)}>{t('action.edit')}</Button>

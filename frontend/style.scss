@@ -2305,6 +2305,28 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   margin-inline-start: 16px;
 }
 
+.connection-profile-row .ant-list-item-action {
+  display: flex;
+  gap: 4px;
+  margin-inline-start: 10px;
+}
+
+.connection-profile-row .ant-list-item-action > li {
+  padding: 0;
+}
+
+.connection-profile-row .ant-list-item-action .ant-btn-primary {
+  min-width: 0;
+  max-width: 104px;
+  overflow: hidden;
+}
+
+.connection-profile-row .ant-list-item-action .ant-btn-primary > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .profile-search {
   width: min(420px, 100%);
 }
