@@ -816,8 +816,84 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   width: 32px;
 }
 
-.topbar-actions .terminal-search {
-  width: clamp(170px, 22vw, 260px);
+.topbar-actions .terminal-search-control {
+  display: flex;
+  align-items: center;
+  width: clamp(230px, 27vw, 340px);
+  height: 32px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-muted);
+  transition: border-color 140ms ease, box-shadow 140ms ease, background-color 140ms ease;
+}
+
+.topbar-actions .terminal-search-control:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 72%, var(--border));
+  background: var(--panel);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 14%, transparent);
+}
+
+.terminal-search-control .ant-input-affix-wrapper {
+  min-width: 72px;
+  height: 30px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none !important;
+}
+
+.terminal-search-control .ant-input-prefix {
+  color: var(--muted);
+}
+
+.terminal-search-control .ant-input {
+  min-width: 0;
+  background: transparent;
+}
+
+.terminal-search-result {
+  flex: 0 0 auto;
+  min-width: 44px;
+  max-width: 74px;
+  padding: 0 5px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  line-height: 30px;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.terminal-search-control.is-empty .terminal-search-result {
+  min-width: 58px;
+  color: color-mix(in srgb, #d9902f 76%, var(--muted));
+}
+
+.terminal-search-navigation {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  height: 22px;
+  padding-left: 2px;
+  margin-right: 3px;
+  border-left: 1px solid var(--border-subtle);
+}
+
+.topbar-actions .terminal-search-navigation .ant-btn {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--muted);
+}
+
+.topbar-actions .terminal-search-navigation .ant-btn:not(:disabled):hover {
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 @media (max-width: 1180px) {
@@ -865,6 +941,10 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   .command-palette-label,
   .command-palette-shortcut {
     display: none;
+  }
+
+  .topbar-actions .terminal-search-control {
+    width: clamp(210px, 34vw, 300px);
   }
 
   .topbar-utility-action {

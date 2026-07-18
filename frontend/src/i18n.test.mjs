@@ -22,6 +22,10 @@ assert.equal(t('terminal.error.recoveryHint'), 'Check the connection and retry. 
 assert.equal(t('operation.error.reason.network'), 'Network connection failed');
 assert.equal(t('operation.error.suggestion.authentication'), 'Review the username, authentication method, and saved credential before trying again.');
 assert.equal(t('terminal.status.preparing'), 'Preparing terminal');
+assert.equal(t('action.clearSearch'), 'Clear search');
+assert.equal(t('terminal.search.noMatches'), 'No matches');
+assert.equal(t('terminal.search.resultPositionLabel', { current: 3, total: 8 }), 'Match 3 of 8');
+assert.equal(t('terminal.search.resultsLimitedLabel', { count: 1000 }), 'More than 1000 matches');
 assert.equal(t('action.restoreClosedSession'), 'Reopen closed session');
 assert.equal(t('session.empty.restoreAvailable', { count: 3, updatedAt: '12:00' }), 'Restore 3 saved sessions from 12:00');
 assert.equal(t('session.empty.restoreUnavailable'), 'No saved workspace is available yet');
@@ -106,6 +110,10 @@ assert.equal(t('terminal.error.recoveryHint'), '检查连接配置和网络后�
 assert.equal(t('operation.error.reason.network'), '网络连接失败');
 assert.equal(t('operation.error.suggestion.authentication'), '请检查用户名、认证方式和已保存凭据，修正后再试。');
 assert.equal(t('terminal.status.preparing'), '正在准备终端');
+assert.equal(t('action.clearSearch'), '清除搜索');
+assert.equal(t('terminal.search.noMatches'), '无匹配');
+assert.equal(t('terminal.search.resultPositionLabel', { current: 3, total: 8 }), '第 3 个匹配，共 8 个');
+assert.equal(t('terminal.search.resultsLimitedLabel', { count: 1000 }), '超过 1000 个匹配');
 assert.equal(t('action.restoreClosedSession'), '恢复最近关闭的会话');
 assert.equal(t('session.empty.restoreAvailable', { count: 3, updatedAt: '12:00' }), '恢复 12:00 保存的 3 个会话');
 assert.equal(t('session.empty.restoreUnavailable'), '目前还没有可恢复的工作区');

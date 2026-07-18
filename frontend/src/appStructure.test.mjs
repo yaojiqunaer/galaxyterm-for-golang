@@ -11,6 +11,8 @@ const replaySource = await readFile(new URL('./components/AuditReplayPlayer.jsx'
 const commandPaletteSource = await readFile(new URL('./components/CommandPalette.jsx', import.meta.url), 'utf8');
 const connectionGroupDialogSource = await readFile(new URL('./components/ConnectionGroupDialog.jsx', import.meta.url), 'utf8').catch(() => '');
 const terminalPaneSource = await readFile(new URL('./components/TerminalPane.jsx', import.meta.url), 'utf8');
+const terminalSearchControlSource = await readFile(new URL('./components/TerminalSearchControl.jsx', import.meta.url), 'utf8').catch(() => '');
+const terminalSearchSource = await readFile(new URL('./terminalSearch.js', import.meta.url), 'utf8').catch(() => '');
 const workspaceStateSource = await readFile(new URL('./workspaceState.js', import.meta.url), 'utf8');
 const savedSshProfileSource = await readFile(new URL('./components/SavedSSHProfileSelect.jsx', import.meta.url), 'utf8');
 const activeSessionDeclaration = source.indexOf('const activeSession =');
@@ -378,11 +380,14 @@ assert.ok(
   'terminal failures must use a structured detail disclosure and compact recovery labels',
 );
 assert.ok(
-  /\{terminalSearch\.trim\(\)\s*&&\s*\([\s\S]*?action\.findPrevious[\s\S]*?action\.findNext[\s\S]*?\)\}/.test(source),
-  'terminal result navigation must only appear while a search query is active',
+  source.includes('<TerminalSearchControl')
+    && source.includes('result={activeTerminalSearchResult}')
+    && source.includes("onFindPrevious={() => findInTerminal('previous')}")
+    && source.includes("onFindNext={() => findInTerminal('next')}"),
+  'terminal search must use a focused control with result feedback and explicit navigation',
 );
 assert.ok(
-  /\{activeKey\s*&&\s*selectedNav\s*===\s*'sessions'\s*&&\s*\([\s\S]*?className="terminal-search"/.test(source),
+  /\{activeKey\s*&&\s*selectedNav\s*===\s*'sessions'\s*&&\s*\([\s\S]*?<TerminalSearchControl/.test(source),
   'terminal output search must stay inside the visible session workspace instead of acting on a hidden terminal',
 );
 assert.ok(
@@ -510,9 +515,34 @@ assert.ok(
     && source.includes("configurableShortcutAction === 'search'")
     && source.includes('terminalSearchRef.current?.select?.();')
     && source.includes('const closeTerminalSearch = () => {')
-    && source.includes("if (event.key === 'Escape') {")
     && source.includes('ref={terminalSearchRef}'),
   'terminal search must select the current query and return focus to the terminal on Escape',
+);
+assert.ok(
+  source.includes('const [terminalSearchResults, setTerminalSearchResults] = useState({});')
+    && source.includes('onSearchResultsChange={(result) => updateTerminalSearchResult(session.id, result)}')
+    && /useEffect\(\(\) => \{[\s\S]*?terminalSearch\.trim\(\)[\s\S]*?findNext\?\./.test(source),
+  'terminal search must keep result state per session and reapply the query after session changes',
+);
+assert.ok(
+  source.includes('terminalSearchQueriesRef.current[activeKey] === keyword')
+    && source.includes('if (searchResult === undefined)')
+    && source.includes('delete terminalSearchQueriesRef.current[activeKey]'),
+  'terminal search must not advance again on unrelated status changes and must retry when xterm is not ready',
+);
+assert.ok(
+  terminalPaneSource.includes('searchAddon.current.onDidChangeResults')
+    && terminalPaneSource.includes('onSearchResultsChange')
+    && terminalPaneSource.includes('terminalSearchOptions'),
+  'terminal panes must expose xterm result changes and search with decorations enabled',
+);
+assert.ok(
+  terminalSearchControlSource.includes('aria-live="polite"')
+    && terminalSearchControlSource.includes('resolveTerminalSearchKeyAction(event)')
+    && terminalSearchSource.includes("event.key === 'Enter'")
+    && terminalSearchSource.includes('event.shiftKey')
+    && terminalSearchSource.includes("event.key === 'Escape'"),
+  'terminal search feedback must be announced and support Enter, Shift+Enter, and Escape',
 );
 assert.ok(
   source.includes("window.addEventListener('keydown', handleKeydown, true);")

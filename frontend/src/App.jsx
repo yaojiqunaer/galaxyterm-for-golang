@@ -73,7 +73,6 @@ import {
   StarOutlined,
   StopOutlined,
   ThunderboltOutlined,
-  UpOutlined,
   UploadOutlined,
   UnlockOutlined,
   VideoCameraOutlined,
@@ -293,7 +292,13 @@ import ConnectionGroupDialog from './components/ConnectionGroupDialog.jsx';
 import SavedSSHProfileSelect from './components/SavedSSHProfileSelect.jsx';
 import FileProviderFormFields from './components/FileProviderFormFields.jsx';
 import OperationErrorDescription from './components/OperationErrorDescription.jsx';
+import TerminalSearchControl from './components/TerminalSearchControl.jsx';
 import { buildOperationError } from './operationFeedback.js';
+import {
+  emptyTerminalSearchResult,
+  hasTerminalSearchKeywordChanged,
+  normalizeTerminalSearchResult,
+} from './terminalSearch.js';
 
 const TerminalPane = lazy(() => import('./components/TerminalPane.jsx'));
 const AuditReplayPlayer = lazy(() => import('./components/AuditReplayPlayer.jsx'));
@@ -408,6 +413,7 @@ function App() {
   const [renamingSessionId, setRenamingSessionId] = useState('');
   const [renamingSessionName, setRenamingSessionName] = useState('');
   const [terminalSearch, setTerminalSearch] = useState('');
+  const [terminalSearchResults, setTerminalSearchResults] = useState({});
   const [sidebarSessionQuery, setSidebarSessionQuery] = useState('');
   const [terminalStatuses, setTerminalStatuses] = useState({});
   const [sessionActivity, setSessionActivity] = useState({});
@@ -552,6 +558,7 @@ function App() {
     fileTransferCleanupRef.current = null;
   }, []);
   const terminalRefs = useRef({});
+  const terminalSearchQueriesRef = useRef({});
   const terminalSearchRef = useRef(null);
   const fileSearchRef = useRef(null);
   const profileImportRef = useRef(null);
@@ -576,11 +583,36 @@ function App() {
   };
   const closeTerminalSearch = () => {
     setTerminalSearch('');
+    delete terminalSearchQueriesRef.current[activeKey];
+    setTerminalSearchResults((current) => ({
+      ...current,
+      [activeKey]: emptyTerminalSearchResult,
+    }));
     terminalRefs.current[activeKey]?.clearSearch?.();
     focusTerminalSession(activeKey);
   };
+  const updateTerminalSearchResult = (sessionId, result) => {
+    const query = terminalSearch.trim();
+    if (!sessionId || terminalSearchQueriesRef.current[sessionId] !== query) return;
+    setTerminalSearchResults((current) => ({
+      ...current,
+      [sessionId]: normalizeTerminalSearchResult(result, query),
+    }));
+  };
+  const updateTerminalSearchQuery = (query) => {
+    const keywordChanged = hasTerminalSearchKeywordChanged(terminalSearch, query);
+    setTerminalSearch(query);
+    if (!keywordChanged) return;
+    setTerminalSearchResults((current) => ({
+      ...current,
+      [activeKey]: emptyTerminalSearchResult,
+    }));
+  };
   const activeSession = sessions.find((session) => session.id === activeKey);
   const activeTerminalStatus = terminalStatuses[activeKey] || {};
+  const activeTerminalSearchResult = terminalSearchQueriesRef.current[activeKey] === terminalSearch.trim()
+    ? terminalSearchResults[activeKey] || emptyTerminalSearchResult
+    : emptyTerminalSearchResult;
   const visibleSessionIds = useMemo(() => {
     if (selectedNav !== 'sessions') return [];
     if (sessionView === 'grid') return sessions.map((session) => session.id);
@@ -832,6 +864,23 @@ function App() {
     });
     return () => window.cancelAnimationFrame(frame);
   }, [activeKey, focusMode, selectedNav, sessionView]);
+
+  useEffect(() => {
+    if (!activeKey || selectedNav !== 'sessions') return undefined;
+    const keyword = terminalSearch.trim();
+    if (!keyword) {
+      delete terminalSearchQueriesRef.current[activeKey];
+      terminalRefs.current[activeKey]?.clearSearch?.();
+      return undefined;
+    }
+    if (terminalSearchQueriesRef.current[activeKey] === keyword) return undefined;
+    const frame = window.requestAnimationFrame(() => {
+      terminalSearchQueriesRef.current[activeKey] = keyword;
+      const searchResult = terminalRefs.current[activeKey]?.findNext?.(keyword, { incremental: true });
+      if (searchResult === undefined) delete terminalSearchQueriesRef.current[activeKey];
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeKey, activeTerminalStatus.status, selectedNav, terminalSearch]);
 
   useEffect(() => {
     setSessionActivity((current) => visibleSessionIds.reduce(
@@ -1642,11 +1691,14 @@ function App() {
       messageApi.warning(t('message.noActiveSession'));
       return;
     }
+    terminalSearchQueriesRef.current[activeKey] = keyword;
     if (direction === 'previous') {
-      activeTerminal.findPrevious?.(keyword);
+      const searchResult = activeTerminal.findPrevious?.(keyword);
+      if (searchResult === undefined) delete terminalSearchQueriesRef.current[activeKey];
       return;
     }
-    activeTerminal.findNext?.(keyword);
+    const searchResult = activeTerminal.findNext?.(keyword);
+    if (searchResult === undefined) delete terminalSearchQueriesRef.current[activeKey];
   };
 
   const copyTerminalSelection = async () => {
@@ -2782,6 +2834,7 @@ function App() {
             onCommandSubmitted={(command) => recordCommandHistory(command, session)}
             onConfirmPaste={confirmTerminalPaste}
             onOutputActivity={(outputAt) => recordSessionActivity(session.id, outputAt)}
+            onSearchResultsChange={(result) => updateTerminalSearchResult(session.id, result)}
             onSessionCreated={(backendSessionId) => {
               setSessions((current) => current.map((item) => (
                 item.id === session.id ? { ...item, backendSessionId, status: 'connected' } : item
@@ -6159,37 +6212,15 @@ function App() {
           </Space>
           <Space className="topbar-actions">
             {activeKey && selectedNav === 'sessions' && (
-              <>
-                <Input.Search
-                  className="terminal-search"
-                  ref={terminalSearchRef}
-                  allowClear
-                  size="middle"
-                  value={terminalSearch}
-                  onChange={(event) => {
-                    setTerminalSearch(event.target.value);
-                    if (!event.target.value) terminalRefs.current[activeKey]?.clearSearch?.();
-                  }}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Escape') {
-                      event.preventDefault();
-                      closeTerminalSearch();
-                    }
-                  }}
-                  onSearch={() => findInTerminal('next')}
-                  placeholder={t('placeholder.searchTerminal')}
-                />
-                {terminalSearch.trim() && (
-                  <>
-                    <Tooltip title={t('action.findPrevious')}>
-                      <Button icon={<UpOutlined />} onClick={() => findInTerminal('previous')} />
-                    </Tooltip>
-                    <Tooltip title={t('action.findNext')}>
-                      <Button icon={<DownOutlined />} onClick={() => findInTerminal('next')} />
-                    </Tooltip>
-                  </>
-                )}
-              </>
+              <TerminalSearchControl
+                ref={terminalSearchRef}
+                query={terminalSearch}
+                result={activeTerminalSearchResult}
+                onChange={updateTerminalSearchQuery}
+                onClose={closeTerminalSearch}
+                onFindPrevious={() => findInTerminal('previous')}
+                onFindNext={() => findInTerminal('next')}
+              />
             )}
             <Tooltip title={t('action.language')}>
               <Button className="topbar-utility-action" aria-label={t('action.language')} icon={<GlobalOutlined />} onClick={openLanguageSettings} />

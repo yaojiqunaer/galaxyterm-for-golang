@@ -15,6 +15,7 @@ import {
   shouldNotifyTerminalActivity,
   terminalOutputIndicatesPrompt,
 } from '../terminalExecution.js';
+import { terminalSearchOptions } from '../terminalSearch.js';
 
 function TerminalPane({
   request,
@@ -23,6 +24,7 @@ function TerminalPane({
   onCommandSubmitted,
   onConfirmPaste,
   onOutputActivity,
+  onSearchResultsChange,
   onSessionCreated,
   onSessionClosed,
   onStatusChange,
@@ -47,6 +49,7 @@ function TerminalPane({
     onCommandSubmitted,
     onConfirmPaste,
     onOutputActivity,
+    onSearchResultsChange,
     onSessionClosed,
     onSessionCreated,
     onStatusChange,
@@ -56,6 +59,7 @@ function TerminalPane({
     onCommandSubmitted,
     onConfirmPaste,
     onOutputActivity,
+    onSearchResultsChange,
     onSessionClosed,
     onSessionCreated,
     onStatusChange,
@@ -210,9 +214,18 @@ function TerminalPane({
       screen: terminalBufferText(term.current),
       startedAt: startedAt.current.toISOString(),
     }),
-    findNext: (keyword) => searchAddon.current?.findNext(keyword),
-    findPrevious: (keyword) => searchAddon.current?.findPrevious(keyword),
-    clearSearch: () => searchAddon.current?.clearDecorations(),
+    findNext: (keyword, options = {}) => searchAddon.current?.findNext(keyword, {
+      ...terminalSearchOptions,
+      ...options,
+    }),
+    findPrevious: (keyword, options = {}) => searchAddon.current?.findPrevious(keyword, {
+      ...terminalSearchOptions,
+      ...options,
+    }),
+    clearSearch: () => {
+      searchAddon.current?.clearDecorations();
+      callbacksRef.current.onSearchResultsChange?.({ resultCount: 0, resultIndex: -1 });
+    },
   }), []);
 
   useEffect(() => {
@@ -221,6 +234,7 @@ function TerminalPane({
     let cleanupData = null;
     let cleanupError = null;
     let cleanupExit = null;
+    let searchResultsDisposable = null;
 
     async function initTerminal() {
       const terminalTheme = await resolveTerminalTheme(settings);
@@ -244,6 +258,9 @@ function TerminalPane({
       searchAddon.current = new SearchAddon();
       term.current.loadAddon(fitAddon.current);
       term.current.loadAddon(searchAddon.current);
+      searchResultsDisposable = searchAddon.current.onDidChangeResults((result) => {
+        callbacksRef.current.onSearchResultsChange?.(result);
+      });
       term.current.open(containerRef.current);
       emitStatus({ status: 'connecting' });
 
@@ -375,6 +392,7 @@ function TerminalPane({
       cleanupData?.();
       cleanupError?.();
       cleanupExit?.();
+      searchResultsDisposable?.dispose();
       cleanupWindow?.();
       observer?.disconnect();
       if (sessionId.current) {
