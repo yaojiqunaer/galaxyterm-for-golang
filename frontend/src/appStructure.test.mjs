@@ -11,6 +11,7 @@ const replaySource = await readFile(new URL('./components/AuditReplayPlayer.jsx'
 const commandPaletteSource = await readFile(new URL('./components/CommandPalette.jsx', import.meta.url), 'utf8');
 const connectionGroupDialogSource = await readFile(new URL('./components/ConnectionGroupDialog.jsx', import.meta.url), 'utf8').catch(() => '');
 const terminalPaneSource = await readFile(new URL('./components/TerminalPane.jsx', import.meta.url), 'utf8');
+const workspaceStateSource = await readFile(new URL('./workspaceState.js', import.meta.url), 'utf8');
 const savedSshProfileSource = await readFile(new URL('./components/SavedSSHProfileSelect.jsx', import.meta.url), 'utf8');
 const activeSessionDeclaration = source.indexOf('const activeSession =');
 const firstActiveSessionUsage = source.indexOf('activeSession?.providerType');
@@ -91,6 +92,21 @@ assert.ok(
     && source.includes('ref={contentPageRef}')
     && /useLayoutEffect\(\(\) => \{[\s\S]*?contentPageScrollPositionsRef[\s\S]*?layer\.scrollTop[\s\S]*?\}, \[selectedNav\]\);/.test(source),
   'workspace pages must restore independent scroll positions instead of inheriting the previous page offset',
+);
+assert.ok(
+  source.includes('buildWorkspaceRestorePlan(snapshot, sessions, {')
+    && source.includes('workspaceRestoringRef.current')
+    && source.includes('workspaceStartupHandledRef.current')
+    && source.includes('workspaceHadSessionsRef.current')
+    && source.includes('if (!workspaceHydrated || !settings.autoSaveWorkspace) return;')
+    && source.includes('if (!clearPersistedWorkspaceSnapshot()) return;')
+    && !source.includes('!settings.autoSaveWorkspace || sessions.length === 0')
+    && source.includes('return profileToRequest(profile);')
+    && source.includes("profile.providerType === 'ssh' && !profile.auth?.credentialRef")
+    && source.includes('request: await resolveCredentialRequest(entry.request)')
+    && workspaceStateSource.includes('currentByFingerprint.get(fingerprint)?.shift()')
+    && workspaceStateSource.match(/request: sanitizeWorkspaceRequest\(session\.request\)/g)?.length >= 2,
+  'workspace restore must clear stale empty snapshots, rebuild saved profiles, and match duplicate sessions by count',
 );
 assert.equal(
   source.match(/\{renderTerminalPane\(session\)\}/g)?.length,
@@ -569,7 +585,7 @@ assert.ok(
     && source.includes("buildSessionClosePlan(sessions, { mode: 'closed' })")
     && source.includes("buildSessionClosePlan(sessions, { keepSessionId: activeKey, mode: 'others' })")
     && source.includes('closable: !session.protected')
-    && source.includes('protected: Boolean(session.protected)')
+    && workspaceStateSource.includes('protected: Boolean(session.protected)')
     && source.includes('toggleSessionProtection(current, sessionId)')
     && source.includes('display.protected &&')
     && /\.session-protection-icon\s*\{/.test(styles),

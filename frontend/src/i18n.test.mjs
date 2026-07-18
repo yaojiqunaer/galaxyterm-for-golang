@@ -27,6 +27,8 @@ assert.equal(t('session.empty.restoreAvailable', { count: 3, updatedAt: '12:00' 
 assert.equal(t('session.empty.restoreUnavailable'), 'No saved workspace is available yet');
 assert.equal(t('palette.reason.noWorkspaceSession'), 'Open at least one session before saving a workspace.');
 assert.equal(t('palette.reason.noWorkspaceSnapshot'), 'Save a workspace before restoring or clearing it.');
+assert.equal(t('message.workspaceRestoreSummary', { existing: 2, restored: 3, skipped: 1 }), 'Restored 3 sessions, kept 2 already open, and skipped 1');
+assert.equal(t('message.workspaceAlreadyOpen', { count: 2 }), 'All 2 workspace sessions are already open');
 assert.equal(t('palette.recentHint'), 'Recently used actions appear first');
 assert.equal(t('palette.keyboardHint'), '↑↓ select · Enter run · Esc close');
 assert.equal(t('replay.state.playing'), 'Playing');
@@ -109,6 +111,8 @@ assert.equal(t('session.empty.restoreAvailable', { count: 3, updatedAt: '12:00' 
 assert.equal(t('session.empty.restoreUnavailable'), '目前还没有可恢复的工作区');
 assert.equal(t('palette.reason.noWorkspaceSession'), '请先打开至少一个会话，再保存工作区。');
 assert.equal(t('palette.reason.noWorkspaceSnapshot'), '请先保存工作区，再执行恢复或清理。');
+assert.equal(t('message.workspaceRestoreSummary', { existing: 2, restored: 3, skipped: 1 }), '已恢复 3 个会话，2 个已打开，跳过 1 个');
+assert.equal(t('message.workspaceAlreadyOpen', { count: 2 }), '工作区中的 2 个会话已经打开');
 assert.equal(t('palette.recentHint'), '最近使用的操作会优先显示');
 assert.equal(t('palette.keyboardHint'), '↑↓ 选择 · Enter 执行 · Esc 关闭');
 assert.equal(t('replay.state.playing'), '播放中');

@@ -229,6 +229,15 @@ import {
   normalizeCommandHistoryItem,
   upsertCommandHistory,
 } from './commandHistory.js';
+import {
+  buildWorkspaceRestorePlan,
+  buildWorkspaceSnapshot,
+  clearWorkspaceSnapshot as clearPersistedWorkspaceSnapshot,
+  loadWorkspaceSnapshot,
+  loadWorkspaceSummary,
+  persistWorkspaceSnapshot,
+  sanitizeWorkspaceRequest,
+} from './workspaceState.js';
 
 import {
   buildQuickCommandFromHistory,
@@ -293,7 +302,6 @@ const { Text, Title } = Typography;
 
 const profileStorageKey = 'galaxyterm.connectionProfiles';
 const settingsStorageKey = 'galaxyterm.settings';
-const workspaceStorageKey = 'galaxyterm.workspaceSnapshot';
 const commandStorageKey = 'galaxyterm.quickCommands';
 const commandHistoryStorageKey = 'galaxyterm.commandHistory';
 const recentConnectionStorageKey = 'galaxyterm.recentConnections';
@@ -420,6 +428,7 @@ function App() {
   const [auditQuery, setAuditQuery] = useState('');
   const [auditProviderFilter, setAuditProviderFilter] = useState('all');
   const [workspaceSummary, setWorkspaceSummary] = useState(() => loadWorkspaceSummary());
+  const [workspaceHydrated, setWorkspaceHydrated] = useState(false);
   const [quickCommands, setQuickCommands] = useState(() => loadQuickCommands());
   const [commandHistory, setCommandHistory] = useState(() => loadCommandHistory());
   const [commandQuery, setCommandQuery] = useState('');
@@ -550,6 +559,9 @@ function App() {
   const contentPageScrollPositionsRef = useRef(new Map());
   const previousContentPageRef = useRef(selectedNav);
   const draggedSessionIdRef = useRef('');
+  const workspaceHadSessionsRef = useRef(false);
+  const workspaceRestoringRef = useRef(false);
+  const workspaceStartupHandledRef = useRef(false);
   const focusTerminalSession = (sessionId = activeKey) => {
     if (!sessionId) return;
     window.requestAnimationFrame(() => {
@@ -631,16 +643,34 @@ function App() {
   }, [settings]);
 
   useEffect(() => {
-    if (settings.autoRestoreWorkspace) {
-      restoreWorkspace({ silent: true });
-    }
+    if (workspaceStartupHandledRef.current) return;
+    workspaceStartupHandledRef.current = true;
+    const hydrateWorkspace = async () => {
+      try {
+        if (settings.autoRestoreWorkspace) await restoreWorkspace({ silent: true });
+      } finally {
+        setWorkspaceHydrated(true);
+      }
+    };
+    hydrateWorkspace();
   }, []);
 
   useEffect(() => {
-    if (!settings.autoSaveWorkspace || sessions.length === 0) return;
+    if (sessions.length > 0) workspaceHadSessionsRef.current = true;
+  }, [sessions.length]);
+
+  useEffect(() => {
+    if (!workspaceHydrated || !settings.autoSaveWorkspace) return;
+    if (sessions.length === 0) {
+      if (!workspaceHadSessionsRef.current) return;
+      if (!clearPersistedWorkspaceSnapshot()) return;
+      workspaceHadSessionsRef.current = false;
+      setWorkspaceSummary(loadWorkspaceSummary());
+      return;
+    }
     persistWorkspaceSnapshot(buildWorkspaceSnapshot(sessions, activeKey, sessionView));
     setWorkspaceSummary(loadWorkspaceSummary());
-  }, [activeKey, sessionView, sessions, settings.autoSaveWorkspace]);
+  }, [activeKey, sessionView, sessions, settings.autoSaveWorkspace, workspaceHydrated]);
 
   useEffect(() => {
     if (!commandsOpen) return;
@@ -1900,47 +1930,110 @@ function App() {
       return;
     }
     const snapshot = buildWorkspaceSnapshot(sessions, activeKey, sessionView);
-    persistWorkspaceSnapshot(snapshot);
+    if (!persistWorkspaceSnapshot(snapshot)) {
+      messageApi.error(t('message.workspaceSaveFailed'));
+      return;
+    }
     setWorkspaceSummary(loadWorkspaceSummary());
     messageApi.success(t('message.workspaceSaved'));
   };
 
-  const restoreWorkspace = ({ silent = false } = {}) => {
+  const restoreWorkspace = async ({ silent = false } = {}) => {
+    if (workspaceRestoringRef.current) {
+      if (!silent) messageApi.info(t('message.workspaceRestoreInProgress'));
+      return null;
+    }
     const snapshot = loadWorkspaceSnapshot();
     if (!snapshot || snapshot.sessions.length === 0) {
       if (!silent) messageApi.info(t('message.noWorkspaceSnapshot'));
-      return;
+      return null;
     }
-    const restorableSessions = snapshot.sessions.filter((session) => canRestoreSession(session.request));
-    const skipped = snapshot.sessions.length - restorableSessions.length;
-    if (restorableSessions.length === 0) {
-      if (!silent) messageApi.warning(t('message.workspaceRestoreSkipped'));
-      return;
-    }
-    let restoredActiveKey = '';
-    const restoredSessions = restorableSessions.map((session) => {
-      const nextId = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
-      if (session.id === snapshot.activeKey) restoredActiveKey = nextId;
-      return {
-        ...session,
-        auditEvents: [createAuditEvent({
-          sessionId: nextId,
-          sessionLabel: session.label,
-          type: 'workspace.restore',
-        })],
-        id: nextId,
-        backendSessionId: '',
-        startedAt: new Date().toISOString(),
-        status: 'connecting',
-        revision: 0,
-      };
-    });
-    setSessions((current) => [...current, ...restoredSessions]);
-    setActiveKey(restoredActiveKey || restoredSessions[0].id);
-    setSessionView(snapshot.sessionView || 'tabs');
-    setSelectedNav('sessions');
-    if (!silent) {
-      messageApi.success(skipped > 0 ? t('message.workspaceRestoredPartial') : t('message.workspaceRestored'));
+
+    workspaceRestoringRef.current = true;
+    try {
+      const restorePlan = buildWorkspaceRestorePlan(snapshot, sessions, {
+        resolveRequest: (session) => {
+          const request = session.request || {};
+          if (request.providerType === 'local') {
+            return providers.some((provider) => provider.type === 'local') ? request : null;
+          }
+          const profile = profiles.find((item) => item.id === request.profileId);
+          if (!profile || profile.kind === 'file') return null;
+          if (!providers.some((provider) => provider.type === profile.providerType)) return null;
+          if (profile.providerType === 'ssh' && !profile.auth?.credentialRef) return null;
+          return profileToRequest(profile);
+        },
+      });
+      const resolvedEntries = [];
+      let credentialFailureCount = 0;
+      for (const entry of restorePlan.restoreEntries) {
+        try {
+          resolvedEntries.push({
+            ...entry,
+            request: await resolveCredentialRequest(entry.request),
+          });
+        } catch {
+          credentialFailureCount += 1;
+        }
+      }
+
+      let restoredActiveKey = '';
+      const restoredAt = new Date().toISOString();
+      const restoredSessions = resolvedEntries.map(({ request, session }, index) => {
+        const nextId = crypto.randomUUID
+          ? crypto.randomUUID()
+          : `${Date.now()}-${index}-${Math.random()}`;
+        if (session.id === snapshot.activeKey) restoredActiveKey = nextId;
+        return {
+          ...session,
+          auditEvents: [createAuditEvent({
+            sessionId: nextId,
+            sessionLabel: session.label,
+            type: 'workspace.restore',
+          })],
+          id: nextId,
+          backendSessionId: '',
+          providerType: request.providerType,
+          request,
+          startedAt: restoredAt,
+          status: 'connecting',
+          revision: 0,
+        };
+      });
+      const skippedCount = restorePlan.skippedCount + credentialFailureCount;
+      const restoredCount = restoredSessions.length;
+      const existingCount = restorePlan.existingCount;
+
+      if (restoredCount > 0) setSessions((current) => [...current, ...restoredSessions]);
+      const nextActiveKey = restoredActiveKey
+        || restorePlan.activeExistingSessionId
+        || activeKey
+        || restoredSessions[0]?.id
+        || '';
+      if (nextActiveKey) setActiveKey(nextActiveKey);
+      if (restoredCount > 0 || existingCount > 0) {
+        setSessionView(snapshot.sessionView || 'tabs');
+        setSelectedNav('sessions');
+      }
+
+      if (!silent) {
+        if (restoredCount === 0 && existingCount === 0) {
+          messageApi.warning(t('message.workspaceRestoreSkipped'));
+        } else if (restoredCount === 0 && skippedCount === 0) {
+          messageApi.info(t('message.workspaceAlreadyOpen', { count: existingCount }));
+        } else {
+          const summaryMessage = t('message.workspaceRestoreSummary', {
+            existing: existingCount,
+            restored: restoredCount,
+            skipped: skippedCount,
+          });
+          if (skippedCount > 0) messageApi.warning(summaryMessage);
+          else messageApi.success(summaryMessage);
+        }
+      }
+      return { existingCount, restoredCount, skippedCount };
+    } finally {
+      workspaceRestoringRef.current = false;
     }
   };
 
@@ -1949,7 +2042,10 @@ function App() {
       messageApi.info(t(workspaceActionState.clear.reasonKey));
       return;
     }
-    localStorage.removeItem(workspaceStorageKey);
+    if (!clearPersistedWorkspaceSnapshot()) {
+      messageApi.error(t('message.workspaceClearFailed'));
+      return;
+    }
     setWorkspaceSummary(loadWorkspaceSummary());
     messageApi.success(t('message.workspaceCleared'));
   };
@@ -7411,7 +7507,7 @@ function persistAuditRecords(records, options = {}) {
 }
 
 function rememberConnection(request, setRecentConnections) {
-  const safeRequest = sanitizeRequest(request);
+  const safeRequest = sanitizeWorkspaceRequest(request);
   const recent = {
     id: recentConnectionKey(safeRequest),
     providerType: safeRequest.providerType,
@@ -7955,63 +8051,6 @@ function isInteractiveControl(target) {
 function resolveAppTheme(theme) {
   if (theme === 'dark' || theme === 'light') return theme;
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-}
-
-function buildWorkspaceSnapshot(sessions, activeKey, sessionView) {
-  return {
-    version: 1,
-    updatedAt: new Date().toISOString(),
-    activeKey,
-    sessionView,
-    sessions: sessions.map((session) => ({
-      id: session.id,
-      label: session.label,
-      protected: Boolean(session.protected),
-      providerType: session.providerType,
-      request: sanitizeRequest(session.request),
-    })),
-  };
-}
-
-function sanitizeRequest(request) {
-  return {
-    ...request,
-    config: { ...(request?.config || {}) },
-    auth: {
-      username: request?.auth?.username || '',
-      authType: request?.auth?.authType || 'password',
-      jumpUsername: request?.auth?.jumpUsername || '',
-      credentialRef: request?.auth?.credentialRef || null,
-    },
-  };
-}
-
-function canRestoreSession(request) {
-  return request?.providerType === 'local';
-}
-
-function persistWorkspaceSnapshot(snapshot) {
-  localStorage.setItem(workspaceStorageKey, JSON.stringify(snapshot));
-}
-
-function loadWorkspaceSnapshot() {
-  try {
-    const raw = localStorage.getItem(workspaceStorageKey);
-    const parsed = JSON.parse(raw || 'null');
-    if (!parsed || !Array.isArray(parsed.sessions)) return null;
-    return parsed;
-  } catch {
-    return null;
-  }
-}
-
-function loadWorkspaceSummary() {
-  const snapshot = loadWorkspaceSnapshot();
-  if (!snapshot) return null;
-  return {
-    count: snapshot.sessions.length,
-    updatedAt: new Date(snapshot.updatedAt).toLocaleString(),
-  };
 }
 
 function parentPath(current) {
