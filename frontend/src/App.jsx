@@ -2144,6 +2144,26 @@ function App() {
     if (action === 'delete') confirmDeleteProfile(profile);
   };
 
+  const buildConnectionProfileActionMenu = (profile) => {
+    const primaryAction = connectionProfileLaunchModel(profile).primary;
+    return {
+      items: profileActionModel(profile)
+        .filter((action) => action !== 'connect' || primaryAction.action === 'focus')
+        .map((action) => ({
+          key: action,
+          danger: action === 'delete',
+          icon: connectionProfileActionIcon(action),
+          label: t(action === 'connect'
+            ? profile.kind === 'file' ? 'action.openFiles' : 'action.newTerminal'
+            : `profile.action.${action}`),
+        })),
+      onClick: ({ domEvent, key }) => {
+        domEvent?.stopPropagation();
+        runProfileAction(key, profile);
+      },
+    };
+  };
+
   const clearProfileFilters = () => {
     setProfileQuery('');
     setGroupQuery('all');
@@ -3042,23 +3062,7 @@ function App() {
                     <span className="tooltip-dropdown-trigger">
                       <Dropdown
                         trigger={['click']}
-                        menu={{
-                          items: profileActionModel(profile)
-                            .filter((action) => action !== 'connect' || primaryAction.action === 'focus')
-                            .map((action) => ({
-                              key: action,
-                              danger: action === 'delete',
-                              label: t(action === 'connect' && profile.kind === 'file'
-                                ? 'action.openFiles'
-                                : action === 'connect'
-                                  ? 'action.newTerminal'
-                                : `profile.action.${action}`),
-                            })),
-                          onClick: ({ domEvent, key }) => {
-                            domEvent.stopPropagation();
-                            runProfileAction(key, profile);
-                          },
-                        }}
+                        menu={buildConnectionProfileActionMenu(profile)}
                       >
                         <Button
                           aria-label={t('action.manage')}
@@ -3082,52 +3086,57 @@ function App() {
                 ];
                 const badges = buildConnectionProfileBadges(profile, sessionInfo, { providerAvailable });
                 return (
-                <List.Item
-                  className={(compactConnectionDetail ? explicitlySelectedProfile?.id : selectedProfile?.id) === profile.id ? 'connection-profile-row active' : 'connection-profile-row'}
-                  id={`connection-profile-option-${profileIndex}`}
-                  role="option"
-                  aria-selected={(compactConnectionDetail ? explicitlySelectedProfile?.id : selectedProfile?.id) === profile.id}
-                  tabIndex={-1}
-                  onClick={() => {
-                    setSelectedProfileId(profile.id);
-                    if (compactConnectionDetail) setConnectionDetailProfileId(profile.id);
-                  }}
-                  onDoubleClick={(event) => {
-                    if (isInteractiveControl(event.target)) return;
-                    runConnectionProfileNewAction(profile);
-                  }}
-                  actions={actions.filter(Boolean)}
+                <Dropdown
+                  menu={buildConnectionProfileActionMenu(profile)}
+                  trigger={['contextMenu']}
                 >
-                  <List.Item.Meta
-                    avatar={<span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>}
-                    title={(
-                      <span className="connection-profile-title">
-                        <strong>{profile.displayName}</strong>
-                        <small>{providerTypeLabel(profile.providerType, providers)}</small>
-                      </span>
-                    )}
-                    description={(
-                      <span className="connection-profile-description">
-                        <span className="connection-profile-endpoint-line">{localizedConnectionProfileSubtitle(profile)}</span>
-                        <span className="connection-profile-badges">
-                          {badges.map((badge) => (
-                            <span key={badge.key} className={`connection-profile-badge tone-${badge.tone}`}>
-                              {connectionProfileBadgeLabel(badge)}
-                            </span>
-                          ))}
-                          {profile.lastUsedAt && (
-                            <span className="connection-profile-badge tone-default">
-                              {`${t('label.lastUsed')}: ${formatProfileLastUsed(profile.lastUsedAt)}`}
-                            </span>
+                  <List.Item
+                    className={(compactConnectionDetail ? explicitlySelectedProfile?.id : selectedProfile?.id) === profile.id ? 'connection-profile-row active' : 'connection-profile-row'}
+                    id={`connection-profile-option-${profileIndex}`}
+                    role="option"
+                    aria-selected={(compactConnectionDetail ? explicitlySelectedProfile?.id : selectedProfile?.id) === profile.id}
+                    tabIndex={-1}
+                    onClick={() => {
+                      setSelectedProfileId(profile.id);
+                      if (compactConnectionDetail) setConnectionDetailProfileId(profile.id);
+                    }}
+                    onDoubleClick={(event) => {
+                      if (isInteractiveControl(event.target)) return;
+                      runConnectionProfileNewAction(profile);
+                    }}
+                    actions={actions.filter(Boolean)}
+                  >
+                    <List.Item.Meta
+                      avatar={<span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>}
+                      title={(
+                        <span className="connection-profile-title">
+                          <strong>{profile.displayName}</strong>
+                          <small>{providerTypeLabel(profile.providerType, providers)}</small>
+                        </span>
+                      )}
+                      description={(
+                        <span className="connection-profile-description">
+                          <span className="connection-profile-endpoint-line">{localizedConnectionProfileSubtitle(profile)}</span>
+                          <span className="connection-profile-badges">
+                            {badges.map((badge) => (
+                              <span key={badge.key} className={`connection-profile-badge tone-${badge.tone}`}>
+                                {connectionProfileBadgeLabel(badge)}
+                              </span>
+                            ))}
+                            {profile.lastUsedAt && (
+                              <span className="connection-profile-badge tone-default">
+                                {`${t('label.lastUsed')}: ${formatProfileLastUsed(profile.lastUsedAt)}`}
+                              </span>
+                            )}
+                          </span>
+                          {profile.providerType === 'ssh' && profile.config?.jumpHost && (
+                            <small>{`${t('field.jumpHost')}: ${profile.config.jumpHost}`}</small>
                           )}
                         </span>
-                        {profile.providerType === 'ssh' && profile.config?.jumpHost && (
-                          <small>{`${t('field.jumpHost')}: ${profile.config.jumpHost}`}</small>
-                        )}
-                      </span>
-                    )}
-                  />
-                </List.Item>
+                      )}
+                    />
+                  </List.Item>
+                </Dropdown>
                 );
               }}
             />
@@ -5664,12 +5673,19 @@ function App() {
                 size="small"
                 dataSource={providers}
                 renderItem={(provider) => (
-                  <List.Item className="provider-row" onClick={() => launchDefaultTerminal(provider.type)}>
-                    <Space>
-                      <span className="provider-icon">{providerIcons[provider.type] || <CodeOutlined />}</span>
-                      <span>{providerLabel(provider)}</span>
-                    </Space>
-                    <Badge status={provider.category === 'builtin' ? 'success' : 'processing'} />
+                  <List.Item className="provider-row">
+                    <button
+                      aria-label={providerLabel(provider)}
+                      className="provider-row-activate"
+                      type="button"
+                      onClick={() => launchDefaultTerminal(provider.type)}
+                    >
+                      <Space>
+                        <span className="provider-icon">{providerIcons[provider.type] || <CodeOutlined />}</span>
+                        <span>{providerLabel(provider)}</span>
+                      </Space>
+                      <Badge status={provider.category === 'builtin' ? 'success' : 'processing'} />
+                    </button>
                   </List.Item>
                 )}
               />
@@ -5683,27 +5699,50 @@ function App() {
                       const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
                       const badges = buildConnectionProfileBadges(profile, sessionInfo).filter((badge) => badge.key !== 'group').slice(0, 2);
                       return (
-                        <List.Item
-                          className={sessionInfo.activeCount > 0 ? 'quick-profile-row active' : 'quick-profile-row'}
-                          onClick={() => focusProfileSession(profile)}
-                          title={`${profile.displayName} · ${localizedConnectionProfileSubtitle(profile)}`}
+                        <Dropdown
+                          menu={buildConnectionProfileActionMenu(profile)}
+                          trigger={['contextMenu']}
                         >
-                          <span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>
-                          <span className="quick-profile-main">
-                            <span>{profile.displayName}</span>
-                            <small>{localizedConnectionProfileSubtitle(profile)}</small>
-                            {badges.length > 0 && (
-                              <span className="quick-profile-badges">
-                                {badges.map((badge) => (
-                                  <span key={badge.key} className={`connection-profile-badge tone-${badge.tone}`}>
-                                    {connectionProfileBadgeLabel(badge)}
+                          <List.Item
+                            className={sessionInfo.activeCount > 0 ? 'quick-profile-row active' : 'quick-profile-row'}
+                            title={`${profile.displayName} · ${localizedConnectionProfileSubtitle(profile)}`}
+                          >
+                            <button
+                              aria-label={profile.displayName}
+                              className="quick-profile-activate"
+                              type="button"
+                              onClick={() => runConnectionProfilePrimaryAction(profile)}
+                            >
+                              <span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>
+                              <span className="quick-profile-main">
+                                <span>{profile.displayName}</span>
+                                <small>{localizedConnectionProfileSubtitle(profile)}</small>
+                                {badges.length > 0 && (
+                                  <span className="quick-profile-badges">
+                                    {badges.map((badge) => (
+                                      <span key={badge.key} className={`connection-profile-badge tone-${badge.tone}`}>
+                                        {connectionProfileBadgeLabel(badge)}
+                                      </span>
+                                    ))}
                                   </span>
-                                ))}
+                                )}
                               </span>
-                            )}
-                          </span>
-                          {profile.favorite && <StarFilled className="quick-profile-star" />}
-                        </List.Item>
+                              {profile.favorite && <StarFilled className="quick-profile-star" />}
+                            </button>
+                            <Tooltip title={t('action.manage')}>
+                              <Dropdown menu={buildConnectionProfileActionMenu(profile)} trigger={['click']}>
+                                <Button
+                                  aria-label={`${t('action.manage')}: ${profile.displayName}`}
+                                  className="quick-profile-menu"
+                                  icon={<MoreOutlined />}
+                                  size="small"
+                                  type="text"
+                                  onClick={(event) => event.stopPropagation()}
+                                />
+                              </Dropdown>
+                            </Tooltip>
+                          </List.Item>
+                        </Dropdown>
                       );
                     }}
                   />
@@ -6854,6 +6893,15 @@ function SessionTabLabel({
       )}
     </span>
   );
+}
+
+function connectionProfileActionIcon(action) {
+  if (action === 'connect') return <PlusOutlined />;
+  if (action === 'edit' || action === 'rename') return <EditOutlined />;
+  if (action === 'duplicate') return <CopyOutlined />;
+  if (action === 'favorite') return <StarOutlined />;
+  if (action === 'unfavorite') return <StarFilled />;
+  return <DeleteOutlined />;
 }
 
 function sessionTabActionIcon(action) {

@@ -69,7 +69,7 @@ assert.ok(
   source.includes("action !== 'connect' || primaryAction.action === 'focus'")
     && source.includes('launchModel.secondary && (')
     && source.includes('runConnectionProfileLaunchAction(launchModel.secondary, profile)')
-    && source.includes("? 'action.newTerminal'"),
+    && source.includes(": 'action.newTerminal'"),
   'profiles with active sessions must expose both focus-existing and open-new actions',
 );
 
@@ -198,6 +198,15 @@ assert.ok(
     && source.includes("placeholder={t('placeholder.searchSessions')}")
     && source.includes('activateSession(sidebarSessions[0].id);'),
   'the active-session sidebar must provide compact search without changing session lifetime',
+);
+assert.ok(
+  source.includes('const buildConnectionProfileActionMenu = (profile) => {')
+    && source.match(/menu=\{buildConnectionProfileActionMenu\(profile\)\}/g)?.length >= 3
+    && source.includes('className="provider-row-activate"')
+    && source.includes('className="quick-profile-activate"')
+    && source.includes('className="quick-profile-menu"')
+    && /className="quick-profile-activate"[\s\S]*?onClick=\{\(\) => runConnectionProfilePrimaryAction\(profile\)\}/.test(source),
+  'quick terminals and saved connections must expose native keyboard actions and the shared profile menu',
 );
 assert.ok(
   source.includes('const buildSessionActionMenu = (session) => {')
