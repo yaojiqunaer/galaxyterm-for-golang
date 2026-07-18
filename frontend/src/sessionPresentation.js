@@ -168,7 +168,8 @@ export function buildSessionToolbarContext(session, options = {}) {
   const config = session.config || session.request?.config || {};
   const auth = session.auth || session.request?.auth || {};
   const provider = options.providerName || session.providerType || session.request?.providerType || 'Terminal';
-  const target = resolveSessionTarget(config);
+  const providerType = session.providerType || session.request?.providerType || '';
+  const target = resolveSessionTarget(config, providerType);
   const user = config.username || auth.username || '';
   return {
     iconType: session.providerType || session.request?.providerType || 'terminal',
@@ -596,11 +597,11 @@ function matchesSessionQuery(session = {}, queryTokens = []) {
   return queryTokens.every((token) => searchText.includes(token));
 }
 
-function resolveSessionTarget(config = {}) {
+function resolveSessionTarget(config = {}, providerType = '') {
   if (config.host) {
     return config.port ? `${config.host}:${config.port}` : config.host;
   }
-  return config.workingDirectory || config.cwd || '';
+  return config.workingDirectory || config.cwd || (providerType === 'local' ? '~' : '');
 }
 
 function resolveRecordingState(session = {}, options = {}) {

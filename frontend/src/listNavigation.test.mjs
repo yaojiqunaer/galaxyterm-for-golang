@@ -5,6 +5,7 @@ import {
   resolveNumberedSessionIndex,
   resolveSessionShortcutNumber,
   resolveRelativeSessionIndex,
+  resolveTabSessionAction,
 } from './listNavigation.js';
 
 assert.equal(resolveListIndex(0, 0, 'next'), -1);
@@ -34,3 +35,8 @@ assert.equal(resolveRelativeSessionIndex([], 'missing', 'next'), -1);
 assert.equal(resolveBracketSessionAction({ shiftKey: true, key: '{', code: 'BracketLeft' }), 'previous');
 assert.equal(resolveBracketSessionAction({ shiftKey: true, key: '}', code: 'BracketRight' }), 'next');
 assert.equal(resolveBracketSessionAction({ shiftKey: false, key: '[', code: 'BracketLeft' }), '');
+
+assert.equal(resolveTabSessionAction({ ctrlKey: true, key: 'Tab' }), 'next');
+assert.equal(resolveTabSessionAction({ ctrlKey: true, key: 'Tab', shiftKey: true }), 'previous');
+assert.equal(resolveTabSessionAction({ metaKey: true, key: 'Tab' }), '');
+assert.equal(resolveTabSessionAction({ ctrlKey: true, altKey: true, key: 'Tab' }), '');

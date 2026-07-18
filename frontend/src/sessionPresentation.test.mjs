@@ -268,6 +268,16 @@ assert.deepEqual(buildSessionIdentityDisplay({
   provider: 'Custom',
   tooltip: 'Plugin session · Custom · connecting',
 });
+assert.deepEqual(buildSessionIdentityDisplay({
+  label: 'Local Terminal',
+  providerType: 'local',
+}, { providerName: 'Local Terminal', statusName: 'Connected' }), {
+  copyValue: '~',
+  displayName: 'Local Terminal',
+  identity: '~',
+  provider: 'Local Terminal',
+  tooltip: 'Local Terminal · ~ · Connected',
+});
 
 assert.equal(buildDesktopWindowTitle(null, { appName: 'GalaxyTerm' }), 'GalaxyTerm');
 assert.equal(buildDesktopWindowTitle(null, {

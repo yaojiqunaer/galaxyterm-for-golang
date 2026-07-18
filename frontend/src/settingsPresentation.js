@@ -67,7 +67,7 @@ export function buildShortcutGroups(settings = {}) {
       key: 'sessions',
       items: [
         [`${modifier} + 1..9`, 'shortcut.switchNumberedSession'],
-        [`${modifier} + Shift + [ / ]`, 'shortcut.switchAdjacentSession'],
+        ['Ctrl + Tab / Ctrl + Shift + Tab', 'shortcut.switchAdjacentSession'],
         [binding('closeSession'), 'action.closeSession'],
         [`${modifier} + Shift + T`, 'action.restoreClosedSession'],
         [`${modifier} + Shift + F`, 'action.focusMode'],
@@ -136,6 +136,7 @@ export function resolveConfigurableShortcutAction(event = {}, settings = {}) {
     !isCommandShortcut(event, settings)
     || event.altKey
     || event.shiftKey
+    || event.repeat
     || isEditableShortcutTarget(event.target)
   ) return '';
   const key = normalizeShortcutKey(event.key);

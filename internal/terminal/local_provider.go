@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -32,9 +33,10 @@ func NewLocalProvider() session.Provider {
 		Category:     "builtin",
 		Capabilities: []string{"stream", "resize"},
 		NewDriver: func(req session.CreateSessionRequest) (session.Driver, error) {
+			homeDirectory, _ := os.UserHomeDir()
 			return &localDriver{
 				args:             localShellArgs(req.Config),
-				workingDirectory: localWorkingDirectory(req.Config),
+				workingDirectory: localWorkingDirectory(req.Config, homeDirectory),
 			}, nil
 		},
 	}
@@ -107,15 +109,29 @@ func localShellArgs(config map[string]interface{}) []string {
 	return []string{shell, "-li"}
 }
 
-func localWorkingDirectory(config map[string]interface{}) string {
+func localWorkingDirectory(config map[string]interface{}, homeDirectory string) string {
 	for _, key := range []string{"workingDirectory", "cwd"} {
 		if raw, ok := config[key].(string); ok {
 			if value := strings.TrimSpace(raw); value != "" {
-				return value
+				return expandHomeDirectory(value, homeDirectory)
 			}
 		}
 	}
-	return ""
+	return strings.TrimSpace(homeDirectory)
+}
+
+func expandHomeDirectory(value, homeDirectory string) string {
+	home := strings.TrimSpace(homeDirectory)
+	if value == "~" {
+		return home
+	}
+	if strings.HasPrefix(value, "~/") || strings.HasPrefix(value, `~\`) {
+		if home == "" {
+			return ""
+		}
+		return filepath.Join(home, value[2:])
+	}
+	return value
 }
 
 func commandFromArgs(args []string) (*exec.Cmd, error) {

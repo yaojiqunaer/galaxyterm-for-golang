@@ -64,6 +64,10 @@ assert.deepEqual(buildDefaultTerminalLaunch({
     providerType: 'local',
   },
 });
+assert.equal(
+  buildDefaultTerminalLaunch({ providerName: 'Local Terminal' }).request.config.workingDirectory,
+  '~',
+);
 assert.deepEqual(buildDefaultTerminalLaunch({ providerType: 'ssh' }), {
   kind: 'configure',
   providerType: 'ssh',

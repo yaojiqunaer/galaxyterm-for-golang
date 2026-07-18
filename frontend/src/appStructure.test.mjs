@@ -208,10 +208,29 @@ assert.ok(
     && source.includes('const launchDefaultTerminal = async (providerType = terminalDefaults.defaultProviderType) => {')
     && source.includes("if (launch.kind === 'configure') {")
     && source.includes('await startProfileRequests([launch.request]);')
+    && source.includes("workingDirectory: type === 'local'")
     && source.includes("showOperationError('message.terminalStartFailed', error")
     && source.includes("if (configurableShortcutAction === 'newTerminal')")
     && source.includes('launchDefaultTerminal();'),
   'default terminal entry points must share one safe direct-launch plan with structured recovery',
+);
+assert.ok(
+  source.includes('const paletteInputRef = useRef(null);')
+    && source.includes('afterOpenChange={(open) => {')
+    && source.includes('paletteInputRef.current?.focus({ cursor:')
+    && source.includes('ref={paletteInputRef}'),
+  'the command palette must restore input focus after its modal transition',
+);
+assert.ok(
+  source.includes('resolveTabSessionAction,')
+    && source.includes('const tabSessionAction = resolveTabSessionAction(event);')
+    && source.includes('resolveRelativeSessionIndex(sessionIds, activeKey, tabSessionAction)'),
+  'Ctrl+Tab must cycle sessions even while the terminal input owns focus',
+);
+assert.ok(
+  source.includes("t(`session.status.${sessionStatusLabel(session)}`)")
+    && !source.includes('sessionStatusLabel(session.status)'),
+  'command palette session rows must show the real localized lifecycle state',
 );
 assert.ok(
   source.includes('onClick={() => launchDefaultTerminal(provider.type)}')

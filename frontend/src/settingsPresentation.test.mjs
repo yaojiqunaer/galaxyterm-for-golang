@@ -140,6 +140,10 @@ assert.equal(resolveConfigurableShortcutAction(
   { shortcutModifier: 'meta', shortcutBindings: { newTerminal: 'p' } },
 ), '');
 assert.equal(resolveConfigurableShortcutAction(
+  { key: 'p', metaKey: true, repeat: true },
+  { shortcutModifier: 'meta', shortcutBindings: { newTerminal: 'p' } },
+), '');
+assert.equal(resolveConfigurableShortcutAction(
   { key: 'p', ctrlKey: true },
   { shortcutModifier: 'meta', shortcutBindings: { newTerminal: 'p' } },
 ), '');
@@ -178,6 +182,10 @@ assert.deepEqual(buildShortcutKeyOptions({ shortcutModifier: 'ctrl' })[0], {
 assert.equal(
   buildShortcutGroups({ shortcutModifier: 'meta', shortcutBindings: { newTerminal: 'p' } })[0].items[0][0],
   'Cmd + P',
+);
+assert.equal(
+  buildShortcutGroups({ shortcutModifier: 'meta' })[1].items[1][0],
+  'Ctrl + Tab / Ctrl + Shift + Tab',
 );
 assert.deepEqual(
   buildShortcutGroups({ shortcutModifier: 'meta' })

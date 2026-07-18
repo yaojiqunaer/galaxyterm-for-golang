@@ -30,3 +30,8 @@ export function resolveBracketSessionAction(event = {}) {
   if (event.code === 'BracketRight' || event.key === ']' || event.key === '}') return 'next';
   return '';
 }
+
+export function resolveTabSessionAction(event = {}) {
+  if (event.key !== 'Tab' || !event.ctrlKey || event.metaKey || event.altKey) return '';
+  return event.shiftKey ? 'previous' : 'next';
+}

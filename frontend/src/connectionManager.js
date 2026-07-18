@@ -30,7 +30,7 @@ export function buildDefaultTerminalLaunch({
       auth: {},
       config: {
         shell: '',
-        workingDirectory: String(workingDirectory || '').trim(),
+        workingDirectory: String(workingDirectory || '~').trim() || '~',
       },
       displayName: providerName,
       group: '',

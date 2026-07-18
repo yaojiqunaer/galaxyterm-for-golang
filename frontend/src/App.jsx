@@ -248,6 +248,7 @@ import {
   resolveNumberedSessionIndex,
   resolveRelativeSessionIndex,
   resolveSessionShortcutNumber,
+  resolveTabSessionAction,
 } from './listNavigation.js';
 import * as ExtensionsAPI from '../wailsjs/go/extensions/API.js';
 import * as FilesAPI from '../wailsjs/go/files/API.js';
@@ -516,6 +517,7 @@ function App() {
   }, []);
   const terminalRefs = useRef({});
   const terminalSearchRef = useRef(null);
+  const paletteInputRef = useRef(null);
   const fileSearchRef = useRef(null);
   const profileImportRef = useRef(null);
   const contentPageRef = useRef(null);
@@ -681,6 +683,17 @@ function App() {
       if (configurableShortcutAction === 'reconnect') {
         event.preventDefault();
         if (activeKey) reconnectSession();
+        return;
+      }
+      const tabSessionAction = resolveTabSessionAction(event);
+      if (tabSessionAction && sessions.length > 1) {
+        const sessionIds = sessions.map((session) => session.id);
+        const nextIndex = resolveRelativeSessionIndex(sessionIds, activeKey, tabSessionAction);
+        const nextSession = sessions[nextIndex];
+        if (nextSession) {
+          event.preventDefault();
+          activateSession(nextSession.id);
+        }
         return;
       }
       const commandKey = isCommandShortcut(event, settings);
@@ -5423,9 +5436,14 @@ function App() {
         width={620}
         className="command-palette-modal"
         onCancel={closePalette}
+        afterOpenChange={(open) => {
+          if (!open) return;
+          window.requestAnimationFrame(() => paletteInputRef.current?.focus({ cursor: 'all' }));
+        }}
       >
         <Input
           autoFocus
+          ref={paletteInputRef}
           value={paletteQuery}
           onChange={(event) => setPaletteQuery(event.target.value)}
           onKeyDown={handlePaletteKeyDown}
@@ -6878,7 +6896,7 @@ function buildPaletteItems(actions) {
     id: `session:${session.id}`,
     group: t('palette.group.sessions'),
     title: actions.sessionDisplayLabels?.[session.id] || session.label,
-    description: `${sessionStatusLabel(session.status)} · ${profileDescription(profileFromRequest(session.request))}`,
+    description: `${t(`session.status.${sessionStatusLabel(session)}`)} · ${profileDescription(profileFromRequest(session.request))}`,
     icon: providerIcons[session.providerType] || <CodeOutlined />,
     keywords: `${actions.sessionDisplayLabels?.[session.id] || ''} ${session.label} ${session.providerType} ${session.status} ${index + 1}`,
     run: () => actions.activateSession(session.id),
@@ -7392,7 +7410,9 @@ function buildRequest(type, displayName, values) {
     group: values.group || '',
     config: {
       shell: values.shell || '',
-      workingDirectory: values.workingDirectory || '',
+      workingDirectory: type === 'local'
+        ? String(values.workingDirectory || '').trim() || '~'
+        : values.workingDirectory || '',
     },
     auth: {},
   };
