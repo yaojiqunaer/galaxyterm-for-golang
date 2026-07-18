@@ -45,12 +45,14 @@ assert.equal(summary.tunnels, 1);
 const auditRecords = [
   {
     id: 'ssh-prod',
+    sessionId: 'session-ssh-prod',
     providerType: 'ssh',
     title: 'Prod SSH',
     auditEvents: [{ type: 'quick-command.run', detail: 'systemctl status nginx' }],
   },
   {
     id: 'mysql-dev',
+    sessionId: 'session-mysql-dev',
     providerType: 'mysql',
     title: 'Dev Database',
     auditEvents: [{ type: 'session.open', detail: 'opened' }],
@@ -60,6 +62,14 @@ const auditRecords = [
 assert.deepEqual(filterAuditRecords(auditRecords, { providerType: 'all', query: 'nginx' }).map((item) => item.id), ['ssh-prod']);
 assert.deepEqual(filterAuditRecords(auditRecords, { providerType: 'mysql', query: '' }).map((item) => item.id), ['mysql-dev']);
 assert.deepEqual(filterAuditRecords(auditRecords, { providerType: 'ssh', query: 'database' }), []);
+assert.deepEqual(filterAuditRecords(auditRecords, {
+  providerType: 'all',
+  query: '',
+  sessionId: 'session-mysql-dev',
+}).map((item) => item.id), ['mysql-dev']);
+assert.deepEqual(filterAuditRecords(auditRecords, {
+  sessionId: 'missing-session',
+}), []);
 
 const catalog = buildExtensionCatalog({
   installedExtensions: [

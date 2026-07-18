@@ -43,9 +43,15 @@ export function summarizeWorkspace({
   };
 }
 
-export function filterAuditRecords(records = [], { providerType = 'all', query = '' } = {}) {
+export function filterAuditRecords(records = [], {
+  providerType = 'all',
+  query = '',
+  sessionId = 'all',
+} = {}) {
   const normalizedQuery = query.trim().toLowerCase();
   return records.filter((record) => {
+    const matchesSession = sessionId === 'all' || record.sessionId === sessionId;
+    if (!matchesSession) return false;
     const matchesProvider = providerType === 'all' || record.providerType === providerType;
     if (!matchesProvider) return false;
     if (!normalizedQuery) return true;

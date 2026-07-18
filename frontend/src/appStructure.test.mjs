@@ -364,6 +364,14 @@ assert.ok(
   'session context, recording, and audit state must share the terminal status rail',
 );
 assert.ok(
+  source.includes('buildProviderRuntimeState(session.providerType')
+    && source.includes('providerRuntime={providerRuntime}')
+    && source.includes('onManageProvider={() => openProviderExtension(providerRuntime)}')
+    && source.includes('className={`provider-runtime-indicator tone-${providerRuntime.tone}`}')
+    && source.includes("setExtensionScope(runtimeState.status === 'missing' ? 'all' : 'installed')"),
+  'active sessions must disclose their provider runtime and link extension-backed sessions to management',
+);
+assert.ok(
   /@media \(max-width: 860px\)[\s\S]*?\.session-context-status-fact\.fact-target[\s\S]*?\.session-context-status-fact\.fact-user[\s\S]*?display:\s*none/.test(styles),
   'narrow session workspaces must hide secondary context before status and recovery controls',
 );
@@ -835,8 +843,18 @@ assert.ok(
 assert.ok(
   source.includes('sessionRecordingIndicatorLabel(recordingFact)')
     && source.includes('sessionAuditIndicatorLabel(auditSummary)')
+    && /className=\{`session-recording-indicator[\s\S]{0,240}?onClick=\{onOpenAudit\}/.test(source)
+    && /className=\{`session-audit-indicator[\s\S]{0,240}?onClick=\{onOpenAudit\}/.test(source)
     && styles.includes('.session-capture-indicator-label'),
-  'recording and audit state must remain readable without relying on icon hover tooltips',
+  'recording and audit state must remain readable and open the current session record',
+);
+assert.ok(
+  source.includes("const [auditSessionFilter, setAuditSessionFilter] = useState('all');")
+    && source.includes('sessionId: auditSessionFilter,')
+    && source.includes("setAuditSessionFilter(sessionId || 'all');")
+    && source.includes('className="audit-session-filter"')
+    && source.includes('options={auditSessionOptions}'),
+  'audit navigation must filter records by the exact session instead of relying on duplicate-prone labels',
 );
 assert.ok(
   source.includes('persistAuditRecordSet(localStorage, auditRecordStorageKey, records, options)')
@@ -850,7 +868,7 @@ assert.ok(
 assert.ok(
   /\.terminal-status-fact\s*\{[\s\S]*?border:\s*0;[\s\S]*?border-radius:\s*0;[\s\S]*?background:\s*transparent;/.test(styles)
     && /\.terminal-status-fact\.fact-status::before\s*\{[\s\S]*?border-radius:\s*50%;/.test(styles)
-    && /\.session-audit-indicator,\s*\.session-recording-indicator\s*\{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;/.test(styles),
+    && /\.session-audit-indicator,\s*\.session-recording-indicator,\s*\.provider-runtime-indicator\s*\{[\s\S]*?border:\s*0;[\s\S]*?background:\s*transparent;/.test(styles),
   'terminal status should use a quiet desktop status strip instead of stacked pill controls',
 );
 assert.ok(

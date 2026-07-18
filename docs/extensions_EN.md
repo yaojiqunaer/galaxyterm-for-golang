@@ -45,6 +45,8 @@ The Extensions page searches by name, extension ID, terminal provider, file prov
 
 Installed extensions show how many saved connections and active sessions currently use their providers. Disabling an extension in use presents the exact impact first. Existing terminal sessions remain open, but new sessions cannot start until the extension is enabled again. Uninstall confirmation repeats the connection and session impact because active sessions may be interrupted; saved connections are retained and become usable again after reinstalling the same provider.
 
+The active terminal status rail always identifies the provider runtime source. Core terminals are marked Core; extension terminals report enabled, disabled, or missing state. Disabling does not force an existing session to close, and a session whose extension was removed remains available until the user closes it, but reconnecting requires the extension to be enabled or installed again. Selecting the extension state opens Extensions with the extension ID or provider type already filtered. Audit and recording states open the current session record directly.
+
 The current location of a non-SFTP file provider can be saved as a file connection and appears alongside terminal connections in groups, favorites, search, and the command palette. `configFields` are stored in the profile, while `authFields` are written only to the system credential store. Import and export remove credential references so another device never presents an unavailable secret as saved. Opening a file connection without a stored credential stops at its authentication form for one-time input.
 
 ## Release Index

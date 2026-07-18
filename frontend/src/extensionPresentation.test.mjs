@@ -7,6 +7,7 @@ import {
   buildExtensionSummary,
   buildExtensionUsageImpact,
   buildInstalledExtensionRows,
+  buildProviderRuntimeState,
   compareExtensionVersions,
   findCatalogItemForType,
   findExtensionUpdate,
@@ -211,6 +212,82 @@ assert.deepEqual(buildExtensionUsageImpact(installedExtensions[2], {
 assert.deepEqual(filterProvidersByDisabledExtensions(providers, installedExtensions, [
   'galaxyterm-extension-mysql',
 ]).map((provider) => provider.type), ['local', 'ssh']);
+
+assert.deepEqual(buildProviderRuntimeState('ssh', {
+  providers: [
+    { type: 'ssh', category: 'builtin', capabilities: ['stream', 'resize'] },
+  ],
+  installedExtensions,
+}), {
+  capabilities: ['stream', 'resize'],
+  extensionId: '',
+  extensionName: '',
+  key: 'builtin',
+  labelKey: 'provider.runtime.builtin',
+  manageable: false,
+  providerType: 'ssh',
+  source: 'builtin',
+  status: 'enabled',
+  tone: 'neutral',
+  version: '',
+});
+
+assert.deepEqual(buildProviderRuntimeState('mysql', {
+  providers,
+  installedExtensions,
+}), {
+  capabilities: ['stream', 'query'],
+  extensionId: 'galaxyterm-extension-mysql',
+  extensionName: 'MySQL',
+  key: 'extension',
+  labelKey: 'provider.runtime.extension',
+  manageable: true,
+  providerType: 'mysql',
+  source: 'extension',
+  status: 'enabled',
+  tone: 'success',
+  version: '0.1.0',
+});
+
+assert.deepEqual(buildProviderRuntimeState('mysql', {
+  providers,
+  installedExtensions,
+  disabledExtensionIds: ['galaxyterm-extension-mysql'],
+}), {
+  capabilities: ['stream', 'query'],
+  extensionId: 'galaxyterm-extension-mysql',
+  extensionName: 'MySQL',
+  key: 'extension-disabled',
+  labelKey: 'provider.runtime.disabled',
+  manageable: true,
+  providerType: 'mysql',
+  source: 'extension',
+  status: 'disabled',
+  tone: 'warning',
+  version: '0.1.0',
+});
+
+assert.deepEqual(buildProviderRuntimeState('mysql', {
+  providers,
+  installedExtensions: [],
+}), {
+  capabilities: [],
+  extensionId: '',
+  extensionName: '',
+  key: 'extension-missing',
+  labelKey: 'provider.runtime.missing',
+  manageable: true,
+  providerType: 'mysql',
+  source: 'extension',
+  status: 'missing',
+  tone: 'danger',
+  version: '',
+});
+
+assert.equal(buildProviderRuntimeState('docker', {
+  providers: providers.filter((provider) => provider.type !== 'docker'),
+  installedExtensions: [],
+}).status, 'missing');
 
 const remoteCatalog = [
   {

@@ -255,6 +255,7 @@ import {
   buildExtensionSummary,
   buildExtensionUsageImpact,
   buildInstalledExtensionRows,
+  buildProviderRuntimeState,
   findCatalogItemForType,
   findExtensionUpdate,
   filterExtensionWorkspace,
@@ -438,6 +439,7 @@ function App() {
   const [connectionGroupEditor, setConnectionGroupEditor] = useState(null);
   const [auditQuery, setAuditQuery] = useState('');
   const [auditProviderFilter, setAuditProviderFilter] = useState('all');
+  const [auditSessionFilter, setAuditSessionFilter] = useState('all');
   const [workspaceSummary, setWorkspaceSummary] = useState(() => loadWorkspaceSummary());
   const [workspaceHydrated, setWorkspaceHydrated] = useState(false);
   const [quickCommands, setQuickCommands] = useState(() => loadQuickCommands());
@@ -950,10 +952,10 @@ function App() {
   const sessionIdentityDisplays = useMemo(() => Object.fromEntries(
     sessions.map((session) => [session.id, buildSessionIdentityDisplay(session, {
       displayName: sessionDisplayLabels[session.id],
-      providerName: providerTypeLabel(session.providerType, providers),
+      providerName: providerTypeLabel(session.providerType, allProviders),
       statusName: t(`session.status.${sessionStatusLabel(session)}`),
     })]),
-  ), [locale, providers, sessionDisplayLabels, sessions]);
+  ), [allProviders, locale, sessionDisplayLabels, sessions]);
   const desktopWindowTitle = useMemo(() => {
     const appName = t('app.title');
     if (selectedNav !== 'sessions') {
@@ -963,11 +965,11 @@ function App() {
       appName,
       displayName: sessionDisplayLabels[activeSession.id],
       providerName: activeSession
-        ? providerTypeLabel(activeSession.providerType, providers)
+        ? providerTypeLabel(activeSession.providerType, allProviders)
         : '',
       unreadCount: unreadSessionCount,
     });
-  }, [activeSession, locale, providers, selectedNav, sessionDisplayLabels, unreadSessionCount]);
+  }, [activeSession, allProviders, locale, selectedNav, sessionDisplayLabels, unreadSessionCount]);
 
   useEffect(() => {
     syncDesktopWindowTitle(desktopWindowTitle);
@@ -1221,10 +1223,35 @@ function App() {
     ...Array.from(new Set(auditRecords.map((record) => record.providerType || 'terminal')))
       .map((type) => ({ value: type, label: type })),
   ], [auditRecords, locale]);
+  const auditSessionOptions = useMemo(() => {
+    const labelsById = new Map();
+    sessions.forEach((session) => {
+      labelsById.set(session.id, sessionDisplayLabels[session.id] || session.label || session.id);
+    });
+    auditRecords.forEach((record) => {
+      if (record.sessionId && !labelsById.has(record.sessionId)) {
+        labelsById.set(
+          record.sessionId,
+          [record.title || record.sessionId, record.providerType].filter(Boolean).join(' · '),
+        );
+      }
+    });
+    return [
+      { value: 'all', label: t('filter.allSessions') },
+      ...[...labelsById].map(([value, label]) => ({ value, label })),
+    ];
+  }, [auditRecords, locale, sessionDisplayLabels, sessions]);
   const visibleAuditRecords = useMemo(() => filterAuditRecords(auditRecords, {
     providerType: auditProviderFilter,
     query: auditQuery,
-  }), [auditProviderFilter, auditQuery, auditRecords]);
+    sessionId: auditSessionFilter,
+  }), [auditProviderFilter, auditQuery, auditRecords, auditSessionFilter]);
+
+  useEffect(() => {
+    if (auditSessionFilter === 'all') return;
+    if (auditSessionOptions.some((option) => option.value === auditSessionFilter)) return;
+    setAuditSessionFilter('all');
+  }, [auditSessionFilter, auditSessionOptions]);
   const currentSessionSummary = useMemo(() => sessionSummary(sessions), [sessions]);
   const workspaceActionState = buildWorkspaceActionState({
     hasSnapshot: buildWorkspaceSnapshotSummary(workspaceSummary).hasSnapshot,
@@ -1310,6 +1337,12 @@ function App() {
   const openExtensionsForProvider = (providerType = '') => {
     setExtensionQuery(String(providerType || '').trim());
     setExtensionScope('all');
+    setSelectedNav('extensions');
+  };
+
+  const openProviderExtension = (runtimeState = {}) => {
+    setExtensionQuery(runtimeState.extensionId || runtimeState.providerType || '');
+    setExtensionScope(runtimeState.status === 'missing' ? 'all' : 'installed');
     setSelectedNav('extensions');
   };
 
@@ -2841,23 +2874,31 @@ function App() {
 
   const openSessionAudit = (sessionId) => {
     setActiveKey(sessionId);
+    setAuditSessionFilter(sessionId || 'all');
     setSelectedNav('audit');
   };
 
   const renderTerminalPane = (session) => {
     const recording = terminalRefs.current[session.id]?.recording?.();
     const recordingActive = Boolean(recording?.startedAt) && session.status !== 'closed';
+    const providerRuntime = buildProviderRuntimeState(session.providerType, {
+      disabledExtensionIds: settings.disabledExtensionIds,
+      installedExtensions,
+      providers: allProviders,
+    });
     return (
       <TerminalFrame
         auditSummary={buildSessionAuditSummary(session, { recordingActive })}
         contextFacts={buildSessionContextFacts(session, {
-          providerName: providerTypeLabel(session.providerType, providers),
+          providerName: providerTypeLabel(session.providerType, allProviders),
           recordingActive,
         })}
         onCopyError={() => copyTerminalError(session.id)}
         onInterrupt={() => interruptSession(session.id)}
         onOpenAudit={() => openSessionAudit(session.id)}
+        onManageProvider={() => openProviderExtension(providerRuntime)}
         onReconnect={() => reconnectSession(session.id)}
+        providerRuntime={providerRuntime}
         status={terminalStatuses[session.id]}
       >
         <Suspense fallback={<TerminalLoadingState />}>
@@ -3026,7 +3067,7 @@ function App() {
     });
     const sessionToolbarContext = buildSessionToolbarContext(activeSession, {
       providerName: activeSession
-        ? providerTypeLabel(activeSession.providerType, providers)
+        ? providerTypeLabel(activeSession.providerType, allProviders)
         : '',
     });
     const runSessionToolbarAction = (action) => {
@@ -5554,6 +5595,12 @@ function App() {
           placeholder={t('placeholder.auditSearch')}
         />
         <Select
+          className="audit-session-filter"
+          value={auditSessionFilter}
+          onChange={setAuditSessionFilter}
+          options={auditSessionOptions}
+        />
+        <Select
           className="provider-filter"
           value={auditProviderFilter}
           onChange={setAuditProviderFilter}
@@ -7318,8 +7365,10 @@ function TerminalFrame({
   contextFacts = [],
   onCopyError,
   onInterrupt,
+  onManageProvider,
   onOpenAudit,
   onReconnect,
+  providerRuntime,
   status,
 }) {
   const facts = buildTerminalStatusFacts(status || {});
@@ -7349,30 +7398,59 @@ function TerminalFrame({
             </span>
           ))}
         </div>
-        {(recordingFact || auditSummary || controlActions.length > 0 || errorDetail || recoveryActions.length > 0) && (
+        {(providerRuntime || recordingFact || auditSummary || controlActions.length > 0 || errorDetail || recoveryActions.length > 0) && (
           <div className="terminal-recovery-actions">
+            {providerRuntime && (
+              <Tooltip title={providerRuntimeDescription(providerRuntime)}>
+                {providerRuntime.manageable ? (
+                  <Button
+                    aria-label={providerRuntimeDescription(providerRuntime)}
+                    className={`provider-runtime-indicator tone-${providerRuntime.tone}`}
+                    icon={<AppstoreOutlined />}
+                    onClick={onManageProvider}
+                    size="small"
+                    type="text"
+                  >
+                    <span className="session-capture-indicator-label">{t(providerRuntime.labelKey)}</span>
+                  </Button>
+                ) : (
+                  <span
+                    aria-label={providerRuntimeDescription(providerRuntime)}
+                    className={`provider-runtime-indicator tone-${providerRuntime.tone}`}
+                    role="status"
+                  >
+                    <ApiOutlined />
+                    <span className="session-capture-indicator-label">{t(providerRuntime.labelKey)}</span>
+                  </span>
+                )}
+              </Tooltip>
+            )}
             {recordingFact && (
               <Tooltip title={`${sessionContextFactLabel(recordingFact)}: ${sessionContextFactValue(recordingFact)}`}>
-                <span
+                <Button
                   aria-label={`${sessionContextFactLabel(recordingFact)}: ${sessionContextFactValue(recordingFact)}`}
                   className={`session-recording-indicator tone-${recordingFact.tone}`}
-                  role="status"
+                  icon={<VideoCameraOutlined />}
+                  onClick={onOpenAudit}
+                  size="small"
+                  type="text"
                 >
-                  <VideoCameraOutlined />
                   <span className="session-capture-indicator-label">{sessionRecordingIndicatorLabel(recordingFact)}</span>
-                </span>
+                </Button>
               </Tooltip>
             )}
             {auditSummary && (
               <Tooltip title={t(auditSummary.descriptionKey, auditSummary.values)}>
-                <span
+                <Button
                   aria-label={t(auditSummary.titleKey, auditSummary.values)}
                   className={`session-audit-indicator tone-${auditSummary.tone}`}
-                  role="status"
+                  icon={<AuditOutlined />}
+                  onClick={onOpenAudit}
+                  size="small"
+                  type="text"
                 >
-                  <AuditOutlined />
                   <span className="session-capture-indicator-label">{sessionAuditIndicatorLabel(auditSummary)}</span>
-                </span>
+                </Button>
               </Tooltip>
             )}
             {controlActions.map((action) => (
@@ -7965,6 +8043,25 @@ function sessionAuditIndicatorLabel(summary) {
   if (summary?.titleKey === 'session.audit.saved.title') return t('session.audit.indicator.saved');
   if (summary?.titleKey === 'session.audit.recording.title') return t('session.audit.indicator.active');
   return t('session.audit.indicator.pending');
+}
+
+function providerRuntimeDescription(runtimeState = {}) {
+  if (runtimeState.status === 'disabled') {
+    return t('provider.runtime.disabledDescription', {
+      name: runtimeState.extensionName || runtimeState.providerType,
+      version: runtimeState.version,
+    });
+  }
+  if (runtimeState.status === 'missing') {
+    return t('provider.runtime.missingDescription', { type: runtimeState.providerType });
+  }
+  if (runtimeState.source === 'extension') {
+    return t('provider.runtime.extensionDescription', {
+      name: runtimeState.extensionName || runtimeState.providerType,
+      version: runtimeState.version,
+    });
+  }
+  return t('provider.runtime.builtinDescription');
 }
 
 function terminalStatusFactLabel(fact) {

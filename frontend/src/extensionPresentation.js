@@ -163,6 +163,64 @@ export function buildInstalledExtensionRows(installedExtensions = [], disabledEx
   });
 }
 
+export function buildProviderRuntimeState(
+  providerType = '',
+  { providers = [], installedExtensions = [], disabledExtensionIds = [] } = {},
+) {
+  const provider = providers.find((item) => item.type === providerType);
+  const extension = installedExtensions.find((item) => (
+    (item.providers || []).some((candidate) => candidate.type === providerType)
+  ));
+
+  if (!extension && provider && provider.category !== 'extension') {
+    return {
+      capabilities: provider?.capabilities || [],
+      extensionId: '',
+      extensionName: '',
+      key: 'builtin',
+      labelKey: 'provider.runtime.builtin',
+      manageable: false,
+      providerType,
+      source: 'builtin',
+      status: 'enabled',
+      tone: 'neutral',
+      version: '',
+    };
+  }
+
+  if (!extension) {
+    return {
+      capabilities: [],
+      extensionId: '',
+      extensionName: '',
+      key: 'extension-missing',
+      labelKey: 'provider.runtime.missing',
+      manageable: true,
+      providerType,
+      source: 'extension',
+      status: 'missing',
+      tone: 'danger',
+      version: '',
+    };
+  }
+
+  const extensionProvider = (extension.providers || []).find((item) => item.type === providerType);
+  const disabled = new Set(disabledExtensionIds).has(extension.id);
+  return {
+    capabilities: extensionProvider?.capabilities || provider?.capabilities || [],
+    extensionId: extension.id || '',
+    extensionName: extension.name || extension.id || providerType,
+    key: disabled ? 'extension-disabled' : 'extension',
+    labelKey: disabled ? 'provider.runtime.disabled' : 'provider.runtime.extension',
+    manageable: true,
+    providerType,
+    source: 'extension',
+    status: disabled ? 'disabled' : 'enabled',
+    tone: disabled ? 'warning' : 'success',
+    version: extension.version || '',
+  };
+}
+
 export function buildExtensionUsageImpact(extension = {}, { profiles = [], sessions = [] } = {}) {
   const providerTypes = new Set([...(extension.providers || []), ...(extension.fileProviders || [])]
     .map((provider) => (typeof provider === 'string' ? provider : provider?.type))

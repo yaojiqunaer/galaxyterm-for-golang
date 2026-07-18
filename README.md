@@ -71,7 +71,7 @@
 
 ## 架构
 
-核心程序只保留本地终端、SSH、会话管理、通用文件工作区、凭据和扩展宿主。终端扩展与文件协议扩展分别声明 `providers` 和 `fileProviders`，可通过 GitHub Releases 在线获取或使用 `.gtx` 包离线安装。扩展管理支持按名称、Provider、能力和状态搜索；保存连接缺少对应 Provider 时可直接定位扩展安装或启用入口，停用或卸载前会展示受影响的连接和活动会话。文件协议扩展支持按能力声明 `list`、`read`、`write`、`upload`、`download`、`mkdir`、`rename`、`delete` 等操作，并通过 `configFields`、`authFields` 贡献连接表单；文件位置可保存到统一连接管理中，认证字段进入系统凭据库，连接档案和导出文件不保存明文。界面无需识别具体协议，只展示当前 Provider 实际支持的字段和命令。
+核心程序只保留本地终端、SSH、会话管理、通用文件工作区、凭据和扩展宿主。终端扩展与文件协议扩展分别声明 `providers` 和 `fileProviders`，可通过 GitHub Releases 在线获取或使用 `.gtx` 包离线安装。扩展管理支持按名称、Provider、能力和状态搜索；保存连接缺少对应 Provider 时可直接定位扩展安装或启用入口，停用或卸载前会展示受影响的连接和活动会话。每个活动终端会在状态栏标明由核心还是扩展提供；扩展被停用或卸载后，已打开会话保持到用户关闭，同时状态会明确告知新会话是否可用，点击扩展状态可直接定位管理页面。审计和录屏状态同样可点击并进入当前会话记录。文件协议扩展支持按能力声明 `list`、`read`、`write`、`upload`、`download`、`mkdir`、`rename`、`delete` 等操作，并通过 `configFields`、`authFields` 贡献连接表单；文件位置可保存到统一连接管理中，认证字段进入系统凭据库，连接档案和导出文件不保存明文。界面无需识别具体协议，只展示当前 Provider 实际支持的字段和命令。
 
 扩展源、`galaxyterm-index.json` 与 GitHub Release 发布格式见 [扩展分发文档](docs/extensions.md)。
 

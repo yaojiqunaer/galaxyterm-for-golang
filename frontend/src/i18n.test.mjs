@@ -205,6 +205,14 @@ assert.equal(t('filter.allProviders'), '全部类型');
 assert.equal(t('metric.builtinProviders'), '内置终端类型');
 assert.equal(t('section.installedProviders'), '已安装终端类型');
 assert.equal(t('extension.sftp'), 'SFTP 文件扩展');
+assert.equal(t('provider.runtime.builtin'), '核心');
+assert.equal(t('provider.runtime.extension'), '扩展');
+assert.equal(t('provider.runtime.disabled'), '已停用');
+assert.equal(t('provider.runtime.missing'), '扩展缺失');
+assert.equal(t('provider.runtime.disabledDescription', {
+  name: 'MySQL',
+  version: '0.1.0',
+}), 'MySQL 0.1.0 已停用；当前会话保持运行，但无法新建同类型会话。');
 assert.equal(t('file.noProviderHint'), '安装 SFTP、FTP、S3 或兼容的文件协议扩展后即可浏览远程文件。');
 [
   'operation.error.reason.unavailable',
@@ -215,4 +223,6 @@ assert.equal(t('file.noProviderHint'), '安装 SFTP、FTP、S3 或兼容的文�
 setLocale('en-US');
 assert.equal(currentLocale(), 'en-US');
 assert.equal(t('nav.sessions'), 'Sessions');
+assert.equal(t('provider.runtime.builtinDescription'), 'Provided by the GalaxyTerm core; no extension is required.');
+assert.equal(t('provider.runtime.missingDescription', { type: 'mysql' }), 'The mysql provider extension is not installed. This session remains available until it is closed.');
 assert.equal(t('confirm.closeAllSessionsContent', { count: 2 }), '2 sessions will be closed after saving their audit records.');

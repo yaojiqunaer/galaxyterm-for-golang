@@ -1129,7 +1129,8 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
 }
 
 .session-audit-indicator,
-.session-recording-indicator {
+.session-recording-indicator,
+.provider-runtime-indicator {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -1142,6 +1143,47 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   border-radius: 0;
   background: transparent;
   color: var(--muted);
+}
+
+.provider-runtime-indicator.ant-btn {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 5px;
+  color: var(--muted);
+}
+
+.session-audit-indicator.ant-btn,
+.session-recording-indicator.ant-btn {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 5px;
+  color: var(--muted);
+}
+
+.session-audit-indicator.ant-btn:hover,
+.session-audit-indicator.ant-btn:focus-visible,
+.session-recording-indicator.ant-btn:hover,
+.session-recording-indicator.ant-btn:focus-visible {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  color: var(--accent);
+}
+
+.provider-runtime-indicator.ant-btn:hover,
+.provider-runtime-indicator.ant-btn:focus-visible {
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  color: var(--accent);
+}
+
+.provider-runtime-indicator.tone-success {
+  color: var(--success);
+}
+
+.provider-runtime-indicator.tone-warning {
+  color: var(--warning);
+}
+
+.provider-runtime-indicator.tone-danger {
+  color: var(--danger);
 }
 
 .session-capture-indicator-label {
@@ -1737,7 +1779,11 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
 
 @media (max-width: 680px) {
   .session-audit-indicator,
-  .session-recording-indicator {
+  .session-recording-indicator,
+  .provider-runtime-indicator,
+  .session-audit-indicator.ant-btn,
+  .session-recording-indicator.ant-btn,
+  .provider-runtime-indicator.ant-btn {
     width: 26px;
     padding: 0;
     justify-content: center;
@@ -3046,17 +3092,23 @@ code {
 .list-toolbar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 10px;
   margin-top: 12px;
 }
 
 .list-search {
+  flex: 1 1 280px;
   width: min(420px, 100%);
 }
 
 .provider-filter {
   width: 180px;
+}
+
+.audit-session-filter {
+  width: min(240px, 30vw);
 }
 
 .audit-summary-grid {
