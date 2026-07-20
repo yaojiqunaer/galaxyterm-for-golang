@@ -113,6 +113,7 @@ import {
   removeConnectionGroup,
   renameConnectionGroup,
   resolveConnectionGroupFilter,
+  resolveConnectionProfileDrop,
   resolveProfileSaveDefault,
   resolveSelectedProfileId,
   selectBatchProfiles,
@@ -458,6 +459,7 @@ function App() {
   const [selectedProfileId, setSelectedProfileId] = useState('');
   const [connectionDetailProfileId, setConnectionDetailProfileId] = useState('');
   const [connectionGroupEditor, setConnectionGroupEditor] = useState(null);
+  const [connectionDragState, setConnectionDragState] = useState({ profileId: '', targetKey: '' });
   const [auditQuery, setAuditQuery] = useState('');
   const [auditProviderFilter, setAuditProviderFilter] = useState('all');
   const [auditSessionFilter, setAuditSessionFilter] = useState('all');
@@ -597,6 +599,7 @@ function App() {
   const contentPageScrollPositionsRef = useRef(new Map());
   const previousContentPageRef = useRef(selectedNav);
   const draggedSessionIdRef = useRef('');
+  const draggedProfileIdRef = useRef('');
   const workspaceHadSessionsRef = useRef(false);
   const workspaceRestoringRef = useRef(false);
   const workspaceStartupHandledRef = useRef(false);
@@ -1168,6 +1171,10 @@ function App() {
     groupKey: resolvedGroupQuery.group,
     key: groupQuery,
   };
+  const connectionGroupCreateTarget = activeConnectionGroup.type === 'group'
+    && activeConnectionGroup.groupKey !== ungroupedKey
+    ? activeConnectionGroup.groupKey
+    : '';
 
   useEffect(() => {
     if (connectionGroupNav.some((item) => item.key === groupQuery)) return;
@@ -2539,6 +2546,59 @@ function App() {
     });
   };
 
+  const clearConnectionProfileDrag = () => {
+    draggedProfileIdRef.current = '';
+    setConnectionDragState({ profileId: '', targetKey: '' });
+  };
+
+  const beginConnectionProfileDrag = (event, profile) => {
+    if (isInteractiveControl(event.target)) {
+      event.preventDefault();
+      return;
+    }
+    draggedProfileIdRef.current = profile.id;
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', profile.id);
+    setConnectionDragState({ profileId: profile.id, targetKey: '' });
+  };
+
+  const connectionProfileDropPlan = (item) => {
+    const profileId = draggedProfileIdRef.current;
+    const profile = profiles.find((candidate) => candidate.id === profileId);
+    return profile ? resolveConnectionProfileDrop(profile, item) : null;
+  };
+
+  const allowConnectionProfileDrop = (event, item) => {
+    const plan = connectionProfileDropPlan(item);
+    if (!plan) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    if (connectionDragState.targetKey !== plan.targetKey) {
+      setConnectionDragState((current) => ({ ...current, targetKey: plan.targetKey }));
+    }
+  };
+
+  const leaveConnectionProfileDrop = (event, item) => {
+    if (event.currentTarget.contains(event.relatedTarget)) return;
+    setConnectionDragState((current) => (
+      current.targetKey === item.key ? { ...current, targetKey: '' } : current
+    ));
+  };
+
+  const dropConnectionProfile = (event, item) => {
+    const plan = connectionProfileDropPlan(item);
+    if (plan) event.preventDefault();
+    const profile = profiles.find((candidate) => candidate.id === plan?.profileId);
+    clearConnectionProfileDrag();
+    if (!profile || !plan) return;
+    if (plan.action === 'favorite') {
+      toggleProfileFavorite(profile.id);
+      messageApi.success(t('message.connectionFavorited', { name: profile.displayName }));
+      return;
+    }
+    moveProfileToGroup(profile, plan.targetGroup);
+  };
+
   const openNewGroupForProfile = (profile) => setConnectionGroupEditor({
     affectedCount: 1,
     mode: 'move',
@@ -3368,18 +3428,43 @@ function App() {
         <aside className="connection-groups-panel">
           <div className="connection-panel-head">
             <Text strong>{t('section.connectionGroups')}</Text>
-            <Button
-              size="small"
-              type="text"
-              icon={<StarFilled />}
-              onClick={() => openBatchProfiles({ favoritesOnly: true })}
-              disabled={!profiles.some((profile) => profile.favorite)}
-            />
+            <div className="connection-panel-actions">
+              <Tooltip title={t('action.openFavorites')}>
+                <span className="connection-panel-action-trigger">
+                  <Button
+                    aria-label={t('action.openFavorites')}
+                    size="small"
+                    type="text"
+                    icon={<StarFilled />}
+                    onClick={() => openBatchProfiles({ favoritesOnly: true })}
+                    disabled={!profiles.some((profile) => profile.favorite)}
+                  />
+                </span>
+              </Tooltip>
+              <Tooltip title={t(connectionGroupCreateTarget ? 'action.newConnectionInGroup' : 'action.newConnection')}>
+                <Button
+                  aria-label={t(connectionGroupCreateTarget ? 'action.newConnectionInGroup' : 'action.newConnection')}
+                  size="small"
+                  type="text"
+                  icon={<PlusOutlined />}
+                  onClick={() => openConnectionDrawer(terminalDefaults.defaultProviderType, connectionGroupCreateTarget)}
+                />
+              </Tooltip>
+            </div>
           </div>
           <div className="connection-group-nav">
             {connectionGroupNav.map((item) => {
               const row = (
-                <div className={groupQuery === item.key ? 'connection-group-nav-item active' : 'connection-group-nav-item'}>
+                <div
+                  className={[
+                    'connection-group-nav-item',
+                    groupQuery === item.key ? 'active' : '',
+                    connectionDragState.targetKey === item.key ? 'drop-target' : '',
+                  ].filter(Boolean).join(' ')}
+                  onDragLeave={(event) => leaveConnectionProfileDrop(event, item)}
+                  onDragOver={(event) => allowConnectionProfileDrop(event, item)}
+                  onDrop={(event) => dropConnectionProfile(event, item)}
+                >
                   <button
                     aria-current={groupQuery === item.key ? 'page' : undefined}
                     className="connection-group-nav-activate"
@@ -3642,11 +3727,18 @@ function App() {
                   trigger={['contextMenu']}
                 >
                   <List.Item
-                    className={(compactConnectionDetail ? explicitlySelectedProfile?.id : selectedProfile?.id) === profile.id ? 'connection-profile-row active' : 'connection-profile-row'}
+                    className={[
+                      'connection-profile-row',
+                      (compactConnectionDetail ? explicitlySelectedProfile?.id : selectedProfile?.id) === profile.id ? 'active' : '',
+                      connectionDragState.profileId === profile.id ? 'dragging' : '',
+                    ].filter(Boolean).join(' ')}
+                    draggable={profiles.length > 0}
                     id={`connection-profile-option-${profileIndex}`}
                     role="option"
                     aria-selected={(compactConnectionDetail ? explicitlySelectedProfile?.id : selectedProfile?.id) === profile.id}
                     tabIndex={-1}
+                    onDragEnd={clearConnectionProfileDrag}
+                    onDragStart={(event) => beginConnectionProfileDrag(event, profile)}
                     onClick={() => {
                       setSelectedProfileId(profile.id);
                       if (compactConnectionDetail) setConnectionDetailProfileId(profile.id);

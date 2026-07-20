@@ -978,5 +978,21 @@ assert.ok(
     && source.includes('}, [installedExtensions, locale]);'),
   'installed extension dictionaries must refresh after language, install, update, or uninstall changes',
 );
+assert.ok(
+  source.includes('resolveConnectionProfileDrop')
+    && source.includes('const beginConnectionProfileDrag = (event, profile) => {')
+    && source.includes('if (isInteractiveControl(event.target))')
+    && source.includes('const dropConnectionProfile = (event, item) => {')
+    && source.includes("connectionDragState.targetKey === item.key ? 'drop-target' : ''")
+    && source.includes('draggable={profiles.length > 0}')
+    && source.includes("'action.newConnectionInGroup'")
+    && source.includes("t('action.openFavorites')"),
+  'connection groups must support guarded drag and drop plus discoverable group shortcuts',
+);
+assert.ok(
+  /\.connection-profile-row\[draggable='true'\]\s*\{[\s\S]*?cursor:\s*grab;/.test(styles)
+    && /\.connection-group-nav-item\.drop-target\s*\{[\s\S]*?box-shadow:\s*inset/.test(styles),
+  'connection drag and drop must provide clear source and destination feedback',
+);
 
 console.log('app structure tests passed');

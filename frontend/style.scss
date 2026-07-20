@@ -2190,6 +2190,16 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   border-bottom: 1px solid var(--border-subtle);
 }
 
+.connection-panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.connection-panel-action-trigger {
+  display: inline-flex;
+}
+
 .connection-group-nav {
   display: flex;
   flex-direction: column;
@@ -2205,11 +2215,18 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   border-radius: 6px;
   background: transparent;
   color: var(--text);
+  transition: background 120ms ease, box-shadow 120ms ease, color 120ms ease;
 }
 
 .connection-group-nav-item:hover,
 .connection-group-nav-item.active {
   background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.connection-group-nav-item.drop-target {
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+  box-shadow: inset 3px 0 0 var(--accent), inset 0 0 0 1px color-mix(in srgb, var(--accent) 45%, transparent);
   color: var(--accent);
 }
 
@@ -2421,6 +2438,19 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
 .connection-profile-row {
   cursor: pointer;
   outline: none;
+  transition: opacity 120ms ease;
+}
+
+.connection-profile-row[draggable='true'] {
+  cursor: grab;
+}
+
+.connection-profile-row[draggable='true']:active {
+  cursor: grabbing;
+}
+
+.connection-profile-row.dragging {
+  opacity: 0.48;
 }
 
 .connection-profile-row .ant-list-item-meta {

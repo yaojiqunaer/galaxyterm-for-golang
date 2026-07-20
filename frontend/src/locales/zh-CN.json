@@ -660,6 +660,7 @@
   "confirm.removeConnectionGroupContent": "分组中的 {count} 个连接会移动到“未分组”，连接配置和凭据不会删除。",
   "message.connectionGroupUnchanged": "连接分组没有变化",
   "message.connectionMovedToGroup": "连接已移动到“{name}”",
+  "message.connectionFavorited": "已将“{name}”加入收藏",
   "message.connectionGroupRenamed": "已将 {count} 个连接归入“{name}”",
   "message.connectionGroupRemoved": "已移除“{name}”，{count} 个连接已移到“未分组”",
   "message.profileSaved": "连接已保存",

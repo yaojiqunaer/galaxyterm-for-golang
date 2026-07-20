@@ -186,6 +186,45 @@ assert.equal(removedGroup?.changedCount, 2);
 assert.deepEqual(removedGroup?.profiles.map((profile) => profile.group), ['', '', '']);
 assert.equal(removedGroup?.profiles.length, profiles.length);
 
+assert.deepEqual(connectionManager.resolveConnectionProfileDrop?.(profiles[2], {
+  groupKey: 'Production',
+  key: 'group:Production',
+  type: 'group',
+}), {
+  action: 'move',
+  profileId: 'dev-shell',
+  targetGroup: 'Production',
+  targetKey: 'group:Production',
+});
+assert.deepEqual(connectionManager.resolveConnectionProfileDrop?.(profiles[1], {
+  key: 'favorites',
+  type: 'favorites',
+}), {
+  action: 'favorite',
+  profileId: 'prod-web',
+  targetGroup: '',
+  targetKey: 'favorites',
+});
+assert.deepEqual(connectionManager.resolveConnectionProfileDrop?.(profiles[0], {
+  groupKey: '__ungrouped__',
+  key: 'group:__ungrouped__',
+  type: 'group',
+}), {
+  action: 'move',
+  profileId: 'prod-db',
+  targetGroup: '',
+  targetKey: 'group:__ungrouped__',
+});
+assert.equal(connectionManager.resolveConnectionProfileDrop?.(profiles[0], {
+  groupKey: 'Production', key: 'group:Production', type: 'group',
+}), null);
+assert.equal(connectionManager.resolveConnectionProfileDrop?.(profiles[0], {
+  key: 'favorites', type: 'favorites',
+}), null);
+assert.equal(connectionManager.resolveConnectionProfileDrop?.(profiles[0], {
+  key: 'all', type: 'all',
+}), null);
+
 assert.deepEqual(
   selectBatchProfiles(profiles, { favoritesOnly: true }).map((profile) => profile.id),
   ['dev-shell', 'prod-db'],

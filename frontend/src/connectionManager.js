@@ -148,6 +148,30 @@ export function removeConnectionGroup(profiles = [], sourceGroup = '') {
   return renameConnectionGroup(profiles, sourceGroup, '');
 }
 
+export function resolveConnectionProfileDrop(profile = {}, target = {}) {
+  if (!profile.id) return null;
+  if (target.type === 'favorites') {
+    if (profile.favorite) return null;
+    return {
+      action: 'favorite',
+      profileId: profile.id,
+      targetGroup: '',
+      targetKey: target.key || 'favorites',
+    };
+  }
+  if (target.type !== 'group') return null;
+  const targetGroup = target.groupKey === ungroupedKey
+    ? ''
+    : normalizeConnectionGroupName(target.groupKey);
+  if (normalizeConnectionGroupName(profile.group) === targetGroup) return null;
+  return {
+    action: 'move',
+    profileId: profile.id,
+    targetGroup,
+    targetKey: target.key || buildConnectionGroupFilter(target.groupKey),
+  };
+}
+
 export function normalizeConnectionGroupName(group = '') {
   const normalized = String(group || '').trim().slice(0, 80);
   return normalized === ungroupedKey ? '' : normalized;

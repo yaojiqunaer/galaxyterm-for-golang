@@ -108,6 +108,7 @@ assert.equal(t('replay.eventProgress', { current: 3, total: 8 }), '3 / 8 output 
 assert.equal(t('replay.seekEvent', { time: '0:05.0', type: 'command' }), 'Seek to 0:05.0: command');
 assert.equal(t('replay.eventUnavailable', { type: 'legacy' }), 'legacy is not linked to this recording');
 assert.equal(t('session.status.error'), 'Error');
+assert.equal(t('message.connectionFavorited', { name: 'Production' }), 'Added “Production” to Favorites');
 assert.equal(t('locale.en-US'), 'English');
 assert.equal(t('locale.zh-CN'), 'Simplified Chinese');
 replaceExtensionMessages('en-US', {
@@ -140,6 +141,7 @@ assert.equal(t('terminal.search.matchWholeWord'), '全词匹配');
 assert.equal(t('terminal.search.useRegex'), '使用正则表达式');
 assert.equal(t('terminal.search.invalidRegex'), '正则表达式无效');
 assert.equal(t('action.scrollToBottom'), '滚动到底部');
+assert.equal(t('message.connectionFavorited', { name: '生产环境' }), '已将“生产环境”加入收藏');
 assert.equal(t('terminal.scrollToBottomHint'), '滚动到最新输出');
 assert.equal(t('action.restoreClosedSession'), '恢复最近关闭的会话');
 assert.equal(t('session.empty.restoreAvailable', { count: 3, updatedAt: '12:00' }), '恢复 12:00 保存的 3 个会话');

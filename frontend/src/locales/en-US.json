@@ -660,6 +660,7 @@
   "confirm.removeConnectionGroupContent": "Its {count} connections move to Ungrouped. Connection settings and credentials are kept.",
   "message.connectionGroupUnchanged": "Connection group is unchanged",
   "message.connectionMovedToGroup": "Connection moved to “{name}”",
+  "message.connectionFavorited": "Added “{name}” to Favorites",
   "message.connectionGroupRenamed": "Moved {count} connections into “{name}”",
   "message.connectionGroupRemoved": "Removed “{name}” and moved {count} connections to Ungrouped",
   "message.profileSaved": "Connection saved",
