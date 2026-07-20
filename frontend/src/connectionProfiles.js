@@ -2,7 +2,7 @@ export function normalizeStoredConnectionProfile(profile = {}, options = {}) {
   const kind = profile.kind === 'file' ? 'file' : 'terminal';
   const preserveCredentialRef = options.preserveCredentialRef !== false;
   const credentialRef = preserveCredentialRef ? profile.auth?.credentialRef || null : null;
-  const auth = kind === 'file'
+  const auth = kind === 'file' || profile.providerType !== 'ssh'
     ? { credentialRef }
     : {
       username: profile.auth?.username || '',

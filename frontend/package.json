@@ -28,6 +28,7 @@
     "test:terminal-status": "node src/terminalStatus.test.mjs",
     "test:terminal-search": "node src/terminalSearch.test.mjs",
     "test:terminal-interaction": "node src/terminalInteraction.test.mjs",
+    "test:terminal-providers": "node src/terminalProviders.test.mjs",
     "test:terminal-execution": "node src/terminalExecution.test.mjs",
     "test:workspace": "node src/workspaceState.test.mjs",
     "test:ssh-config": "node src/sshConfigProfiles.test.mjs"

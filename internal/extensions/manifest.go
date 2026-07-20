@@ -52,11 +52,13 @@ type RuntimeManifest struct {
 }
 
 type ProviderManifest struct {
-	Type         string   `json:"type"`
-	NameKey      string   `json:"nameKey"`
-	Description  string   `json:"description"`
-	Category     string   `json:"category"`
-	Capabilities []string `json:"capabilities"`
+	Type         string                      `json:"type"`
+	NameKey      string                      `json:"nameKey"`
+	Description  string                      `json:"description"`
+	Category     string                      `json:"category"`
+	Capabilities []string                    `json:"capabilities"`
+	ConfigFields []FileProviderFieldManifest `json:"configFields,omitempty"`
+	AuthFields   []FileProviderFieldManifest `json:"authFields,omitempty"`
 }
 
 // FileProviderManifest contributes a protocol adapter to the shared remote file workspace.
@@ -114,9 +116,20 @@ func ValidateManifest(manifest Manifest) error {
 	if len(manifest.Providers) == 0 && len(manifest.FileProviders) == 0 {
 		return fmt.Errorf("missing extension contributions")
 	}
+	providerTypes := make(map[string]struct{}, len(manifest.Providers))
 	for _, provider := range manifest.Providers {
 		if strings.TrimSpace(provider.Type) == "" {
 			return fmt.Errorf("missing provider type")
+		}
+		if _, exists := providerTypes[provider.Type]; exists {
+			return fmt.Errorf("duplicate provider type: %s", provider.Type)
+		}
+		providerTypes[provider.Type] = struct{}{}
+		if err := validateFileProviderFields(provider.ConfigFields, false); err != nil {
+			return fmt.Errorf("invalid provider %s config fields: %w", provider.Type, err)
+		}
+		if err := validateFileProviderFields(provider.AuthFields, true); err != nil {
+			return fmt.Errorf("invalid provider %s auth fields: %w", provider.Type, err)
 		}
 	}
 	fileProviderTypes := make(map[string]struct{}, len(manifest.FileProviders))
@@ -143,7 +156,8 @@ func ValidateManifest(manifest Manifest) error {
 			return fmt.Errorf("invalid file provider %s auth fields: %w", provider.Type, err)
 		}
 	}
-	if len(manifest.FileProviders) > 0 {
+	hasRuntime := strings.TrimSpace(manifest.Runtime.Protocol) != "" || strings.TrimSpace(manifest.Runtime.Entrypoint) != ""
+	if hasRuntime || len(manifest.FileProviders) > 0 {
 		if manifest.Runtime.Protocol != RuntimeProtocolStdioJSONV1 {
 			return fmt.Errorf("unsupported extension runtime protocol: %s", manifest.Runtime.Protocol)
 		}

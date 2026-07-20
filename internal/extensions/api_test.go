@@ -170,6 +170,36 @@ func TestInstallOfflineExtractsAndResolvesFileProviderRuntime(t *testing.T) {
 	}
 }
 
+func TestInstallOfflineExtractsAndResolvesTerminalProviderRuntime(t *testing.T) {
+	storePath := filepath.Join(t.TempDir(), "extensions", "installed.json")
+	api := NewAPIWithStore(storePath)
+	manifest := Manifest{
+		ID:         "galaxyterm-extension-redis",
+		Name:       "Redis",
+		Version:    "0.1.0",
+		APIVersion: "v1",
+		Runtime:    RuntimeManifest{Protocol: RuntimeProtocolStdioJSONV1, Entrypoint: "bin/extension"},
+		Providers: []ProviderManifest{{
+			Type: "redis", NameKey: "extension.redis.name", Capabilities: []string{"stream", "resize"},
+		}},
+	}
+	packagePath := writeGTXPackageWithFiles(t, manifest, map[string]string{"bin/extension": "#!/bin/sh\n"})
+
+	if _, err := api.InstallOffline(packagePath); err != nil {
+		t.Fatalf("InstallOffline returned error: %v", err)
+	}
+	runtimeInfo, err := api.ResolveTerminalProvider("redis")
+	if err != nil {
+		t.Fatalf("ResolveTerminalProvider returned error: %v", err)
+	}
+	if runtimeInfo.ExtensionID != manifest.ID || runtimeInfo.Provider.Type != "redis" {
+		t.Fatalf("runtimeInfo = %#v, want redis provider from %s", runtimeInfo, manifest.ID)
+	}
+	if _, err := os.Stat(runtimeInfo.Executable); err != nil {
+		t.Fatalf("stat terminal runtime: %v", err)
+	}
+}
+
 func TestInstallOfflineRejectsArchivePathTraversal(t *testing.T) {
 	storePath := filepath.Join(t.TempDir(), "extensions", "installed.json")
 	api := NewAPIWithStore(storePath)

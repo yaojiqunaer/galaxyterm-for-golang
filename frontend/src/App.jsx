@@ -307,6 +307,12 @@ import {
   terminalSearchRequestKey,
   validateTerminalSearchQuery,
 } from './terminalSearch.js';
+import {
+  buildExtensionTerminalCredentialValues,
+  buildExtensionTerminalFormValues,
+  buildExtensionTerminalRequest,
+  extensionTerminalDescription,
+} from './terminalProviders.js';
 
 const TerminalPane = lazy(() => import('./components/TerminalPane.jsx'));
 const AuditReplayPlayer = lazy(() => import('./components/AuditReplayPlayer.jsx'));
@@ -1320,6 +1326,7 @@ function App() {
     initialGroup = '',
   ) => {
     const providerType = profile?.providerType || type;
+    const provider = providers.find((item) => item.type === providerType);
     const resolvedIntent = profile ? 'edit' : intent;
     if (resolvedIntent !== 'session') {
       setSelectedProfileId('');
@@ -1345,11 +1352,22 @@ function App() {
       rememberCredential: !!profile?.auth?.credentialRef,
       shell: profile?.config?.shell || '',
       workingDirectory: profile?.config?.workingDirectory || terminalDefaults.defaultWorkingDirectory,
+      ...(provider?.category === 'extension'
+        ? buildExtensionTerminalFormValues(provider, profile)
+        : { config: {}, auth: {} }),
       saveProfile: resolveProfileSaveDefault({ intent, profile }),
     });
     setEditingProfileId(profile?.id || '');
     setSshAuthType(profile?.auth?.authType || 'password');
     setDrawerOpen(true);
+  };
+
+  const changeTerminalProvider = (providerType) => {
+    const provider = providers.find((item) => item.type === providerType);
+    setNewType(providerType);
+    form.setFieldsValue(provider?.category === 'extension'
+      ? { ...buildExtensionTerminalFormValues(provider), rememberCredential: false }
+      : { config: {}, auth: {}, rememberCredential: false });
   };
 
   const openConnectionDrawer = (
@@ -1386,7 +1404,7 @@ function App() {
     const values = await form.validateFields();
     const provider = providers.find((item) => item.type === newType) || fallbackProviders[0];
     const label = values.displayName || providerLabel(provider);
-    let request = buildRequest(newType, label, values);
+    let request = buildRequest(newType, label, values, provider);
     let profileId = editingProfileId;
     const submitPlan = buildTerminalSubmitPlan({
       action,
@@ -1429,6 +1447,25 @@ function App() {
               credentialRef: null,
             },
           };
+        }
+        if (provider.category === 'extension') {
+          profileId = profileId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`);
+          const existingProfile = profiles.find((item) => item.id === editingProfileId);
+          let credentialRef = existingProfile?.auth?.credentialRef || null;
+          const credentialValues = buildExtensionTerminalCredentialValues(provider, values.auth || {});
+          if (values.rememberCredential && Object.keys(credentialValues).length > 0) {
+            credentialRef = await CredentialsAPI.SaveProviderCredential({
+              id: profileId,
+              previousFields: credentialRef?.fields || [],
+              providerType: provider.type,
+              values: credentialValues,
+            });
+          }
+          if (!values.rememberCredential && credentialRef) {
+            await CredentialsAPI.DeleteProviderCredential(credentialRef);
+            credentialRef = null;
+          }
+          request = { ...request, auth: { ...request.auth, credentialRef } };
         }
         profileId = profileId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`);
         request = { ...request, profileId };
@@ -1522,14 +1559,19 @@ function App() {
 
   const testConnection = async () => {
     if (newType !== 'ssh') {
-      messageApi.info(t('message.localTestSkipped'));
+      messageApi.info(t(newType === 'local' ? 'message.localTestSkipped' : 'message.extensionTestOnOpen'));
       return;
     }
     const values = await form.validateFields();
     const provider = providers.find((item) => item.type === newType) || fallbackProviders[0];
     setTestingConnection(true);
     try {
-      const request = await resolveCredentialRequest(buildRequest(newType, values.displayName || providerLabel(provider), values));
+      const request = await resolveCredentialRequest(buildRequest(
+        newType,
+        values.displayName || providerLabel(provider),
+        values,
+        provider,
+      ));
       await TerminalAPI.TestSSHConnection(request);
       messageApi.success(t('message.connectionTestSuccess'));
     } catch (error) {
@@ -2227,7 +2269,7 @@ function App() {
     persistProfiles(nextProfiles);
     setProfiles(nextProfiles);
     try {
-      if (profile?.kind === 'file' && profile.auth?.credentialRef) {
+      if (profile?.auth?.credentialRef && profile.providerType !== 'ssh') {
         await CredentialsAPI.DeleteProviderCredential(profile.auth.credentialRef);
       } else {
         await CredentialsAPI.DeleteSSHCredential(profileId);
@@ -4065,14 +4107,31 @@ function App() {
     });
   };
 
+  const refreshExtensionRuntime = async () => {
+    const items = await ExtensionsAPI.ListInstalled();
+    setInstalledExtensions(Array.isArray(items) ? items : []);
+    try {
+      await SessionAPI.RefreshProviders();
+      const loadedProviders = await SessionAPI.ListProviders();
+      setAllProviders(Array.isArray(loadedProviders) && loadedProviders.length > 0
+        ? loadedProviders
+        : fallbackProviders);
+      return true;
+    } catch (error) {
+      showOperationError('message.extensionProviderRefreshFailed', error, {
+        retry: refreshExtensionRuntime,
+        scope: 'extension',
+      });
+      return false;
+    }
+  };
+
   const installOfflineExtension = async () => {
     setExtensionOfflineInstalling(true);
     try {
       const result = await ExtensionsAPI.InstallOfflineFromDialog();
       if (result?.canceled) return;
-      const items = await ExtensionsAPI.ListInstalled();
-      setInstalledExtensions(Array.isArray(items) ? items : []);
-      messageApi.success(t('message.extensionInstalled'));
+      if (await refreshExtensionRuntime()) messageApi.success(t('message.extensionInstalled'));
     } catch (error) {
       showOperationError('message.extensionInstallFailed', error, {
         retry: installOfflineExtension,
@@ -4099,9 +4158,7 @@ function App() {
         url: asset.url,
         sha256: asset.sha256,
       });
-      const items = await ExtensionsAPI.ListInstalled();
-      setInstalledExtensions(Array.isArray(items) ? items : []);
-      messageApi.success(t('message.extensionInstalled'));
+      if (await refreshExtensionRuntime()) messageApi.success(t('message.extensionInstalled'));
     } catch (error) {
       showOperationError('message.extensionInstallFailed', error, {
         retry: () => installOnlineExtension(catalogItem),
@@ -4116,9 +4173,7 @@ function App() {
     setExtensionUninstallingId(extensionID);
     try {
       await ExtensionsAPI.Uninstall(extensionID);
-      const items = await ExtensionsAPI.ListInstalled();
-      setInstalledExtensions(Array.isArray(items) ? items : []);
-      messageApi.success(t('message.extensionUninstalled'));
+      if (await refreshExtensionRuntime()) messageApi.success(t('message.extensionUninstalled'));
     } catch (error) {
       showOperationError('message.extensionInstallFailed', error, {
         retry: () => uninstallExtension(extensionID),
@@ -6493,7 +6548,7 @@ function App() {
         </div>
         <Form form={form} layout="vertical" className="terminal-form">
           <Form.Item label={t('field.type')}>
-            <Select value={newType} onChange={setNewType} options={providerOptions} />
+            <Select value={newType} onChange={changeTerminalProvider} options={providerOptions} />
           </Form.Item>
           <Form.Item name="displayName" label={t('field.name')}>
             <Input placeholder={t('placeholder.sessionName')} />
@@ -6566,6 +6621,19 @@ function App() {
                 <Checkbox>{t('field.rememberCredential')}</Checkbox>
               </Form.Item>
               <Alert type="info" showIcon message={t('settings.credentialHint')} />
+            </>
+          )}
+          {selectedProvider.category === 'extension' && (
+            <>
+              <FileProviderFormFields provider={selectedProvider} />
+              {selectedProvider.authFields?.length > 0 && (
+                <>
+                  <Form.Item name="rememberCredential" valuePropName="checked">
+                    <Checkbox>{t('field.rememberCredential')}</Checkbox>
+                  </Form.Item>
+                  <Alert type="info" showIcon message={t('settings.credentialHint')} />
+                </>
+              )}
             </>
           )}
           {terminalDrawerIntent === 'session' && (
@@ -7757,7 +7825,8 @@ function recentConnectionKey(request) {
   if (request.providerType === 'ssh') {
     return `ssh:${request.auth?.username || ''}@${request.config?.host || ''}:${request.config?.port || 22}`;
   }
-  return `local:${request.config?.shell || 'default'}`;
+  if (request.providerType === 'local') return `local:${request.config?.shell || 'default'}`;
+  return `${request.providerType}:${JSON.stringify(request.config || {})}`;
 }
 
 function profileFromRequest(request) {
@@ -8201,8 +8270,10 @@ function parseCredentialRef(value) {
 }
 
 async function resolveCredentialRequest(request) {
-  if (request.providerType !== 'ssh' || !request.auth?.credentialRef) return request;
-  return CredentialsAPI.ResolveSSHRequest(request);
+  if (!request.auth?.credentialRef) return request;
+  if (request.providerType === 'ssh') return CredentialsAPI.ResolveSSHRequest(request);
+  const auth = await CredentialsAPI.ResolveProviderCredential({ auth: request.auth });
+  return { ...request, auth };
 }
 
 function saveProfile(profiles, request, editingProfileId = '', profileId = '') {
@@ -8215,12 +8286,12 @@ function saveProfile(profiles, request, editingProfileId = '', profileId = '') {
     config: request.config,
     favorite: !!existingProfile?.favorite,
     lastUsedAt: existingProfile?.lastUsedAt || '',
-    auth: {
+    auth: request.providerType === 'ssh' ? {
       username: request.auth?.username || '',
       authType: request.auth?.authType || 'password',
       jumpUsername: request.auth?.jumpUsername || '',
       credentialRef: request.auth?.credentialRef || null,
-    },
+    } : { credentialRef: request.auth?.credentialRef || null },
   };
   if (editingProfileId) {
     const nextProfiles = profiles.map((item) => (item.id === editingProfileId ? profile : item));
@@ -8237,6 +8308,9 @@ function profileDescription(profile) {
     return `${profile.auth?.username || '-'}@${profile.config?.host || '-'}:${profile.config?.port || 22}`;
   }
   if (profile.kind === 'file') return buildConnectionProfileSubtitle(profile);
+  if (profile.providerType !== 'local') {
+    return extensionTerminalDescription({ type: profile.providerType }, profile);
+  }
   return profile.config?.shell || t('label.defaultShell');
 }
 
@@ -8316,7 +8390,7 @@ function joinRemotePath(base, name) {
   return `${base.replace(/\/+$/, '')}/${name}`;
 }
 
-function buildRequest(type, displayName, values) {
+function buildRequest(type, displayName, values, provider = null) {
   if (type === 'ssh') {
     const credentialRef = parseCredentialRef(values.credentialRef);
     return {
@@ -8340,6 +8414,10 @@ function buildRequest(type, displayName, values) {
         credentialRef,
       },
     };
+  }
+
+  if (provider?.category === 'extension') {
+    return buildExtensionTerminalRequest(provider, displayName, values);
   }
 
   return {

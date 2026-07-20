@@ -75,6 +75,8 @@
 
 扩展源、`galaxyterm-index.json` 与 GitHub Release 发布格式见 [扩展分发文档](docs/extensions.md)。
 
+交互式终端扩展以每会话一个受控 sidecar 进程运行。安装或卸载后可用 Provider 会立即刷新，无需重启应用，也不会中断已经打开的会话；协议帧、超时和进程生命周期约束见扩展分发文档。
+
 ----
 
 ## 安装

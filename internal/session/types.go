@@ -53,13 +53,35 @@ type Driver interface {
 type DriverFactory func(req CreateSessionRequest) (Driver, error)
 
 type Provider struct {
-	Type         string        `json:"type"`
-	NameKey      string        `json:"nameKey"`
-	Name         string        `json:"name"`
-	Description  string        `json:"description"`
-	Category     string        `json:"category"`
-	Capabilities []string      `json:"capabilities"`
-	NewDriver    DriverFactory `json:"-"`
+	Type         string          `json:"type"`
+	NameKey      string          `json:"nameKey"`
+	Name         string          `json:"name"`
+	Description  string          `json:"description"`
+	Category     string          `json:"category"`
+	Capabilities []string        `json:"capabilities"`
+	ConfigFields []ProviderField `json:"configFields,omitempty"`
+	AuthFields   []ProviderField `json:"authFields,omitempty"`
+	NewDriver    DriverFactory   `json:"-"`
+}
+
+type ProviderField struct {
+	Key            string                `json:"key"`
+	LabelKey       string                `json:"labelKey,omitempty"`
+	Label          string                `json:"label,omitempty"`
+	PlaceholderKey string                `json:"placeholderKey,omitempty"`
+	Placeholder    string                `json:"placeholder,omitempty"`
+	Type           string                `json:"type"`
+	Required       bool                  `json:"required,omitempty"`
+	Default        any                   `json:"default,omitempty"`
+	Min            *float64              `json:"min,omitempty"`
+	Max            *float64              `json:"max,omitempty"`
+	Options        []ProviderFieldOption `json:"options,omitempty"`
+}
+
+type ProviderFieldOption struct {
+	Value    string `json:"value"`
+	LabelKey string `json:"labelKey,omitempty"`
+	Label    string `json:"label,omitempty"`
 }
 
 type CreateSessionRequest struct {

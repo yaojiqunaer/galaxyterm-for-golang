@@ -391,6 +391,12 @@ export function buildConnectionProfileFacts(profile = {}, { defaultShellLabel = 
       { key: 'lastUsed', value: profile.lastUsedAt || '' },
     ];
   }
+  if (profile.providerType !== 'local') {
+    return [
+      ...Object.entries(profile.config || {}).slice(0, 3).map(([key, value]) => ({ key, value })),
+      { key: 'lastUsed', value: profile.lastUsedAt || '' },
+    ];
+  }
   return [
     { key: 'shell', value: profile.config?.shell || defaultShellLabel },
     profile.config?.workingDirectory && { key: 'workingDirectory', value: profile.config.workingDirectory },
@@ -408,6 +414,7 @@ export function buildConnectionProfileSubtitle(profile = {}, { defaultShellLabel
   if (profile.kind === 'file') {
     return `${fileConnectionEndpoint(profile)} · ${profile.filePath || '.'}`;
   }
+  if (profile.providerType !== 'local') return terminalConnectionEndpoint(profile);
   return profile.config?.shell || defaultShellLabel;
 }
 
@@ -528,6 +535,18 @@ function fileConnectionEndpoint(profile = {}) {
     || '-';
 }
 
+function terminalConnectionEndpoint(profile = {}) {
+  const config = profile.config || {};
+  const host = config.host || config.endpoint;
+  if (host) return `${host}${config.port ? `:${config.port}` : ''}`;
+  if (config.pod) return `${config.namespace ? `${config.namespace} / ` : ''}${config.pod}`;
+  if (config.container) return String(config.container);
+  if (config.database !== undefined && config.database !== '') return String(config.database);
+  return Object.values(config).find((value) => ['string', 'number'].includes(typeof value))?.toString()
+    || profile.providerType
+    || '-';
+}
+
 function compareText(left = '', right = '') {
   return String(left || '').localeCompare(String(right || ''));
 }
@@ -544,7 +563,8 @@ function connectionFingerprint(connection = {}) {
   if (providerType === 'local') {
     return `local:${String(request.config?.shell || 'default').trim() || 'default'}`;
   }
-  return '';
+  const config = Object.fromEntries(Object.entries(request.config || {}).sort(([left], [right]) => left.localeCompare(right)));
+  return providerType ? `${providerType}:${JSON.stringify(config)}` : '';
 }
 
 function compareGroup(left, right) {

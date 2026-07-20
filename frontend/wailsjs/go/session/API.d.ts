@@ -8,6 +8,8 @@ export function ListProviders():Promise<any[]>;
 
 export function ListSessions():Promise<any[]>;
 
+export function RefreshProviders():Promise<void>;
+
 export function Resize(arg1:string,arg2:number,arg3:number):Promise<void>;
 
 export function Send(arg1:string,arg2:string):Promise<void>;

@@ -16,6 +16,75 @@ func TestValidateManifestAcceptsValidManifest(t *testing.T) {
 	}
 }
 
+func TestValidateManifestAcceptsRunnableTerminalExtension(t *testing.T) {
+	manifest := Manifest{
+		ID:         "galaxyterm-extension-redis",
+		Name:       "Redis",
+		Version:    "0.1.0",
+		APIVersion: "v1",
+		Runtime: RuntimeManifest{
+			Protocol:   RuntimeProtocolStdioJSONV1,
+			Entrypoint: "bin/extension",
+		},
+		Providers: []ProviderManifest{{
+			Type: "redis", NameKey: "extension.redis.name",
+			ConfigFields: []FileProviderFieldManifest{{Key: "host", Type: "string", Required: true}},
+			AuthFields:   []FileProviderFieldManifest{{Key: "password", Type: "password"}},
+		}},
+	}
+
+	if err := ValidateManifest(manifest); err != nil {
+		t.Fatalf("ValidateManifest returned error for terminal extension: %v", err)
+	}
+}
+
+func TestValidateManifestRejectsInvalidTerminalProviderFields(t *testing.T) {
+	base := Manifest{
+		ID:         "galaxyterm-extension-redis",
+		Name:       "Redis",
+		Version:    "0.1.0",
+		APIVersion: "v1",
+		Runtime:    RuntimeManifest{Protocol: RuntimeProtocolStdioJSONV1, Entrypoint: "bin/extension"},
+	}
+	cases := []ProviderManifest{
+		{Type: "redis", ConfigFields: []FileProviderFieldManifest{{Key: "password", Type: "password"}}},
+		{Type: "redis", ConfigFields: []FileProviderFieldManifest{{Key: "host", Type: "string"}, {Key: "host", Type: "string"}}},
+		{Type: "redis", AuthFields: []FileProviderFieldManifest{{Key: "password", Type: "password", Default: "secret"}}},
+	}
+
+	for _, provider := range cases {
+		manifest := base
+		manifest.Providers = []ProviderManifest{provider}
+		if err := ValidateManifest(manifest); err == nil {
+			t.Fatalf("ValidateManifest accepted invalid terminal provider fields: %#v", provider)
+		}
+	}
+}
+
+func TestValidateManifestRejectsInvalidTerminalRuntimeAndDuplicateProviders(t *testing.T) {
+	base := Manifest{
+		ID:         "galaxyterm-extension-database",
+		Name:       "Database terminals",
+		Version:    "0.1.0",
+		APIVersion: "v1",
+		Providers:  []ProviderManifest{{Type: "redis"}},
+	}
+	cases := []Manifest{
+		withRuntime(base, RuntimeManifest{Protocol: "http", Entrypoint: "bin/extension"}),
+		withRuntime(base, RuntimeManifest{Protocol: RuntimeProtocolStdioJSONV1, Entrypoint: "../extension"}),
+		{
+			ID: base.ID, Name: base.Name, Version: base.Version, APIVersion: base.APIVersion,
+			Providers: []ProviderManifest{{Type: "redis"}, {Type: "redis"}},
+		},
+	}
+
+	for _, manifest := range cases {
+		if err := ValidateManifest(manifest); err == nil {
+			t.Fatalf("ValidateManifest(%#v) returned nil error", manifest)
+		}
+	}
+}
+
 func TestValidateManifestAcceptsFileTransferOnlyExtension(t *testing.T) {
 	manifest := Manifest{
 		ID:         "galaxyterm-extension-s3",

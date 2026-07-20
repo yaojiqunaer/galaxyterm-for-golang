@@ -1,11 +1,16 @@
 package session
 
 type API struct {
-	manager *Manager
+	manager          *Manager
+	refreshProviders func() error
 }
 
-func NewAPI(manager *Manager) *API {
-	return &API{manager: manager}
+func NewAPI(manager *Manager, refreshers ...func() error) *API {
+	api := &API{manager: manager}
+	if len(refreshers) > 0 {
+		api.refreshProviders = refreshers[0]
+	}
+	return api
 }
 
 func (api *API) CreateSession(req CreateSessionRequest) (string, error) {
@@ -30,4 +35,11 @@ func (api *API) ListProviders() []Provider {
 
 func (api *API) ListSessions() []SessionInfo {
 	return api.manager.ListSessions()
+}
+
+func (api *API) RefreshProviders() error {
+	if api.refreshProviders == nil {
+		return nil
+	}
+	return api.refreshProviders()
 }

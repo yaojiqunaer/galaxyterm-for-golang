@@ -738,6 +738,8 @@
   "message.batchConnectionsSkipped": "已跳过停用终端类型的连接",
   "message.desktopBridgeUnavailable": "当前运行在 Web 预览模式，终端、文件、隧道、扩展安装等桌面后端能力不可用；请用 Wails 桌面应用启动以体验完整功能。",
   "message.localTestSkipped": "本地终端无需连接测试",
+  "message.extensionTestOnOpen": "扩展终端会在打开会话时验证连接",
+  "message.extensionProviderRefreshFailed": "扩展已变更，但终端 Provider 刷新失败",
   "message.noTerminalSelection": "终端没有选中文本",
   "message.noTerminalError": "暂无终端错误",
   "message.clipboardEmpty": "剪贴板为空",

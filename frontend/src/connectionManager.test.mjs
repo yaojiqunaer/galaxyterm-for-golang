@@ -400,6 +400,24 @@ assert.deepEqual(buildConnectionProfileFacts(fileProfile), [
   { key: 'lastUsed', value: '' },
 ]);
 assert.equal(buildConnectionProfileSubtitle(fileProfile), 'https://objects.example.com · /releases');
+
+const redisProfile = {
+  id: 'redis-prod',
+  providerType: 'redis',
+  config: { host: 'cache.internal', port: 6380, database: 2 },
+  auth: { credentialRef: { id: 'redis-prod', providerType: 'redis', fields: ['password'] } },
+};
+assert.deepEqual(buildConnectionProfileFacts(redisProfile), [
+  { key: 'host', value: 'cache.internal' },
+  { key: 'port', value: 6380 },
+  { key: 'database', value: 2 },
+  { key: 'lastUsed', value: '' },
+]);
+assert.equal(buildConnectionProfileSubtitle(redisProfile), 'cache.internal:6380');
+assert.equal(buildConnectionProfileSubtitle({
+  providerType: 'kubernetes',
+  config: { namespace: 'apps', pod: 'api-0' },
+}), 'apps / api-0');
 assert.deepEqual(buildConnectionProfileHints({ activeCount: 0 }), ['enterOpen']);
 assert.deepEqual(buildConnectionProfileHints({ activeCount: 2 }), [
   'focusOpenSession',

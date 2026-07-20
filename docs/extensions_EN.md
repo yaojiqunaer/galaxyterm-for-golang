@@ -4,6 +4,54 @@ English | [简体中文](extensions.md)
 
 The GalaxyTerm core includes local terminals and SSH. SFTP, FTP/FTPS, S3, Kubernetes, Docker, databases, and other terminal or file protocols are distributed as `.gtx` extensions.
 
+## Interactive Terminal Providers
+
+A terminal extension declares types in `providers` and ships a `stdio-json-v1` executable entrypoint. GalaxyTerm refreshes providers immediately after installation or removal without an application restart, and refreshing never closes an existing session. Legacy manifests without `runtime` remain installable and visible but are not registered as runnable terminal providers.
+
+```json
+{
+  "id": "galaxyterm-extension-redis",
+  "name": "Redis",
+  "version": "0.1.0",
+  "apiVersion": "v1",
+  "runtime": {
+    "protocol": "stdio-json-v1",
+    "entrypoint": "bin/galaxyterm-extension-redis"
+  },
+  "providers": [
+    {
+      "type": "redis",
+      "nameKey": "extension.redis.name",
+      "description": "Interactive Redis terminal",
+      "capabilities": ["stream", "resize"],
+      "configFields": [
+        {"key":"host","label":"Host","type":"string","required":true,"default":"127.0.0.1"},
+        {"key":"port","label":"Port","type":"number","required":true,"default":6379,"min":1,"max":65535}
+      ],
+      "authFields": [
+        {"key":"password","label":"Password","type":"password"}
+      ]
+    }
+  ],
+  "locales": ["zh-CN", "en-US"]
+}
+```
+
+`configFields` and `authFields` use the same `string`, `textarea`, `number`, `boolean`, `select`, and `password` field model as file providers. The core renders the connection form from the manifest. Configuration enters the saved profile, while authentication values go to the system credential store only when the user opts in; profiles, exports, and workspace snapshots never contain plaintext secrets.
+
+GalaxyTerm starts one isolated sidecar process per terminal session and exchanges newline-delimited JSON frames over standard input and output. Authentication values only appear in the `create` request on standard input; they are never command-line arguments or environment variables. Every request must receive a `response` with the same `requestId`. A single output frame is limited to 16 MiB.
+
+```json
+{"apiVersion":"v1","type":"request","requestId":"...","providerType":"redis","operation":"create","config":{"host":"127.0.0.1","port":6379},"auth":{"password":"..."}}
+{"type":"response","requestId":"..."}
+{"type":"event","event":"data","data":"127.0.0.1:6379> "}
+{"apiVersion":"v1","type":"request","requestId":"...","providerType":"redis","operation":"send","data":"PING\r"}
+{"apiVersion":"v1","type":"request","requestId":"...","providerType":"redis","operation":"resize","cols":120,"rows":40}
+{"apiVersion":"v1","type":"request","requestId":"...","providerType":"redis","operation":"close"}
+```
+
+Supported events are `data`, `status`, `error`, `exit`, and `log`. An `error` contains `code`, optional `messageKey`, `defaultMessage`, and `details`. Provider `log` events never enter the terminal stream so extension diagnostics cannot accidentally expose credentials. `send` should acknowledge accepted input promptly and deliver long-running remote command output through later events. `close` should release the remote connection and exit normally. The host bounds startup and operation waits and terminates only the affected sidecar after an invalid frame, oversized frame, or shutdown timeout.
+
 ## File Provider Capabilities
 
 The remote-file workspace derives every available action from `fileProviders[].capabilities`; it contains no protocol-specific action branches. `list` enables directory browsing; `read` and `write` control size-limited text viewing and editing; `upload` and `download` control native streamed transfers; and `mkdir`, `rename`, and `delete` control their matching operations. A provider with `read` but no `write` opens files read-only. Delete actions require confirmation by default. Transfer capabilities must be declared explicitly, so older text-only providers never receive the new operations.

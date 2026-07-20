@@ -28,6 +28,13 @@ type FileProviderRuntime struct {
 	Provider         FileProviderManifest `json:"provider"`
 }
 
+type TerminalProviderRuntime struct {
+	ExtensionID      string           `json:"extensionId"`
+	ExtensionVersion string           `json:"extensionVersion"`
+	Executable       string           `json:"executable"`
+	Provider         ProviderManifest `json:"provider"`
+}
+
 type API struct {
 	mu              sync.RWMutex
 	installed       []Manifest
@@ -134,6 +141,38 @@ func (api *API) ResolveFileProvider(providerType string) (FileProviderRuntime, e
 		}
 	}
 	return FileProviderRuntime{}, fmt.Errorf("file provider not installed: %s", providerType)
+}
+
+func (api *API) ResolveTerminalProvider(providerType string) (TerminalProviderRuntime, error) {
+	api.mu.RLock()
+	defer api.mu.RUnlock()
+	providerType = strings.TrimSpace(providerType)
+	for index := len(api.installed) - 1; index >= 0; index-- {
+		manifest := api.installed[index]
+		for _, provider := range manifest.Providers {
+			if provider.Type != providerType {
+				continue
+			}
+			if manifest.Runtime.Protocol != RuntimeProtocolStdioJSONV1 || !isSafePackagePath(manifest.Runtime.Entrypoint) {
+				return TerminalProviderRuntime{}, fmt.Errorf("terminal provider runtime unavailable: extension has no executable runtime")
+			}
+			executable := filepath.Join(api.packageDir(manifest), filepath.FromSlash(manifest.Runtime.Entrypoint))
+			info, err := os.Stat(executable)
+			if err != nil {
+				return TerminalProviderRuntime{}, fmt.Errorf("terminal provider runtime unavailable: %w", err)
+			}
+			if !info.Mode().IsRegular() {
+				return TerminalProviderRuntime{}, fmt.Errorf("terminal provider runtime is not a regular file")
+			}
+			return TerminalProviderRuntime{
+				ExtensionID:      manifest.ID,
+				ExtensionVersion: manifest.Version,
+				Executable:       executable,
+				Provider:         provider,
+			}, nil
+		}
+	}
+	return TerminalProviderRuntime{}, fmt.Errorf("terminal provider not installed: %s", providerType)
 }
 
 func (api *API) upsertInstalled(manifest Manifest) {

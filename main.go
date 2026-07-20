@@ -48,6 +48,12 @@ func main() {
 	terminal.RegisterBuiltInProviders(sessionManager)
 	tunnelAPI := tunnel.NewAPI()
 	extensionAPI := extensions.NewDesktopAPI(func() context.Context { return appCtx })
+	if err := terminal.SyncExtensionProviders(sessionManager, extensionAPI); err != nil {
+		println("Unable to load terminal extensions:", err.Error())
+	}
+	sessionAPI := session.NewAPI(sessionManager, func() error {
+		return terminal.SyncExtensionProviders(sessionManager, extensionAPI)
+	})
 	fileAPI := files.NewDesktopAPI(extensionAPI, func() context.Context { return appCtx })
 
 	// Create application with options
@@ -84,7 +90,7 @@ func main() {
 		//OnBeforeClose:   beforeClose,
 		//CSSDragProperty: "--wails-draggable",
 		Bind: []interface{}{
-			session.NewAPI(sessionManager),
+			sessionAPI,
 			desktop.NewDesktopAPI(func() context.Context { return appCtx }),
 			fileAPI,
 			extensionAPI,

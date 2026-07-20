@@ -18,6 +18,10 @@ export function ListSessions() {
   return callWails(['session', 'API', 'ListSessions']);
 }
 
+export function RefreshProviders() {
+  return callWails(['session', 'API', 'RefreshProviders']);
+}
+
 export function Resize(arg1, arg2, arg3) {
   return callWails(['session', 'API', 'Resize'], arg1, arg2, arg3);
 }

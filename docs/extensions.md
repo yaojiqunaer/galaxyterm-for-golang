@@ -4,6 +4,54 @@
 
 GalaxyTerm 核心包内置本地终端与 SSH。SFTP、FTP/FTPS、S3、Kubernetes、Docker、数据库及其他终端或文件协议通过 `.gtx` 扩展分发。
 
+## 交互式终端 Provider
+
+终端扩展在 `providers` 中声明类型，并提供 `stdio-json-v1` 可执行入口。安装或卸载后，GalaxyTerm 会立即刷新可用 Provider，无需重启；刷新不会关闭已经打开的会话。没有 `runtime` 的旧清单仍可安装和展示，但不会注册为可创建会话的终端 Provider。
+
+```json
+{
+  "id": "galaxyterm-extension-redis",
+  "name": "Redis",
+  "version": "0.1.0",
+  "apiVersion": "v1",
+  "runtime": {
+    "protocol": "stdio-json-v1",
+    "entrypoint": "bin/galaxyterm-extension-redis"
+  },
+  "providers": [
+    {
+      "type": "redis",
+      "nameKey": "extension.redis.name",
+      "description": "Interactive Redis terminal",
+      "capabilities": ["stream", "resize"],
+      "configFields": [
+        {"key":"host","label":"Host","type":"string","required":true,"default":"127.0.0.1"},
+        {"key":"port","label":"Port","type":"number","required":true,"default":6379,"min":1,"max":65535}
+      ],
+      "authFields": [
+        {"key":"password","label":"Password","type":"password"}
+      ]
+    }
+  ],
+  "locales": ["zh-CN", "en-US"]
+}
+```
+
+`configFields` 和 `authFields` 使用与文件 Provider 相同的 `string`、`textarea`、`number`、`boolean`、`select`、`password` 字段模型。核心根据清单生成连接表单；配置进入保存连接，认证值仅在用户选择保存时写入系统凭据库，档案、导出和工作区快照都不保存明文。
+
+GalaxyTerm 为每个终端会话启动一个独立 sidecar 进程，以换行分隔的 JSON 帧通过标准输入输出通信。认证信息只出现在 `create` 请求的标准输入中，不进入命令行参数或环境变量。每个请求都必须返回相同 `requestId` 的 `response`；输出单帧上限为 16 MiB。
+
+```json
+{"apiVersion":"v1","type":"request","requestId":"...","providerType":"redis","operation":"create","config":{"host":"127.0.0.1","port":6379},"auth":{"password":"..."}}
+{"type":"response","requestId":"..."}
+{"type":"event","event":"data","data":"127.0.0.1:6379> "}
+{"apiVersion":"v1","type":"request","requestId":"...","providerType":"redis","operation":"send","data":"PING\r"}
+{"apiVersion":"v1","type":"request","requestId":"...","providerType":"redis","operation":"resize","cols":120,"rows":40}
+{"apiVersion":"v1","type":"request","requestId":"...","providerType":"redis","operation":"close"}
+```
+
+事件可使用 `data`、`status`、`error`、`exit` 和 `log`。`error` 携带 `code`、可选 `messageKey`、`defaultMessage` 与 `details`；`log` 不写入终端，以免扩展日志泄露凭据。`send` 应在接收输入后尽快响应，耗时的远程命令通过后续事件异步输出。`close` 应释放远程连接并正常退出。宿主会限制启动和操作等待时间，遇到非法帧、超大帧或无法退出的进程时终止当前 sidecar，不影响其他会话。
+
 ## 文件 Provider 能力
 
 远程文件工作区只根据 `fileProviders[].capabilities` 展示可用操作，不包含协议专用分支。`list` 控制目录浏览，`read`、`write` 控制受限文本查看与编辑，`upload`、`download` 控制原生流式传输，`mkdir`、`rename`、`delete` 分别控制新建目录、重命名和删除。只有 `read` 而没有 `write` 时，文件以只读方式打开；删除操作默认需要二次确认。传输能力必须显式声明，旧版只支持文本读写的扩展不会收到新增操作。

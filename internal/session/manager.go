@@ -2,7 +2,9 @@ package session
 
 import (
 	"context"
+	"fmt"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -36,6 +38,42 @@ func (m *Manager) RegisterProvider(provider Provider) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.providers[provider.Type] = provider
+}
+
+// ReplaceProvidersByCategory atomically refreshes one provider source. Existing
+// sessions keep their current drivers and are not interrupted by the refresh.
+func (m *Manager) ReplaceProvidersByCategory(category string, providers []Provider) error {
+	category = strings.TrimSpace(category)
+	if category == "" {
+		return fmt.Errorf("provider category is required")
+	}
+
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	next := make(map[string]Provider, len(m.providers)+len(providers))
+	for providerType, provider := range m.providers {
+		if provider.Category != category {
+			next[providerType] = provider
+		}
+	}
+	for _, provider := range providers {
+		provider.Type = strings.TrimSpace(provider.Type)
+		if provider.Type == "" {
+			return fmt.Errorf("provider type is required")
+		}
+		if provider.Category != category {
+			return fmt.Errorf("provider %s belongs to category %s, want %s", provider.Type, provider.Category, category)
+		}
+		if provider.NewDriver == nil {
+			return fmt.Errorf("provider %s has no driver factory", provider.Type)
+		}
+		if _, exists := next[provider.Type]; exists {
+			return fmt.Errorf("provider type conflicts with an existing provider: %s", provider.Type)
+		}
+		next[provider.Type] = provider
+	}
+	m.providers = next
+	return nil
 }
 
 func (m *Manager) ListProviders() []Provider {

@@ -110,3 +110,48 @@ func TestManagerCloseIsIdempotent(t *testing.T) {
 		t.Fatalf("closeCount = %d, want 1", driver.closeCount)
 	}
 }
+
+func TestManagerReplacesProvidersByCategoryWithoutTouchingActiveSessions(t *testing.T) {
+	driver := &fakeDriver{}
+	manager := NewManager(nil)
+	manager.RegisterProvider(Provider{Type: "ssh", Category: "builtin", NewDriver: func(CreateSessionRequest) (Driver, error) {
+		return driver, nil
+	}})
+	manager.RegisterProvider(Provider{Type: "redis", Category: "extension", NewDriver: func(CreateSessionRequest) (Driver, error) {
+		return driver, nil
+	}})
+	id, err := manager.Create(context.Background(), CreateSessionRequest{ProviderType: "redis"})
+	if err != nil {
+		t.Fatalf("Create returned error: %v", err)
+	}
+
+	if err := manager.ReplaceProvidersByCategory("extension", []Provider{{
+		Type: "kubernetes", Category: "extension", NewDriver: func(CreateSessionRequest) (Driver, error) { return &fakeDriver{}, nil },
+	}}); err != nil {
+		t.Fatalf("ReplaceProvidersByCategory returned error: %v", err)
+	}
+	providers := manager.ListProviders()
+	if len(providers) != 2 || providers[0].Type != "kubernetes" || providers[1].Type != "ssh" {
+		t.Fatalf("providers = %#v, want kubernetes and ssh", providers)
+	}
+	if err := manager.Send(id, "still-open"); err != nil {
+		t.Fatalf("active session stopped after provider replacement: %v", err)
+	}
+}
+
+func TestManagerRejectsProviderReplacementConflicts(t *testing.T) {
+	manager := NewManager(nil)
+	manager.RegisterProvider(Provider{Type: "ssh", Category: "builtin"})
+
+	cases := [][]Provider{
+		{{Type: "ssh", Category: "extension"}},
+		{{Type: "redis", Category: "extension"}, {Type: "redis", Category: "extension"}},
+		{{Type: "redis", Category: "builtin"}},
+		{{Type: "", Category: "extension"}},
+	}
+	for _, providers := range cases {
+		if err := manager.ReplaceProvidersByCategory("extension", providers); err == nil {
+			t.Fatalf("ReplaceProvidersByCategory accepted %#v", providers)
+		}
+	}
+}

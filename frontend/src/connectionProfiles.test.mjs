@@ -47,6 +47,20 @@ assert.deepEqual(normalizeImportedConnectionProfile(storedFileProfile).auth, {
   credentialRef: null,
 });
 
+const extensionTerminalProfile = normalizeStoredConnectionProfile({
+  id: 'redis-production',
+  providerType: 'redis',
+  displayName: 'Production Redis',
+  config: { host: 'cache.internal', port: 6379 },
+  auth: {
+    password: 'must-not-persist',
+    credentialRef: { id: 'redis-production', providerType: 'redis', fields: ['password'] },
+  },
+});
+assert.deepEqual(extensionTerminalProfile.auth, {
+  credentialRef: { id: 'redis-production', providerType: 'redis', fields: ['password'] },
+});
+
 const sshProfile = {
   id: 'ssh-production',
   providerType: 'ssh',

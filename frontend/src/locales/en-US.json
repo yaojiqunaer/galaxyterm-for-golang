@@ -738,6 +738,8 @@
   "message.batchConnectionsSkipped": "Skipped connections with disabled terminal types",
   "message.desktopBridgeUnavailable": "GalaxyTerm is running in web preview mode. Desktop backend features such as terminals, files, tunnels, and extension installation are unavailable; launch the Wails desktop app for the full experience.",
   "message.localTestSkipped": "Local terminal does not need a connection test",
+  "message.extensionTestOnOpen": "Extension terminal connections are verified when a session opens",
+  "message.extensionProviderRefreshFailed": "The extension changed, but terminal providers could not be refreshed",
   "message.noTerminalSelection": "No terminal text selected",
   "message.noTerminalError": "No terminal error",
   "message.clipboardEmpty": "Clipboard is empty",

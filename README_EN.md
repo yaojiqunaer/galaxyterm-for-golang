@@ -76,6 +76,8 @@ The core contains the local terminal, SSH, session management, shared file works
 
 See [Extension Distribution](docs/extensions_EN.md) for extension sources, `galaxyterm-index.json`, and the GitHub Release format.
 
+Interactive terminal extensions run as one controlled sidecar process per session. Installing or removing one refreshes available providers immediately without restarting the app or interrupting existing sessions; the extension guide defines protocol frames, timeouts, and process lifecycle constraints.
+
 ----
 
 ## Installation
