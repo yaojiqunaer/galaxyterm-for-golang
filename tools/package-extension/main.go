@@ -96,6 +96,11 @@ func packageExtension(name, targetOS, targetArch, outputDir string) error {
 		}
 		files = append(files, packageFile{Name: candidate.Target, Mode: 0o644, Data: content})
 	}
+	localeFiles, err := readLocaleFiles(extensionDir, manifest.Locales)
+	if err != nil {
+		return err
+	}
+	files = append(files, localeFiles...)
 	checksums := buildChecksums(files)
 	files = append(files, packageFile{Name: "checksums.txt", Mode: 0o644, Data: checksums})
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
@@ -107,6 +112,23 @@ func packageExtension(name, targetOS, targetArch, outputDir string) error {
 	}
 	_, _ = fmt.Fprintln(os.Stdout, outputPath)
 	return nil
+}
+
+func readLocaleFiles(extensionDir string, locales []string) ([]packageFile, error) {
+	files := make([]packageFile, 0, len(locales))
+	for _, locale := range locales {
+		source := filepath.Join(extensionDir, "locales", locale+".json")
+		content, err := os.ReadFile(source)
+		if err != nil {
+			return nil, fmt.Errorf("read declared locale %s: %w", locale, err)
+		}
+		files = append(files, packageFile{
+			Name: path.Join("locales", locale+".json"),
+			Mode: 0o644,
+			Data: content,
+		})
+	}
+	return files, nil
 }
 
 func prepareManifest(content []byte, targetOS string) (extensions.Manifest, []byte, error) {

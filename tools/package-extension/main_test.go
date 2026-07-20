@@ -101,3 +101,27 @@ func TestSafeSegmentRejectsPathTraversal(t *testing.T) {
 		t.Fatal("safeSegment rejected a valid package segment")
 	}
 }
+
+func TestReadLocaleFilesIncludesDeclaredDictionaries(t *testing.T) {
+	extensionDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(extensionDir, "locales"), 0o755); err != nil {
+		t.Fatalf("create locales: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(extensionDir, "locales", "zh-CN.json"), []byte(`{"extension.sftp":"SFTP 文件"}`), 0o644); err != nil {
+		t.Fatalf("write locale: %v", err)
+	}
+
+	files, err := readLocaleFiles(extensionDir, []string{"zh-CN"})
+	if err != nil {
+		t.Fatalf("readLocaleFiles returned error: %v", err)
+	}
+	if len(files) != 1 || files[0].Name != "locales/zh-CN.json" {
+		t.Fatalf("locale files = %#v, want zh-CN dictionary", files)
+	}
+}
+
+func TestReadLocaleFilesRequiresDeclaredDictionaries(t *testing.T) {
+	if _, err := readLocaleFiles(t.TempDir(), []string{"zh-CN"}); err == nil {
+		t.Fatal("readLocaleFiles accepted a missing declared dictionary")
+	}
+}

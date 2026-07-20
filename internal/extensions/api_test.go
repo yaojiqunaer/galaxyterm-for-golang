@@ -200,6 +200,78 @@ func TestInstallOfflineExtractsAndResolvesTerminalProviderRuntime(t *testing.T) 
 	}
 }
 
+func TestInstallOfflineLoadsNamespacedLocaleMessages(t *testing.T) {
+	api := NewAPIWithStore(filepath.Join(t.TempDir(), "extensions", "installed.json"))
+	manifest := Manifest{
+		ID: "galaxyterm-extension-redis", Name: "Redis", Version: "0.1.0", APIVersion: "v1",
+		Runtime:   RuntimeManifest{Protocol: RuntimeProtocolStdioJSONV1, Entrypoint: "bin/extension"},
+		Providers: []ProviderManifest{{Type: "redis", NameKey: "extension.redis.name"}},
+		Locales:   []string{"zh-CN", "en-US"},
+	}
+	packagePath := writeGTXPackageWithFiles(t, manifest, map[string]string{
+		"bin/extension":      "#!/bin/sh\n",
+		"locales/zh-CN.json": `{"extension.redis.name":"Redis 交互终端","extension.redis.field.database":"数据库"}`,
+		"locales/en-US.json": `{"extension.redis.name":"Redis Interactive Terminal"}`,
+	})
+	if _, err := api.InstallOffline(packagePath); err != nil {
+		t.Fatalf("InstallOffline returned error: %v", err)
+	}
+
+	messages, err := api.LoadLocaleMessages("zh-CN")
+	if err != nil {
+		t.Fatalf("LoadLocaleMessages returned error: %v", err)
+	}
+	if messages["extension.redis.name"] != "Redis 交互终端" || messages["extension.redis.field.database"] != "数据库" {
+		t.Fatalf("messages = %#v, want Redis translations", messages)
+	}
+	missing, err := api.LoadLocaleMessages("ja-JP")
+	if err != nil || len(missing) != 0 {
+		t.Fatalf("missing locale messages = %#v, %v, want empty", missing, err)
+	}
+}
+
+func TestInstallOfflineRejectsLocaleThatOverridesCoreMessages(t *testing.T) {
+	api := NewAPIWithStore(filepath.Join(t.TempDir(), "extensions", "installed.json"))
+	manifest := Manifest{
+		ID: "galaxyterm-extension-redis", Name: "Redis", Version: "0.1.0", APIVersion: "v1",
+		Runtime:   RuntimeManifest{Protocol: RuntimeProtocolStdioJSONV1, Entrypoint: "bin/extension"},
+		Providers: []ProviderManifest{{Type: "redis"}}, Locales: []string{"en-US"},
+	}
+	packagePath := writeGTXPackageWithFiles(t, manifest, map[string]string{
+		"bin/extension":      "#!/bin/sh\n",
+		"locales/en-US.json": `{"nav.sessions":"Hijacked"}`,
+	})
+
+	if _, err := api.InstallOffline(packagePath); err == nil {
+		t.Fatal("InstallOffline accepted a locale that overrides a core message")
+	}
+}
+
+func TestLoadLocaleMessagesMatchesLocaleCaseAndProviderIdentifier(t *testing.T) {
+	api := NewAPIWithStore(filepath.Join(t.TempDir(), "extensions", "installed.json"))
+	manifest := Manifest{
+		ID: "galaxyterm-extension-redis-tls", Name: "Redis TLS", Version: "0.1.0", APIVersion: "v1",
+		Runtime:   RuntimeManifest{Protocol: RuntimeProtocolStdioJSONV1, Entrypoint: "bin/extension"},
+		Providers: []ProviderManifest{{Type: "redis+tls", NameKey: "extension.redis+tls.name"}},
+		Locales:   []string{"en-us"},
+	}
+	packagePath := writeGTXPackageWithFiles(t, manifest, map[string]string{
+		"bin/extension":      "#!/bin/sh\n",
+		"locales/en-us.json": `{"extension.redis+tls.name":"Redis over TLS"}`,
+	})
+	if _, err := api.InstallOffline(packagePath); err != nil {
+		t.Fatalf("InstallOffline returned error: %v", err)
+	}
+
+	messages, err := api.LoadLocaleMessages("en-US")
+	if err != nil {
+		t.Fatalf("LoadLocaleMessages returned error: %v", err)
+	}
+	if messages["extension.redis+tls.name"] != "Redis over TLS" {
+		t.Fatalf("messages = %#v, want case-insensitive locale match", messages)
+	}
+}
+
 func TestInstallOfflineRejectsArchivePathTraversal(t *testing.T) {
 	storePath := filepath.Join(t.TempDir(), "extensions", "installed.json")
 	api := NewAPIWithStore(storePath)

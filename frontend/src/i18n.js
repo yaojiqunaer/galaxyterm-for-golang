@@ -6,6 +6,8 @@ const dictionaries = {
   'en-US': enUS,
 };
 
+const extensionDictionaries = {};
+
 const localeStorageKey = 'galaxyterm.locale';
 
 function detectLocale() {
@@ -28,7 +30,11 @@ let activeLocale = detectLocale();
 export function t(key, fallbackOrValues = key) {
   const values = isPlainObject(fallbackOrValues) ? fallbackOrValues : null;
   const fallback = values ? key : fallbackOrValues;
-  const template = dictionaries[activeLocale]?.[key] || dictionaries['en-US']?.[key] || fallback;
+  const template = extensionDictionaries[activeLocale]?.[key]
+    || dictionaries[activeLocale]?.[key]
+    || extensionDictionaries['en-US']?.[key]
+    || dictionaries['en-US']?.[key]
+    || fallback;
   if (!values || typeof template !== 'string') return template;
   return template.replace(/\{(\w+)\}/g, (match, name) => (
     Object.prototype.hasOwnProperty.call(values, name) ? String(values[name]) : match
@@ -48,6 +54,13 @@ export function setLocale(locale) {
 
 export function availableLocales() {
   return Object.keys(dictionaries);
+}
+
+export function replaceExtensionMessages(locale, messages = {}) {
+  extensionDictionaries[locale] = Object.fromEntries(
+    Object.entries(isPlainObject(messages) ? messages : {})
+      .filter(([key, value]) => key.startsWith('extension.') && typeof value === 'string'),
+  );
 }
 
 function isPlainObject(value) {

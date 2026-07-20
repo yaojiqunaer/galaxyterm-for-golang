@@ -1,0 +1,7 @@
+{
+  "extension.sftp": "SFTP 文件",
+  "extension.sftp.field.hostKeyPolicy": "主机密钥策略",
+  "extension.sftp.field.knownHostsPath": "已知主机文件",
+  "extension.sftp.option.acceptNew": "首次连接时信任",
+  "extension.sftp.option.strict": "严格校验"
+}

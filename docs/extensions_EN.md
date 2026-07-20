@@ -41,6 +41,21 @@ A terminal extension declares types in `providers` and ships a `stdio-json-v1` e
 
 Test Connection starts a disposable driver with the current form values and closes it immediately after a successful connection. A probe creates no tab or active session and writes no audit or recording entry. It has a 20-second default timeout and uses the shared structured-error and retry feedback. When a saved profile references the system credential store, the probe resolves that reference without copying secrets back into the form; an explicit non-empty authentication value entered for this attempt takes precedence over its stored value.
 
+## Extension Localization
+
+An extension may declare languages in `locales` and place each JSON dictionary at `locales/<locale>.json` inside the `.gtx` package. Manifest `nameKey` values and field or option `labelKey` and `placeholderKey` values resolve in the active language. Dictionaries refresh immediately after a language change or extension install, update, or uninstall; no restart or active-session recreation is required.
+
+```json
+{
+  "extension.redis.name": "Redis Interactive Terminal",
+  "extension.redis.field.database": "Database"
+}
+```
+
+Every key must stay in its provider's `extension.<providerType>` namespace. For example, a Redis provider may define only `extension.redis` or `extension.redis.*`. Extensions cannot replace navigation, security prompts, or other core messages. Duplicate keys, non-string values, foreign namespaces, oversized dictionaries, and overlong messages fail installation. One dictionary may contain up to 512 messages and 256 KiB; one message may contain up to 4096 bytes.
+
+For compatibility with already published extensions, the client accepts an older package that declares `locales` without shipping dictionaries. The UI then falls back to the core dictionary, manifest English text, or the message key. The official packager requires a file for every declared locale and includes those files in `checksums.txt`.
+
 GalaxyTerm starts one isolated sidecar process per terminal session and exchanges newline-delimited JSON frames over standard input and output. Authentication values only appear in the `create` request on standard input; they are never command-line arguments or environment variables. Every request must receive a `response` with the same `requestId`. A single output frame is limited to 16 MiB.
 
 ```json

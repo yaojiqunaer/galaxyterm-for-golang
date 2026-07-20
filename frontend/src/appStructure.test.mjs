@@ -968,5 +968,15 @@ assert.ok(
   /if \(resolvedIntent !== 'session'\) \{[\s\S]*?setSelectedProfileId\(''\);[\s\S]*?setConnectionDetailProfileId\(''\);[\s\S]*?\}/.test(source),
   'opening a connection editor must dismiss the compact connection detail drawer',
 );
+assert.ok(
+  source.includes('ExtensionsAPI.LoadLocaleMessages(locale)')
+    && source.includes("const fallbackLocale = 'en-US';")
+    && source.includes('ExtensionsAPI.LoadLocaleMessages(fallbackLocale)')
+    && source.includes('replaceExtensionMessages(locale, messages)')
+    && source.includes('replaceExtensionMessages(fallbackLocale, fallbackMessages)')
+    && source.includes('const [translationRevision, setTranslationRevision] = useState(0);')
+    && source.includes('}, [installedExtensions, locale]);'),
+  'installed extension dictionaries must refresh after language, install, update, or uninstall changes',
+);
 
 console.log('app structure tests passed');

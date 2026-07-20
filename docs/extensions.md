@@ -41,6 +41,21 @@ GalaxyTerm 核心包内置本地终端与 SSH。SFTP、FTP/FTPS、S3、Kubernete
 
 连接表单的“测试连接”会用当前配置启动一个临时 Driver，成功建立后立即关闭。探测不会创建标签或活动会话，也不会写入审计和录屏记录；默认 20 秒超时，失败时沿用统一的结构化错误和重试提示。保存连接引用了系统凭据时，测试会先解析凭据，但不会把密钥回写到表单；用户本次明确输入的非空认证值优先于已保存值。
 
+## 扩展多语言资源
+
+扩展可在 `locales` 中声明语言，并把对应 JSON 词典放在 `.gtx` 的 `locales/<语言>.json`。清单中的 `nameKey`、字段 `labelKey`、`placeholderKey` 和选项 `labelKey` 都会使用当前语言解析；切换语言以及安装、更新或卸载扩展后立即刷新，无需重启，也不会重建活动会话。
+
+```json
+{
+  "extension.redis.name": "Redis 交互终端",
+  "extension.redis.field.database": "数据库"
+}
+```
+
+每个键必须位于当前 Provider 的 `extension.<providerType>` 命名空间，例如 Redis Provider 只能提供 `extension.redis` 或 `extension.redis.*`。扩展不能覆盖导航、安全提示等核心文案；重复键、非字符串值、越界命名空间、超大词典或超长文案会使安装失败。每个词典最多 256 KiB、512 条文案，单条最多 4096 字节。
+
+为兼容已发布扩展，客户端允许旧包只声明 `locales` 而不包含词典文件，此时继续使用核心词典、清单中的英文文案或键名回退。官方打包工具要求每个已声明语言都有对应文件，并将词典纳入 `checksums.txt`。
+
 GalaxyTerm 为每个终端会话启动一个独立 sidecar 进程，以换行分隔的 JSON 帧通过标准输入输出通信。认证信息只出现在 `create` 请求的标准输入中，不进入命令行参数或环境变量。每个请求都必须返回相同 `requestId` 的 `response`；输出单帧上限为 16 MiB。
 
 ```json

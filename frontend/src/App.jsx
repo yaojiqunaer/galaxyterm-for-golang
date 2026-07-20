@@ -290,7 +290,13 @@ import * as SessionAPI from '../wailsjs/go/session/API.js';
 import * as TerminalAPI from '../wailsjs/go/terminal/API.js';
 import * as TunnelAPI from '../wailsjs/go/tunnel/API.js';
 import * as runtime from '../wailsjs/runtime/runtime.js';
-import { availableLocales, currentLocale, setLocale, t } from './i18n.js';
+import {
+  availableLocales,
+  currentLocale,
+  replaceExtensionMessages,
+  setLocale,
+  t,
+} from './i18n.js';
 import CommandPalette from './components/CommandPalette.jsx';
 import ConnectionGroupDialog from './components/ConnectionGroupDialog.jsx';
 import SavedSSHProfileSelect from './components/SavedSSHProfileSelect.jsx';
@@ -408,6 +414,7 @@ function App() {
   const [profiles, setProfiles] = useState(() => loadProfiles());
   const [settings, setSettings] = useState(() => loadSettings());
   const [locale, setLocaleState] = useState(() => currentLocale());
+  const [translationRevision, setTranslationRevision] = useState(0);
   const [terminalThemes, setTerminalThemes] = useState(['auto']);
   const [installedExtensions, setInstalledExtensions] = useState([]);
   const [extensionSources, setExtensionSources] = useState(() => loadExtensionSources());
@@ -696,6 +703,35 @@ function App() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+    const fallbackLocale = 'en-US';
+    const fallbackRequest = locale === fallbackLocale
+      ? Promise.resolve(null)
+      : ExtensionsAPI.LoadLocaleMessages(fallbackLocale);
+    Promise.all([
+      ExtensionsAPI.LoadLocaleMessages(locale),
+      fallbackRequest,
+    ])
+      .then(([messages, fallbackMessages]) => {
+        if (!active) return;
+        replaceExtensionMessages(locale, messages);
+        if (fallbackMessages !== null) {
+          replaceExtensionMessages(fallbackLocale, fallbackMessages);
+        }
+        setTranslationRevision((revision) => revision + 1);
+      })
+      .catch(() => {
+        if (!active) return;
+        replaceExtensionMessages(locale, {});
+        replaceExtensionMessages(fallbackLocale, {});
+        setTranslationRevision((revision) => revision + 1);
+      });
+    return () => {
+      active = false;
+    };
+  }, [installedExtensions, locale]);
+
+  useEffect(() => {
     Promise.resolve()
       .then(() => ThemeAPI.GetAllThemes())
       .then((themes) => {
@@ -973,7 +1009,7 @@ function App() {
       providerName: providerTypeLabel(session.providerType, allProviders),
       statusName: t(`session.status.${sessionStatusLabel(session)}`),
     })]),
-  ), [allProviders, locale, sessionDisplayLabels, sessions]);
+  ), [allProviders, locale, sessionDisplayLabels, sessions, translationRevision]);
   const desktopWindowTitle = useMemo(() => {
     const appName = t('app.title');
     if (selectedNav !== 'sessions') {
@@ -987,7 +1023,7 @@ function App() {
         : '',
       unreadCount: unreadSessionCount,
     });
-  }, [activeSession, allProviders, locale, selectedNav, sessionDisplayLabels, unreadSessionCount]);
+  }, [activeSession, allProviders, locale, selectedNav, sessionDisplayLabels, translationRevision, unreadSessionCount]);
 
   useEffect(() => {
     syncDesktopWindowTitle(desktopWindowTitle);
@@ -1001,14 +1037,14 @@ function App() {
         {providerLabel(provider)}
       </span>
     ),
-  })), [providers, locale]);
+  })), [providers, locale, translationRevision]);
   const quickCommandProviderOptions = useMemo(() => [
     { value: 'all', label: t('filter.allProviders') },
     ...providers.map((provider) => ({
       value: provider.type,
       label: providerTypeLabel(provider.type, providers),
     })),
-  ], [providers, locale]);
+  ], [providers, locale, translationRevision]);
   const shortcutModifier = normalizeShortcutModifier(settings.shortcutModifier);
   const shortcutLabel = shortcutModifierLabel(shortcutModifier);
   const shortcutEditorRows = useMemo(
@@ -1241,7 +1277,7 @@ function App() {
     { value: 'all', label: t('filter.allProviders') },
     ...Array.from(new Set(auditRecords.map((record) => record.providerType || 'terminal')))
       .map((type) => ({ value: type, label: type })),
-  ], [auditRecords, locale]);
+  ], [auditRecords, locale, translationRevision]);
   const auditSessionOptions = useMemo(() => {
     const labelsById = new Map();
     sessions.forEach((session) => {
@@ -1259,7 +1295,7 @@ function App() {
       { value: 'all', label: t('filter.allSessions') },
       ...[...labelsById].map(([value, label]) => ({ value, label })),
     ];
-  }, [auditRecords, locale, sessionDisplayLabels, sessions]);
+  }, [auditRecords, locale, sessionDisplayLabels, sessions, translationRevision]);
   const visibleAuditRecords = useMemo(() => filterAuditRecords(auditRecords, {
     providerType: auditProviderFilter,
     query: auditQuery,

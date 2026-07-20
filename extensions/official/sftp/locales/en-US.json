@@ -1,0 +1,7 @@
+{
+  "extension.sftp": "SFTP Files",
+  "extension.sftp.field.hostKeyPolicy": "Host key policy",
+  "extension.sftp.field.knownHostsPath": "Known hosts file",
+  "extension.sftp.option.acceptNew": "Trust on first use",
+  "extension.sftp.option.strict": "Strict verification"
+}

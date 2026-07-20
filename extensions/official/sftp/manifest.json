@@ -37,16 +37,18 @@
         {
           "key": "hostKeyPolicy",
           "type": "select",
+          "labelKey": "extension.sftp.field.hostKeyPolicy",
           "label": "Host key policy",
           "default": "accept-new",
           "options": [
-            {"value": "accept-new", "label": "Trust first use"},
-            {"value": "strict", "label": "Strict"}
+            {"value": "accept-new", "labelKey": "extension.sftp.option.acceptNew", "label": "Trust first use"},
+            {"value": "strict", "labelKey": "extension.sftp.option.strict", "label": "Strict"}
           ]
         },
         {
           "key": "knownHostsPath",
           "type": "string",
+          "labelKey": "extension.sftp.field.knownHostsPath",
           "label": "Known hosts file"
         }
       ],

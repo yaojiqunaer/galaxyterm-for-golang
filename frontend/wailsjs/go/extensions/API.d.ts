@@ -2,6 +2,8 @@
 
 export function ListInstalled():Promise<any[]>;
 
+export function LoadLocaleMessages(arg1:string):Promise<Record<string, string>>;
+
 export function Validate(arg1:any):Promise<void>;
 
 export function RegisterInstalled(arg1:any):Promise<void>;

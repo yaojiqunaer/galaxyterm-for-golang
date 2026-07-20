@@ -302,6 +302,9 @@ func (api *API) extractPackage(packagePath string, manifest Manifest) error {
 			return err
 		}
 	}
+	if err := validateExtractedLocaleFiles(tempDir, manifest); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(targetDir), 0o755); err != nil {
 		return err
 	}

@@ -262,3 +262,32 @@ func TestValidateManifestRejectsMissingRequiredFields(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateManifestRejectsInvalidOrDuplicateLocales(t *testing.T) {
+	base := Manifest{
+		ID: "galaxyterm-extension-redis", Name: "Redis", Version: "0.1.0", APIVersion: "v1",
+		Providers: []ProviderManifest{{Type: "redis"}},
+	}
+	for _, locales := range [][]string{
+		{"../zh-CN"},
+		{"zh_CN"},
+		{"zh-CN", "zh-CN"},
+		{"en-US", "EN-us"},
+	} {
+		manifest := base
+		manifest.Locales = locales
+		if err := ValidateManifest(manifest); err == nil {
+			t.Fatalf("ValidateManifest accepted locales %#v", locales)
+		}
+	}
+}
+
+func TestValidateManifestRejectsUnsafeProviderType(t *testing.T) {
+	manifest := Manifest{
+		ID: "galaxyterm-extension-redis", Name: "Redis", Version: "0.1.0", APIVersion: "v1",
+		Providers: []ProviderManifest{{Type: "../redis"}},
+	}
+	if err := ValidateManifest(manifest); err == nil {
+		t.Fatal("ValidateManifest accepted an unsafe provider type")
+	}
+}

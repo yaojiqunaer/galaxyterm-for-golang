@@ -10,7 +10,12 @@ Object.defineProperty(globalThis, 'navigator', {
   value: { language: 'en-US' },
 });
 
-const { currentLocale, setLocale, t } = await import('./i18n.js');
+const {
+  currentLocale,
+  replaceExtensionMessages,
+  setLocale,
+  t,
+} = await import('./i18n.js');
 
 assert.equal(currentLocale(), 'en-US');
 assert.equal(t('nav.sessions'), 'Sessions');
@@ -105,6 +110,14 @@ assert.equal(t('replay.eventUnavailable', { type: 'legacy' }), 'legacy is not li
 assert.equal(t('session.status.error'), 'Error');
 assert.equal(t('locale.en-US'), 'English');
 assert.equal(t('locale.zh-CN'), 'Simplified Chinese');
+replaceExtensionMessages('en-US', {
+  'extension.redis.customName': 'Redis Workbench',
+  'nav.sessions': 'Must not override core',
+});
+assert.equal(t('extension.redis.customName'), 'Redis Workbench');
+assert.equal(t('nav.sessions'), 'Sessions');
+replaceExtensionMessages('en-US', {});
+assert.equal(t('extension.redis.customName', 'Redis'), 'Redis');
 
 setLocale('zh-CN');
 assert.equal(currentLocale(), 'zh-CN');

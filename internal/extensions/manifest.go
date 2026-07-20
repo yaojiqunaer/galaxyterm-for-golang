@@ -12,6 +12,7 @@ const RuntimeProtocolStdioJSONV1 = "stdio-json-v1"
 
 var extensionIdentifierPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+-]*$`)
 var extensionFieldKeyPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9._-]*$`)
+var extensionLocalePattern = regexp.MustCompile(`^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,2}$`)
 
 var fileProviderCapabilities = map[string]struct{}{
 	"delete":   {},
@@ -118,8 +119,8 @@ func ValidateManifest(manifest Manifest) error {
 	}
 	providerTypes := make(map[string]struct{}, len(manifest.Providers))
 	for _, provider := range manifest.Providers {
-		if strings.TrimSpace(provider.Type) == "" {
-			return fmt.Errorf("missing provider type")
+		if !extensionIdentifierPattern.MatchString(provider.Type) {
+			return fmt.Errorf("invalid provider type: %s", provider.Type)
 		}
 		if _, exists := providerTypes[provider.Type]; exists {
 			return fmt.Errorf("duplicate provider type: %s", provider.Type)
@@ -134,8 +135,8 @@ func ValidateManifest(manifest Manifest) error {
 	}
 	fileProviderTypes := make(map[string]struct{}, len(manifest.FileProviders))
 	for _, provider := range manifest.FileProviders {
-		if strings.TrimSpace(provider.Type) == "" {
-			return fmt.Errorf("missing file provider type")
+		if !extensionIdentifierPattern.MatchString(provider.Type) {
+			return fmt.Errorf("invalid file provider type: %s", provider.Type)
 		}
 		if strings.TrimSpace(provider.Protocol) == "" {
 			return fmt.Errorf("missing file provider protocol")
@@ -164,6 +165,17 @@ func ValidateManifest(manifest Manifest) error {
 		if !isSafePackagePath(manifest.Runtime.Entrypoint) {
 			return fmt.Errorf("invalid extension runtime entrypoint")
 		}
+	}
+	locales := make(map[string]struct{}, len(manifest.Locales))
+	for _, locale := range manifest.Locales {
+		if !extensionLocalePattern.MatchString(locale) {
+			return fmt.Errorf("invalid extension locale: %s", locale)
+		}
+		normalized := strings.ToLower(locale)
+		if _, exists := locales[normalized]; exists {
+			return fmt.Errorf("duplicate extension locale: %s", locale)
+		}
+		locales[normalized] = struct{}{}
 	}
 	return nil
 }

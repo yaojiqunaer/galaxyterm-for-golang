@@ -6,6 +6,10 @@ export function ListInstalled() {
   return callWails(['extensions', 'API', 'ListInstalled']);
 }
 
+export function LoadLocaleMessages(arg1) {
+  return callWails(['extensions', 'API', 'LoadLocaleMessages'], arg1);
+}
+
 export function Validate(arg1) {
   return callWails(['extensions', 'API', 'Validate'], arg1);
 }
