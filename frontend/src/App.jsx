@@ -79,11 +79,13 @@ import {
 } from '@ant-design/icons';
 import {
   buildAsciinemaCast,
+  buildAuditCaptureID,
   buildAuditRecord,
   buildAuditRecordSummary,
   createAuditEvent,
   persistAuditRecordSet,
   sanitizeAuditRecord,
+  upsertAuditSessionRecord,
 } from './auditLog.js';
 import {
   buildExtensionCatalog,
@@ -123,6 +125,7 @@ import {
   appendClosedSessions,
   buildSessionAttentionSummary,
   buildSessionAuditSummary,
+  buildSessionAuditWorkspaceSummary,
   buildSessionClosePlan,
   buildSessionCloseConfirm,
   buildSessionContextFacts,
@@ -565,6 +568,8 @@ function App() {
     fileTransferCleanupRef.current = null;
   }, []);
   const terminalRefs = useRef({});
+  const sessionsRef = useRef(sessions);
+  const saveAuditRecordRef = useRef(null);
   const terminalSearchQueriesRef = useRef({});
   const terminalSearchRef = useRef(null);
   const fileSearchRef = useRef(null);
@@ -576,6 +581,7 @@ function App() {
   const workspaceHadSessionsRef = useRef(false);
   const workspaceRestoringRef = useRef(false);
   const workspaceStartupHandledRef = useRef(false);
+  sessionsRef.current = sessions;
   const focusTerminalSession = (sessionId = activeKey) => {
     if (!sessionId) return;
     window.requestAnimationFrame(() => {
@@ -1246,6 +1252,23 @@ function App() {
     query: auditQuery,
     sessionId: auditSessionFilter,
   }), [auditProviderFilter, auditQuery, auditRecords, auditSessionFilter]);
+  const auditWorkspaceSession = sessions.find((session) => (
+    session.id === (auditSessionFilter === 'all' ? activeKey : auditSessionFilter)
+  )) || null;
+  const auditWorkspaceRecording = auditWorkspaceSession
+    ? terminalRefs.current[auditWorkspaceSession.id]?.recording?.()
+    : null;
+  const auditWorkspaceSummary = buildSessionAuditWorkspaceSummary(
+    auditWorkspaceSession,
+    auditRecords,
+    {
+      recordingActive: Boolean(auditWorkspaceRecording?.startedAt)
+        && auditWorkspaceSession?.status !== 'closed',
+    },
+  );
+  const auditWorkspaceRecordingState = auditWorkspaceSummary?.recordingActive
+    ? 'active'
+    : auditWorkspaceSummary?.finalized ? 'saved' : 'pending';
 
   useEffect(() => {
     if (auditSessionFilter === 'all') return;
@@ -1552,6 +1575,7 @@ function App() {
       status: 'connecting',
       startedAt: new Date().toISOString(),
       auditEvents: [],
+      auditRecordSaved: false,
       revision: 0,
     }]);
     setActiveKey(id);
@@ -1561,7 +1585,7 @@ function App() {
   const closeSessionSet = (closingSessions = []) => {
     if (closingSessions.length === 0) return;
     const closingSessionIds = new Set(closingSessions.map((session) => session.id));
-    closingSessions.forEach((session) => saveAuditRecord(session.id));
+    closingSessions.forEach((session) => saveAuditRecord(session.id, { finalize: true }));
     rememberClosedSessions(closingSessions);
     const remainingSessions = sessions.filter((session) => !closingSessionIds.has(session.id));
     setSessions((current) => current.filter((session) => !closingSessionIds.has(session.id)));
@@ -1726,18 +1750,17 @@ function App() {
       messageApi.warning(t('message.noActiveSession'));
       return;
     }
+    saveAuditRecord(sessionId, { finalize: true });
     setSessions((current) => current.map((session) => (
       session.id === sessionId
         ? {
           ...session,
-          auditEvents: [
-            ...(session.auditEvents || []),
-            createAuditEvent({
-              sessionId: session.id,
-              sessionLabel: session.label,
-              type: 'session.reconnect',
-            }),
-          ],
+          auditEvents: [createAuditEvent({
+            sessionId: session.id,
+            sessionLabel: session.label,
+            type: 'session.reconnect',
+          })],
+          auditRecordSaved: false,
           backendSessionId: '',
           status: 'connecting',
           revision: (session.revision || 0) + 1,
@@ -1933,7 +1956,10 @@ function App() {
     )));
   };
 
-  const saveAuditRecord = (sessionId = activeKey) => {
+  const saveAuditRecord = (
+    sessionId = activeKey,
+    { finalize = false, updateSession = true } = {},
+  ) => {
     const session = sessions.find((item) => item.id === sessionId || item.backendSessionId === sessionId);
     if (!session || session.auditRecordSaved) return null;
     const recording = terminalRefs.current[session.id]?.recording?.();
@@ -1952,16 +1978,17 @@ function App() {
       auditEvents: session.auditEvents || [],
       cast,
       endedAt: new Date().toISOString(),
+      id: buildAuditCaptureID(session),
       providerType: session.providerType,
+      revision: session.revision || 0,
       screen: recording?.screen || '',
       sessionId: session.id,
       startedAt: recording?.startedAt || session.startedAt || '',
       title: session.label,
     });
-    const persistence = persistAuditRecords(
-      [record, ...loadAuditRecords()],
-      { preferredId: record.id },
-    );
+    const nextRecords = upsertAuditSessionRecord(loadAuditRecords(), record);
+    const nextRecord = nextRecords[0];
+    const persistence = persistAuditRecords(nextRecords, { preferredId: nextRecord.id });
     setAuditRecords(persistence.records);
     if (!persistence.preferredStored) {
       notificationApi.error({
@@ -1976,11 +2003,32 @@ function App() {
     if (persistence.evictedCount > 0) {
       messageApi.warning(t('message.auditRecordsPruned', { count: persistence.evictedCount }));
     }
-    setSessions((current) => current.map((item) => (
-      item.id === session.id ? { ...item, auditRecordSaved: true } : item
-    )));
+    if (finalize && updateSession) {
+      setSessions((current) => current.map((item) => (
+        item.id === session.id ? { ...item, auditRecordSaved: true } : item
+      )));
+    }
+    return nextRecord;
+  };
+
+  const saveCurrentAuditSnapshot = (sessionId = activeKey) => {
+    const record = saveAuditRecord(sessionId);
+    if (record) messageApi.success(t('message.auditSnapshotSaved'));
+    if (!record) messageApi.info(t('message.terminalOutputEmpty'));
     return record;
   };
+
+  saveAuditRecordRef.current = saveAuditRecord;
+
+  useEffect(() => {
+    const finalizeOpenAuditRecords = () => {
+      sessionsRef.current.forEach((session) => {
+        saveAuditRecordRef.current?.(session.id, { finalize: true, updateSession: false });
+      });
+    };
+    window.addEventListener('beforeunload', finalizeOpenAuditRecords);
+    return () => window.removeEventListener('beforeunload', finalizeOpenAuditRecords);
+  }, []);
 
   const openAuditReplay = (record) => {
     setReplayRecord(record);
@@ -2041,7 +2089,7 @@ function App() {
   };
 
   const updateSessionStatus = (sessionId, status) => {
-    if (status === 'closed') saveAuditRecord(sessionId);
+    if (status === 'closed') saveAuditRecord(sessionId, { finalize: true });
     setSessions((current) => current.map((item) => (
       item.backendSessionId === sessionId || item.id === sessionId ? { ...item, status } : item
     )));
@@ -2346,9 +2394,7 @@ function App() {
     if (action === 'copyTranscript') copyTerminalTranscript();
     if (action === 'exportTranscript') exportTerminalTranscript();
     if (action === 'saveAudit') {
-      const record = saveAuditRecord(activeKey);
-      if (record) messageApi.success(t('message.auditRecordSaved'));
-      if (!record) messageApi.info(t('message.terminalOutputEmpty'));
+      saveCurrentAuditSnapshot(activeKey);
     }
     if (action === 'closeSession') confirmRemoveSession(activeKey);
     if (action === 'closeClosed') confirmCloseClosedSessions();
@@ -5573,11 +5619,42 @@ function App() {
           <Title level={3}>{t('section.auditLogs')}</Title>
         </div>
         <Space>
-          <Button onClick={() => saveAuditRecord(activeKey)} disabled={!activeKey}>{t('action.saveAuditRecord')}</Button>
           <Button danger onClick={confirmClearAuditRecords} disabled={auditRecords.length === 0}>{t('action.clear')}</Button>
         </Space>
       </div>
       <div className="audit-hint-strip">{t('settings.auditHint')}</div>
+      {auditWorkspaceSummary && (
+        <div className="audit-live-session-strip">
+          <span className="provider-icon"><AuditOutlined /></span>
+          <div className="audit-live-session-copy">
+            <strong>
+              {sessionIdentityDisplays[auditWorkspaceSession.id]?.displayName || auditWorkspaceSession.label}
+            </strong>
+            <small>{t('audit.currentSessionDescription')}</small>
+          </div>
+          <div className="audit-live-session-facts">
+            <span>
+              <small>{t('label.auditEvents')}</small>
+              <strong>{auditWorkspaceSummary.eventCount}</strong>
+            </span>
+            <span>
+              <small>{t('metric.recordings')}</small>
+              <strong>{auditWorkspaceSummary.captureCount}</strong>
+            </span>
+            <span className={auditWorkspaceRecordingState === 'pending' ? 'tone-warning' : 'tone-success'}>
+              <small>{t('label.recording')}</small>
+              <strong>{t(`recording.state.${auditWorkspaceRecordingState}`)}</strong>
+            </span>
+          </div>
+          <Button
+            icon={<SaveOutlined />}
+            disabled={auditWorkspaceSummary.finalized}
+            onClick={() => saveCurrentAuditSnapshot(auditWorkspaceSession.id)}
+          >
+            {t('action.saveAuditSnapshot')}
+          </Button>
+        </div>
+      )}
       <div className="audit-summary-grid">
         <MetricCard label={t('metric.recordings')} value={auditRecords.length} />
         <MetricCard label={t('metric.visibleRecords')} value={visibleAuditRecords.length} />
@@ -5613,7 +5690,12 @@ function App() {
         locale={{
           emptyText: (
             <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noAuditRecords')}>
-              <Button onClick={() => saveAuditRecord(activeKey)} disabled={!activeKey}>{t('action.saveAuditRecord')}</Button>
+              <Button
+                onClick={() => saveCurrentAuditSnapshot(auditWorkspaceSession?.id)}
+                disabled={!auditWorkspaceSession}
+              >
+                {t('action.saveAuditSnapshot')}
+              </Button>
             </Empty>
           ),
         }}
@@ -5640,6 +5722,7 @@ function App() {
                   <span className="audit-record-description">
                     <span>{`${record.startedAt || '-'} -> ${record.endedAt || '-'}`}</span>
                     <span className="audit-record-badges">
+                      <span>{t('audit.connectionSegment', { count: (Number(record.revision) || 0) + 1 })}</span>
                       <span>{`${t('label.auditEvents')}: ${summary.eventCount}`}</span>
                       <span>{`${t('label.duration')}: ${formatReplayTime(summary.duration)}`}</span>
                       {summary.hasRecording && <span>{t('label.recording')}</span>}
@@ -5805,9 +5888,7 @@ function App() {
     exportTranscript: exportTerminalTranscript,
     history: () => setHistoryOpen(true),
     saveAudit: () => {
-      const record = saveAuditRecord(activeKey);
-      if (record) messageApi.success(t('message.auditRecordSaved'));
-      if (!record) messageApi.info(t('message.terminalOutputEmpty'));
+      saveCurrentAuditSnapshot(activeKey);
     },
     zoomIn: () => zoomTerminalFont(1),
     zoomOut: () => zoomTerminalFont(-1),
@@ -5881,7 +5962,7 @@ function App() {
     activeKey && {
       key: 'saveAudit',
       icon: <AuditOutlined />,
-      label: t('action.saveAuditRecord'),
+      label: t('action.saveAuditSnapshot'),
     },
     activeKey && {
       key: 'reset',
@@ -7821,7 +7902,7 @@ function buildPaletteItems(actions) {
       reconnect: t('action.reconnect'),
       restoreClosed: t('action.restoreClosedSession'),
       renameSession: t('action.renameSession'),
-      saveAudit: t('action.saveAuditRecord'),
+      saveAudit: t('action.saveAuditSnapshot'),
       unprotectSession: t('action.unprotectSession'),
     },
     runAction: actions.runSessionAction,

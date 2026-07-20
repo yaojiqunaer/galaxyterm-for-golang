@@ -47,7 +47,7 @@ Search connections, active sessions, terminal types, quick commands, and workspa
 
 <details>
 <summary><b>🧾 Audit logs and terminal recordings</b></summary>
-Records session open, reconnect, close, error, clear, quick command, and large paste events. Terminal output is stored as asciinema v2 text recordings. The Audit page uses a read-only xterm renderer to restore ANSI colors, carriage-return updates, screen clearing, and cursor movement at the original timestamps. Playback supports pause, restart, seeking, event stepping, speed control, and `.cast` or `.log` export. When local audit storage is full, GalaxyTerm removes the oldest records first. If the new recording still cannot be stored, existing history is preserved, the failure is shown explicitly, and session closing continues.
+Records session open, reconnect, close, error, clear, quick command, and large paste events. Terminal output is stored as asciinema v2 text recordings. The Audit page uses a read-only xterm renderer to restore ANSI colors, carriage-return updates, screen clearing, and cursor movement at the original timestamps. Playback supports pause, restart, seeking, event stepping, speed control, and `.cast` or `.log` export. Active sessions can save a snapshot at any time; saving the same connection segment again updates its existing record. Closing a session, reconnecting, or exiting the app finalizes the complete recording, while output after reconnect is retained as a new connection segment under the same session. When local audit storage is full, GalaxyTerm removes the oldest records first. If the new recording still cannot be stored, existing history is preserved, the failure is shown explicitly, and session closing continues.
 </details>
 
 <details>

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   buildAsciinemaCast,
+  buildAuditCaptureID,
   buildAuditRecord,
   buildAuditRecordSummary,
   resolveReplayEventTime,
@@ -11,6 +12,7 @@ import {
   renderReplayFrame,
   redactSensitive,
   sanitizeAuditRecord,
+  upsertAuditSessionRecord,
 } from './auditLog.js';
 
 const sensitive = [
@@ -119,6 +121,64 @@ assert.equal(auditRecord.auditEvents[1].detail, 'kubectl get pods');
 assert.ok(!auditRecord.screen.includes('hunter2'));
 assert.ok(!auditRecord.title.includes('secret-value'));
 assert.ok(!JSON.parse(auditRecord.cast.split('\n')[0]).command.includes('secret'));
+
+assert.equal(buildAuditCaptureID({ id: 'session-1', revision: 0 }), 'audit-session-1-0');
+assert.equal(buildAuditCaptureID({ id: 'session-1', revision: 2 }), 'audit-session-1-2');
+assert.equal(buildAuditCaptureID(null), '');
+
+const initialCapture = {
+  id: 'legacy-capture-id',
+  sessionId: 'session-1',
+  revision: 0,
+  title: 'Initial snapshot',
+  endedAt: '2026-07-20T10:00:00.000Z',
+};
+const unrelatedCapture = {
+  id: 'other-capture',
+  sessionId: 'session-2',
+  revision: 0,
+  title: 'Other session',
+};
+const duplicateInitialCapture = {
+  ...initialCapture,
+  id: 'duplicate-legacy-capture-id',
+};
+assert.deepEqual(upsertAuditSessionRecord([
+  initialCapture,
+  duplicateInitialCapture,
+  unrelatedCapture,
+], {
+  id: 'audit-session-1-0',
+  sessionId: 'session-1',
+  revision: 0,
+  title: 'Updated snapshot',
+  endedAt: '2026-07-20T10:05:00.000Z',
+}), [
+  {
+    id: 'legacy-capture-id',
+    sessionId: 'session-1',
+    revision: 0,
+    title: 'Updated snapshot',
+    endedAt: '2026-07-20T10:05:00.000Z',
+  },
+  unrelatedCapture,
+]);
+assert.deepEqual(upsertAuditSessionRecord([
+  initialCapture,
+], {
+  id: 'audit-session-1-1',
+  sessionId: 'session-1',
+  revision: 1,
+  title: 'Reconnected capture',
+}), [
+  {
+    id: 'audit-session-1-1',
+    sessionId: 'session-1',
+    revision: 1,
+    title: 'Reconnected capture',
+  },
+  initialCapture,
+]);
 
 const legacyCast = [
   JSON.stringify({

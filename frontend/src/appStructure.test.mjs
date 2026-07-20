@@ -857,8 +857,26 @@ assert.ok(
   'audit navigation must filter records by the exact session instead of relying on duplicate-prone labels',
 );
 assert.ok(
+  source.includes('upsertAuditSessionRecord(loadAuditRecords(), record)')
+    && source.includes('id: buildAuditCaptureID(session),')
+    && source.includes('revision: session.revision || 0,')
+    && source.includes('if (finalize && updateSession) {')
+    && source.includes('saveAuditRecord(session.id, { finalize: true })')
+    && source.includes("if (status === 'closed') saveAuditRecord(sessionId, { finalize: true });")
+    && source.includes('auditRecordSaved: false,')
+    && /const duplicateSession[\s\S]{0,500}?auditEvents:\s*\[\],[\s\S]{0,80}?auditRecordSaved:\s*false,[\s\S]{0,80}?revision:\s*0/.test(source)
+    && source.includes('className="audit-live-session-strip"')
+    && source.includes('disabled={auditWorkspaceSummary.finalized}')
+    && source.includes('saveCurrentAuditSnapshot(auditWorkspaceSession.id)')
+    && source.includes("window.addEventListener('beforeunload', finalizeOpenAuditRecords)")
+    && source.includes("window.removeEventListener('beforeunload', finalizeOpenAuditRecords)")
+    && source.includes('saveAuditRecordRef.current?.(session.id, { finalize: true, updateSession: false })'),
+  'audit snapshots must update the current connection segment while close and reconnect finalize complete recordings',
+);
+assert.ok(
   source.includes('persistAuditRecordSet(localStorage, auditRecordStorageKey, records, options)')
-    && /persistAuditRecords\([\s\S]*?\[record, \.\.\.loadAuditRecords\(\)\][\s\S]*?preferredId:\s*record\.id/.test(source)
+    && source.includes('const nextRecords = upsertAuditSessionRecord(loadAuditRecords(), record);')
+    && source.includes('persistAuditRecords(nextRecords, { preferredId: nextRecord.id })')
     && source.includes('if (!persistence.preferredStored)')
     && source.includes("t('message.auditRecordStorageFailed')")
     && source.includes("t('message.auditRecordsPruned'")

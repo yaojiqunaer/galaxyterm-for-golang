@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   appendClosedSessions,
   buildSessionAuditSummary,
+  buildSessionAuditWorkspaceSummary,
   buildSessionClosePlan,
   buildSessionContextFacts,
   buildSessionDisplayLabels,
@@ -574,6 +575,29 @@ assert.deepEqual(buildSessionAuditSummary({
   tone: 'warning',
   values: { count: 0 },
 });
+
+assert.deepEqual(buildSessionAuditWorkspaceSummary({
+  id: 'session-1',
+  auditEvents: [{ type: 'terminal.open' }, { type: 'terminal.copy' }],
+  providerType: 'ssh',
+  status: 'connected',
+}, [
+  { id: 'capture-1', sessionId: 'session-1', revision: 0 },
+  { id: 'capture-2', sessionId: 'session-1', revision: 1 },
+  { id: 'capture-other', sessionId: 'session-2', revision: 0 },
+], { recordingActive: true }), {
+  captureCount: 2,
+  eventCount: 2,
+  finalized: false,
+  providerType: 'ssh',
+  recordingActive: true,
+  status: 'connected',
+});
+assert.equal(buildSessionAuditWorkspaceSummary({
+  id: 'session-1',
+  auditRecordSaved: true,
+}, []).finalized, true);
+assert.equal(buildSessionAuditWorkspaceSummary(null, []), null);
 
 const sessionFilterFixture = [
   { id: '1', label: 'Prod SSH', providerType: 'ssh', status: 'connected', config: { host: 'prod.example.com', username: 'root' } },

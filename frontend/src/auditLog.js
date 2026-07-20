@@ -93,6 +93,7 @@ export function buildAuditRecord({
   endedAt = new Date().toISOString(),
   id = randomId('record'),
   providerType = '',
+  revision = 0,
   screen = '',
   sessionId = '',
   startedAt = '',
@@ -104,11 +105,35 @@ export function buildAuditRecord({
     cast,
     endedAt,
     providerType,
+    revision,
     screen,
     sessionId,
     startedAt,
     title,
   });
+}
+
+export function buildAuditCaptureID(session) {
+  if (!session?.id) return '';
+  return `audit-${session.id}-${Math.max(0, Number(session.revision) || 0)}`;
+}
+
+export function upsertAuditSessionRecord(records = [], record = {}) {
+  const revision = Math.max(0, Number(record.revision) || 0);
+  const matchesCapture = (item) => (
+    item?.id === record.id
+    || (
+      record.sessionId
+      && item?.sessionId === record.sessionId
+      && Math.max(0, Number(item.revision) || 0) === revision
+    )
+  );
+  const existing = records.find(matchesCapture);
+  const nextRecord = existing ? { ...record, id: existing.id } : record;
+  return [
+    nextRecord,
+    ...records.filter((item) => !matchesCapture(item)),
+  ];
 }
 
 export function sanitizeAuditRecord(record = {}) {

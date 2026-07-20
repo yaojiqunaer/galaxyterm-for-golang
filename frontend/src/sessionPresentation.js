@@ -368,6 +368,18 @@ export function buildSessionAuditSummary(session, options = {}) {
   };
 }
 
+export function buildSessionAuditWorkspaceSummary(session, records = [], options = {}) {
+  if (!session) return null;
+  return {
+    captureCount: records.filter((record) => record.sessionId === session.id).length,
+    eventCount: (session.auditEvents || []).length,
+    finalized: session.auditRecordSaved === true,
+    providerType: session.providerType || 'terminal',
+    recordingActive: options.recordingActive === true,
+    status: session.status || 'connecting',
+  };
+}
+
 export function filterSessions(sessions = [], options = {}) {
   const queryTokens = String(options.query || '')
     .trim()

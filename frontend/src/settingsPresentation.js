@@ -86,7 +86,7 @@ export function buildShortcutGroups(settings = {}) {
     {
       key: 'audit',
       items: [
-        ['Session menu', 'action.saveAuditRecord'],
+        ['Session menu', 'action.saveAuditSnapshot'],
         ['Audit page', 'action.replay'],
         ['Audit page', 'action.exportCast'],
       ],
