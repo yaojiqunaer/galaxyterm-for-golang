@@ -184,6 +184,21 @@ function TerminalPane({
         term.current?.focus();
       }
     },
+    sendBackground: (data) => {
+      if (!sessionId.current) return Promise.reject(new Error('Terminal session is unavailable'));
+      trackOutgoingData(data);
+      return Promise.resolve().then(() => SessionAPI.Send(sessionId.current, data)).catch((error) => {
+        stopDurationTicker();
+        const detail = String(error?.message || error || 'Terminal input failed');
+        emitStatus({
+          durationMs: commandDurationMs(lastCommandStartedAt.current),
+          error: detail,
+          status: 'error',
+        });
+        callbacksRef.current.onAuditEvent?.({ detail, type: 'input.error' });
+        throw error;
+      });
+    },
     interrupt: () => {
       if (sessionId.current) {
         markCommandInterrupted();

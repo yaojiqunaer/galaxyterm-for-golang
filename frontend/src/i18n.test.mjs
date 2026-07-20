@@ -233,6 +233,9 @@ assert.equal(t('provider.runtime.disabledDescription', {
   version: '0.1.0',
 }), 'MySQL 0.1.0 已停用；当前会话保持运行，但无法新建同类型会话。');
 assert.equal(t('file.noProviderHint'), '安装 SFTP、FTP、S3 或兼容的文件协议扩展后即可浏览远程文件。');
+assert.equal(t('action.broadcastCommand'), '批量发送命令');
+assert.equal(t('broadcast.reason.sensitive'), '检测到密码、令牌或密钥等敏感内容，已禁止批量发送。');
+assert.equal(t('message.broadcastSuccess', { count: 3 }), '命令已发送到 3 个会话');
 [
   'operation.error.reason.unavailable',
   'operation.error.suggestion.unavailable',
@@ -247,3 +250,5 @@ assert.equal(t('audit.connectionSegment', { count: 2 }), 'Connection 2');
 assert.equal(t('provider.runtime.builtinDescription'), 'Provided by the GalaxyTerm core; no extension is required.');
 assert.equal(t('provider.runtime.missingDescription', { type: 'mysql' }), 'The mysql provider extension is not installed. This session remains available until it is closed.');
 assert.equal(t('confirm.closeAllSessionsContent', { count: 2 }), '2 sessions will be closed after saving their audit records.');
+assert.equal(t('action.broadcastCommand'), 'Send Command to Sessions');
+assert.equal(t('message.broadcastPartial', { failed: 1, succeeded: 2, total: 3 }), 'Sent to 2/3 sessions. Failed sessions: 1; they remain selected for review.');

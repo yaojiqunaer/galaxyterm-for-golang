@@ -61,6 +61,11 @@ Interactive terminals show the current command, live duration, and execution sta
 </details>
 
 <details>
+<summary><b>Multi-session commands</b></summary>
+Send one command to several terminals from the session toolbar or session menu. Targets are limited to connected, idle sessions; only the current session is selected initially, and the user must explicitly choose at least two targets. Busy, connecting, failed, and closed sessions are excluded automatically. Multi-session send accepts a single command line and blocks common password, token, and private-key content. Every successful target still records its own command history, audit event, and terminal recording, while partial failures are never retried against successful sessions automatically.
+</details>
+
+<details>
 <summary><b>Terminal output search</b></summary>
 Typing a query highlights matches immediately and shows the active position and total count. Match case, whole word, and regular-expression modes are available, while invalid expressions are reported without interrupting the terminal. Press `Enter` for the next match, `Shift+Enter` for the previous match, or `Esc` to clear search and return focus to the terminal. The active query is reapplied when switching sessions, new output refreshes matches automatically, and results remain isolated per session. A compact control returns a scrolled terminal to the latest output. HTTP(S) links require a `Cmd`-click or `Ctrl`-click before GalaxyTerm opens them in the system browser, preventing accidental activation and unsafe schemes.
 </details>

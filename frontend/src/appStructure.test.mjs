@@ -994,5 +994,16 @@ assert.ok(
     && /\.connection-group-nav-item\.drop-target\s*\{[\s\S]*?box-shadow:\s*inset/.test(styles),
   'connection drag and drop must provide clear source and destination feedback',
 );
+assert.ok(
+  terminalPaneSource.includes('sendBackground: (data) =>')
+    && source.includes('buildBroadcastCommandPlan')
+    && source.includes('buildBroadcastSessionTargets')
+    && source.includes('const sendBroadcastCommand = async () => {')
+    && source.includes("appendAuditEvent(sessionId, 'broadcast-command.run'")
+    && source.includes('broadcastPlan.targetIds.map(async (sessionId) =>')
+    && source.includes('open={broadcastOpen}')
+    && source.includes("t('action.broadcastCommand')"),
+  'multi-session commands must use guarded background sends while retaining audit tracking',
+);
 
 console.log('app structure tests passed');

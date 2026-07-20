@@ -145,6 +145,11 @@ export function buildSessionToolbarModel(options = {}) {
         labelKey: activeProtected ? 'action.unprotectSession' : 'action.protectSession',
         disabled: !hasActiveSession,
       },
+      ...(options.broadcastReadyCount === undefined ? [] : [{
+        key: 'broadcast',
+        labelKey: 'action.broadcastCommand',
+        disabled: Number(options.broadcastReadyCount) < 2,
+      }]),
       ...(!reconnectPrimary ? [reconnectAction] : []),
       { key: 'closeClosed', labelKey: 'action.closeClosed', disabled: closedCount === 0 },
       {

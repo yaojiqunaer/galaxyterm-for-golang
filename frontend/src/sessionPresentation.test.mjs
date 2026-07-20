@@ -222,6 +222,25 @@ assert.deepEqual(buildSessionToolbarContext({
 });
 assert.equal(buildSessionToolbarContext(null), null);
 
+const broadcastToolbar = buildSessionToolbarModel({
+  activeKey: 's1',
+  broadcastReadyCount: 3,
+  sessionCount: 3,
+  terminalStatus: 'connected',
+  view: 'tabs',
+});
+assert.deepEqual(
+  broadcastToolbar.overflow.find((action) => action.key === 'broadcast'),
+  { key: 'broadcast', labelKey: 'action.broadcastCommand', disabled: false },
+);
+assert.equal(buildSessionToolbarModel({
+  activeKey: 's1',
+  broadcastReadyCount: 1,
+  sessionCount: 1,
+  terminalStatus: 'connected',
+  view: 'tabs',
+}).overflow.find((action) => action.key === 'broadcast')?.disabled, true);
+
 const duplicateSessionLabels = buildSessionDisplayLabels([
   { id: 'local-1', label: 'Local Terminal', providerType: 'local' },
   { id: 'prod', label: 'Production', providerType: 'ssh' },

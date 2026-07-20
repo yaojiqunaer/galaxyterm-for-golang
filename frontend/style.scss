@@ -4208,6 +4208,35 @@ code {
   margin-bottom: 12px;
 }
 
+.broadcast-command-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-top: 4px;
+}
+
+.broadcast-command-field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.broadcast-command-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.broadcast-command-targets {
+  width: 100%;
+}
+
+.broadcast-command-modal .ant-input-textarea-show-count::after {
+  color: var(--muted);
+}
+
 .command-history-list {
   margin-top: 12px;
   max-height: calc(100vh - 260px);

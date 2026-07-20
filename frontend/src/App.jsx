@@ -68,6 +68,7 @@ import {
   ReloadOutlined,
   RightOutlined,
   SaveOutlined,
+  SendOutlined,
   SettingOutlined,
   StarFilled,
   StarOutlined,
@@ -232,6 +233,10 @@ import {
   normalizeCommandHistoryItem,
   upsertCommandHistory,
 } from './commandHistory.js';
+import {
+  buildBroadcastCommandPlan,
+  buildBroadcastSessionTargets,
+} from './broadcastCommand.js';
 import {
   buildWorkspaceRestorePlan,
   buildWorkspaceSnapshot,
@@ -473,6 +478,11 @@ function App() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historyQuery, setHistoryQuery] = useState('');
   const [historyScope, setHistoryScope] = useState('provider');
+  const [broadcastOpen, setBroadcastOpen] = useState(false);
+  const [broadcastCommand, setBroadcastCommand] = useState('');
+  const [broadcastTargetIds, setBroadcastTargetIds] = useState([]);
+  const [broadcastAppendEnter, setBroadcastAppendEnter] = useState(true);
+  const [broadcastSending, setBroadcastSending] = useState(false);
   const [recentConnections, setRecentConnections] = useState(() => loadRecentConnections());
   const [auditRecords, setAuditRecords] = useState(() => loadAuditRecords());
   const [replayRecord, setReplayRecord] = useState(null);
@@ -589,6 +599,7 @@ function App() {
     fileTransferCleanupRef.current = null;
   }, []);
   const terminalRefs = useRef({});
+  const broadcastSendingRef = useRef(false);
   const sessionsRef = useRef(sessions);
   const saveAuditRecordRef = useRef(null);
   const terminalSearchQueriesRef = useRef({});
@@ -674,6 +685,22 @@ function App() {
   );
   const unreadSessionCount = sessionAttentionSummary.total;
   const sessionDisplayLabels = useMemo(() => buildSessionDisplayLabels(sessions), [sessions]);
+  const broadcastTargets = useMemo(() => buildBroadcastSessionTargets(sessions, {
+    activeKey,
+    displayLabels: sessionDisplayLabels,
+    terminalStatuses,
+  }), [activeKey, sessionDisplayLabels, sessions, terminalStatuses]);
+  const broadcastReadyIds = useMemo(
+    () => broadcastTargets.map((target) => target.id),
+    [broadcastTargets],
+  );
+  const broadcastReadySignature = broadcastReadyIds.join('\u0000');
+  const broadcastPlan = useMemo(() => buildBroadcastCommandPlan({
+    appendEnter: broadcastAppendEnter,
+    command: broadcastCommand,
+    readySessionIds: broadcastReadyIds,
+    targetIds: broadcastTargetIds,
+  }), [broadcastAppendEnter, broadcastCommand, broadcastReadySignature, broadcastTargetIds]);
   const sessionClosePlans = useMemo(() => ({
     all: buildSessionClosePlan(sessions),
     closed: buildSessionClosePlan(sessions, { mode: 'closed' }),
@@ -683,6 +710,12 @@ function App() {
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
+
+  useEffect(() => {
+    if (!broadcastOpen) return;
+    const readyIds = new Set(broadcastReadyIds);
+    setBroadcastTargetIds((current) => current.filter((sessionId) => readyIds.has(sessionId)));
+  }, [broadcastOpen, broadcastReadySignature]);
 
   useEffect(() => {
     Promise.resolve()
@@ -2054,6 +2087,59 @@ function App() {
     )));
   };
 
+  const openBroadcastCommand = () => {
+    if (broadcastTargets.length < 2) {
+      messageApi.info(t('message.broadcastNeedsSessions'));
+      return;
+    }
+    const defaultTarget = broadcastTargets.find((target) => target.id === activeKey)
+      || broadcastTargets[0];
+    setBroadcastCommand('');
+    setBroadcastTargetIds(defaultTarget ? [defaultTarget.id] : []);
+    setBroadcastAppendEnter(true);
+    setBroadcastOpen(true);
+  };
+
+  const sendBroadcastCommand = async () => {
+    if (broadcastSendingRef.current) return;
+    if (!broadcastPlan.ok) {
+      messageApi.warning(t(`broadcast.reason.${broadcastPlan.reason}`));
+      return;
+    }
+    broadcastSendingRef.current = true;
+    setBroadcastSending(true);
+    try {
+      const results = await Promise.allSettled(
+        broadcastPlan.targetIds.map(async (sessionId) => {
+          const terminal = terminalRefs.current[sessionId];
+          if (!terminal?.sendBackground) throw new Error('Terminal session is unavailable');
+          await terminal.sendBackground(broadcastPlan.payload);
+          appendAuditEvent(sessionId, 'broadcast-command.run', broadcastPlan.command);
+          return sessionId;
+        }),
+      );
+      const failedIds = results
+        .map((result, index) => (result.status === 'rejected' ? broadcastPlan.targetIds[index] : ''))
+        .filter(Boolean);
+      if (failedIds.length === 0) {
+        messageApi.success(t('message.broadcastSuccess', { count: results.length }));
+        setBroadcastOpen(false);
+        setBroadcastCommand('');
+        setBroadcastTargetIds([]);
+        return;
+      }
+      setBroadcastTargetIds(failedIds);
+      messageApi.warning(t('message.broadcastPartial', {
+        failed: failedIds.length,
+        succeeded: results.length - failedIds.length,
+        total: results.length,
+      }));
+    } finally {
+      broadcastSendingRef.current = false;
+      setBroadcastSending(false);
+    }
+  };
+
   const saveAuditRecord = (
     sessionId = activeKey,
     { finalize = false, updateSession = true } = {},
@@ -3255,6 +3341,7 @@ function App() {
     const sessionToolbarModel = buildSessionToolbarModel({
       activeKey,
       activeProtected: activeSession?.protected,
+      broadcastReadyCount: broadcastTargets.length,
       canNavigate: sessionNavigationState.canNavigate,
       closableOtherCount: sessionClosePlans.others.closingSessions.length,
       closedCount: sessionClosePlans.closed.closingSessions.length,
@@ -3274,6 +3361,7 @@ function App() {
       if (action === 'reconnect') reconnectSession();
       if (action === 'rename') openRenameSession();
       if (action === 'protect' || action === 'unprotect') toggleProtectedSession();
+      if (action === 'broadcast') openBroadcastCommand();
       if (action === 'closeClosed') confirmCloseClosedSessions();
       if (action === 'closeOthers') confirmCloseOtherSessions();
       if (action === 'closeCurrent') confirmRemoveSession(activeKey);
@@ -3519,6 +3607,7 @@ function App() {
                 <Button size="small" onClick={clearProfileFilters}>{t('action.clearFilters')}</Button>
               )}
               <Button
+                disabled={broadcastSending}
                 size="small"
                 onClick={() => openBatchProfiles({
                   ...(groupQuery === 'favorites' ? { favoritesOnly: true } : { group: groupQuery }),
@@ -6083,6 +6172,7 @@ function App() {
     copyTranscript: copyTerminalTranscript,
     exportTranscript: exportTerminalTranscript,
     history: () => setHistoryOpen(true),
+    broadcast: openBroadcastCommand,
     saveAudit: () => {
       saveCurrentAuditSnapshot(activeKey);
     },
@@ -6149,6 +6239,12 @@ function App() {
       key: 'history',
       icon: <HistoryOutlined />,
       label: t('action.commandHistory'),
+    },
+    activeKey && {
+      key: 'broadcast',
+      icon: <SendOutlined />,
+      label: t('action.broadcastCommand'),
+      disabled: broadcastTargets.length < 2,
     },
     activeKey && {
       key: 'exportTranscript',
@@ -7008,6 +7104,97 @@ function App() {
           }}
         />
       </Drawer>
+      <Modal
+        className="broadcast-command-modal"
+        title={t('action.broadcastCommand')}
+        open={broadcastOpen}
+        closable={!broadcastSending}
+        keyboard={!broadcastSending}
+        maskClosable={false}
+        okText={t('action.send')}
+        cancelText={t('action.cancel')}
+        confirmLoading={broadcastSending}
+        okButtonProps={{ disabled: !broadcastPlan.ok }}
+        onCancel={() => {
+          if (!broadcastSending) setBroadcastOpen(false);
+        }}
+        onOk={sendBroadcastCommand}
+      >
+        <div className="broadcast-command-body">
+          <Alert type="info" showIcon message={t('broadcast.hint')} />
+          <div className="broadcast-command-field">
+            <div className="broadcast-command-field-head">
+              <Text strong>{t('field.targetSessions')}</Text>
+              <Button
+                size="small"
+                type="text"
+                onClick={() => setBroadcastTargetIds(broadcastReadyIds)}
+              >
+                {t('action.selectAllReady')}
+              </Button>
+            </div>
+            <Select
+              aria-label={t('field.targetSessions')}
+              className="broadcast-command-targets"
+              mode="multiple"
+              maxTagCount="responsive"
+              disabled={broadcastSending}
+              value={broadcastTargetIds}
+              onChange={setBroadcastTargetIds}
+              options={broadcastTargets.map((target) => ({
+                label: `${target.displayName} · ${t(`terminal.runStatus.${target.status}`)}`,
+                value: target.id,
+              }))}
+              placeholder={t('placeholder.selectTargetSessions')}
+            />
+          </div>
+          <div className="broadcast-command-field">
+            <Text strong>{t('field.command')}</Text>
+            <Input.TextArea
+              aria-label={t('field.command')}
+              autoFocus
+              autoSize={{ minRows: 2, maxRows: 4 }}
+              disabled={broadcastSending}
+              maxLength={2000}
+              showCount
+              value={broadcastCommand}
+              onChange={(event) => setBroadcastCommand(event.target.value)}
+              placeholder={t('placeholder.broadcastCommand')}
+              onPressEnter={(event) => {
+                if (!event.shiftKey
+                  && !event.isComposing
+                  && !event.nativeEvent?.isComposing
+                  && broadcastPlan.ok
+                  && !broadcastSending) {
+                  event.preventDefault();
+                  sendBroadcastCommand();
+                }
+              }}
+            />
+          </div>
+          <Checkbox
+            checked={broadcastAppendEnter}
+            disabled={broadcastSending}
+            onChange={(event) => setBroadcastAppendEnter(event.target.checked)}
+          >
+            {t('field.appendEnter')}
+          </Checkbox>
+          {broadcastCommand && broadcastPlan.reason && broadcastPlan.reason !== 'empty' && (
+            <Alert
+              showIcon
+              type={broadcastPlan.reason === 'sensitive' || broadcastPlan.reason === 'multiline' ? 'error' : 'warning'}
+              message={t(`broadcast.reason.${broadcastPlan.reason}`)}
+            />
+          )}
+          {broadcastPlan.ok && (
+            <Alert
+              showIcon
+              type="success"
+              message={t('broadcast.impact', { count: broadcastPlan.targetIds.length })}
+            />
+          )}
+        </div>
+      </Modal>
       <Drawer
         title={t('drawer.commandHistory')}
         width={620}
@@ -7558,6 +7745,7 @@ function sessionTabActionIcon(action) {
   if (action === 'protect') return <LockOutlined />;
   if (action === 'unprotect') return <UnlockOutlined />;
   if (action === 'reconnect') return <ReloadOutlined />;
+  if (action === 'broadcast') return <SendOutlined />;
   if (action === 'duplicate' || action === 'copyTarget') return <CopyOutlined />;
   if (action === 'moveLeft') return <LeftOutlined />;
   if (action === 'moveRight') return <RightOutlined />;
