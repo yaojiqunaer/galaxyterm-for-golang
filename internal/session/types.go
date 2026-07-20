@@ -53,15 +53,17 @@ type Driver interface {
 type DriverFactory func(req CreateSessionRequest) (Driver, error)
 
 type Provider struct {
-	Type         string          `json:"type"`
-	NameKey      string          `json:"nameKey"`
-	Name         string          `json:"name"`
-	Description  string          `json:"description"`
-	Category     string          `json:"category"`
-	Capabilities []string        `json:"capabilities"`
-	ConfigFields []ProviderField `json:"configFields,omitempty"`
-	AuthFields   []ProviderField `json:"authFields,omitempty"`
-	NewDriver    DriverFactory   `json:"-"`
+	Type             string          `json:"type"`
+	NameKey          string          `json:"nameKey"`
+	Name             string          `json:"name"`
+	Description      string          `json:"description"`
+	Category         string          `json:"category"`
+	Capabilities     []string        `json:"capabilities"`
+	ExtensionID      string          `json:"extensionId,omitempty"`
+	ExtensionVersion string          `json:"extensionVersion,omitempty"`
+	ConfigFields     []ProviderField `json:"configFields,omitempty"`
+	AuthFields       []ProviderField `json:"authFields,omitempty"`
+	NewDriver        DriverFactory   `json:"-"`
 }
 
 type ProviderField struct {

@@ -61,6 +61,29 @@ func TestSaveResolveAndDeleteSSHCredential(t *testing.T) {
 	}
 }
 
+func TestResolveSSHRequestKeepsExplicitOneTimeSecret(t *testing.T) {
+	store := newMemoryStore()
+	api := NewAPIWithStore(store)
+	ref, err := api.SaveSSHCredential(SaveSSHCredentialRequest{ID: "profile-1", Password: "stored"})
+	if err != nil {
+		t.Fatalf("SaveSSHCredential returned error: %v", err)
+	}
+
+	resolved, err := api.ResolveSSHRequest(session.CreateSessionRequest{
+		ProviderType: "ssh",
+		Auth: map[string]interface{}{
+			"credentialRef": ref,
+			"password":      "one-time",
+		},
+	})
+	if err != nil {
+		t.Fatalf("ResolveSSHRequest returned error: %v", err)
+	}
+	if resolved.Auth["password"] != "one-time" {
+		t.Fatalf("password = %v, want explicit one-time value", resolved.Auth["password"])
+	}
+}
+
 func TestSaveResolveAndDeleteProviderCredential(t *testing.T) {
 	store := newMemoryStore()
 	api := NewAPIWithStore(store)
@@ -124,6 +147,28 @@ func TestSaveResolveAndDeleteProviderCredential(t *testing.T) {
 	}
 	if len(resolved) != 0 {
 		t.Fatalf("deleted values should not be resolved: %+v", resolved)
+	}
+}
+
+func TestResolveProviderCredentialKeepsExplicitOneTimeValue(t *testing.T) {
+	store := newMemoryStore()
+	api := NewAPIWithStore(store)
+	ref, err := api.SaveProviderCredential(SaveProviderCredentialRequest{
+		ID: "redis-production", ProviderType: "redis", Values: map[string]interface{}{"password": "stored"},
+	})
+	if err != nil {
+		t.Fatalf("SaveProviderCredential returned error: %v", err)
+	}
+
+	resolved, err := api.ResolveProviderCredential(ResolveProviderCredentialRequest{Auth: map[string]interface{}{
+		"credentialRef": ref,
+		"password":      "one-time",
+	}})
+	if err != nil {
+		t.Fatalf("ResolveProviderCredential returned error: %v", err)
+	}
+	if resolved["password"] != "one-time" {
+		t.Fatalf("password = %v, want explicit one-time value", resolved["password"])
 	}
 }
 

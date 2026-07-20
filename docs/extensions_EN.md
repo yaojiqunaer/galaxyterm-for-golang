@@ -39,6 +39,8 @@ A terminal extension declares types in `providers` and ships a `stdio-json-v1` e
 
 `configFields` and `authFields` use the same `string`, `textarea`, `number`, `boolean`, `select`, and `password` field model as file providers. The core renders the connection form from the manifest. Configuration enters the saved profile, while authentication values go to the system credential store only when the user opts in; profiles, exports, and workspace snapshots never contain plaintext secrets.
 
+Test Connection starts a disposable driver with the current form values and closes it immediately after a successful connection. A probe creates no tab or active session and writes no audit or recording entry. It has a 20-second default timeout and uses the shared structured-error and retry feedback. When a saved profile references the system credential store, the probe resolves that reference without copying secrets back into the form; an explicit non-empty authentication value entered for this attempt takes precedence over its stored value.
+
 GalaxyTerm starts one isolated sidecar process per terminal session and exchanges newline-delimited JSON frames over standard input and output. Authentication values only appear in the `create` request on standard input; they are never command-line arguments or environment variables. Every request must receive a `response` with the same `requestId`. A single output frame is limited to 16 MiB.
 
 ```json

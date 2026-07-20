@@ -1,12 +1,20 @@
 package session
 
+import (
+	"context"
+	"time"
+)
+
+const defaultProviderProbeTimeout = 20 * time.Second
+
 type API struct {
-	manager          *Manager
-	refreshProviders func() error
+	manager              *Manager
+	refreshProviders     func() error
+	providerProbeTimeout time.Duration
 }
 
 func NewAPI(manager *Manager, refreshers ...func() error) *API {
-	api := &API{manager: manager}
+	api := &API{manager: manager, providerProbeTimeout: defaultProviderProbeTimeout}
 	if len(refreshers) > 0 {
 		api.refreshProviders = refreshers[0]
 	}
@@ -42,4 +50,10 @@ func (api *API) RefreshProviders() error {
 		return nil
 	}
 	return api.refreshProviders()
+}
+
+func (api *API) TestProvider(req CreateSessionRequest) error {
+	ctx, cancel := context.WithTimeout(context.Background(), api.providerProbeTimeout)
+	defer cancel()
+	return api.manager.ProbeProvider(ctx, req)
 }

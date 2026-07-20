@@ -29,3 +29,7 @@ export function Resize(arg1, arg2, arg3) {
 export function Send(arg1, arg2) {
   return callWails(['session', 'API', 'Send'], arg1, arg2);
 }
+
+export function TestProvider(arg1) {
+  return callWails(['session', 'API', 'TestProvider'], arg1);
+}

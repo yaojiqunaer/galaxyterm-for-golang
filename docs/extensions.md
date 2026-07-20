@@ -39,6 +39,8 @@ GalaxyTerm 核心包内置本地终端与 SSH。SFTP、FTP/FTPS、S3、Kubernete
 
 `configFields` 和 `authFields` 使用与文件 Provider 相同的 `string`、`textarea`、`number`、`boolean`、`select`、`password` 字段模型。核心根据清单生成连接表单；配置进入保存连接，认证值仅在用户选择保存时写入系统凭据库，档案、导出和工作区快照都不保存明文。
 
+连接表单的“测试连接”会用当前配置启动一个临时 Driver，成功建立后立即关闭。探测不会创建标签或活动会话，也不会写入审计和录屏记录；默认 20 秒超时，失败时沿用统一的结构化错误和重试提示。保存连接引用了系统凭据时，测试会先解析凭据，但不会把密钥回写到表单；用户本次明确输入的非空认证值优先于已保存值。
+
 GalaxyTerm 为每个终端会话启动一个独立 sidecar 进程，以换行分隔的 JSON 帧通过标准输入输出通信。认证信息只出现在 `create` 请求的标准输入中，不进入命令行参数或环境变量。每个请求都必须返回相同 `requestId` 的 `response`；输出单帧上限为 16 MiB。
 
 ```json

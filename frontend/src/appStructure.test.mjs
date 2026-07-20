@@ -220,6 +220,20 @@ assert.ok(
   'the active-session sidebar must provide compact search without changing session lifetime',
 );
 assert.ok(
+  source.includes('await SessionAPI.TestProvider(request);')
+    && source.includes('const [connectionTestResult, setConnectionTestResult] = useState(null);')
+    && source.includes('className="connection-test-result"')
+    && source.includes('onValuesChange={() => setConnectionTestResult(null)}'),
+  'extension connection tests must run the real provider and keep a visible result until form values change',
+);
+assert.ok(
+  source.includes('buildTerminalProviderSummary(selectedProvider)')
+    && source.includes('selectedProviderSummary.extensionVersion')
+    && source.includes("aria-label={t('action.manageExtension')}")
+    && styles.includes('.drawer-provider-meta'),
+  'the connection drawer must identify extension source, version, and capabilities',
+);
+assert.ok(
   source.includes('const buildConnectionProfileActionMenu = (profile) => {')
     && source.match(/menu=\{buildConnectionProfileActionMenu\(profile\)\}/g)?.length >= 3
     && source.includes('className="provider-row-activate"')

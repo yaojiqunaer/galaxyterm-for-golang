@@ -2,6 +2,7 @@ package session
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -155,6 +156,24 @@ func (m *Manager) Create(ctx context.Context, req CreateSessionRequest) (string,
 
 func (m *Manager) CreateSession(req CreateSessionRequest) (string, error) {
 	return m.Create(context.Background(), req)
+}
+
+// ProbeProvider validates a provider configuration without adding a user-visible
+// session. The driver is always closed, including failed and canceled probes.
+func (m *Manager) ProbeProvider(ctx context.Context, req CreateSessionRequest) error {
+	m.mu.RLock()
+	provider, ok := m.providers[req.ProviderType]
+	m.mu.RUnlock()
+	if !ok {
+		return unknownProviderError(req.ProviderType)
+	}
+	driver, err := provider.NewDriver(req)
+	if err != nil {
+		return err
+	}
+	startErr := driver.Start(ctx, func(Event) {})
+	closeErr := driver.Close()
+	return errors.Join(startErr, closeErr)
 }
 
 func (m *Manager) Send(sessionID string, data string) error {

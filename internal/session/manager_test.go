@@ -11,11 +11,27 @@ type fakeDriver struct {
 	resizes    []Resize
 	closed     bool
 	closeCount int
+	startCount int
+	startErr   error
 }
 
 func (d *fakeDriver) Start(ctx context.Context, emit Emitter) error {
-	return nil
+	d.startCount++
+	return d.startErr
 }
+
+type contextDriver struct {
+	closed bool
+}
+
+func (driver *contextDriver) Start(ctx context.Context, emit Emitter) error {
+	<-ctx.Done()
+	return ctx.Err()
+}
+
+func (driver *contextDriver) Send(string) error           { return nil }
+func (driver *contextDriver) Resize(uint16, uint16) error { return nil }
+func (driver *contextDriver) Close() error                { driver.closed = true; return nil }
 
 func (d *fakeDriver) Send(data string) error {
 	d.sent = append(d.sent, data)
@@ -108,6 +124,64 @@ func TestManagerCloseIsIdempotent(t *testing.T) {
 
 	if driver.closeCount != 1 {
 		t.Fatalf("closeCount = %d, want 1", driver.closeCount)
+	}
+}
+
+func TestManagerProbesProviderWithoutCreatingSession(t *testing.T) {
+	driver := &fakeDriver{}
+	emitted := 0
+	manager := NewManager(func(Event) { emitted++ })
+	manager.RegisterProvider(Provider{
+		Type:      "redis",
+		NewDriver: func(CreateSessionRequest) (Driver, error) { return driver, nil },
+	})
+
+	if err := manager.ProbeProvider(context.Background(), CreateSessionRequest{ProviderType: "redis"}); err != nil {
+		t.Fatalf("ProbeProvider returned error: %v", err)
+	}
+	if driver.startCount != 1 || driver.closeCount != 1 {
+		t.Fatalf("driver start/close = %d/%d, want 1/1", driver.startCount, driver.closeCount)
+	}
+	if sessions := manager.ListSessions(); len(sessions) != 0 {
+		t.Fatalf("sessions = %#v, want no probe session", sessions)
+	}
+	if emitted != 0 {
+		t.Fatalf("emitted = %d, want no user-visible events", emitted)
+	}
+}
+
+func TestManagerProbeClosesDriverAfterStartError(t *testing.T) {
+	want := errors.New("connection refused")
+	driver := &fakeDriver{startErr: want}
+	manager := NewManager(nil)
+	manager.RegisterProvider(Provider{
+		Type:      "redis",
+		NewDriver: func(CreateSessionRequest) (Driver, error) { return driver, nil },
+	})
+
+	if err := manager.ProbeProvider(context.Background(), CreateSessionRequest{ProviderType: "redis"}); !errors.Is(err, want) {
+		t.Fatalf("ProbeProvider error = %v, want %v", err, want)
+	}
+	if driver.closeCount != 1 {
+		t.Fatalf("closeCount = %d, want 1", driver.closeCount)
+	}
+}
+
+func TestManagerProbeHonorsContext(t *testing.T) {
+	driver := &contextDriver{}
+	manager := NewManager(nil)
+	manager.RegisterProvider(Provider{
+		Type:      "redis",
+		NewDriver: func(CreateSessionRequest) (Driver, error) { return driver, nil },
+	})
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	if err := manager.ProbeProvider(ctx, CreateSessionRequest{ProviderType: "redis"}); !errors.Is(err, context.Canceled) {
+		t.Fatalf("ProbeProvider error = %v, want context.Canceled", err)
+	}
+	if !driver.closed {
+		t.Fatal("driver was not closed after context cancellation")
 	}
 }
 

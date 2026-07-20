@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   buildExtensionTerminalFormValues,
   buildExtensionTerminalRequest,
+  buildTerminalProviderSummary,
   extensionTerminalDescription,
 } from './terminalProviders.js';
 
@@ -40,5 +41,20 @@ assert.deepEqual(buildExtensionTerminalRequest(provider, 'Production cache', {
 
 assert.equal(extensionTerminalDescription(provider, { config: { host: 'cache.internal', port: 6380 } }), 'cache.internal:6380');
 assert.equal(extensionTerminalDescription({ type: 'kubernetes' }, { config: { namespace: 'apps', pod: 'api-0' } }), 'apps / api-0');
+
+assert.deepEqual(buildTerminalProviderSummary({
+  type: 'redis',
+  category: 'extension',
+  description: 'Interactive Redis terminal',
+  extensionId: 'galaxyterm-extension-redis',
+  extensionVersion: '0.2.0',
+  capabilities: ['stream', 'resize'],
+}), {
+  capabilities: ['stream', 'resize'],
+  description: 'Interactive Redis terminal',
+  extensionId: 'galaxyterm-extension-redis',
+  extensionVersion: '0.2.0',
+  isExtension: true,
+});
 
 console.log('terminal provider tests passed');

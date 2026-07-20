@@ -33,14 +33,16 @@ func SyncExtensionProviders(manager *session.Manager, resolver ExtensionProvider
 			seen[providerType] = manifest.ID
 			providerTypeForFactory := providerType
 			providers = append(providers, session.Provider{
-				Type:         providerType,
-				NameKey:      contribution.NameKey,
-				Name:         manifest.Name,
-				Description:  contribution.Description,
-				Category:     extensionProviderCategory,
-				Capabilities: append([]string(nil), contribution.Capabilities...),
-				ConfigFields: extensionProviderFields(contribution.ConfigFields),
-				AuthFields:   extensionProviderFields(contribution.AuthFields),
+				Type:             providerType,
+				NameKey:          contribution.NameKey,
+				Name:             manifest.Name,
+				Description:      contribution.Description,
+				Category:         extensionProviderCategory,
+				Capabilities:     append([]string(nil), contribution.Capabilities...),
+				ExtensionID:      manifest.ID,
+				ExtensionVersion: manifest.Version,
+				ConfigFields:     extensionProviderFields(contribution.ConfigFields),
+				AuthFields:       extensionProviderFields(contribution.AuthFields),
 				NewDriver: func(request session.CreateSessionRequest) (session.Driver, error) {
 					runtimeInfo, err := resolver.ResolveTerminalProvider(providerTypeForFactory)
 					if err != nil {

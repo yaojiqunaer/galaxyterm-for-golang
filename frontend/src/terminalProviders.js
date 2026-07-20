@@ -27,6 +27,16 @@ export function buildExtensionTerminalCredentialValues(provider = {}, auth = {})
   return providerFieldValues(provider.authFields, auth);
 }
 
+export function buildTerminalProviderSummary(provider = {}) {
+  return {
+    capabilities: Array.isArray(provider.capabilities) ? provider.capabilities : [],
+    description: provider.description || '',
+    extensionId: provider.extensionId || '',
+    extensionVersion: provider.extensionVersion || '',
+    isExtension: provider.category === 'extension',
+  };
+}
+
 export function extensionTerminalDescription(provider = {}, profile = {}) {
   const config = profile.config || {};
   const host = config.host || config.endpoint;

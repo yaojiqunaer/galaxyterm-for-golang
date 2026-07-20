@@ -311,6 +311,7 @@ import {
   buildExtensionTerminalCredentialValues,
   buildExtensionTerminalFormValues,
   buildExtensionTerminalRequest,
+  buildTerminalProviderSummary,
   extensionTerminalDescription,
 } from './terminalProviders.js';
 
@@ -376,6 +377,10 @@ const providerIcons = {
 
 function providerLabel(provider) {
   return t(provider.nameKey, provider.name || provider.type);
+}
+
+function providerCapabilityLabel(capability) {
+  return t(`provider.capability.${capability}`, capability);
 }
 
 function providerTypeLabel(type, providers = []) {
@@ -474,6 +479,7 @@ function App() {
   const [fileConnectionProfileId, setFileConnectionProfileId] = useState('');
   const [fileCredentialEditing, setFileCredentialEditing] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
+  const [connectionTestResult, setConnectionTestResult] = useState(null);
   const [creatingSession, setCreatingSession] = useState(false);
   const [extensionOfflineInstalling, setExtensionOfflineInstalling] = useState(false);
   const [extensionRefreshingAll, setExtensionRefreshingAll] = useState(false);
@@ -1041,6 +1047,7 @@ function App() {
       })),
   ], [fileProviders, providers]);
   const selectedProvider = providers.find((item) => item.type === newType) || providers[0] || fallbackProviders[0];
+  const selectedProviderSummary = buildTerminalProviderSummary(selectedProvider);
   const profileSessionSummary = useMemo(() => summarizeProfileSessions(profiles, sessions), [profiles, sessions]);
   const visibleProfiles = useMemo(
     () => sortConnectionProfiles(filterConnectionProfiles(profiles, {
@@ -1359,12 +1366,14 @@ function App() {
     });
     setEditingProfileId(profile?.id || '');
     setSshAuthType(profile?.auth?.authType || 'password');
+    setConnectionTestResult(null);
     setDrawerOpen(true);
   };
 
   const changeTerminalProvider = (providerType) => {
     const provider = providers.find((item) => item.type === providerType);
     setNewType(providerType);
+    setConnectionTestResult(null);
     form.setFieldsValue(provider?.category === 'extension'
       ? { ...buildExtensionTerminalFormValues(provider), rememberCredential: false }
       : { config: {}, auth: {}, rememberCredential: false });
@@ -1558,12 +1567,13 @@ function App() {
   };
 
   const testConnection = async () => {
-    if (newType !== 'ssh') {
-      messageApi.info(t(newType === 'local' ? 'message.localTestSkipped' : 'message.extensionTestOnOpen'));
+    if (newType === 'local') {
+      messageApi.info(t('message.localTestSkipped'));
       return;
     }
     const values = await form.validateFields();
     const provider = providers.find((item) => item.type === newType) || fallbackProviders[0];
+    setConnectionTestResult(null);
     setTestingConnection(true);
     try {
       const request = await resolveCredentialRequest(buildRequest(
@@ -1572,9 +1582,12 @@ function App() {
         values,
         provider,
       ));
-      await TerminalAPI.TestSSHConnection(request);
+      if (newType === 'ssh') await TerminalAPI.TestSSHConnection(request);
+      else await SessionAPI.TestProvider(request);
+      setConnectionTestResult({ status: 'success' });
       messageApi.success(t('message.connectionTestSuccess'));
     } catch (error) {
+      setConnectionTestResult({ status: 'error', model: buildOperationError(error) });
       showOperationError('message.connectionTestFailed', error, { retry: testConnection });
     } finally {
       setTestingConnection(false);
@@ -6541,12 +6554,79 @@ function App() {
       >
         <div className="drawer-provider-head">
           <span className="drawer-provider-icon">{providerIcons[selectedProvider.type] || <CodeOutlined />}</span>
-          <div>
-            <Text strong>{providerLabel(selectedProvider)}</Text>
-            <Text type="secondary">{selectedProvider.category === 'builtin' ? t('provider.category.builtin') : t('provider.category.extension')}</Text>
+          <div className="drawer-provider-copy">
+            <div className="drawer-provider-title">
+              <Text strong>{providerLabel(selectedProvider)}</Text>
+              {selectedProviderSummary.description && (
+                <Tooltip title={selectedProviderSummary.description}>
+                  <InfoCircleOutlined className="drawer-provider-info" />
+                </Tooltip>
+              )}
+              <Tag bordered={false}>
+                {t(selectedProviderSummary.isExtension ? 'provider.category.extension' : 'provider.category.builtin')}
+              </Tag>
+              {selectedProviderSummary.isExtension && (
+                <Tooltip title={t('action.manageExtension')}>
+                  <Button
+                    aria-label={t('action.manageExtension')}
+                    className="drawer-provider-manage"
+                    icon={<AppstoreAddOutlined />}
+                    size="small"
+                    type="text"
+                    onClick={() => {
+                      setDrawerOpen(false);
+                      openProviderExtension({
+                        extensionId: selectedProviderSummary.extensionId,
+                        providerType: selectedProvider.type,
+                      });
+                    }}
+                  />
+                </Tooltip>
+              )}
+            </div>
+            <Text type="secondary">
+              {selectedProviderSummary.isExtension
+                ? t('provider.runtime.extensionDescription', {
+                  name: selectedProvider.name || providerLabel(selectedProvider),
+                  version: selectedProviderSummary.extensionVersion,
+                })
+                : t('provider.runtime.builtinDescription')}
+            </Text>
+            {selectedProviderSummary.isExtension && (
+              <div className="drawer-provider-meta">
+                {selectedProviderSummary.extensionVersion && (
+                  <Tooltip title={selectedProviderSummary.extensionId}>
+                    <Tag>{`v${selectedProviderSummary.extensionVersion}`}</Tag>
+                  </Tooltip>
+                )}
+                {selectedProviderSummary.capabilities.slice(0, 4).map((capability) => (
+                  <Tag key={capability}>{providerCapabilityLabel(capability)}</Tag>
+                ))}
+              </div>
+            )}
           </div>
         </div>
-        <Form form={form} layout="vertical" className="terminal-form">
+        {connectionTestResult && (
+          <Alert
+            className="connection-test-result"
+            closable
+            showIcon
+            type={connectionTestResult.status === 'success' ? 'success' : 'error'}
+            message={t(connectionTestResult.status === 'success'
+              ? 'message.connectionTestSuccess'
+              : 'message.connectionTestFailed')}
+            description={connectionTestResult.status === 'success'
+              ? t('message.connectionTestSuccessDescription')
+              : <OperationErrorDescription model={connectionTestResult.model} />}
+            onClose={() => setConnectionTestResult(null)}
+          />
+        )}
+        <Form
+          form={form}
+          layout="vertical"
+          className="terminal-form"
+          onValuesChange={() => setConnectionTestResult(null)}
+        >
           <Form.Item label={t('field.type')}>
             <Select value={newType} onChange={changeTerminalProvider} options={providerOptions} />
           </Form.Item>
@@ -8417,7 +8497,14 @@ function buildRequest(type, displayName, values, provider = null) {
   }
 
   if (provider?.category === 'extension') {
-    return buildExtensionTerminalRequest(provider, displayName, values);
+    const request = buildExtensionTerminalRequest(provider, displayName, values);
+    return {
+      ...request,
+      auth: {
+        ...request.auth,
+        credentialRef: parseCredentialRef(values.credentialRef),
+      },
+    };
   }
 
   return {

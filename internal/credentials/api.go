@@ -112,28 +112,28 @@ func (api *API) ResolveSSHRequest(req session.CreateSessionRequest) (session.Cre
 		return req, nil
 	}
 	auth := copyMap(req.Auth)
-	if ref.HasPassword {
+	if ref.HasPassword && !hasExplicitCredentialValue(auth, "password") {
 		if value, err := api.store.Get(serviceName, secretKey(ref.ID, "password")); err == nil {
 			auth["password"] = value
 		} else if !errors.Is(err, ErrNotFound) {
 			return req, err
 		}
 	}
-	if ref.HasPrivateKey {
+	if ref.HasPrivateKey && !hasExplicitCredentialValue(auth, "privateKey") {
 		if value, err := api.store.Get(serviceName, secretKey(ref.ID, "privateKey")); err == nil {
 			auth["privateKey"] = value
 		} else if !errors.Is(err, ErrNotFound) {
 			return req, err
 		}
 	}
-	if ref.HasPassphrase {
+	if ref.HasPassphrase && !hasExplicitCredentialValue(auth, "passphrase") {
 		if value, err := api.store.Get(serviceName, secretKey(ref.ID, "passphrase")); err == nil {
 			auth["passphrase"] = value
 		} else if !errors.Is(err, ErrNotFound) {
 			return req, err
 		}
 	}
-	if ref.HasJumpPassword {
+	if ref.HasJumpPassword && !hasExplicitCredentialValue(auth, "jumpPassword") {
 		if value, err := api.store.Get(serviceName, secretKey(ref.ID, "jumpPassword")); err == nil {
 			auth["jumpPassword"] = value
 		} else if !errors.Is(err, ErrNotFound) {
@@ -201,6 +201,9 @@ func (api *API) ResolveProviderCredential(req ResolveProviderCredentialRequest) 
 		return nil, err
 	}
 	for _, field := range ref.Fields {
+		if hasExplicitCredentialValue(auth, field) {
+			continue
+		}
 		value, err := api.store.Get(serviceName, providerSecretKey(ref.ProviderType, ref.ID, field))
 		if errors.Is(err, ErrNotFound) {
 			continue
@@ -215,6 +218,17 @@ func (api *API) ResolveProviderCredential(req ResolveProviderCredentialRequest) 
 		auth[field] = decoded
 	}
 	return auth, nil
+}
+
+func hasExplicitCredentialValue(values map[string]interface{}, key string) bool {
+	value, exists := values[key]
+	if !exists || value == nil {
+		return false
+	}
+	if text, ok := value.(string); ok {
+		return text != ""
+	}
+	return true
 }
 
 func (api *API) DeleteProviderCredential(ref ProviderCredentialRef) error {

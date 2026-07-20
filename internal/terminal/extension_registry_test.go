@@ -50,6 +50,9 @@ func TestSyncExtensionProvidersRegistersRunnableContributions(t *testing.T) {
 	if len(providers[1].ConfigFields) != 1 || providers[1].ConfigFields[0].Key != "host" || len(providers[1].AuthFields) != 1 {
 		t.Fatalf("provider fields = %#v / %#v, want manifest fields", providers[1].ConfigFields, providers[1].AuthFields)
 	}
+	if providers[1].ExtensionID != manifest.ID || providers[1].ExtensionVersion != manifest.Version {
+		t.Fatalf("provider extension = %s@%s, want %s@%s", providers[1].ExtensionID, providers[1].ExtensionVersion, manifest.ID, manifest.Version)
+	}
 }
 
 func TestSyncExtensionProvidersSkipsLegacyMetadataOnlyContributions(t *testing.T) {

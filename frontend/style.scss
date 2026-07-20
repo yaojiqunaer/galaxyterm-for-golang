@@ -332,8 +332,7 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
 
 .theme-dark .provider-card,
 .theme-dark .profile-list,
-.theme-dark .file-browser-card,
-.theme-dark .drawer-provider-head {
+.theme-dark .file-browser-card {
   border-color: var(--border);
   background: var(--panel);
 }
@@ -4739,13 +4738,51 @@ code {
 
 .drawer-provider-head {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 12px;
   margin-bottom: 18px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--panel-muted);
+  padding: 0 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.drawer-provider-head .drawer-provider-icon {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+}
+
+.drawer-provider-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.drawer-provider-title,
+.drawer-provider-meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.drawer-provider-title {
+  min-height: 24px;
+}
+
+.drawer-provider-info {
+  color: var(--muted);
+}
+
+.drawer-provider-manage {
+  margin-left: auto;
+}
+
+.drawer-provider-meta {
+  margin-top: 8px;
+}
+
+.drawer-provider-meta .ant-tag,
+.drawer-provider-title .ant-tag {
+  margin-inline-end: 0;
 }
 
 .terminal-drawer-footer {
@@ -4766,6 +4803,10 @@ code {
 
 .terminal-form .ant-form-item {
   margin-bottom: 14px;
+}
+
+.connection-test-result {
+  margin-bottom: 16px;
 }
 
 .xterm,
