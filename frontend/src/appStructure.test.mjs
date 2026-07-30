@@ -78,6 +78,18 @@ assert.ok(
     && source.includes(": 'action.newTerminal'"),
   'profiles with active sessions must expose both focus-existing and open-new actions',
 );
+assert.ok(
+  source.includes('reserveConnectionLaunchRequests(')
+    && source.includes('releaseConnectionLaunchRequests(')
+    && source.includes('connectionLaunchKeysRef.current')
+    && source.includes('aria-busy={launching}')
+    && source.includes("loading={launching && primaryAction.action !== 'focus'}")
+    && source.includes('connectionLaunchKeys={connectionLaunchKeys}')
+    && source.includes('connectionLaunchKeys.includes(buildConnectionLaunchKey(request))')
+    && source.includes('isDefaultTerminalLaunching()')
+    && source.includes("message.connectionLaunchInProgress"),
+  'connection launch entry points must share immediate progress and duplicate-click protection',
+);
 
 assert.ok(
   /\.content-area\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-rows:\s*auto minmax\(0, 1fr\)/.test(styles),

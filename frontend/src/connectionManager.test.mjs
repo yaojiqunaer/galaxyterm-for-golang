@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  buildConnectionLaunchKey,
   buildConnectionGroupNav,
   buildConnectionGroups,
   buildConnectionEmptyState,
@@ -16,6 +17,9 @@ import {
   filterConnectionProfiles,
   filterRecentConnectionsByProviders,
   isProfileProviderAvailable,
+  isProfileConnectionLaunching,
+  releaseConnectionLaunchRequests,
+  reserveConnectionLaunchRequests,
   resolveSelectedProfileId,
   selectBatchProfiles,
   shouldPersistConnection,
@@ -118,6 +122,44 @@ const profiles = [
     auth: {},
   },
 ];
+
+const pendingProdRequest = {
+  profileId: 'prod-db',
+  providerType: 'ssh',
+  displayName: 'Prod DB',
+  config: { host: '10.0.0.10', port: 22 },
+};
+const pendingWebRequest = {
+  profileId: 'prod-web',
+  providerType: 'ssh',
+  displayName: 'Prod Web',
+  config: { host: '10.0.0.20', port: 22 },
+};
+assert.equal(buildConnectionLaunchKey(pendingProdRequest), 'profile:prod-db');
+assert.equal(
+  buildConnectionLaunchKey({
+    providerType: 'local',
+    displayName: 'Local Terminal',
+    config: { workingDirectory: '/Users/me/dev' },
+  }),
+  'request:local:Local%20Terminal:%2FUsers%2Fme%2Fdev',
+);
+const launchReservation = reserveConnectionLaunchRequests(
+  ['profile:prod-db'],
+  [pendingProdRequest, pendingWebRequest, pendingWebRequest],
+);
+assert.deepEqual(launchReservation.acceptedRequests, [pendingWebRequest]);
+assert.deepEqual(launchReservation.blockedKeys, ['profile:prod-db', 'profile:prod-web']);
+assert.deepEqual(launchReservation.pendingKeys, ['profile:prod-db', 'profile:prod-web']);
+assert.deepEqual(
+  releaseConnectionLaunchRequests(launchReservation.pendingKeys, launchReservation.acceptedRequests),
+  ['profile:prod-db'],
+);
+assert.equal(
+  isProfileConnectionLaunching({ id: 'prod-web' }, launchReservation.pendingKeys),
+  true,
+);
+assert.equal(isProfileConnectionLaunching({ id: 'dev-shell' }, launchReservation.pendingKeys), false);
 
 const fileProfile = {
   id: 's3-assets',
@@ -349,6 +391,12 @@ assert.deepEqual(buildConnectionProfileBadges(fileProfile, { activeCount: 0 }), 
   { key: 'fileWorkspace', tone: 'info', value: true },
   { key: 'credential', tone: 'info', value: true },
 ]);
+assert.deepEqual(buildConnectionProfileBadges(profiles[1], { activeCount: 0 }, {
+  launching: true,
+}), [
+  { key: 'group', tone: 'default', value: 'Production' },
+  { key: 'launching', tone: 'info', value: true },
+]);
 
 assert.equal(isProfileProviderAvailable(profiles[0], [{ type: 'ssh' }, { type: 'local' }]), true);
 assert.equal(isProfileProviderAvailable(profiles[0], [{ type: 'local' }]), false);
@@ -546,6 +594,47 @@ assert.equal(buildConnectionProfileLaunchModel({
   providerAvailable: true,
   sessionInfo: { activeCount: 0, focusSessionId: '' },
 }).secondary, null);
+assert.deepEqual(buildConnectionProfileLaunchModel({
+  launching: true,
+  providerAvailable: true,
+  sessionInfo: { activeCount: 0, focusSessionId: '' },
+}), {
+  primary: {
+    action: 'connect',
+    disabled: true,
+    labelKey: 'action.openingConnection',
+    reasonKey: 'message.connectionLaunchInProgress',
+  },
+  secondary: null,
+});
+assert.deepEqual(buildConnectionProfileLaunchModel({
+  launching: true,
+  providerAvailable: true,
+  sessionInfo: { activeCount: 1, focusSessionId: 's1' },
+}), {
+  primary: {
+    action: 'focus',
+    disabled: false,
+    labelKey: 'action.focusSession',
+    reasonKey: '',
+  },
+  secondary: {
+    action: 'connect',
+    disabled: true,
+    labelKey: 'action.openingConnection',
+    reasonKey: 'message.connectionLaunchInProgress',
+  },
+});
+assert.deepEqual(buildConnectionProfileStatusSummary({
+  launching: true,
+  providerAvailable: true,
+  sessionInfo: { activeCount: 0, focusSessionId: '' },
+}), {
+  descriptionKey: 'connection.status.opening.description',
+  titleKey: 'connection.status.opening.title',
+  tone: 'info',
+  values: {},
+});
 assert.deepEqual(buildConnectionProfileStatusSummary({
   providerAvailable: true,
   sessionInfo: { activeCount: 2, focusSessionId: 's1' },

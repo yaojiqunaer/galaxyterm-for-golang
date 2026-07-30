@@ -238,6 +238,8 @@ assert.equal(t('broadcast.reason.sensitive'), '检测到密码、令牌或密钥
 assert.equal(t('message.broadcastSuccess', { count: 3 }), '命令已发送到 3 个会话');
 assert.equal(t('session.switcher.title'), '切换会话');
 assert.equal(t('shortcut.switchAdjacentSession'), '按最近使用顺序切换会话');
+assert.equal(t('action.openingConnection'), '正在打开');
+assert.equal(t('message.connectionLaunchSkipped', { count: 2 }), '已跳过 2 个正在打开的连接。');
 [
   'operation.error.reason.unavailable',
   'operation.error.suggestion.unavailable',
@@ -255,3 +257,4 @@ assert.equal(t('confirm.closeAllSessionsContent', { count: 2 }), '2 sessions wil
 assert.equal(t('action.broadcastCommand'), 'Send Command to Sessions');
 assert.equal(t('message.broadcastPartial', { failed: 1, succeeded: 2, total: 3 }), 'Sent to 2/3 sessions. Failed sessions: 1; they remain selected for review.');
 assert.equal(t('session.switcher.title'), 'Switch Session');
+assert.equal(t('connection.status.opening.title'), 'Opening connection');

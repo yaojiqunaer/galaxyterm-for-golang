@@ -97,6 +97,7 @@ import {
   buildConnectionGroupFilter,
   buildConnectionGroupNav,
   buildConnectionGroups,
+  buildConnectionLaunchKey,
   buildConnectionEmptyState,
   buildConnectionProfileBadges,
   buildConnectionProfileFacts,
@@ -109,10 +110,13 @@ import {
   buildTerminalSubmitPlan,
   filterConnectionProfiles,
   filterRecentConnectionsByProviders,
+  isProfileConnectionLaunching,
   isProfileProviderAvailable,
   moveConnectionProfilesToGroup,
   removeConnectionGroup,
+  releaseConnectionLaunchRequests,
   renameConnectionGroup,
+  reserveConnectionLaunchRequests,
   resolveConnectionGroupFilter,
   resolveConnectionProfileDrop,
   resolveProfileSaveDefault,
@@ -479,6 +483,7 @@ function App() {
   const [connectionDetailProfileId, setConnectionDetailProfileId] = useState('');
   const [connectionGroupEditor, setConnectionGroupEditor] = useState(null);
   const [connectionDragState, setConnectionDragState] = useState({ profileId: '', targetKey: '' });
+  const [connectionLaunchKeys, setConnectionLaunchKeys] = useState([]);
   const [auditQuery, setAuditQuery] = useState('');
   const [auditProviderFilter, setAuditProviderFilter] = useState('all');
   const [auditSessionFilter, setAuditSessionFilter] = useState('all');
@@ -614,6 +619,7 @@ function App() {
   }, []);
   const terminalRefs = useRef({});
   const broadcastSendingRef = useRef(false);
+  const connectionLaunchKeysRef = useRef(connectionLaunchKeys);
   const sessionSwitchStateRef = useRef(sessionSwitchState);
   const sessionSwitchOriginViewRef = useRef(selectedNav);
   const sessionsRef = useRef(sessions);
@@ -631,6 +637,10 @@ function App() {
   const workspaceRestoringRef = useRef(false);
   const workspaceStartupHandledRef = useRef(false);
   sessionsRef.current = sessions;
+  const updateConnectionLaunchKeys = (keys) => {
+    connectionLaunchKeysRef.current = keys;
+    setConnectionLaunchKeys(keys);
+  };
   const focusTerminalSession = (sessionId = activeKey) => {
     if (!sessionId) return;
     window.requestAnimationFrame(() => {
@@ -1671,45 +1681,86 @@ function App() {
   };
 
   const startProfileRequests = async (requests, { closeDrawer = false } = {}) => {
-    const createdSessions = [];
-    for (const request of requests) {
-      const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${createdSessions.length}`;
-      const label = request.displayName || request.providerType;
-      rememberConnection(request, setRecentConnections);
-      const sessionRequest = await resolveCredentialRequest(request);
-      createdSessions.push({
-        id,
-        auditEvents: [createAuditEvent({
-          detail: profileDescription(profileFromRequest(request)),
-          sessionId: id,
-          sessionLabel: label,
-          type: 'session.open',
-        })],
-        label,
-        providerType: request.providerType,
-        request: sessionRequest,
-        startedAt: new Date().toISOString(),
-        status: 'connecting',
-        revision: 0,
-      });
+    const reservation = reserveConnectionLaunchRequests(
+      connectionLaunchKeysRef.current,
+      requests,
+    );
+    const { acceptedRequests, blockedKeys } = reservation;
+    if (blockedKeys.length > 0) {
+      messageApi.info(t(
+        blockedKeys.length > 1 || acceptedRequests.length > 0
+          ? 'message.connectionLaunchSkipped'
+          : 'message.connectionLaunchInProgress',
+        { count: blockedKeys.length },
+      ));
     }
-    if (createdSessions.length === 0) return;
-    if (closeDrawer) setDrawerOpen(false);
-    setSessions((current) => [...current, ...createdSessions]);
-    setActiveKey(createdSessions[createdSessions.length - 1].id);
-    setSelectedNav('sessions');
-    messageApi.success(createdSessions.length > 1
-      ? `${t('message.batchSessionsStarted')}: ${createdSessions.length}`
-      : t('terminal.status.connecting'));
+    if (acceptedRequests.length === 0) {
+      return { createdCount: 0, createdProfileIds: [], skippedPendingCount: blockedKeys.length };
+    }
+    updateConnectionLaunchKeys(reservation.pendingKeys);
+    const createdSessions = [];
+    try {
+      for (const request of acceptedRequests) {
+        const id = crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${createdSessions.length}`;
+        const label = request.displayName || request.providerType;
+        rememberConnection(request, setRecentConnections);
+        const sessionRequest = await resolveCredentialRequest(request);
+        createdSessions.push({
+          id,
+          auditEvents: [createAuditEvent({
+            detail: profileDescription(profileFromRequest(request)),
+            sessionId: id,
+            sessionLabel: label,
+            type: 'session.open',
+          })],
+          label,
+          providerType: request.providerType,
+          request: sessionRequest,
+          startedAt: new Date().toISOString(),
+          status: 'connecting',
+          revision: 0,
+        });
+      }
+      if (createdSessions.length === 0) {
+        return { createdCount: 0, createdProfileIds: [], skippedPendingCount: blockedKeys.length };
+      }
+      if (closeDrawer) setDrawerOpen(false);
+      setSessions((current) => [...current, ...createdSessions]);
+      setActiveKey(createdSessions[createdSessions.length - 1].id);
+      setSelectedNav('sessions');
+      messageApi.success(createdSessions.length > 1
+        ? `${t('message.batchSessionsStarted')}: ${createdSessions.length}`
+        : t('terminal.status.connecting'));
+      return {
+        createdCount: createdSessions.length,
+        createdProfileIds: acceptedRequests.map((request) => request.profileId).filter(Boolean),
+        skippedPendingCount: blockedKeys.length,
+      };
+    } finally {
+      updateConnectionLaunchKeys(releaseConnectionLaunchRequests(
+        connectionLaunchKeysRef.current,
+        acceptedRequests,
+      ));
+    }
   };
 
-  const launchDefaultTerminal = async (providerType = terminalDefaults.defaultProviderType) => {
+  const defaultTerminalLaunchFor = (providerType = terminalDefaults.defaultProviderType) => {
     const provider = providers.find((item) => item.type === providerType) || fallbackProviders[0];
-    const launch = buildDefaultTerminalLaunch({
+    return buildDefaultTerminalLaunch({
       providerName: providerLabel(provider),
       providerType,
       workingDirectory: terminalDefaults.defaultWorkingDirectory,
     });
+  };
+
+  const isDefaultTerminalLaunching = (providerType = terminalDefaults.defaultProviderType) => {
+    const launch = defaultTerminalLaunchFor(providerType);
+    return launch.kind === 'open'
+      && connectionLaunchKeys.includes(buildConnectionLaunchKey(launch.request));
+  };
+
+  const launchDefaultTerminal = async (providerType = terminalDefaults.defaultProviderType) => {
+    const launch = defaultTerminalLaunchFor(providerType);
     if (launch.kind === 'configure') {
       openDrawer(providerType);
       return;
@@ -1737,7 +1788,10 @@ function App() {
     }
     setClosedSessions(remaining);
     try {
-      await startProfileRequests([entry.request]);
+      const result = await startProfileRequests([entry.request]);
+      if (result.createdCount === 0) {
+        setClosedSessions((current) => [entry, ...current].slice(0, 10));
+      }
     } catch (error) {
       setClosedSessions((current) => [entry, ...current].slice(0, 10));
       showOperationError('message.credentialFailed', error, { retry: restoreLastClosedSession });
@@ -2583,8 +2637,8 @@ function App() {
       return;
     }
     try {
-      await startProfileRequests([profileToRequest(profile)]);
-      markProfilesUsed([profile.id]);
+      const result = await startProfileRequests([profileToRequest(profile)]);
+      if (result.createdCount > 0) markProfilesUsed([profile.id]);
     } catch (error) {
       showOperationError('message.credentialFailed', error, {
         retry: () => openProfile(profile),
@@ -2628,6 +2682,7 @@ function App() {
     const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
     const providerAvailable = isProfileProviderAvailable(profile, connectionProviders);
     return buildConnectionProfileLaunchModel({
+      launching: isProfileConnectionLaunching(profile, connectionLaunchKeys),
       profileKind: profile.kind,
       providerAvailable,
       sessionInfo,
@@ -2854,7 +2909,9 @@ function App() {
   };
 
   const buildConnectionProfileActionMenu = (profile) => {
-    const primaryAction = connectionProfileLaunchModel(profile).primary;
+    const launchModel = connectionProfileLaunchModel(profile);
+    const primaryAction = launchModel.primary;
+    const newSessionAction = launchModel.secondary || primaryAction;
     const currentGroup = profile.group || ungroupedKey;
     const groupTargets = [...connectionGroupNames, ungroupedKey]
       .filter((group) => group !== currentGroup)
@@ -2867,6 +2924,7 @@ function App() {
       .map((action) => ({
         key: action,
         danger: action === 'delete',
+        disabled: action === 'connect' && newSessionAction.disabled,
         icon: connectionProfileActionIcon(action),
         label: t(action === 'connect'
           ? profile.kind === 'file' ? 'action.openFiles' : 'action.newTerminal'
@@ -2953,8 +3011,8 @@ function App() {
       return;
     }
     try {
-      await startProfileRequests(selectedProfiles.map(profileToRequest));
-      markProfilesUsed(selectedProfiles.map((profile) => profile.id));
+      const result = await startProfileRequests(selectedProfiles.map(profileToRequest));
+      markProfilesUsed(result.createdProfileIds);
       if (skipped > 0) {
         messageApi.warning(`${t('message.batchConnectionsSkipped')}: ${skipped}`);
       }
@@ -3427,6 +3485,8 @@ function App() {
     if (sessions.length === 0) {
       return (
         <SessionEmptyPanel
+          connectionLaunchKeys={connectionLaunchKeys}
+          localTerminalLaunching={isDefaultTerminalLaunching('local')}
           openConnections={() => setSelectedNav('connections')}
           openDefaultTerminal={launchDefaultTerminal}
           openDrawer={openDrawer}
@@ -3582,6 +3642,7 @@ function App() {
   const renderConnectionProfilePreview = (profile) => profile ? (
     <ConnectionProfilePreview
       profile={profile}
+      launching={isProfileConnectionLaunching(profile, connectionLaunchKeys)}
       providers={connectionProviders}
       openProfileEditor={openProfileEditor}
       duplicateProfile={duplicateProfile}
@@ -3796,19 +3857,33 @@ function App() {
             <div className="recent-connection-rail">
               <Text type="secondary">{t('section.recentConnections')}</Text>
               <div className="recent-connection-list compact">
-                {visibleRecentConnections.slice(0, 4).map((connection) => (
-                  <button
-                    key={connection.id}
-                    className="recent-connection-chip"
-                    onClick={() => openRecentConnection(connection)}
-                  >
-                    <span className="provider-icon">{providerIcons[connection.providerType] || <CodeOutlined />}</span>
-                    <span>
-                      <strong>{connection.displayName}</strong>
-                      <small>{localizedConnectionProfileSubtitle(recentToProfile(connection))}</small>
-                    </span>
-                  </button>
-                ))}
+                {visibleRecentConnections.slice(0, 4).map((connection) => {
+                  const request = connection.request || profileToRequest(recentToProfile(connection));
+                  const launching = connectionLaunchKeys.includes(buildConnectionLaunchKey(request));
+                  return (
+                    <button
+                      aria-busy={launching}
+                      key={connection.id}
+                      className={`recent-connection-chip${launching ? ' launching' : ''}`}
+                      disabled={launching}
+                      onClick={() => openRecentConnection(connection)}
+                    >
+                      <span className="provider-icon">
+                        {launching
+                          ? <LoadingOutlined spin />
+                          : providerIcons[connection.providerType] || <CodeOutlined />}
+                      </span>
+                      <span>
+                        <strong>{connection.displayName}</strong>
+                        <small>
+                          {launching
+                            ? t('action.openingConnection')
+                            : localizedConnectionProfileSubtitle(recentToProfile(connection))}
+                        </small>
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
               <Button size="small" type="text" onClick={clearRecentConnections}>{t('action.clear')}</Button>
             </div>
@@ -3859,26 +3934,34 @@ function App() {
               renderItem={(profile, profileIndex) => {
                 const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
                 const providerAvailable = isProfileProviderAvailable(profile, connectionProviders);
-                const launchModel = buildConnectionProfileLaunchModel({
-                  profileKind: profile.kind,
-                  providerAvailable,
-                  sessionInfo,
-                });
+                const launching = isProfileConnectionLaunching(profile, connectionLaunchKeys);
+                const launchModel = connectionProfileLaunchModel(profile);
                 const primaryAction = launchModel.primary;
                 const actions = [
-                  <Button key="primary" size="small" type="primary" onClick={(event) => {
-                    event.stopPropagation();
-                    runConnectionProfilePrimaryAction(profile);
-                  }} disabled={primaryAction.disabled}>{t(primaryAction.labelKey)}</Button>,
+                  <Button
+                    key="primary"
+                    disabled={primaryAction.disabled}
+                    loading={launching && primaryAction.action !== 'focus'}
+                    size="small"
+                    type="primary"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      runConnectionProfilePrimaryAction(profile);
+                    }}
+                  >
+                    {t(primaryAction.labelKey)}
+                  </Button>,
                   launchModel.secondary && (
                     <Tooltip key="secondary" title={t(launchModel.secondary.labelKey)}>
                       <Button
                         aria-label={t(launchModel.secondary.labelKey)}
+                        disabled={launchModel.secondary.disabled}
                         icon={launchModel.secondary.action === 'findExtension'
                           ? <AppstoreAddOutlined />
                           : launchModel.secondary.action === 'openFiles'
                             ? <FolderOpenOutlined />
                             : <PlusOutlined />}
+                        loading={launching && launchModel.secondary.action === 'connect'}
                         size="small"
                         onClick={(event) => {
                           event.stopPropagation();
@@ -3913,7 +3996,10 @@ function App() {
                     />
                   </Tooltip>,
                 ];
-                const badges = buildConnectionProfileBadges(profile, sessionInfo, { providerAvailable });
+                const badges = buildConnectionProfileBadges(profile, sessionInfo, {
+                  launching,
+                  providerAvailable,
+                });
                 return (
                 <Dropdown
                   menu={buildConnectionProfileActionMenu(profile)}
@@ -3924,7 +4010,9 @@ function App() {
                       'connection-profile-row',
                       (compactConnectionDetail ? explicitlySelectedProfile?.id : selectedProfile?.id) === profile.id ? 'active' : '',
                       connectionDragState.profileId === profile.id ? 'dragging' : '',
+                      launching ? 'launching' : '',
                     ].filter(Boolean).join(' ')}
+                    aria-busy={launching}
                     draggable={profiles.length > 0}
                     id={`connection-profile-option-${profileIndex}`}
                     role="option"
@@ -6528,22 +6616,30 @@ function App() {
               <List
                 size="small"
                 dataSource={providers}
-                renderItem={(provider) => (
-                  <List.Item className="provider-row">
-                    <button
-                      aria-label={providerLabel(provider)}
-                      className="provider-row-activate"
-                      type="button"
-                      onClick={() => launchDefaultTerminal(provider.type)}
-                    >
-                      <Space>
-                        <span className="provider-icon">{providerIcons[provider.type] || <CodeOutlined />}</span>
-                        <span>{providerLabel(provider)}</span>
-                      </Space>
-                      <Badge status={provider.category === 'builtin' ? 'success' : 'processing'} />
-                    </button>
-                  </List.Item>
-                )}
+                renderItem={(provider) => {
+                  const launching = isDefaultTerminalLaunching(provider.type);
+                  return (
+                    <List.Item aria-busy={launching} className="provider-row">
+                      <button
+                        aria-label={providerLabel(provider)}
+                        className="provider-row-activate"
+                        disabled={launching}
+                        type="button"
+                        onClick={() => launchDefaultTerminal(provider.type)}
+                      >
+                        <Space>
+                          <span className="provider-icon">
+                            {launching
+                              ? <LoadingOutlined spin />
+                              : providerIcons[provider.type] || <CodeOutlined />}
+                          </span>
+                          <span>{launching ? t('action.openingConnection') : providerLabel(provider)}</span>
+                        </Space>
+                        <Badge status={provider.category === 'builtin' ? 'success' : 'processing'} />
+                      </button>
+                    </List.Item>
+                  );
+                }}
               />
               {sidebarQuickProfiles.length > 0 && (
                 <div className="sidebar-quick-profiles">
@@ -6553,23 +6649,37 @@ function App() {
                     dataSource={sidebarQuickProfiles}
                     renderItem={(profile) => {
                       const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
-                      const badges = buildConnectionProfileBadges(profile, sessionInfo).filter((badge) => badge.key !== 'group').slice(0, 2);
+                      const launching = isProfileConnectionLaunching(profile, connectionLaunchKeys);
+                      const primaryAction = connectionProfileLaunchModel(profile).primary;
+                      const badges = buildConnectionProfileBadges(profile, sessionInfo, { launching })
+                        .filter((badge) => badge.key !== 'group')
+                        .slice(0, 2);
                       return (
                         <Dropdown
                           menu={buildConnectionProfileActionMenu(profile)}
                           trigger={['contextMenu']}
                         >
                           <List.Item
-                            className={sessionInfo.activeCount > 0 ? 'quick-profile-row active' : 'quick-profile-row'}
+                            aria-busy={launching}
+                            className={[
+                              'quick-profile-row',
+                              sessionInfo.activeCount > 0 ? 'active' : '',
+                              launching ? 'launching' : '',
+                            ].filter(Boolean).join(' ')}
                             title={`${profile.displayName} · ${localizedConnectionProfileSubtitle(profile)}`}
                           >
                             <button
                               aria-label={profile.displayName}
                               className="quick-profile-activate"
+                              disabled={primaryAction.disabled}
                               type="button"
                               onClick={() => runConnectionProfilePrimaryAction(profile)}
                             >
-                              <span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>
+                              <span className="provider-icon">
+                                {launching && primaryAction.action !== 'focus'
+                                  ? <LoadingOutlined spin />
+                                  : providerIcons[profile.providerType] || <CodeOutlined />}
+                              </span>
                               <span className="quick-profile-main">
                                 <span>{profile.displayName}</span>
                                 <small>{localizedConnectionProfileSubtitle(profile)}</small>
@@ -6728,6 +6838,7 @@ function App() {
                 <Button
                   aria-label={t('action.newTerminal')}
                   className="topbar-new-terminal"
+                  loading={isDefaultTerminalLaunching()}
                   type="primary"
                   icon={<PlusOutlined />}
                   onClick={() => launchDefaultTerminal()}
@@ -7503,6 +7614,8 @@ function WelcomePanel({ providers, openDrawer }) {
 }
 
 function SessionEmptyPanel({
+  connectionLaunchKeys = [],
+  localTerminalLaunching = false,
   openConnections,
   openDefaultTerminal,
   openDrawer,
@@ -7525,8 +7638,14 @@ function SessionEmptyPanel({
           <Text>{t('session.empty.description')}</Text>
         </div>
         <Space className="session-empty-actions" wrap>
-          <Button type="primary" icon={<LaptopOutlined />} onClick={() => openDefaultTerminal('local')}>
-            {t('provider.local.name')}
+          <Button
+            disabled={localTerminalLaunching}
+            icon={<LaptopOutlined />}
+            loading={localTerminalLaunching}
+            type="primary"
+            onClick={() => openDefaultTerminal('local')}
+          >
+            {localTerminalLaunching ? t('action.openingConnection') : t('provider.local.name')}
           </Button>
           <Button icon={<CloudServerOutlined />} onClick={() => openDrawer('ssh')}>
             {t('provider.ssh.name')}
@@ -7556,15 +7675,30 @@ function SessionEmptyPanel({
             <section>
               <Text strong>{t('section.savedConnections')}</Text>
               <div className="session-empty-profile-list">
-                {suggestedProfiles.map((profile) => (
-                  <button key={profile.id} type="button" onClick={() => openProfile(profile)}>
-                    <span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>
-                    <span>
-                      <strong>{profile.displayName}</strong>
-                      <small>{localizedConnectionProfileSubtitle(profile)}</small>
-                    </span>
-                  </button>
-                ))}
+                {suggestedProfiles.map((profile) => {
+                  const launching = isProfileConnectionLaunching(profile, connectionLaunchKeys);
+                  return (
+                    <button
+                      aria-busy={launching}
+                      disabled={launching}
+                      key={profile.id}
+                      type="button"
+                      onClick={() => openProfile(profile)}
+                    >
+                      <span className="provider-icon">
+                        {launching
+                          ? <LoadingOutlined spin />
+                          : providerIcons[profile.providerType] || <CodeOutlined />}
+                      </span>
+                      <span>
+                        <strong>{profile.displayName}</strong>
+                        <small>
+                          {launching ? t('action.openingConnection') : localizedConnectionProfileSubtitle(profile)}
+                        </small>
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </section>
           )}
@@ -7572,15 +7706,33 @@ function SessionEmptyPanel({
             <section>
               <Text strong>{t('section.recentConnections')}</Text>
               <div className="session-empty-profile-list compact">
-                {recentConnections.slice(0, 3).map((connection) => (
-                  <button key={connection.id} type="button" onClick={() => openRecentConnection(connection)}>
-                    <span className="provider-icon">{providerIcons[connection.providerType] || <CodeOutlined />}</span>
-                    <span>
-                      <strong>{connection.displayName}</strong>
-                      <small>{localizedConnectionProfileSubtitle(recentToProfile(connection))}</small>
-                    </span>
-                  </button>
-                ))}
+                {recentConnections.slice(0, 3).map((connection) => {
+                  const request = connection.request || profileToRequest(recentToProfile(connection));
+                  const launching = connectionLaunchKeys.includes(buildConnectionLaunchKey(request));
+                  return (
+                    <button
+                      aria-busy={launching}
+                      disabled={launching}
+                      key={connection.id}
+                      type="button"
+                      onClick={() => openRecentConnection(connection)}
+                    >
+                      <span className="provider-icon">
+                        {launching
+                          ? <LoadingOutlined spin />
+                          : providerIcons[connection.providerType] || <CodeOutlined />}
+                      </span>
+                      <span>
+                        <strong>{connection.displayName}</strong>
+                        <small>
+                          {launching
+                            ? t('action.openingConnection')
+                            : localizedConnectionProfileSubtitle(recentToProfile(connection))}
+                        </small>
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </section>
           )}
@@ -7703,6 +7855,7 @@ function WorkspaceActionButton({ action, children, ...buttonProps }) {
 function ConnectionProfilePreview({
   confirmDeleteProfile,
   duplicateProfile,
+  launching = false,
   openProfileEditor,
   profile,
   profileSessionSummary,
@@ -7712,22 +7865,27 @@ function ConnectionProfilePreview({
 }) {
   const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
   const providerAvailable = isProfileProviderAvailable(profile, providers);
-  const badges = buildConnectionProfileBadges(profile, sessionInfo, { providerAvailable });
+  const badges = buildConnectionProfileBadges(profile, sessionInfo, {
+    launching,
+    providerAvailable,
+  });
   const facts = buildConnectionProfileFacts(profile, { defaultShellLabel: t('label.defaultShell') });
   const hints = buildConnectionProfileHints(sessionInfo);
   const launchModel = buildConnectionProfileLaunchModel({
+    launching,
     profileKind: profile.kind,
     providerAvailable,
     sessionInfo,
   });
   const primaryAction = launchModel.primary;
   const statusSummary = buildConnectionProfileStatusSummary({
+    launching,
     profileKind: profile.kind,
     providerAvailable,
     sessionInfo,
   });
   return (
-    <div className="connection-profile-preview">
+    <div aria-busy={launching} className="connection-profile-preview">
       <div className="connection-profile-hero">
         <span className="provider-icon large">{providerIcons[profile.providerType] || <CodeOutlined />}</span>
         <div>
@@ -7741,6 +7899,7 @@ function ConnectionProfilePreview({
           size="small"
           type="primary"
           disabled={primaryAction.disabled}
+          loading={launching && primaryAction.action !== 'focus'}
           onClick={() => runConnectionProfileLaunchAction(primaryAction, profile)}
         >
           {t(primaryAction.labelKey)}
@@ -7748,11 +7907,13 @@ function ConnectionProfilePreview({
         {launchModel.secondary && (
           <Button
             size="small"
+            disabled={launchModel.secondary.disabled}
             icon={launchModel.secondary.action === 'findExtension'
               ? <AppstoreAddOutlined />
               : launchModel.secondary.action === 'openFiles'
                 ? <FolderOpenOutlined />
                 : <PlusOutlined />}
+            loading={launching && launchModel.secondary.action === 'connect'}
             onClick={() => runConnectionProfileLaunchAction(launchModel.secondary, profile)}
           >
             {t(launchModel.secondary.labelKey)}
@@ -8631,6 +8792,7 @@ function connectionProfileBadgeLabel(badge) {
   if (badge.key === 'favorite') return t('label.favorite');
   if (badge.key === 'credential') return t('label.credentialSaved');
   if (badge.key === 'fileWorkspace') return t('label.fileConnection');
+  if (badge.key === 'launching') return t('label.connectionLaunching');
   if (badge.key === 'providerUnavailable') return t('label.providerUnavailable');
   return String(badge.value || badge.key);
 }

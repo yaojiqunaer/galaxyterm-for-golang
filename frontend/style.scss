@@ -518,6 +518,11 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   justify-content: space-between;
 }
 
+.provider-row-activate:disabled {
+  cursor: wait;
+  opacity: 0.78;
+}
+
 .provider-row:focus-within,
 .quick-profile-row:focus-within {
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 68%, transparent);
@@ -578,6 +583,15 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   border-radius: 999px;
   background: var(--success);
   content: '';
+}
+
+.quick-profile-row.launching {
+  background: var(--accent-soft);
+}
+
+.quick-profile-activate:disabled {
+  cursor: wait;
+  opacity: 0.78;
 }
 
 .sidebar-quick-profiles {
@@ -2070,6 +2084,12 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   background: color-mix(in srgb, var(--accent) 10%, var(--terminal-chrome-soft));
 }
 
+.session-empty-profile-list button:disabled {
+  border-color: color-mix(in srgb, var(--accent) 42%, transparent);
+  cursor: wait;
+  opacity: 0.8;
+}
+
 .session-empty-profile-list span:last-child {
   min-width: 0;
 }
@@ -2612,6 +2632,10 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   background: var(--accent-soft);
 }
 
+.connection-profile-row.launching {
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
 .connection-profile-row:focus-visible {
   box-shadow: inset 0 0 0 2px var(--accent);
 }
@@ -2918,6 +2942,14 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
 .recent-connection-chip:hover {
   border-color: var(--accent);
   background: var(--panel-muted);
+}
+
+.recent-connection-chip.launching,
+.recent-connection-chip:disabled {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: var(--accent-soft);
+  cursor: wait;
+  opacity: 0.82;
 }
 
 .recent-connection-chip strong,

@@ -59,6 +59,58 @@ export function buildDefaultTerminalLaunch({
   };
 }
 
+export function buildConnectionLaunchKey(request = {}) {
+  const profileId = String(request.profileId || '').trim();
+  if (profileId) return `profile:${profileId}`;
+  const providerType = String(request.providerType || '').trim();
+  if (!providerType) return '';
+  const config = request.config || {};
+  const target = [
+    config.host,
+    config.endpoint,
+    config.pod,
+    config.container,
+    config.workingDirectory,
+    config.database,
+  ].find((value) => value !== undefined && value !== null && String(value).trim());
+  return [
+    'request',
+    providerType,
+    String(request.displayName || '').trim(),
+    String(target || '').trim(),
+  ].map((value) => encodeURIComponent(value)).join(':');
+}
+
+export function reserveConnectionLaunchRequests(pendingKeys = [], requests = []) {
+  const pending = new Set(pendingKeys.filter(Boolean));
+  const acceptedRequests = [];
+  const blockedKeys = [];
+  requests.forEach((request) => {
+    const key = buildConnectionLaunchKey(request);
+    if (key && pending.has(key)) {
+      blockedKeys.push(key);
+      return;
+    }
+    acceptedRequests.push(request);
+    if (key) pending.add(key);
+  });
+  return {
+    acceptedRequests,
+    blockedKeys,
+    pendingKeys: [...pending],
+  };
+}
+
+export function releaseConnectionLaunchRequests(pendingKeys = [], requests = []) {
+  const released = new Set(requests.map(buildConnectionLaunchKey).filter(Boolean));
+  return pendingKeys.filter((key) => !released.has(key));
+}
+
+export function isProfileConnectionLaunching(profile = {}, pendingKeys = []) {
+  const profileId = String(profile.id || '').trim();
+  return profileId ? pendingKeys.includes(`profile:${profileId}`) : false;
+}
+
 export function buildConnectionTransferActions({ profileCount = 0 } = {}) {
   return [
     { key: 'importSshConfig', labelKey: 'action.importSshConfig', disabled: false },
@@ -362,6 +414,11 @@ export function buildConnectionProfileBadges(profile = {}, sessionInfo = {}, opt
       tone: 'success',
       value: sessionInfo.activeCount,
     },
+    options.launching && {
+      key: 'launching',
+      tone: 'info',
+      value: true,
+    },
     profile.favorite && {
       key: 'favorite',
       tone: 'warning',
@@ -488,7 +545,15 @@ export function buildConnectionProfilePrimaryAction({
 }
 
 export function buildConnectionProfileLaunchModel(options = {}) {
-  const primary = buildConnectionProfilePrimaryAction(options);
+  let primary = buildConnectionProfilePrimaryAction(options);
+  if (options.launching && primary.action !== 'focus') {
+    primary = {
+      ...primary,
+      disabled: true,
+      labelKey: 'action.openingConnection',
+      reasonKey: 'message.connectionLaunchInProgress',
+    };
+  }
   if (primary.action !== 'focus') return { primary, secondary: null };
   if (options.providerAvailable === false) {
     return {
@@ -505,14 +570,17 @@ export function buildConnectionProfileLaunchModel(options = {}) {
     primary,
     secondary: {
       action: options.profileKind === 'file' ? 'openFiles' : 'connect',
-      disabled: false,
-      labelKey: options.profileKind === 'file' ? 'action.openFiles' : 'action.newTerminal',
-      reasonKey: '',
+      disabled: Boolean(options.launching),
+      labelKey: options.launching
+        ? 'action.openingConnection'
+        : options.profileKind === 'file' ? 'action.openFiles' : 'action.newTerminal',
+      reasonKey: options.launching ? 'message.connectionLaunchInProgress' : '',
     },
   };
 }
 
 export function buildConnectionProfileStatusSummary({
+  launching = false,
   profileKind = 'terminal',
   providerAvailable = true,
   sessionInfo = {},
@@ -522,6 +590,14 @@ export function buildConnectionProfileStatusSummary({
       descriptionKey: 'connection.status.unavailable.description',
       titleKey: 'connection.status.unavailable.title',
       tone: 'warning',
+      values: {},
+    };
+  }
+  if (launching) {
+    return {
+      descriptionKey: 'connection.status.opening.description',
+      titleKey: 'connection.status.opening.title',
+      tone: 'info',
       values: {},
     };
   }
