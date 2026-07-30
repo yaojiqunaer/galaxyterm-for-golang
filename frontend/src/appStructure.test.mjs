@@ -15,6 +15,7 @@ const terminalSearchControlSource = await readFile(new URL('./components/Termina
 const terminalSearchSource = await readFile(new URL('./terminalSearch.js', import.meta.url), 'utf8').catch(() => '');
 const workspaceStateSource = await readFile(new URL('./workspaceState.js', import.meta.url), 'utf8');
 const savedSshProfileSource = await readFile(new URL('./components/SavedSSHProfileSelect.jsx', import.meta.url), 'utf8');
+const sessionQuickSwitcherSource = await readFile(new URL('./components/SessionQuickSwitcher.jsx', import.meta.url), 'utf8').catch(() => '');
 const activeSessionDeclaration = source.indexOf('const activeSession =');
 const firstActiveSessionUsage = source.indexOf('activeSession?.providerType');
 const providersDeclaration = source.indexOf('const providers =');
@@ -328,8 +329,8 @@ assert.ok(
 assert.ok(
   source.includes('resolveTabSessionAction,')
     && source.includes('const tabSessionAction = resolveTabSessionAction(event);')
-    && source.includes('resolveRelativeSessionIndex(sessionIds, activeKey, tabSessionAction)'),
-  'Ctrl+Tab must cycle sessions even while the terminal input owns focus',
+    && source.includes('stepSessionSwitch(tabSessionAction);'),
+  'Ctrl+Tab must enter the session switcher even while the terminal input owns focus',
 );
 assert.ok(
   source.includes("t(`session.status.${sessionStatusLabel(session)}`)")
@@ -990,6 +991,11 @@ assert.ok(
   'connection groups must support guarded drag and drop plus discoverable group shortcuts',
 );
 assert.ok(
+  source.includes('broadcastSending')
+    && source.includes('|| !visibleProfiles.some((profile) => ('),
+  'batch connection launch must use one combined availability and busy-state guard',
+);
+assert.ok(
   /\.connection-profile-row\[draggable='true'\]\s*\{[\s\S]*?cursor:\s*grab;/.test(styles)
     && /\.connection-group-nav-item\.drop-target\s*\{[\s\S]*?box-shadow:\s*inset/.test(styles),
   'connection drag and drop must provide clear source and destination feedback',
@@ -1004,6 +1010,21 @@ assert.ok(
     && source.includes('open={broadcastOpen}')
     && source.includes("t('action.broadcastCommand')"),
   'multi-session commands must use guarded background sends while retaining audit tracking',
+);
+assert.ok(
+  source.includes('startSessionSwitch({')
+    && source.includes("window.addEventListener('keyup', handleKeyup, true)")
+    && source.includes('completeSessionSwitch(false)')
+    && source.includes('cancelSessionSwitch()')
+    && source.includes('consumeSessionSwitchEvent(event);')
+    && source.includes('shouldCancelSessionSwitch(')
+    && source.includes('cancelled: cancelled || contextChanged')
+    && source.includes('<SessionQuickSwitcher')
+    && sessionQuickSwitcherSource.includes('role="listbox"')
+    && sessionQuickSwitcherSource.includes('className="session-switcher-live"')
+    && sessionQuickSwitcherSource.includes('aria-live="polite"')
+    && sessionQuickSwitcherSource.includes("scrollIntoView?.({ block: 'nearest' })"),
+  'Ctrl+Tab must use a focus-preserving MRU switcher with explicit commit and cancellation',
 );
 
 console.log('app structure tests passed');

@@ -25,6 +25,7 @@
     "test:replay-timeline": "node src/replayTimeline.test.mjs",
     "test:remote-workspace": "node src/remoteWorkspace.test.mjs",
     "test:settings": "node src/settingsPresentation.test.mjs",
+    "test:session-switcher": "node src/sessionSwitcher.test.mjs",
     "test:sessions": "node src/sessionPresentation.test.mjs",
     "test:terminal-status": "node src/terminalStatus.test.mjs",
     "test:terminal-search": "node src/terminalSearch.test.mjs",

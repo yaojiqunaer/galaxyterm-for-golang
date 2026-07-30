@@ -1037,6 +1037,153 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   background: var(--terminal-bg);
 }
 
+.session-quick-switcher {
+  position: fixed;
+  z-index: 1080;
+  top: 68px;
+  left: 50%;
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(520px, calc(100vh - 100px));
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel);
+  box-shadow: 0 18px 44px rgba(9, 18, 27, 0.24);
+  pointer-events: none;
+  transform: translateX(-50%);
+  animation: session-switcher-enter 100ms ease-out;
+}
+
+.session-quick-switcher-head {
+  display: flex;
+  align-items: center;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.session-quick-switcher-head strong {
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.session-switcher-live {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  border: 0;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.session-quick-switcher-list {
+  max-height: min(410px, calc(100vh - 190px));
+  padding: 5px;
+  overflow-y: auto;
+}
+
+.session-quick-switcher-row {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 6px 9px;
+  border-left: 2px solid transparent;
+  border-radius: 5px;
+  color: var(--text);
+}
+
+.session-quick-switcher-row.selected {
+  border-left-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.session-quick-switcher .provider-icon {
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+}
+
+.session-quick-switcher-main {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.session-quick-switcher-main strong,
+.session-quick-switcher-main small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-quick-switcher-main strong {
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.session-quick-switcher-main small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.session-quick-switcher-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 8px;
+}
+
+.session-switcher-status {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.session-switcher-status.tone-success {
+  color: var(--success);
+}
+
+.session-switcher-status.tone-warning {
+  color: var(--warning);
+}
+
+.session-switcher-status.tone-danger {
+  color: var(--danger);
+}
+
+.session-switcher-status.tone-closed {
+  color: var(--muted);
+}
+
+.app-shell.focus-mode .session-quick-switcher {
+  top: 18px;
+}
+
+@keyframes session-switcher-enter {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .session-quick-switcher {
+    animation: none;
+  }
+}
+
 .terminal-tabs {
   flex: 0 0 auto;
   min-width: 0;

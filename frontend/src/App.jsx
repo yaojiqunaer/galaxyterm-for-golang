@@ -210,6 +210,8 @@ import {
   buildTerminalErrorDetail,
   buildTerminalRecoveryActions,
   buildTerminalStatusFacts,
+  normalizeTerminalStatus,
+  terminalStatusTone,
 } from './terminalStatus.js';
 import { parseSshConfigProfiles } from './sshConfigProfiles.js';
 import {
@@ -287,6 +289,15 @@ import {
   resolveSessionShortcutNumber,
   resolveTabSessionAction,
 } from './listNavigation.js';
+import {
+  advanceSessionSwitch,
+  consumeSessionSwitchEvent,
+  emptySessionSwitchState,
+  recordSessionVisit,
+  resolveSessionSwitchSelection,
+  shouldCancelSessionSwitch,
+  startSessionSwitch,
+} from './sessionSwitcher.js';
 import * as ExtensionsAPI from '../wailsjs/go/extensions/API.js';
 import * as FilesAPI from '../wailsjs/go/files/API.js';
 import * as DesktopAPI from '../wailsjs/go/desktop/API.js';
@@ -305,6 +316,7 @@ import {
 } from './i18n.js';
 import CommandPalette from './components/CommandPalette.jsx';
 import ConnectionGroupDialog from './components/ConnectionGroupDialog.jsx';
+import SessionQuickSwitcher from './components/SessionQuickSwitcher.jsx';
 import SavedSSHProfileSelect from './components/SavedSSHProfileSelect.jsx';
 import FileProviderFormFields from './components/FileProviderFormFields.jsx';
 import OperationErrorDescription from './components/OperationErrorDescription.jsx';
@@ -457,6 +469,8 @@ function App() {
   const [selectedNav, setSelectedNav] = useState('connections');
   const [settingsSection, setSettingsSection] = useState('interface');
   const [sessionView, setSessionView] = useState('tabs');
+  const [sessionRecentIds, setSessionRecentIds] = useState([]);
+  const [sessionSwitchState, setSessionSwitchState] = useState(emptySessionSwitchState);
   const [profileQuery, setProfileQuery] = useState('');
   const [groupQuery, setGroupQuery] = useState('all');
   const [providerFilter, setProviderFilter] = useState('all');
@@ -600,6 +614,8 @@ function App() {
   }, []);
   const terminalRefs = useRef({});
   const broadcastSendingRef = useRef(false);
+  const sessionSwitchStateRef = useRef(sessionSwitchState);
+  const sessionSwitchOriginViewRef = useRef(selectedNav);
   const sessionsRef = useRef(sessions);
   const saveAuditRecordRef = useRef(null);
   const terminalSearchQueriesRef = useRef({});
@@ -626,6 +642,42 @@ function App() {
     setActiveKey(sessionId);
     setSelectedNav('sessions');
     focusTerminalSession(sessionId);
+  };
+  const updateSessionSwitchState = (nextState) => {
+    sessionSwitchStateRef.current = nextState;
+    setSessionSwitchState(nextState);
+  };
+  const cancelSessionSwitch = () => {
+    if (!sessionSwitchStateRef.current.open) return;
+    updateSessionSwitchState(emptySessionSwitchState());
+  };
+  const stepSessionSwitch = (direction) => {
+    const current = sessionSwitchStateRef.current;
+    if (!current.open) sessionSwitchOriginViewRef.current = selectedNav;
+    const next = current.open
+      ? advanceSessionSwitch(current, direction)
+      : startSessionSwitch({
+        activeSessionId: activeKey,
+        direction,
+        recentSessionIds: sessionRecentIds,
+        sessionIds: sessions.map((session) => session.id),
+      });
+    if (next.open) updateSessionSwitchState(next);
+  };
+  const completeSessionSwitch = (cancelled = false) => {
+    const current = sessionSwitchStateRef.current;
+    if (!current.open) return;
+    const contextChanged = shouldCancelSessionSwitch(current, {
+      activeSessionId: activeKey,
+      currentView: selectedNav,
+      originView: sessionSwitchOriginViewRef.current,
+      sessionIds: sessions.map((session) => session.id),
+    });
+    const selectedId = resolveSessionSwitchSelection(current, {
+      cancelled: cancelled || contextChanged,
+    });
+    updateSessionSwitchState(emptySessionSwitchState());
+    if (selectedId) activateSession(selectedId);
   };
   const closeTerminalSearch = () => {
     setTerminalSearch('');
@@ -710,6 +762,19 @@ function App() {
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
+
+  useEffect(() => {
+    const sessionIds = sessions.map((session) => session.id);
+    setSessionRecentIds((current) => recordSessionVisit(current, activeKey, sessionIds));
+    if (shouldCancelSessionSwitch(sessionSwitchStateRef.current, {
+      activeSessionId: activeKey,
+      currentView: selectedNav,
+      originView: sessionSwitchOriginViewRef.current,
+      sessionIds,
+    })) {
+      cancelSessionSwitch();
+    }
+  }, [activeKey, selectedNav, sessions]);
 
   useEffect(() => {
     if (!broadcastOpen) return;
@@ -836,6 +901,11 @@ function App() {
 
   useEffect(() => {
     const handleKeydown = (event) => {
+      if (event.key === 'Escape' && sessionSwitchStateRef.current.open) {
+        consumeSessionSwitchEvent(event);
+        cancelSessionSwitch();
+        return;
+      }
       if (event.key === '?' && !isEditableTarget(event.target)) {
         event.preventDefault();
         setHelpOpen(true);
@@ -887,13 +957,8 @@ function App() {
       }
       const tabSessionAction = resolveTabSessionAction(event);
       if (tabSessionAction && sessions.length > 1) {
-        const sessionIds = sessions.map((session) => session.id);
-        const nextIndex = resolveRelativeSessionIndex(sessionIds, activeKey, tabSessionAction);
-        const nextSession = sessions[nextIndex];
-        if (nextSession) {
-          event.preventDefault();
-          activateSession(nextSession.id);
-        }
+        consumeSessionSwitchEvent(event);
+        stepSessionSwitch(tabSessionAction);
         return;
       }
       const commandKey = isCommandShortcut(event, settings);
@@ -950,14 +1015,31 @@ function App() {
         resetTerminalFont();
       }
     };
+    const handleKeyup = (event) => {
+      if (
+        sessionSwitchStateRef.current.open
+        && (event.key === 'Control' || event.code === 'ControlLeft' || event.code === 'ControlRight')
+      ) {
+        consumeSessionSwitchEvent(event);
+        completeSessionSwitch(false);
+      }
+    };
+    const handleBlur = () => cancelSessionSwitch();
     window.addEventListener('keydown', handleKeydown, true);
-    return () => window.removeEventListener('keydown', handleKeydown, true);
+    window.addEventListener('keyup', handleKeyup, true);
+    window.addEventListener('blur', handleBlur);
+    return () => {
+      window.removeEventListener('keydown', handleKeydown, true);
+      window.removeEventListener('keyup', handleKeyup, true);
+      window.removeEventListener('blur', handleBlur);
+    };
   }, [
     activeKey,
     allProviders,
     closedSessions,
     installedExtensions,
     selectedNav,
+    sessionRecentIds,
     sessions,
     settings.confirmDangerousActions,
     settings.defaultProviderType,
@@ -1046,6 +1128,26 @@ function App() {
       statusName: t(`session.status.${sessionStatusLabel(session)}`),
     })]),
   ), [allProviders, locale, sessionDisplayLabels, sessions, translationRevision]);
+  const sessionSwitcherItems = sessionSwitchState.orderedIds.map((sessionId) => {
+    const session = sessions.find((item) => item.id === sessionId);
+    if (!session) return null;
+    const status = normalizeTerminalStatus(terminalStatuses[sessionId]?.status || session.status);
+    const identityDisplay = sessionIdentityDisplays[sessionId] || {};
+    return {
+      activityKind: sessionActivity[sessionId]?.kind,
+      activityLabel: sessionActivity[sessionId]?.kind === 'error'
+        ? t('session.activity.error')
+        : t('session.activity.unread'),
+      detail: identityDisplay.identity || identityDisplay.provider,
+      displayName: identityDisplay.displayName || sessionDisplayLabels[sessionId] || session.label,
+      icon: providerIcons[session.providerType] || <CodeOutlined />,
+      id: sessionId,
+      providerName: providerTypeLabel(session.providerType, allProviders),
+      statusLabel: t(`terminal.runStatus.${status}`),
+      statusTone: terminalStatusTone(status),
+      unread: sessionActivity[sessionId]?.unread,
+    };
+  }).filter(Boolean);
   const desktopWindowTitle = useMemo(() => {
     const appName = t('app.title');
     if (selectedNav !== 'sessions') {
@@ -3607,15 +3709,17 @@ function App() {
                 <Button size="small" onClick={clearProfileFilters}>{t('action.clearFilters')}</Button>
               )}
               <Button
-                disabled={broadcastSending}
                 size="small"
                 onClick={() => openBatchProfiles({
                   ...(groupQuery === 'favorites' ? { favoritesOnly: true } : { group: groupQuery }),
                   providerType: providerFilter,
                 })}
-                disabled={!visibleProfiles.some((profile) => (
-                  profile.kind !== 'file' && isProfileProviderAvailable(profile, providers)
-                ))}
+                disabled={
+                  broadcastSending
+                  || !visibleProfiles.some((profile) => (
+                    profile.kind !== 'file' && isProfileProviderAvailable(profile, providers)
+                  ))
+                }
               >
                 {groupQuery === 'all' ? t('action.openAll') : t('action.openGroup')}
               </Button>
@@ -6339,6 +6443,11 @@ function App() {
     {notificationContextHolder}
     {modalContextHolder}
     <Layout className={`app-shell theme-${isDarkTheme ? 'dark' : 'light'}${focusMode ? ' focus-mode' : ''}`}>
+      <SessionQuickSwitcher
+        items={sessionSwitcherItems}
+        open={sessionSwitchState.open}
+        selectedId={sessionSwitchState.selectedId}
+      />
       <Sider
         breakpoint="lg"
         collapsed={sidebarCompact}

@@ -236,6 +236,8 @@ assert.equal(t('file.noProviderHint'), '安装 SFTP、FTP、S3 或兼容的文�
 assert.equal(t('action.broadcastCommand'), '批量发送命令');
 assert.equal(t('broadcast.reason.sensitive'), '检测到密码、令牌或密钥等敏感内容，已禁止批量发送。');
 assert.equal(t('message.broadcastSuccess', { count: 3 }), '命令已发送到 3 个会话');
+assert.equal(t('session.switcher.title'), '切换会话');
+assert.equal(t('shortcut.switchAdjacentSession'), '按最近使用顺序切换会话');
 [
   'operation.error.reason.unavailable',
   'operation.error.suggestion.unavailable',
@@ -252,3 +254,4 @@ assert.equal(t('provider.runtime.missingDescription', { type: 'mysql' }), 'The m
 assert.equal(t('confirm.closeAllSessionsContent', { count: 2 }), '2 sessions will be closed after saving their audit records.');
 assert.equal(t('action.broadcastCommand'), 'Send Command to Sessions');
 assert.equal(t('message.broadcastPartial', { failed: 1, succeeded: 2, total: 3 }), 'Sent to 2/3 sessions. Failed sessions: 1; they remain selected for review.');
+assert.equal(t('session.switcher.title'), 'Switch Session');
