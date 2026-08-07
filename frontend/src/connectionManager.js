@@ -506,6 +506,7 @@ export function buildConnectionProfileBadges(profile = {}, sessionInfo = {}, opt
       tone: 'info',
       value: true,
     },
+    options.healthBadge,
     profile.favorite && {
       key: 'favorite',
       tone: 'warning',

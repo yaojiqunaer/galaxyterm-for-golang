@@ -216,6 +216,15 @@ import {
   normalizeStoredConnectionProfile,
 } from './connectionProfiles.js';
 import {
+  beginConnectionProbes,
+  buildConnectionHealthPresentation,
+  buildConnectionProbePlan,
+  clearConnectionHealth,
+  completeConnectionProbe,
+  reconcileConnectionHealth,
+  runConnectionProbeQueue,
+} from './connectionHealth.js';
+import {
   buildTerminalControlActions,
   buildTerminalErrorDetail,
   buildTerminalRecoveryActions,
@@ -327,6 +336,7 @@ import {
 import CommandPalette from './components/CommandPalette.jsx';
 import ConnectionGroupDialog from './components/ConnectionGroupDialog.jsx';
 import ConnectionSelectionToolbar from './components/ConnectionSelectionToolbar.jsx';
+import ConnectionHealthStatus from './components/ConnectionHealthStatus.jsx';
 import SessionQuickSwitcher from './components/SessionQuickSwitcher.jsx';
 import SavedSSHProfileSelect from './components/SavedSSHProfileSelect.jsx';
 import FileProviderFormFields from './components/FileProviderFormFields.jsx';
@@ -492,6 +502,7 @@ function App() {
   const [connectionGroupEditor, setConnectionGroupEditor] = useState(null);
   const [connectionDragState, setConnectionDragState] = useState({ profileId: '', targetKey: '' });
   const [connectionLaunchKeys, setConnectionLaunchKeys] = useState([]);
+  const [connectionHealth, setConnectionHealth] = useState({});
   const connectionSelectionAnchorRef = useRef('');
   const [auditQuery, setAuditQuery] = useState('');
   const [auditProviderFilter, setAuditProviderFilter] = useState('all');
@@ -629,6 +640,7 @@ function App() {
   const terminalRefs = useRef({});
   const broadcastSendingRef = useRef(false);
   const connectionLaunchKeysRef = useRef(connectionLaunchKeys);
+  const connectionHealthRef = useRef(connectionHealth);
   const sessionSwitchStateRef = useRef(sessionSwitchState);
   const sessionSwitchOriginViewRef = useRef(selectedNav);
   const sessionsRef = useRef(sessions);
@@ -649,6 +661,12 @@ function App() {
   const updateConnectionLaunchKeys = (keys) => {
     connectionLaunchKeysRef.current = keys;
     setConnectionLaunchKeys(keys);
+  };
+  const updateConnectionHealth = (updater) => {
+    const next = typeof updater === 'function' ? updater(connectionHealthRef.current) : updater;
+    connectionHealthRef.current = next;
+    setConnectionHealth(next);
+    return next;
   };
   const focusTerminalSession = (sessionId = activeKey) => {
     if (!sessionId) return;
@@ -1263,6 +1281,15 @@ function App() {
     selectedProfileIds,
     { availableProviders: connectionProviders },
   ), [connectionProviders, profiles, selectedProfileIds]);
+  const selectedConnectionProbePlan = useMemo(() => buildConnectionProbePlan(
+    profiles,
+    selectedProfileIds,
+    connectionProviders,
+    connectionHealth,
+  ), [connectionHealth, connectionProviders, profiles, selectedProfileIds]);
+  const selectedConnectionProbeCheckingCount = selectedProfileIds.filter((profileId) => (
+    connectionHealth[profileId]?.status === 'checking'
+  )).length;
   const visibleSelectedProfileCount = useMemo(() => {
     const ids = new Set(selectedProfileIds);
     return visibleProfileIds.filter((id) => ids.has(id)).length;
@@ -1305,6 +1332,13 @@ function App() {
       connectionSelectionAnchorRef.current = '';
     }
   }, [visibleProfileIds]);
+
+  useEffect(() => {
+    updateConnectionHealth((current) => reconcileConnectionHealth(
+      current,
+      profiles.map((profile) => profile.id),
+    ));
+  }, [profiles]);
 
   useEffect(() => {
     if (!compactConnectionDetail || selectedNav !== 'connections' || !connectionDetailProfile) {
@@ -1744,6 +1778,7 @@ function App() {
         request = { ...request, profileId };
         const nextProfiles = saveProfile(profiles, request, editingProfileId, profileId);
         setProfiles(nextProfiles);
+        updateConnectionHealth((current) => clearConnectionHealth(current, [profileId]));
         messageApi.success(t('message.profileSaved'));
       }
       setDrawerOpen(false);
@@ -1899,6 +1934,60 @@ function App() {
       showOperationError('message.connectionTestFailed', error, { retry: testConnection });
     } finally {
       setTestingConnection(false);
+    }
+  };
+
+  const executeConnectionProbe = async (profile) => {
+    if (profile.kind === 'file') {
+      const credential = await resolveStoredProviderCredential(profile);
+      if (!credential.complete) throw new Error('saved credential unavailable');
+      await FilesAPI.List(buildFileConnectionRequest(profile, credential.auth));
+      return;
+    }
+    const request = await resolveCredentialRequest(profileToRequest(profile));
+    if (profile.providerType === 'ssh') {
+      await TerminalAPI.TestSSHConnection(request);
+      return;
+    }
+    await SessionAPI.TestProvider(request);
+  };
+
+  const testConnectionProfile = async (profile, { reserved = false, silent = false } = {}) => {
+    if (!profile?.id) return { profileId: '', reason: 'missing', status: 'skipped' };
+    if (!reserved) {
+      const plan = buildConnectionProbePlan(
+        [profile],
+        [profile.id],
+        connectionProviders,
+        connectionHealthRef.current,
+      );
+      if (plan.probeableProfiles.length === 0) {
+        const reason = plan.skipped.checking > 0
+          ? 'checking'
+          : plan.skipped.local > 0 ? 'local' : 'unavailable';
+        if (!silent) messageApi.info(t(`message.connectionHealthSkipped.${reason}`));
+        return { profileId: profile.id, reason, status: 'skipped' };
+      }
+      updateConnectionHealth((current) => beginConnectionProbes(current, [profile]));
+    }
+    try {
+      await executeConnectionProbe(profile);
+      const completed = updateConnectionHealth((current) => completeConnectionProbe(
+        current,
+        profile.id,
+      ));
+      const latency = completed[profile.id]?.latencyMs || 0;
+      if (!silent) messageApi.success(t('message.connectionHealthSuccess', { latency }));
+      return { latency, profileId: profile.id, status: 'success' };
+    } catch (error) {
+      const model = buildOperationError(error);
+      updateConnectionHealth((current) => completeConnectionProbe(current, profile.id, { error: model }));
+      if (!silent) {
+        showOperationError('message.connectionHealthFailed', error, {
+          retry: () => testConnectionProfile(profile),
+        });
+      }
+      return { error: model, profileId: profile.id, status: 'error' };
     }
   };
 
@@ -2780,6 +2869,11 @@ function App() {
     });
   };
 
+  const connectionHealthPresentation = (profile) => buildConnectionHealthPresentation(
+    connectionHealth[profile.id],
+    profile,
+  );
+
   const runConnectionProfileLaunchAction = (action, profile) => {
     if (!action) return;
     if (action.disabled) {
@@ -3041,6 +3135,7 @@ function App() {
 
   const runProfileAction = (action, profile) => {
     if (action === 'connect') runConnectionProfileNewAction(profile);
+    if (action === 'test') testConnectionProfile(profile);
     if (action === 'edit') openProfileEditor(profile);
     if (action === 'rename') openProfileEditor(profile);
     if (action === 'duplicate') duplicateProfile(profile);
@@ -3057,6 +3152,7 @@ function App() {
     const launchModel = connectionProfileLaunchModel(profile);
     const primaryAction = launchModel.primary;
     const newSessionAction = launchModel.secondary || primaryAction;
+    const health = connectionHealthPresentation(profile);
     const currentGroup = profile.group || ungroupedKey;
     const groupTargets = [...connectionGroupNames, ungroupedKey]
       .filter((group) => group !== currentGroup)
@@ -3075,6 +3171,15 @@ function App() {
           ? profile.kind === 'file' ? 'action.openFiles' : 'action.newTerminal'
           : `profile.action.${action}`),
       }));
+    const editIndex = items.findIndex((item) => item.key === 'edit');
+    items.splice(editIndex < 0 ? 0 : editIndex + 1, 0, {
+      key: 'test',
+      disabled: profile.providerType === 'local'
+        || !isProfileProviderAvailable(profile, connectionProviders)
+        || health?.status === 'checking',
+      icon: health?.status === 'checking' ? <LoadingOutlined spin /> : <ApiOutlined />,
+      label: t('action.testConnection'),
+    });
     const deleteIndex = items.findIndex((item) => item.key === 'delete');
     items.splice(deleteIndex < 0 ? items.length : deleteIndex, 0,
       { type: 'divider' },
@@ -3203,6 +3308,34 @@ function App() {
         retry: openSelectedProfiles,
       });
     }
+  };
+
+  const testSelectedConnections = async () => {
+    const plan = buildConnectionProbePlan(
+      profiles,
+      selectedProfileIds,
+      connectionProviders,
+      connectionHealthRef.current,
+    );
+    const skipped = Object.values(plan.skipped).reduce((total, count) => total + count, 0);
+    if (plan.probeableProfiles.length === 0) {
+      messageApi.info(t('message.connectionHealthNoTargets'));
+      return;
+    }
+    updateConnectionHealth((current) => beginConnectionProbes(current, plan.probeableProfiles));
+    const queueResults = await runConnectionProbeQueue(
+      plan.probeableProfiles,
+      (profile) => testConnectionProfile(profile, { reserved: true, silent: true }),
+      3,
+    );
+    const results = queueResults.map((result) => (
+      result.status === 'fulfilled' ? result.value : { status: 'error' }
+    ));
+    const succeeded = results.filter((result) => result.status === 'success').length;
+    const failed = results.length - succeeded;
+    const summary = t('connection.health.batchSummary', { failed, skipped, succeeded });
+    if (failed > 0) messageApi.warning(summary);
+    else messageApi.success(summary);
   };
 
   const markProfilesUsed = (profileIds) => {
@@ -3829,6 +3962,7 @@ function App() {
 
   const renderConnectionProfilePreview = (profile) => profile ? (
     <ConnectionProfilePreview
+      health={connectionHealthPresentation(profile)}
       profile={profile}
       launching={isProfileConnectionLaunching(profile, connectionLaunchKeys)}
       providers={connectionProviders}
@@ -3836,6 +3970,7 @@ function App() {
       duplicateProfile={duplicateProfile}
       profileSessionSummary={profileSessionSummary}
       runConnectionProfileLaunchAction={runConnectionProfileLaunchAction}
+      testConnectionProfile={testConnectionProfile}
       toggleProfileFavorite={toggleProfileFavorite}
       confirmDeleteProfile={confirmDeleteProfile}
     />
@@ -4050,10 +4185,13 @@ function App() {
             onExport={exportSelectedProfiles}
             onFavorite={setSelectedProfilesFavorite}
             onOpen={openSelectedProfiles}
+            onTest={testSelectedConnections}
             onToggleVisible={toggleVisibleConnectionProfiles}
             openableCount={connectionSelectionState.openableCount}
             partiallyVisibleSelected={visibleSelectedProfileCount > 0 && visibleSelectedProfileCount < visibleProfiles.length}
             selectedCount={connectionSelectionState.selectedCount}
+            testableCount={selectedConnectionProbePlan.probeableProfiles.length + selectedConnectionProbeCheckingCount}
+            testingCount={selectedConnectionProbeCheckingCount}
           />
 
           {visibleRecentConnections.length > 0 && (
@@ -4140,6 +4278,7 @@ function App() {
                 const providerAvailable = isProfileProviderAvailable(profile, connectionProviders);
                 const launching = isProfileConnectionLaunching(profile, connectionLaunchKeys);
                 const checked = selectedProfileIds.includes(profile.id);
+                const health = connectionHealthPresentation(profile);
                 const launchModel = connectionProfileLaunchModel(profile);
                 const primaryAction = launchModel.primary;
                 const actions = [
@@ -4202,6 +4341,7 @@ function App() {
                   </Tooltip>,
                 ];
                 const badges = buildConnectionProfileBadges(profile, sessionInfo, {
+                  healthBadge: health?.badge,
                   launching,
                   providerAvailable,
                 });
@@ -4950,6 +5090,7 @@ function App() {
         : [...profiles, profile];
       persistProfiles(nextProfiles);
       setProfiles(nextProfiles);
+      updateConnectionHealth((current) => clearConnectionHealth(current, [profileId]));
       setFileConnectionProfileId(profile.id);
       setFileCredentialEditing(false);
       messageApi.success(t('message.fileConnectionSaved'));
@@ -6874,8 +7015,12 @@ function App() {
                     renderItem={(profile) => {
                       const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
                       const launching = isProfileConnectionLaunching(profile, connectionLaunchKeys);
+                      const health = connectionHealthPresentation(profile);
                       const primaryAction = connectionProfileLaunchModel(profile).primary;
-                      const badges = buildConnectionProfileBadges(profile, sessionInfo, { launching })
+                      const badges = buildConnectionProfileBadges(profile, sessionInfo, {
+                        healthBadge: health?.badge,
+                        launching,
+                      })
                         .filter((badge) => badge.key !== 'group')
                         .slice(0, 2);
                       return (
@@ -8079,17 +8224,20 @@ function WorkspaceActionButton({ action, children, ...buttonProps }) {
 function ConnectionProfilePreview({
   confirmDeleteProfile,
   duplicateProfile,
+  health = null,
   launching = false,
   openProfileEditor,
   profile,
   profileSessionSummary,
   providers,
   runConnectionProfileLaunchAction,
+  testConnectionProfile,
   toggleProfileFavorite,
 }) {
   const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
   const providerAvailable = isProfileProviderAvailable(profile, providers);
   const badges = buildConnectionProfileBadges(profile, sessionInfo, {
+    healthBadge: health?.badge,
     launching,
     providerAvailable,
   });
@@ -8144,12 +8292,26 @@ function ConnectionProfilePreview({
           </Button>
         )}
         <Button size="small" icon={<EditOutlined />} onClick={() => openProfileEditor(profile)}>{t('action.edit')}</Button>
+        <Button
+          disabled={profile.providerType === 'local' || !providerAvailable || health?.status === 'checking'}
+          icon={<ApiOutlined />}
+          loading={health?.status === 'checking'}
+          size="small"
+          onClick={() => testConnectionProfile(profile)}
+        >
+          {t('action.testConnection')}
+        </Button>
       </div>
       <Alert
         showIcon
         type={statusSummary.tone}
         message={t(statusSummary.titleKey, statusSummary.values)}
         description={t(statusSummary.descriptionKey, statusSummary.values)}
+      />
+      <ConnectionHealthStatus
+        checkedLabel={health?.checkedAt ? formatProfileLastUsed(health.checkedAt) : ''}
+        onRetry={() => testConnectionProfile(profile)}
+        presentation={health}
       />
       <div className="connection-profile-tags">
         {badges.map((badge) => (
@@ -9017,6 +9179,9 @@ function connectionProfileBadgeLabel(badge) {
   if (badge.key === 'credential') return t('label.credentialSaved');
   if (badge.key === 'fileWorkspace') return t('label.fileConnection');
   if (badge.key === 'launching') return t('label.connectionLaunching');
+  if (badge.key === 'healthChecking') return t('label.connectionChecking');
+  if (badge.key === 'healthSuccess') return `${t('label.connectionAvailable')} · ${badge.value} ms`;
+  if (badge.key === 'healthError') return t('label.connectionUnavailable');
   if (badge.key === 'providerUnavailable') return t('label.providerUnavailable');
   return String(badge.value || badge.key);
 }

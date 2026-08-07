@@ -459,6 +459,12 @@ assert.deepEqual(buildConnectionProfileBadges(profiles[1], { activeCount: 0 }, {
   { key: 'group', tone: 'default', value: 'Production' },
   { key: 'launching', tone: 'info', value: true },
 ]);
+assert.deepEqual(buildConnectionProfileBadges(profiles[1], { activeCount: 0 }, {
+  healthBadge: { key: 'healthSuccess', tone: 'success', value: 42 },
+}), [
+  { key: 'group', tone: 'default', value: 'Production' },
+  { key: 'healthSuccess', tone: 'success', value: 42 },
+]);
 
 assert.equal(isProfileProviderAvailable(profiles[0], [{ type: 'ssh' }, { type: 'local' }]), true);
 assert.equal(isProfileProviderAvailable(profiles[0], [{ type: 'local' }]), false);

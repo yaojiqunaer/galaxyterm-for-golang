@@ -105,6 +105,22 @@ assert.ok(
     && connectionSelectionToolbarSource.includes('aria-label={t(\'action.clearSelection\')}'),
   'connection management must expose keyboard-friendly multi-selection and a compact bulk action toolbar',
 );
+assert.ok(
+  source.includes("from './connectionHealth.js';")
+    && source.includes('const [connectionHealth, setConnectionHealth] = useState({});')
+    && source.includes('connectionHealthRef.current')
+    && source.includes('buildConnectionProbePlan(')
+    && source.includes('beginConnectionProbes(')
+    && source.includes('completeConnectionProbe(')
+    && source.includes('runConnectionProbeQueue(')
+    && source.includes('await TerminalAPI.TestSSHConnection(request);')
+    && source.includes('await SessionAPI.TestProvider(request);')
+    && source.includes('await FilesAPI.List(buildFileConnectionRequest(profile, credential.auth));')
+    && source.includes('testConnectionProfile={testConnectionProfile}')
+    && connectionSelectionToolbarSource.includes('onTest')
+    && connectionSelectionToolbarSource.includes('action.testSelectedConnections'),
+  'saved terminal and file profiles must share on-demand single and bounded batch health checks',
+);
 
 assert.ok(
   /\.content-area\s*\{[\s\S]*?display:\s*grid;[\s\S]*?grid-template-rows:\s*auto minmax\(0, 1fr\)/.test(styles),

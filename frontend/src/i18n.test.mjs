@@ -182,7 +182,14 @@ assert.equal(t('action.moveToGroup'), '移动到分组');
 assert.equal(t('action.openSelectedConnections'), '打开已选连接');
 assert.equal(t('action.selectVisibleConnections'), '选择当前结果');
 assert.equal(t('action.clearSelection'), '清除选择');
+assert.equal(t('action.testSelectedConnections'), '检测已选连接');
 assert.equal(t('connection.selection.count', { count: 3 }), '已选择 3 个连接');
+assert.equal(t('connection.health.success.title', { latency: 42 }), '连接可用 · 42 ms');
+assert.equal(t('connection.health.batchSummary', {
+  failed: 1,
+  skipped: 2,
+  succeeded: 3,
+}), '检测完成：3 个可用，1 个失败，2 个已跳过');
 assert.equal(t('confirm.deleteProfilesContent', {
   activeCount: 2,
   count: 3,

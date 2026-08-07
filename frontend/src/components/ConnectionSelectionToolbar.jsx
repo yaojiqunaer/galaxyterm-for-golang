@@ -6,6 +6,7 @@ import {
   Tooltip,
 } from 'antd';
 import {
+  ApiOutlined,
   CloseOutlined,
   DeleteOutlined,
   ExportOutlined,
@@ -25,10 +26,13 @@ export default function ConnectionSelectionToolbar({
   onExport,
   onFavorite,
   onOpen,
+  onTest,
   onToggleVisible,
   openableCount = 0,
   partiallyVisibleSelected = false,
   selectedCount = 0,
+  testableCount = 0,
+  testingCount = 0,
 }) {
   if (selectedCount <= 0) return null;
 
@@ -62,6 +66,23 @@ export default function ConnectionSelectionToolbar({
               {t('action.openSelectedConnections')}
             </span>
             {openableCount > 0 && <span className="connection-selection-action-count">{openableCount}</span>}
+          </Button>
+        </span>
+      </Tooltip>
+      <Tooltip title={t('action.testSelectedConnections')}>
+        <span className="tooltip-button-wrapper">
+          <Button
+            className="connection-selection-test"
+            disabled={testableCount <= 0 || testingCount > 0}
+            icon={<ApiOutlined />}
+            loading={testingCount > 0}
+            size="small"
+            onClick={onTest}
+          >
+            <span className="connection-selection-action-label">
+              {t('action.testSelectedConnections')}
+            </span>
+            {testableCount > 0 && <span className="connection-selection-action-count">{testableCount}</span>}
           </Button>
         </span>
       </Tooltip>

@@ -26,6 +26,7 @@
   --terminal-text: #d4dde4;
   --success: #22a06b;
   --warning: #d59a23;
+  --danger: #d64555;
 }
 
 [data-app-theme='dark'] {
@@ -47,6 +48,7 @@
   --terminal-text: #d7e2ea;
   --success: #34d399;
   --warning: #f5c542;
+  --danger: #fb7185;
 }
 
 html,
@@ -2719,6 +2721,77 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   background: var(--panel);
 }
 
+.connection-health-status {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 9px;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.connection-health-status.tone-success {
+  border-top-color: color-mix(in srgb, var(--success) 24%, var(--border-subtle));
+}
+
+.connection-health-status.tone-error {
+  border-top-color: color-mix(in srgb, var(--danger) 24%, var(--border-subtle));
+}
+
+.connection-health-icon {
+  display: inline-grid;
+  width: 20px;
+  height: 22px;
+  place-items: center;
+  color: var(--accent);
+  font-size: 15px;
+}
+
+.connection-health-status.tone-success .connection-health-icon {
+  color: var(--success);
+}
+
+.connection-health-status.tone-error .connection-health-icon {
+  color: var(--danger);
+}
+
+.connection-health-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.connection-health-copy > strong {
+  color: var(--text);
+  font-size: 13px;
+}
+
+.connection-health-copy > small {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.connection-health-copy .operation-error-description {
+  gap: 5px;
+}
+
+.connection-health-copy .operation-error-detail {
+  max-height: 84px;
+}
+
+@media (max-width: 720px) {
+  .connection-health-status {
+    grid-template-columns: 20px minmax(0, 1fr);
+  }
+
+  .connection-health-status > .ant-btn {
+    grid-column: 2;
+    width: max-content;
+  }
+}
+
 .connection-profile-hero {
   display: flex;
   min-width: 0;
@@ -2806,6 +2879,12 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   border-color: rgb(245 158 11 / 30%);
   background: rgb(245 158 11 / 12%);
   color: var(--warning);
+}
+
+.connection-profile-badge.tone-danger {
+  border-color: color-mix(in srgb, var(--danger) 34%, transparent);
+  background: color-mix(in srgb, var(--danger) 11%, transparent);
+  color: var(--danger);
 }
 
 .connection-profile-badge.tone-info {
@@ -2944,7 +3023,8 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
     padding-inline: 0;
   }
 
-  .connection-selection-toolbar .connection-selection-open {
+  .connection-selection-toolbar .connection-selection-open,
+  .connection-selection-toolbar .connection-selection-test {
     width: auto;
     min-width: 44px;
     padding-inline: 7px;
