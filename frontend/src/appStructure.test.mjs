@@ -10,6 +10,7 @@ const viteConfig = await readFile(new URL('../vite.config.js', import.meta.url),
 const replaySource = await readFile(new URL('./components/AuditReplayPlayer.jsx', import.meta.url), 'utf8');
 const commandPaletteSource = await readFile(new URL('./components/CommandPalette.jsx', import.meta.url), 'utf8');
 const connectionGroupDialogSource = await readFile(new URL('./components/ConnectionGroupDialog.jsx', import.meta.url), 'utf8').catch(() => '');
+const connectionSelectionToolbarSource = await readFile(new URL('./components/ConnectionSelectionToolbar.jsx', import.meta.url), 'utf8').catch(() => '');
 const terminalPaneSource = await readFile(new URL('./components/TerminalPane.jsx', import.meta.url), 'utf8');
 const terminalSearchControlSource = await readFile(new URL('./components/TerminalSearchControl.jsx', import.meta.url), 'utf8').catch(() => '');
 const terminalSearchSource = await readFile(new URL('./terminalSearch.js', import.meta.url), 'utf8').catch(() => '');
@@ -58,7 +59,7 @@ assert.ok(
   source.includes('const runConnectionProfileNewAction = (profile) => {')
     && source.includes('if (event.shiftKey) runConnectionProfileNewAction(selectedProfile);')
     && /const handleConnectionListKeyDown = \(event\) => \{\s*if \(isInteractiveControl\(event\.target\)\) return;/.test(source)
-    && /onDoubleClick=\{\(event\) => \{\s*if \(isInteractiveControl\(event\.target\)\) return;\s*runConnectionProfileNewAction\(profile\);/.test(source)
+    && /onDoubleClick=\{\(event\) => \{\s*if \(isInteractiveControl\(event\.target\) \|\| event\.metaKey \|\| event\.ctrlKey \|\| event\.shiftKey\) return;\s*runConnectionProfileNewAction\(profile\);/.test(source)
     && source.includes("if (action === 'connect') runConnectionProfileNewAction(profile);")
     && source.includes('buildConnectionProfileLaunchModel({'),
   'connection double-click and Shift+Enter must explicitly open a new target instead of refocusing an existing session',
@@ -89,6 +90,20 @@ assert.ok(
     && source.includes('isDefaultTerminalLaunching()')
     && source.includes("message.connectionLaunchInProgress"),
   'connection launch entry points must share immediate progress and duplicate-click protection',
+);
+assert.ok(
+  source.includes("import ConnectionSelectionToolbar from './components/ConnectionSelectionToolbar.jsx';")
+    && source.includes('const [selectedProfileIds, setSelectedProfileIds] = useState([]);')
+    && source.includes('resolveConnectionProfileSelection(')
+    && source.includes('setVisibleConnectionProfileSelection(')
+    && source.includes('aria-multiselectable="true"')
+    && source.includes('event.key.toLowerCase() === \'a\'')
+    && source.includes("event.key === 'Escape'")
+    && source.includes('<ConnectionSelectionToolbar')
+    && source.includes('confirmDeleteSelectedProfiles')
+    && connectionSelectionToolbarSource.includes('role="toolbar"')
+    && connectionSelectionToolbarSource.includes('aria-label={t(\'action.clearSelection\')}'),
+  'connection management must expose keyboard-friendly multi-selection and a compact bulk action toolbar',
 );
 
 assert.ok(

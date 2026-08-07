@@ -2525,6 +2525,45 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   justify-content: flex-start;
 }
 
+.connection-selection-toolbar {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 12px 7px 14px;
+  border-bottom: 1px solid color-mix(in srgb, var(--accent) 24%, var(--border-subtle));
+  background: color-mix(in srgb, var(--accent) 7%, var(--panel));
+}
+
+.connection-selection-count {
+  min-width: 0;
+  color: var(--text);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.connection-selection-spacer {
+  min-width: 8px;
+  flex: 1;
+}
+
+.connection-selection-toolbar .ant-btn {
+  flex: 0 0 auto;
+}
+
+.connection-selection-action-count {
+  display: inline-grid;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 3px;
+  padding-inline: 4px;
+  border-radius: 5px;
+  place-items: center;
+  background: rgb(255 255 255 / 18%);
+  font-size: 11px;
+  line-height: 1;
+}
+
 .connection-list-tools .profile-search {
   width: clamp(240px, 36%, 320px);
 }
@@ -2628,12 +2667,44 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   min-width: 0;
 }
 
+.connection-profile-avatar {
+  display: grid;
+  grid-template-columns: 18px 34px;
+  align-items: center;
+  gap: 8px;
+}
+
+.connection-profile-avatar .ant-checkbox-wrapper {
+  margin: 0;
+  opacity: 0.58;
+  transition: opacity 120ms ease;
+}
+
+.connection-profile-row:hover .connection-profile-avatar .ant-checkbox-wrapper,
+.connection-profile-row.selected .connection-profile-avatar .ant-checkbox-wrapper,
+.connection-profile-avatar .ant-checkbox-wrapper:focus-within {
+  opacity: 1;
+}
+
 .connection-profile-row.active {
   background: var(--accent-soft);
 }
 
+.connection-profile-row.selected {
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.connection-profile-row.selected:hover {
+  background: color-mix(in srgb, var(--accent) 14%, var(--panel));
+}
+
 .connection-profile-row.launching {
   box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.connection-profile-row.selected.launching {
+  box-shadow: inset 3px 0 0 var(--accent), inset 0 -2px 0 color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
 .connection-profile-row:focus-visible {
@@ -2863,6 +2934,23 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   }
 }
 
+@media (max-width: 1180px) {
+  .connection-selection-action-label {
+    display: none;
+  }
+
+  .connection-selection-toolbar .ant-btn {
+    width: 30px;
+    padding-inline: 0;
+  }
+
+  .connection-selection-toolbar .connection-selection-open {
+    width: auto;
+    min-width: 44px;
+    padding-inline: 7px;
+  }
+}
+
 @media (max-width: 960px) {
   .connection-manager-layout,
   .connection-manager-layout.no-detail {
@@ -2886,6 +2974,10 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   .connection-group-nav {
     max-height: none;
     overflow-y: visible;
+  }
+
+  .connection-selection-toolbar {
+    overflow-x: auto;
   }
 
 }
@@ -3241,6 +3333,11 @@ code {
 
 .profile-list .ant-list-item:hover {
   background: var(--panel-muted);
+}
+
+.profile-list .connection-profile-row.selected,
+.profile-list .connection-profile-row.selected:hover {
+  background: color-mix(in srgb, var(--accent) 12%, var(--panel));
 }
 
 .audit-record-list {

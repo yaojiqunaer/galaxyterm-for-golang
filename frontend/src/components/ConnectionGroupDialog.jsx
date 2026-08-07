@@ -57,7 +57,9 @@ export default function ConnectionGroupDialog({
         <Text type="secondary">
           {t(editor?.mode === 'rename'
             ? 'connection.group.renameDescription'
-            : 'connection.group.moveDescription', {
+            : editor?.profileIds?.length > 0
+              ? 'connection.group.moveManyDescription'
+              : 'connection.group.moveDescription', {
             count: editor?.affectedCount || 0,
             name: editor?.profileName || '',
           })}

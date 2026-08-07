@@ -11,6 +11,7 @@ import {
   buildConnectionProfilePrimaryAction,
   buildConnectionProfileStatusSummary,
   buildConnectionProfileSubtitle,
+  buildConnectionSelectionActionState,
   buildConnectionTransferActions,
   buildDefaultTerminalLaunch,
   buildTerminalSubmitPlan,
@@ -18,8 +19,13 @@ import {
   filterRecentConnectionsByProviders,
   isProfileProviderAvailable,
   isProfileConnectionLaunching,
+  removeConnectionProfiles,
+  reconcileConnectionProfileSelection,
   releaseConnectionLaunchRequests,
   reserveConnectionLaunchRequests,
+  resolveConnectionProfileSelection,
+  setVisibleConnectionProfileSelection,
+  updateConnectionProfilesFavorite,
   resolveSelectedProfileId,
   selectBatchProfiles,
   shouldPersistConnection,
@@ -123,6 +129,17 @@ const profiles = [
   },
 ];
 
+const fileProfile = {
+  id: 's3-assets',
+  kind: 'file',
+  providerType: 's3',
+  displayName: 'Production assets',
+  group: 'Production',
+  filePath: '/releases',
+  config: { endpoint: 'https://objects.example.com', bucket: 'assets' },
+  auth: { credentialRef: { id: 's3-assets', providerType: 's3', fields: ['accessKey', 'secretKey'] } },
+};
+
 const pendingProdRequest = {
   profileId: 'prod-db',
   providerType: 'ssh',
@@ -161,16 +178,61 @@ assert.equal(
 );
 assert.equal(isProfileConnectionLaunching({ id: 'dev-shell' }, launchReservation.pendingKeys), false);
 
-const fileProfile = {
-  id: 's3-assets',
-  kind: 'file',
-  providerType: 's3',
-  displayName: 'Production assets',
-  group: 'Production',
-  filePath: '/releases',
-  config: { endpoint: 'https://objects.example.com', bucket: 'assets' },
-  auth: { credentialRef: { id: 's3-assets', providerType: 's3', fields: ['accessKey', 'secretKey'] } },
-};
+assert.deepEqual(
+  resolveConnectionProfileSelection([], 'prod-db', ['prod-db', 'prod-web', 'dev-shell']),
+  { anchorId: 'prod-db', selectedIds: ['prod-db'] },
+);
+assert.deepEqual(
+  resolveConnectionProfileSelection(['prod-db'], 'dev-shell', ['prod-db', 'prod-web', 'dev-shell'], {
+    anchorId: 'prod-db',
+    range: true,
+  }),
+  { anchorId: 'prod-db', selectedIds: ['prod-db', 'prod-web', 'dev-shell'] },
+);
+assert.deepEqual(
+  resolveConnectionProfileSelection(['prod-db', 'prod-web'], 'prod-db', ['prod-db', 'prod-web']),
+  { anchorId: 'prod-db', selectedIds: ['prod-web'] },
+);
+assert.deepEqual(
+  reconcileConnectionProfileSelection(['prod-db', 'missing', 'dev-shell'], ['dev-shell', 'prod-db']),
+  ['prod-db', 'dev-shell'],
+);
+assert.deepEqual(
+  setVisibleConnectionProfileSelection(['prod-db'], ['prod-web', 'dev-shell'], true),
+  ['prod-db', 'prod-web', 'dev-shell'],
+);
+assert.deepEqual(
+  setVisibleConnectionProfileSelection(['prod-db', 'prod-web'], ['prod-web'], false),
+  ['prod-db'],
+);
+
+assert.deepEqual(buildConnectionSelectionActionState(profiles, ['prod-db', 'prod-web'], {
+  availableProviders: [{ type: 'ssh' }, { type: 'local' }],
+}), {
+  allFavorite: false,
+  openableCount: 2,
+  selectedCount: 2,
+});
+assert.equal(buildConnectionSelectionActionState(profiles, ['prod-db', 'dev-shell']).allFavorite, true);
+assert.deepEqual(buildConnectionSelectionActionState([...profiles, fileProfile], ['s3-assets'], {
+  availableProviders: [{ type: 'ssh' }, { type: 'local' }],
+}), {
+  allFavorite: false,
+  openableCount: 0,
+  selectedCount: 1,
+});
+assert.deepEqual(buildConnectionSelectionActionState(profiles, ['missing']), {
+  allFavorite: false,
+  openableCount: 0,
+  selectedCount: 0,
+});
+const favoritedProfiles = updateConnectionProfilesFavorite(profiles, ['prod-web', 'missing'], true);
+assert.equal(favoritedProfiles.changedCount, 1);
+assert.equal(favoritedProfiles.profiles.find((profile) => profile.id === 'prod-web')?.favorite, true);
+assert.equal(favoritedProfiles.profiles.find((profile) => profile.id === 'prod-db'), profiles[0]);
+const removedProfiles = removeConnectionProfiles(profiles, ['prod-web', 'missing']);
+assert.deepEqual(removedProfiles.removedProfiles.map((profile) => profile.id), ['prod-web']);
+assert.deepEqual(removedProfiles.profiles.map((profile) => profile.id), ['prod-db', 'dev-shell']);
 
 const groups = buildConnectionGroups(profiles);
 assert.deepEqual(groups.map((group) => ({

@@ -72,7 +72,7 @@ assert.equal(t('action.updateCredential'), 'Update credential');
 assert.equal(t('field.savedConnection'), 'Saved connection');
 assert.equal(t('file.savedCredentialActive'), 'Credentials are stored securely and will be used for this connection.');
 assert.equal(t('connection.status.fileReady.title'), 'File location ready');
-assert.equal(t('hint.connectionListKeyboard'), '↑↓ select · Enter open/focus · Shift+Enter new');
+assert.equal(t('hint.connectionListKeyboard'), '↑↓ focus · Space select · Enter open · Shift+Enter new · ⌘/Ctrl+A all');
 assert.equal(t('action.moveToGroup'), 'Move to Group');
 assert.equal(t('confirm.removeConnectionGroupContent', { count: 3 }), 'Its 3 connections move to Ungrouped. Connection settings and credentials are kept.');
 assert.equal(t('connection.group.mergeHint', { name: 'Production' }), '“Production” already exists. Confirm to merge into that group.');
@@ -177,8 +177,17 @@ assert.equal(t('action.updateCredential'), '更新凭据');
 assert.equal(t('field.savedConnection'), '已保存连接');
 assert.equal(t('file.savedCredentialActive'), '凭据已安全保存，打开此连接时会自动使用。');
 assert.equal(t('connection.status.fileReady.title'), '文件位置已就绪');
-assert.equal(t('hint.connectionListKeyboard'), '↑↓ 选择 · Enter 打开/定位 · Shift+Enter 新开');
+assert.equal(t('hint.connectionListKeyboard'), '↑↓ 定位 · Space 勾选 · Enter 打开 · Shift+Enter 新开 · ⌘/Ctrl+A 全选');
 assert.equal(t('action.moveToGroup'), '移动到分组');
+assert.equal(t('action.openSelectedConnections'), '打开已选连接');
+assert.equal(t('action.selectVisibleConnections'), '选择当前结果');
+assert.equal(t('action.clearSelection'), '清除选择');
+assert.equal(t('connection.selection.count', { count: 3 }), '已选择 3 个连接');
+assert.equal(t('confirm.deleteProfilesContent', {
+  activeCount: 2,
+  count: 3,
+  credentialCount: 1,
+}), '将删除 3 个连接及 1 份保存凭据；2 个已打开会话会保持运行。');
 assert.equal(t('confirm.removeConnectionGroupContent', { count: 3 }), '分组中的 3 个连接会移动到“未分组”，连接配置和凭据不会删除。');
 assert.equal(t('connection.group.mergeHint', { name: '生产' }), '“生产”已存在，确认后会合并到该分组。');
 assert.equal(t('connection.hint.secondaryOpenNew'), '使用 + 新开一个连接');

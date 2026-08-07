@@ -111,6 +111,93 @@ export function isProfileConnectionLaunching(profile = {}, pendingKeys = []) {
   return profileId ? pendingKeys.includes(`profile:${profileId}`) : false;
 }
 
+export function reconcileConnectionProfileSelection(selectedIds = [], profileIds = []) {
+  const availableIds = new Set(profileIds.filter(Boolean));
+  return selectedIds.filter((id, index, items) => (
+    availableIds.has(id) && items.indexOf(id) === index
+  ));
+}
+
+export function resolveConnectionProfileSelection(
+  selectedIds = [],
+  profileId = '',
+  orderedIds = [],
+  { anchorId = '', range = false } = {},
+) {
+  const availableIds = orderedIds.filter(Boolean);
+  if (!profileId || !availableIds.includes(profileId)) {
+    return {
+      anchorId,
+      selectedIds: reconcileConnectionProfileSelection(selectedIds, availableIds),
+    };
+  }
+  const selected = new Set(reconcileConnectionProfileSelection(selectedIds, availableIds));
+  if (range && availableIds.includes(anchorId)) {
+    const start = availableIds.indexOf(anchorId);
+    const end = availableIds.indexOf(profileId);
+    availableIds.slice(Math.min(start, end), Math.max(start, end) + 1)
+      .forEach((id) => selected.add(id));
+    return { anchorId, selectedIds: availableIds.filter((id) => selected.has(id)) };
+  }
+  if (selected.has(profileId)) selected.delete(profileId);
+  else selected.add(profileId);
+  return { anchorId: profileId, selectedIds: availableIds.filter((id) => selected.has(id)) };
+}
+
+export function setVisibleConnectionProfileSelection(selectedIds = [], visibleIds = [], selected = true) {
+  const next = new Set(selectedIds.filter(Boolean));
+  visibleIds.filter(Boolean).forEach((id) => {
+    if (selected) next.add(id);
+    else next.delete(id);
+  });
+  return [...next];
+}
+
+export function buildConnectionSelectionActionState(
+  profiles = [],
+  selectedIds = [],
+  { availableProviders } = {},
+) {
+  const ids = new Set(selectedIds.filter(Boolean));
+  const selectedProfiles = profiles.filter((profile) => ids.has(profile.id));
+  const providerTypes = Array.isArray(availableProviders)
+    ? new Set(availableProviders.map((provider) => provider.type).filter(Boolean))
+    : null;
+  const selectedCount = selectedProfiles.length;
+  return {
+    allFavorite: selectedCount > 0 && selectedProfiles.every((profile) => profile.favorite),
+    openableCount: selectedProfiles.filter((profile) => (
+      profile.kind !== 'file'
+      && (!providerTypes || providerTypes.has(profile.providerType))
+    )).length,
+    selectedCount,
+  };
+}
+
+export function updateConnectionProfilesFavorite(profiles = [], profileIds = [], favorite = true) {
+  const ids = new Set(profileIds.filter(Boolean));
+  let changedCount = 0;
+  const nextProfiles = profiles.map((profile) => {
+    if (!ids.has(profile.id) || Boolean(profile.favorite) === Boolean(favorite)) return profile;
+    changedCount += 1;
+    return { ...profile, favorite: Boolean(favorite) };
+  });
+  return {
+    changedCount,
+    profiles: changedCount > 0 ? nextProfiles : profiles,
+  };
+}
+
+export function removeConnectionProfiles(profiles = [], profileIds = []) {
+  const ids = new Set(profileIds.filter(Boolean));
+  const removedProfiles = profiles.filter((profile) => ids.has(profile.id));
+  if (removedProfiles.length === 0) return { profiles, removedProfiles };
+  return {
+    profiles: profiles.filter((profile) => !ids.has(profile.id)),
+    removedProfiles,
+  };
+}
+
 export function buildConnectionTransferActions({ profileCount = 0 } = {}) {
   return [
     { key: 'importSshConfig', labelKey: 'action.importSshConfig', disabled: false },

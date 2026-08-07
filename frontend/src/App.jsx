@@ -105,6 +105,7 @@ import {
   buildConnectionProfileLaunchModel,
   buildConnectionProfileStatusSummary,
   buildConnectionProfileSubtitle,
+  buildConnectionSelectionActionState,
   buildConnectionTransferActions,
   buildDefaultTerminalLaunch,
   buildTerminalSubmitPlan,
@@ -113,19 +114,24 @@ import {
   isProfileConnectionLaunching,
   isProfileProviderAvailable,
   moveConnectionProfilesToGroup,
+  reconcileConnectionProfileSelection,
+  removeConnectionProfiles,
   removeConnectionGroup,
   releaseConnectionLaunchRequests,
   renameConnectionGroup,
   reserveConnectionLaunchRequests,
   resolveConnectionGroupFilter,
   resolveConnectionProfileDrop,
+  resolveConnectionProfileSelection,
   resolveProfileSaveDefault,
   resolveSelectedProfileId,
   selectBatchProfiles,
+  setVisibleConnectionProfileSelection,
   summarizeProfileSessions,
   sortConnectionProfiles,
   sortSidebarProfiles,
   ungroupedKey,
+  updateConnectionProfilesFavorite,
 } from './connectionManager.js';
 import {
   appendClosedSessions,
@@ -320,6 +326,7 @@ import {
 } from './i18n.js';
 import CommandPalette from './components/CommandPalette.jsx';
 import ConnectionGroupDialog from './components/ConnectionGroupDialog.jsx';
+import ConnectionSelectionToolbar from './components/ConnectionSelectionToolbar.jsx';
 import SessionQuickSwitcher from './components/SessionQuickSwitcher.jsx';
 import SavedSSHProfileSelect from './components/SavedSSHProfileSelect.jsx';
 import FileProviderFormFields from './components/FileProviderFormFields.jsx';
@@ -480,10 +487,12 @@ function App() {
   const [providerFilter, setProviderFilter] = useState('all');
   const [profileSort, setProfileSort] = useState('favorites');
   const [selectedProfileId, setSelectedProfileId] = useState('');
+  const [selectedProfileIds, setSelectedProfileIds] = useState([]);
   const [connectionDetailProfileId, setConnectionDetailProfileId] = useState('');
   const [connectionGroupEditor, setConnectionGroupEditor] = useState(null);
   const [connectionDragState, setConnectionDragState] = useState({ profileId: '', targetKey: '' });
   const [connectionLaunchKeys, setConnectionLaunchKeys] = useState([]);
+  const connectionSelectionAnchorRef = useRef('');
   const [auditQuery, setAuditQuery] = useState('');
   const [auditProviderFilter, setAuditProviderFilter] = useState('all');
   const [auditSessionFilter, setAuditSessionFilter] = useState('all');
@@ -1241,6 +1250,23 @@ function App() {
     }), profileSort),
     [profiles, profileQuery, groupQuery, providerFilter, profileSort],
   );
+  const visibleProfileIds = useMemo(
+    () => visibleProfiles.map((profile) => profile.id),
+    [visibleProfiles],
+  );
+  const selectedConnectionProfiles = useMemo(() => {
+    const ids = new Set(selectedProfileIds);
+    return profiles.filter((profile) => ids.has(profile.id));
+  }, [profiles, selectedProfileIds]);
+  const connectionSelectionState = useMemo(() => buildConnectionSelectionActionState(
+    profiles,
+    selectedProfileIds,
+    { availableProviders: connectionProviders },
+  ), [connectionProviders, profiles, selectedProfileIds]);
+  const visibleSelectedProfileCount = useMemo(() => {
+    const ids = new Set(selectedProfileIds);
+    return visibleProfileIds.filter((id) => ids.has(id)).length;
+  }, [selectedProfileIds, visibleProfileIds]);
   const explicitlySelectedProfile = visibleProfiles.find((profile) => profile.id === selectedProfileId) || null;
   const selectedProfile = explicitlySelectedProfile || (compactConnectionDetail ? null : visibleProfiles[0] || null);
   const connectionDetailProfile = visibleProfiles.find((profile) => profile.id === connectionDetailProfileId) || null;
@@ -1269,6 +1295,18 @@ function App() {
   }, [compactConnectionDetail, selectedProfileId, visibleProfiles]);
 
   useEffect(() => {
+    setSelectedProfileIds((current) => {
+      const next = reconcileConnectionProfileSelection(current, visibleProfileIds);
+      return next.length === current.length && next.every((id, index) => id === current[index])
+        ? current
+        : next;
+    });
+    if (!visibleProfileIds.includes(connectionSelectionAnchorRef.current)) {
+      connectionSelectionAnchorRef.current = '';
+    }
+  }, [visibleProfileIds]);
+
+  useEffect(() => {
     if (!compactConnectionDetail || selectedNav !== 'connections' || !connectionDetailProfile) {
       setConnectionDetailProfileId('');
     }
@@ -1281,8 +1319,46 @@ function App() {
     if (nextProfile) setSelectedProfileId(nextProfile.id);
   };
 
+  const clearConnectionProfileSelection = () => {
+    connectionSelectionAnchorRef.current = '';
+    setSelectedProfileIds([]);
+  };
+
+  const toggleConnectionProfileSelection = (profileId, { range = false } = {}) => {
+    setSelectedProfileIds((current) => {
+      const result = resolveConnectionProfileSelection(current, profileId, visibleProfileIds, {
+        anchorId: connectionSelectionAnchorRef.current,
+        range,
+      });
+      connectionSelectionAnchorRef.current = result.anchorId;
+      return result.selectedIds;
+    });
+  };
+
+  const toggleVisibleConnectionProfiles = (selected) => {
+    setSelectedProfileIds((current) => (
+      setVisibleConnectionProfileSelection(current, visibleProfileIds, selected)
+    ));
+    connectionSelectionAnchorRef.current = selected ? visibleProfileIds[0] || '' : '';
+  };
+
   const handleConnectionListKeyDown = (event) => {
     if (isInteractiveControl(event.target)) return;
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'a') {
+      event.preventDefault();
+      toggleVisibleConnectionProfiles(true);
+      return;
+    }
+    if (event.key === 'Escape' && selectedProfileIds.length > 0) {
+      event.preventDefault();
+      clearConnectionProfileSelection();
+      return;
+    }
+    if (event.key === ' ' && selectedProfile) {
+      event.preventDefault();
+      toggleConnectionProfileSelection(selectedProfile.id, { range: event.shiftKey });
+      return;
+    }
     if (event.key === 'ArrowDown') {
       event.preventDefault();
       moveSelectedProfile('next');
@@ -2561,21 +2637,36 @@ function App() {
     messageApi.success(t('message.workspaceCleared'));
   };
 
-  const deleteProfile = async (profileId) => {
-    const profile = profiles.find((item) => item.id === profileId);
-    const nextProfiles = profiles.filter((profile) => profile.id !== profileId);
-    persistProfiles(nextProfiles);
-    setProfiles(nextProfiles);
+  const deleteProfileCredential = async (profile) => {
+    if (!profile) return;
     try {
-      if (profile?.auth?.credentialRef && profile.providerType !== 'ssh') {
+      if (profile.auth?.credentialRef && profile.providerType !== 'ssh') {
         await CredentialsAPI.DeleteProviderCredential(profile.auth.credentialRef);
-      } else {
-        await CredentialsAPI.DeleteSSHCredential(profileId);
+      } else if (profile.providerType === 'ssh') {
+        await CredentialsAPI.DeleteSSHCredential(profile.id);
       }
     } catch {
       // Profiles remain removable even if the OS credential store is unavailable.
     }
+  };
+
+  const deleteProfile = async (profileId) => {
+    const result = removeConnectionProfiles(profiles, [profileId]);
+    if (result.removedProfiles.length === 0) return;
+    persistProfiles(result.profiles);
+    setProfiles(result.profiles);
+    await deleteProfileCredential(result.removedProfiles[0]);
     messageApi.success(t('message.profileDeleted'));
+  };
+
+  const deleteSelectedProfiles = async () => {
+    const result = removeConnectionProfiles(profiles, selectedProfileIds);
+    if (result.removedProfiles.length === 0) return;
+    persistProfiles(result.profiles);
+    setProfiles(result.profiles);
+    clearConnectionProfileSelection();
+    await Promise.allSettled(result.removedProfiles.map(deleteProfileCredential));
+    messageApi.success(t('message.profilesDeleted', { count: result.removedProfiles.length }));
   };
 
   const resolveStoredProviderCredential = async (profile) => {
@@ -2771,6 +2862,31 @@ function App() {
     });
   };
 
+  const confirmDeleteSelectedProfiles = () => {
+    if (connectionSelectionState.selectedCount === 0) return;
+    if (settings.confirmDangerousActions === false) {
+      deleteSelectedProfiles();
+      return;
+    }
+    const selectedIds = new Set(selectedProfileIds);
+    const activeCount = sessions.filter((session) => (
+      session.status !== 'closed' && selectedIds.has(session.request?.profileId)
+    )).length;
+    const credentialCount = selectedConnectionProfiles.filter((profile) => profile.auth?.credentialRef).length;
+    modalApi.confirm({
+      title: t('confirm.deleteProfilesTitle', { count: connectionSelectionState.selectedCount }),
+      content: t('confirm.deleteProfilesContent', {
+        activeCount,
+        count: connectionSelectionState.selectedCount,
+        credentialCount,
+      }),
+      okButtonProps: { danger: true },
+      okText: t('action.delete'),
+      cancelText: t('action.cancel'),
+      onOk: deleteSelectedProfiles,
+    });
+  };
+
   const commitConnectionGroupChange = (result, messageKey, values = {}) => {
     if (!result || result.changedCount <= 0) {
       messageApi.info(t('message.connectionGroupUnchanged'));
@@ -2787,6 +2903,27 @@ function App() {
     commitConnectionGroupChange(result, 'message.connectionMovedToGroup', {
       name: groupLabel(result.targetGroup || ungroupedKey),
     });
+  };
+
+  const moveSelectedProfilesToGroup = (targetGroup) => {
+    const result = moveConnectionProfilesToGroup(profiles, selectedProfileIds, targetGroup);
+    if (commitConnectionGroupChange(result, 'message.connectionsMovedToGroup', {
+      name: groupLabel(result.targetGroup || ungroupedKey),
+    })) {
+      clearConnectionProfileSelection();
+    }
+  };
+
+  const setSelectedProfilesFavorite = () => {
+    const favorite = !connectionSelectionState.allFavorite;
+    const result = updateConnectionProfilesFavorite(profiles, selectedProfileIds, favorite);
+    if (result.changedCount <= 0) return;
+    persistProfiles(result.profiles);
+    setProfiles(result.profiles);
+    messageApi.success(t(
+      favorite ? 'message.connectionsFavorited' : 'message.connectionsUnfavorited',
+      { count: result.changedCount },
+    ));
   };
 
   const clearConnectionProfileDrag = () => {
@@ -2849,6 +2986,12 @@ function App() {
     profileName: profile.displayName,
   });
 
+  const openNewGroupForSelectedProfiles = () => setConnectionGroupEditor({
+    affectedCount: connectionSelectionState.selectedCount,
+    mode: 'move',
+    profileIds: selectedProfileIds,
+  });
+
   const openRenameConnectionGroup = (item) => setConnectionGroupEditor({
     affectedCount: item.total,
     mode: 'rename',
@@ -2868,6 +3011,8 @@ function App() {
       })) {
         setGroupQuery(buildConnectionGroupFilter(targetGroup));
       }
+    } else if (connectionGroupEditor.profileIds?.length > 0) {
+      moveSelectedProfilesToGroup(targetGroup);
     } else {
       const profile = profiles.find((item) => item.id === connectionGroupEditor.profileId);
       if (profile) moveProfileToGroup(profile, targetGroup);
@@ -2952,6 +3097,21 @@ function App() {
     };
   };
 
+  const connectionSelectionMoveMenu = {
+    items: [
+      ...[...connectionGroupNames, ungroupedKey].map((group) => ({
+        key: buildConnectionGroupFilter(group),
+        label: groupLabel(group),
+      })),
+      ...(profiles.length > 0 ? [{ type: 'divider' }] : []),
+      { key: 'new', icon: <PlusOutlined />, label: t('action.newGroup') },
+    ],
+    onClick: ({ key }) => {
+      if (key === 'new') openNewGroupForSelectedProfiles();
+      else moveSelectedProfilesToGroup(resolveConnectionGroupFilter(key).group);
+    },
+  };
+
   const buildConnectionGroupActionMenu = (item) => ({
     items: [
       {
@@ -3023,6 +3183,28 @@ function App() {
     }
   };
 
+  const openSelectedProfiles = async () => {
+    const openableProfiles = selectedConnectionProfiles.filter((profile) => (
+      profile.kind !== 'file' && isProfileProviderAvailable(profile, providers)
+    ));
+    const skipped = selectedConnectionProfiles.length - openableProfiles.length;
+    if (openableProfiles.length === 0) {
+      messageApi.info(t('message.noAvailableBatchConnections'));
+      return;
+    }
+    try {
+      const result = await startProfileRequests(openableProfiles.map(profileToRequest));
+      markProfilesUsed(result.createdProfileIds);
+      if (skipped > 0) {
+        messageApi.warning(t('message.selectedConnectionsSkipped', { count: skipped }));
+      }
+    } catch (error) {
+      showOperationError('message.credentialFailed', error, {
+        retry: openSelectedProfiles,
+      });
+    }
+  };
+
   const markProfilesUsed = (profileIds) => {
     const usedIds = new Set(profileIds.filter(Boolean));
     if (usedIds.size === 0) return;
@@ -3040,8 +3222,14 @@ function App() {
     messageApi.success(t('message.recentCleared'));
   };
 
-  const exportProfiles = () => {
-    downloadJson('galaxyterm-profiles.json', buildConnectionProfilesExport(profiles));
+  const exportProfiles = (profilesToExport = profiles, filename = 'galaxyterm-profiles.json') => {
+    downloadJson(filename, buildConnectionProfilesExport(profilesToExport));
+  };
+
+  const exportSelectedProfiles = () => {
+    if (selectedConnectionProfiles.length === 0) return;
+    exportProfiles(selectedConnectionProfiles, 'galaxyterm-profiles-selected.json');
+    messageApi.success(t('message.connectionsExported', { count: selectedConnectionProfiles.length }));
   };
 
   const importProfiles = async (event) => {
@@ -3853,6 +4041,21 @@ function App() {
             )}
           </div>
 
+          <ConnectionSelectionToolbar
+            allFavorite={connectionSelectionState.allFavorite}
+            allVisibleSelected={visibleProfiles.length > 0 && visibleSelectedProfileCount === visibleProfiles.length}
+            moveMenu={connectionSelectionMoveMenu}
+            onClear={clearConnectionProfileSelection}
+            onDelete={confirmDeleteSelectedProfiles}
+            onExport={exportSelectedProfiles}
+            onFavorite={setSelectedProfilesFavorite}
+            onOpen={openSelectedProfiles}
+            onToggleVisible={toggleVisibleConnectionProfiles}
+            openableCount={connectionSelectionState.openableCount}
+            partiallyVisibleSelected={visibleSelectedProfileCount > 0 && visibleSelectedProfileCount < visibleProfiles.length}
+            selectedCount={connectionSelectionState.selectedCount}
+          />
+
           {visibleRecentConnections.length > 0 && (
             <div className="recent-connection-rail">
               <Text type="secondary">{t('section.recentConnections')}</Text>
@@ -3928,6 +4131,7 @@ function App() {
                 : undefined}
               className="profile-list connection-profile-list"
               dataSource={visibleProfiles}
+              aria-multiselectable="true"
               role="listbox"
               tabIndex={0}
               onKeyDown={handleConnectionListKeyDown}
@@ -3935,6 +4139,7 @@ function App() {
                 const sessionInfo = profileSessionSummary.get(profile.id) || { activeCount: 0, focusSessionId: '' };
                 const providerAvailable = isProfileProviderAvailable(profile, connectionProviders);
                 const launching = isProfileConnectionLaunching(profile, connectionLaunchKeys);
+                const checked = selectedProfileIds.includes(profile.id);
                 const launchModel = connectionProfileLaunchModel(profile);
                 const primaryAction = launchModel.primary;
                 const actions = [
@@ -4010,28 +4215,47 @@ function App() {
                       'connection-profile-row',
                       (compactConnectionDetail ? explicitlySelectedProfile?.id : selectedProfile?.id) === profile.id ? 'active' : '',
                       connectionDragState.profileId === profile.id ? 'dragging' : '',
+                      checked ? 'selected' : '',
                       launching ? 'launching' : '',
                     ].filter(Boolean).join(' ')}
                     aria-busy={launching}
                     draggable={profiles.length > 0}
                     id={`connection-profile-option-${profileIndex}`}
                     role="option"
-                    aria-selected={(compactConnectionDetail ? explicitlySelectedProfile?.id : selectedProfile?.id) === profile.id}
+                    aria-selected={selectedProfileIds.length > 0
+                      ? checked
+                      : (compactConnectionDetail ? explicitlySelectedProfile?.id : selectedProfile?.id) === profile.id}
                     tabIndex={-1}
                     onDragEnd={clearConnectionProfileDrag}
                     onDragStart={(event) => beginConnectionProfileDrag(event, profile)}
-                    onClick={() => {
+                    onClick={(event) => {
+                      if (event.metaKey || event.ctrlKey || event.shiftKey) {
+                        toggleConnectionProfileSelection(profile.id, { range: event.shiftKey });
+                        return;
+                      }
                       setSelectedProfileId(profile.id);
                       if (compactConnectionDetail) setConnectionDetailProfileId(profile.id);
                     }}
                     onDoubleClick={(event) => {
-                      if (isInteractiveControl(event.target)) return;
+                      if (isInteractiveControl(event.target) || event.metaKey || event.ctrlKey || event.shiftKey) return;
                       runConnectionProfileNewAction(profile);
                     }}
                     actions={actions.filter(Boolean)}
                   >
                     <List.Item.Meta
-                      avatar={<span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>}
+                      avatar={(
+                        <span className="connection-profile-avatar">
+                          <Checkbox
+                            aria-label={t('action.selectConnection', { name: profile.displayName })}
+                            checked={checked}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={(event) => toggleConnectionProfileSelection(profile.id, {
+                              range: Boolean(event.nativeEvent?.shiftKey),
+                            })}
+                          />
+                          <span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>
+                        </span>
+                      )}
                       title={(
                         <span className="connection-profile-title">
                           <strong>{profile.displayName}</strong>
