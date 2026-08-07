@@ -11,6 +11,7 @@ const replaySource = await readFile(new URL('./components/AuditReplayPlayer.jsx'
 const commandPaletteSource = await readFile(new URL('./components/CommandPalette.jsx', import.meta.url), 'utf8');
 const connectionGroupDialogSource = await readFile(new URL('./components/ConnectionGroupDialog.jsx', import.meta.url), 'utf8').catch(() => '');
 const connectionSelectionToolbarSource = await readFile(new URL('./components/ConnectionSelectionToolbar.jsx', import.meta.url), 'utf8').catch(() => '');
+const quickCommandLibrarySource = await readFile(new URL('./components/QuickCommandLibrary.jsx', import.meta.url), 'utf8').catch(() => '');
 const terminalPaneSource = await readFile(new URL('./components/TerminalPane.jsx', import.meta.url), 'utf8');
 const terminalSearchControlSource = await readFile(new URL('./components/TerminalSearchControl.jsx', import.meta.url), 'utf8').catch(() => '');
 const terminalSearchSource = await readFile(new URL('./terminalSearch.js', import.meta.url), 'utf8').catch(() => '');
@@ -120,6 +121,24 @@ assert.ok(
     && connectionSelectionToolbarSource.includes('onTest')
     && connectionSelectionToolbarSource.includes('action.testSelectedConnections'),
   'saved terminal and file profiles must share on-demand single and bounded batch health checks',
+);
+assert.ok(
+  source.includes("import QuickCommandLibrary from './components/QuickCommandLibrary.jsx';")
+    && source.includes("const [commandEditorOpen, setCommandEditorOpen] = useState(false);")
+    && source.includes('buildQuickCommandDispatch(command, { appendEnter })')
+    && source.includes('const insertQuickCommand = (command) => dispatchQuickCommand(command, false);')
+    && source.includes('buildQuickCommandSummary(quickCommands, { activeSession, terminalStatus: activeTerminalStatus })')
+    && source.includes('quickCommandCanRun: quickCommandSummary.canRun')
+    && source.includes('disabled: !safety.canRun || !actions.quickCommandCanRun,')
+    && source.includes("reasonKey: safety.warningKey || 'palette.reason.noReadySession',")
+    && source.includes('if (runQuickCommand(item.command)) setHistoryOpen(false);')
+    && source.includes('disabled={!quickCommandSummary.canRun}')
+    && source.includes('<QuickCommandLibrary')
+    && quickCommandLibrarySource.includes('quick-command-context')
+    && quickCommandLibrarySource.includes('action.insertCommand')
+    && quickCommandLibrarySource.includes('<Dropdown')
+    && quickCommandLibrarySource.includes('editorOpen && ('),
+  'quick commands must use a compact on-demand editor and one guarded run-or-insert dispatch path',
 );
 
 assert.ok(
@@ -781,7 +800,8 @@ assert.ok(
     && source.includes('onClick={confirmClearAuditRecords}')
     && source.includes('onClick={() => confirmUninstallExtension(extension)}')
     && source.includes('onClick={() => confirmDeleteExtensionSource(source)}')
-    && source.includes('onClick={() => confirmDeleteQuickCommand(item)}')
+    && source.includes('onDelete={confirmDeleteQuickCommand}')
+    && quickCommandLibrarySource.includes("if (key === 'delete') onDelete?.(item);")
     && source.includes('onClick={() => confirmStopTunnel(item, display)}')
     && source.includes("{t('action.stop')}</Button>"),
   'all destructive controls must call their contextual confirmation wrapper',

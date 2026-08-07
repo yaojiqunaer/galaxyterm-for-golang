@@ -1,14 +1,18 @@
 import { isSensitiveCommand } from './commandHistory.js';
 
-export function buildQuickCommandSummary(commands = [], { activeSession = null } = {}) {
+export function buildQuickCommandSummary(commands = [], {
+  activeSession = null,
+  terminalStatus = {},
+} = {}) {
   const providerType = activeSession?.providerType || 'all';
+  const status = terminalStatus.status || activeSession?.status || '';
   return {
     total: commands.length,
     available: filterQuickCommands(commands, '', { providerType }).length,
     favorites: commands.filter((item) => item.favorite).length,
     multiLine: commands.filter((item) => String(item.command || '').includes('\n')).length,
     target: activeSession?.label || '',
-    canRun: !!activeSession?.id,
+    canRun: Boolean(activeSession?.id) && ['connected', 'idle'].includes(status),
   };
 }
 
@@ -92,6 +96,20 @@ export function buildQuickCommandSafetyState(command = {}) {
     displayCommand: rawCommand,
     sensitive: false,
     warningKey: '',
+  };
+}
+
+export function buildQuickCommandDispatch(command = '', { appendEnter = true } = {}) {
+  const data = String(command || '').trim();
+  const mode = appendEnter ? 'run' : 'insert';
+  if (!data) return { data: '', mode, ok: false, reason: 'empty' };
+  if (isSensitiveCommand(data)) return { data: '', mode, ok: false, reason: 'sensitive' };
+  if (!appendEnter && data.includes('\n')) return { data: '', mode, ok: false, reason: 'multiline' };
+  return {
+    data: appendEnter && !data.endsWith('\n') ? `${data}\n` : data,
+    mode,
+    ok: true,
+    reason: '',
   };
 }
 

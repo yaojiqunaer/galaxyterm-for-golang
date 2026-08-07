@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  buildQuickCommandDispatch,
   buildQuickCommandFromHistory,
   buildQuickCommandSafetyState,
   buildQuickCommandSaveResult,
@@ -15,7 +16,10 @@ const commands = [
   { id: 'logs', name: 'Tail service logs', command: 'journalctl -u nginx -f', providerType: 'ssh' },
 ];
 
-assert.deepEqual(buildQuickCommandSummary(commands, { activeSession: { id: 's1', label: 'Prod SSH', providerType: 'ssh' } }), {
+assert.deepEqual(buildQuickCommandSummary(commands, {
+  activeSession: { id: 's1', label: 'Prod SSH', providerType: 'ssh', status: 'connected' },
+  terminalStatus: { status: 'idle' },
+}), {
   total: 3,
   available: 2,
   favorites: 1,
@@ -23,6 +27,15 @@ assert.deepEqual(buildQuickCommandSummary(commands, { activeSession: { id: 's1',
   target: 'Prod SSH',
   canRun: true,
 });
+
+assert.equal(buildQuickCommandSummary(commands, {
+  activeSession: { id: 's1', label: 'Prod SSH', providerType: 'ssh', status: 'connected' },
+  terminalStatus: { status: 'busy' },
+}).canRun, false);
+assert.equal(buildQuickCommandSummary(commands, {
+  activeSession: { id: 's1', label: 'Prod SSH', providerType: 'ssh', status: 'closed' },
+  terminalStatus: {},
+}).canRun, false);
 
 assert.deepEqual(buildQuickCommandSummary([{ id: 'deploy', name: 'Deploy', command: 'cd app\nmake deploy' }], {}), {
   total: 1,
@@ -131,6 +144,49 @@ assert.deepEqual(buildQuickCommandSafetyState({
   displayCommand: 'command.sensitiveHidden',
   sensitive: true,
   warningKey: 'command.sensitiveStoredWarning',
+});
+
+assert.deepEqual(buildQuickCommandDispatch('kubectl get pods'), {
+  data: 'kubectl get pods\n',
+  mode: 'run',
+  ok: true,
+  reason: '',
+});
+assert.deepEqual(buildQuickCommandDispatch('kubectl get pods\n'), {
+  data: 'kubectl get pods\n',
+  mode: 'run',
+  ok: true,
+  reason: '',
+});
+assert.deepEqual(buildQuickCommandDispatch('kubectl get pods', { appendEnter: false }), {
+  data: 'kubectl get pods',
+  mode: 'insert',
+  ok: true,
+  reason: '',
+});
+assert.deepEqual(buildQuickCommandDispatch('cd app\nmake deploy', { appendEnter: false }), {
+  data: '',
+  mode: 'insert',
+  ok: false,
+  reason: 'multiline',
+});
+assert.deepEqual(buildQuickCommandDispatch('cd app\nmake deploy'), {
+  data: 'cd app\nmake deploy\n',
+  mode: 'run',
+  ok: true,
+  reason: '',
+});
+assert.deepEqual(buildQuickCommandDispatch('mysql --password secret'), {
+  data: '',
+  mode: 'run',
+  ok: false,
+  reason: 'sensitive',
+});
+assert.deepEqual(buildQuickCommandDispatch('   ', { appendEnter: false }), {
+  data: '',
+  mode: 'insert',
+  ok: false,
+  reason: 'empty',
 });
 
 assert.deepEqual(upsertQuickCommand(commands, {

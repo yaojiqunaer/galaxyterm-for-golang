@@ -109,6 +109,12 @@ assert.equal(t('replay.seekEvent', { time: '0:05.0', type: 'command' }), 'Seek t
 assert.equal(t('replay.eventUnavailable', { type: 'legacy' }), 'legacy is not linked to this recording');
 assert.equal(t('session.status.error'), 'Error');
 assert.equal(t('message.connectionFavorited', { name: 'Production' }), 'Added “Production” to Favorites');
+assert.equal(t('action.insertCommand'), 'Insert into Terminal');
+assert.equal(t('command.librarySummary', { available: 2, total: 5 }), '2 available for this terminal · 5 total');
+assert.equal(t('command.targetUnavailable'), 'Select a connected, idle session to run or insert a command.');
+assert.equal(t('palette.reason.noReadySession'), 'Select a connected, idle terminal session.');
+assert.equal(t('command.insertMultilineUnavailable'), 'Multiline commands contain embedded line breaks that may execute early. Use the explicit Run action instead.');
+assert.equal(t('message.commandInserted'), 'Command inserted without running');
 assert.equal(t('locale.en-US'), 'English');
 assert.equal(t('locale.zh-CN'), 'Simplified Chinese');
 replaceExtensionMessages('en-US', {
@@ -183,6 +189,12 @@ assert.equal(t('action.openSelectedConnections'), '打开已选连接');
 assert.equal(t('action.selectVisibleConnections'), '选择当前结果');
 assert.equal(t('action.clearSelection'), '清除选择');
 assert.equal(t('action.testSelectedConnections'), '检测已选连接');
+assert.equal(t('action.insertCommand'), '填入终端');
+assert.equal(t('command.librarySummary', { available: 2, total: 5 }), '当前终端可用 2 个 · 共 5 个');
+assert.equal(t('command.targetUnavailable'), '请选择已连接且空闲的会话，再运行或填入命令。');
+assert.equal(t('palette.reason.noReadySession'), '请选择已连接且空闲的终端会话。');
+assert.equal(t('command.insertMultilineUnavailable'), '多行命令包含内部换行，填入时可能提前执行；请使用明确的运行操作。');
+assert.equal(t('message.commandInserted'), '命令已填入终端，尚未执行');
 assert.equal(t('connection.selection.count', { count: 3 }), '已选择 3 个连接');
 assert.equal(t('connection.health.success.title', { latency: 42 }), '连接可用 · 42 ms');
 assert.equal(t('connection.health.batchSummary', {
