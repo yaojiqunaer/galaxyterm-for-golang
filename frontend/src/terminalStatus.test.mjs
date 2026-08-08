@@ -75,6 +75,11 @@ assert.deepEqual(buildTerminalRecoveryActions({
   status: 'closed',
 }).map((action) => action.key), ['reconnect', 'audit']);
 
+assert.deepEqual(
+  buildTerminalRecoveryActions({ status: 'closed' }, { reconnecting: true })[0],
+  { key: 'reconnect', tone: 'primary', disabled: true, loading: true },
+);
+
 assert.deepEqual(buildTerminalRecoveryActions({
   status: 'idle',
 }), []);

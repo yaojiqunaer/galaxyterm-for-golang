@@ -153,13 +153,18 @@ import {
   moveSessionInOrder,
   profileActionModel,
   pruneSessionActivity,
+  reconcileSessionReconnects,
   recordSessionAttention,
   recordSessionOutputActivity,
+  releaseSessionReconnect,
+  reserveSessionReconnect,
   reorderSessions,
   sessionTabDisplay,
   sessionStatusLabel,
   sessionStatusTone,
   sessionSummary,
+  synchronizeSessionCreated,
+  synchronizeSessionTerminalSnapshot,
   synchronizeSessionTerminalStatus,
   takeClosedSession,
   toggleSessionProtection,
@@ -452,6 +457,7 @@ function App() {
   const [modalApi, modalContextHolder] = Modal.useModal();
   const [allProviders, setAllProviders] = useState(fallbackProviders);
   const [sessions, setSessions] = useState([]);
+  const [sessionReconnects, setSessionReconnects] = useState({});
   const [closedSessions, setClosedSessions] = useState([]);
   const [profiles, setProfiles] = useState(() => loadProfiles());
   const [settings, setSettings] = useState(() => loadSettings());
@@ -645,6 +651,7 @@ function App() {
   const broadcastSendingRef = useRef(false);
   const connectionLaunchKeysRef = useRef(connectionLaunchKeys);
   const connectionHealthRef = useRef(connectionHealth);
+  const sessionReconnectsRef = useRef(sessionReconnects);
   const sessionSwitchStateRef = useRef(sessionSwitchState);
   const sessionSwitchOriginViewRef = useRef(selectedNav);
   const sessionsRef = useRef(sessions);
@@ -672,6 +679,15 @@ function App() {
     setConnectionHealth(next);
     return next;
   };
+  const updateSessionReconnects = (updater) => {
+    const next = typeof updater === 'function' ? updater(sessionReconnectsRef.current) : updater;
+    sessionReconnectsRef.current = next;
+    setSessionReconnects(next);
+    return next;
+  };
+  const isSessionReconnecting = (sessionId) => Boolean(
+    sessionId && Object.prototype.hasOwnProperty.call(sessionReconnects, sessionId)
+  );
   const focusTerminalSession = (sessionId = activeKey) => {
     if (!sessionId) return;
     window.requestAnimationFrame(() => {
@@ -1599,6 +1615,9 @@ function App() {
   }), [activeKey, sessions, sidebarSessionQuery]);
   const sidebarSessions = sidebarSessionState.sessions;
   const sessionIds = useMemo(() => sessions.map((session) => session.id), [sessions]);
+  useEffect(() => {
+    updateSessionReconnects((current) => reconcileSessionReconnects(current, sessionIds));
+  }, [sessionIds]);
   const visibleQuickCommands = useMemo(() => filterQuickCommands(quickCommands, commandQuery, {
     favoriteOnly: commandScope === 'favorites',
     providerType: commandScope === 'current' ? activeSession?.providerType || 'all' : 'all',
@@ -2218,22 +2237,38 @@ function App() {
       messageApi.warning(t('message.noActiveSession'));
       return;
     }
+    const session = sessionsRef.current.find((item) => item.id === sessionId);
+    if (!session) {
+      messageApi.warning(t('message.noActiveSession'));
+      return;
+    }
+    const revision = (session.revision || 0) + 1;
+    const reservation = reserveSessionReconnect(sessionReconnectsRef.current, sessionId, revision);
+    if (!reservation.reserved) {
+      messageApi.info(t('message.sessionReconnectInProgress'));
+      return;
+    }
+    updateSessionReconnects(reservation.reconnects);
     saveAuditRecord(sessionId, { finalize: true });
-    setSessions((current) => current.map((session) => (
-      session.id === sessionId
+    setTerminalStatuses((current) => ({
+      ...current,
+      [sessionId]: { status: 'connecting' },
+    }));
+    setSessions((current) => current.map((item) => (
+      item.id === sessionId
         ? {
-          ...session,
+          ...item,
           auditEvents: [createAuditEvent({
-            sessionId: session.id,
-            sessionLabel: session.label,
+            sessionId: item.id,
+            sessionLabel: item.label,
             type: 'session.reconnect',
           })],
           auditRecordSaved: false,
           backendSessionId: '',
           status: 'connecting',
-          revision: (session.revision || 0) + 1,
+          revision,
         }
-        : session
+        : item
     )));
     setActiveKey(sessionId);
     setSelectedNav('sessions');
@@ -3642,10 +3677,19 @@ function App() {
   };
 
   const updateTerminalStatus = (sessionId, status, revision) => {
-    setTerminalStatuses((current) => ({
-      ...current,
-      [sessionId]: status,
-    }));
+    updateSessionReconnects((current) => releaseSessionReconnect(
+      current,
+      sessionId,
+      revision,
+      status?.status || '',
+    ));
+    setTerminalStatuses((current) => synchronizeSessionTerminalSnapshot(
+      current,
+      sessionsRef.current,
+      sessionId,
+      status,
+      revision,
+    ));
     setSessions((current) => synchronizeSessionTerminalStatus(current, sessionId, status, revision));
   };
 
@@ -3708,6 +3752,7 @@ function App() {
         onManageProvider={() => openProviderExtension(providerRuntime)}
         onReconnect={() => reconnectSession(session.id)}
         providerRuntime={providerRuntime}
+        reconnecting={isSessionReconnecting(session.id)}
         status={terminalStatuses[session.id]}
       >
         <Suspense fallback={<TerminalLoadingState />}>
@@ -3724,9 +3769,18 @@ function App() {
             onOutputActivity={(outputAt) => recordSessionActivity(session.id, outputAt)}
             onSearchResultsChange={(result) => updateTerminalSearchResult(session.id, result)}
             onSessionCreated={(backendSessionId) => {
-              setSessions((current) => current.map((item) => (
-                item.id === session.id ? { ...item, backendSessionId, status: 'connected' } : item
-              )));
+              updateSessionReconnects((current) => releaseSessionReconnect(
+                current,
+                session.id,
+                session.revision || 0,
+                'connected',
+              ));
+              setSessions((current) => synchronizeSessionCreated(
+                current,
+                session.id,
+                backendSessionId,
+                session.revision || 0,
+              ));
             }}
             onSessionClosed={(backendSessionId) => updateSessionStatus(backendSessionId, 'closed')}
             onStatusChange={(status) => updateTerminalStatus(session.id, status, session.revision || 0)}
@@ -3750,6 +3804,7 @@ function App() {
   const buildSessionActionMenu = (session) => {
     const sessionIndex = sessions.findIndex((item) => item.id === session.id);
     const identityDisplay = sessionIdentityDisplays[session.id];
+    const reconnecting = isSessionReconnecting(session.id);
     const closeOtherPlan = buildSessionClosePlan(sessions, {
       keepSessionId: session.id,
       mode: 'others',
@@ -3758,6 +3813,7 @@ function App() {
       closableOtherCount: closeOtherPlan.closingSessions.length,
       hasTarget: Boolean(identityDisplay?.copyValue),
       protected: session.protected,
+      reconnecting,
       sessionCount: sessions.length,
       sessionIndex,
     }).flatMap((action) => [
@@ -3768,7 +3824,9 @@ function App() {
         key: action.key,
         danger: action.danger,
         disabled: action.disabled,
-        icon: sessionTabActionIcon(action.key),
+        icon: action.key === 'reconnect' && reconnecting
+          ? <LoadingOutlined spin />
+          : sessionTabActionIcon(action.key),
         label: t(action.labelKey),
       },
     ]);
@@ -3873,6 +3931,7 @@ function App() {
       canNavigate: sessionNavigationState.canNavigate,
       closableOtherCount: sessionClosePlans.others.closingSessions.length,
       closedCount: sessionClosePlans.closed.closingSessions.length,
+      reconnecting: isSessionReconnecting(activeKey),
       sessionCount: sessions.length,
       terminalStatus: activeTerminalStatus,
       view: sessionView,
@@ -3964,9 +4023,11 @@ function App() {
                     <Tooltip title={t('action.reconnect')}>
                       <Button
                         aria-label={t('action.reconnect')}
+                        disabled={isSessionReconnecting(session.id)}
                         size="small"
                         type="text"
                         icon={<ReloadOutlined />}
+                        loading={isSessionReconnecting(session.id)}
                         onClick={() => reconnectSession(session.id)}
                       />
                     </Tooltip>
@@ -6687,6 +6748,7 @@ function App() {
     activeSessionId: activeKey,
     activeSessionHasTarget: Boolean(sessionIdentityDisplays[activeKey]?.copyValue),
     activeSessionProtected: Boolean(activeSession?.protected),
+    activeSessionReconnecting: isSessionReconnecting(activeKey),
     canNavigateSessions: sessionNavigationState.canNavigate,
     closableClosedCount: sessionClosePlans.closed.closingSessions.length,
     closableOtherCount: sessionClosePlans.others.closingSessions.length,
@@ -6903,7 +6965,8 @@ function App() {
     },
     activeKey && {
       key: 'reconnect',
-      icon: <ReloadOutlined />,
+      disabled: isSessionReconnecting(activeKey),
+      icon: isSessionReconnecting(activeKey) ? <LoadingOutlined spin /> : <ReloadOutlined />,
       label: t('action.reconnect'),
     },
     currentSessionSummary.closed > 0 && {
@@ -8368,6 +8431,7 @@ function SessionToolbarActions({ model, onAction }) {
               disabled={action.disabled}
               danger={action.danger}
               icon={icons[action.key]}
+              loading={action.loading}
               size="small"
               type={action.key === 'interrupt' || action.key === 'reconnect' ? 'primary' : 'text'}
               onClick={() => onAction(action.key)}
@@ -8452,12 +8516,13 @@ function TerminalFrame({
   onOpenAudit,
   onReconnect,
   providerRuntime,
+  reconnecting = false,
   status,
 }) {
   const facts = buildTerminalStatusFacts(status || {});
   const controlActions = buildTerminalControlActions(status || {});
   const errorDetail = buildTerminalErrorDetail(status || {});
-  const recoveryActions = buildTerminalRecoveryActions(status || {});
+  const recoveryActions = buildTerminalRecoveryActions(status || {}, { reconnecting });
   const recordingFact = contextFacts.find((fact) => fact.key === 'recording');
   const visibleContextFacts = contextFacts.filter((fact) => ['provider', 'target', 'user'].includes(fact.key));
   return (
@@ -8581,6 +8646,7 @@ function TerminalFrame({
                   type={action.tone === 'primary' ? 'primary' : 'default'}
                   disabled={action.disabled}
                   icon={terminalRecoveryActionIcon(action)}
+                  loading={action.loading}
                   onClick={() => runTerminalRecoveryAction(action.key, {
                     onCopyError,
                     onOpenAudit,
@@ -8881,6 +8947,7 @@ function buildPaletteItems(actions) {
     activeSessionHasTarget: actions.activeSessionHasTarget,
     activeSessionId: actions.activeSessionId,
     activeSessionProtected: actions.activeSessionProtected,
+    activeSessionReconnecting: actions.activeSessionReconnecting,
     canNavigate: actions.canNavigateSessions,
     closableClosedCount: actions.closableClosedCount,
     closableOtherCount: actions.closableOtherCount,

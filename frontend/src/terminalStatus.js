@@ -48,18 +48,23 @@ export function buildTerminalErrorDetail(state = {}) {
   };
 }
 
-export function buildTerminalRecoveryActions(state = {}) {
+export function buildTerminalRecoveryActions(state = {}, options = {}) {
   const status = normalizeTerminalStatus(state.status);
+  const reconnectAction = {
+    key: 'reconnect',
+    tone: 'primary',
+    ...(options.reconnecting ? { disabled: true, loading: true } : {}),
+  };
   if (status === 'error') {
     return [
-      { key: 'reconnect', tone: 'primary' },
+      reconnectAction,
       { key: 'copyError', tone: 'default', disabled: !String(state.error || '').trim() },
       { key: 'audit', tone: 'default' },
     ];
   }
   if (status === 'closed') {
     return [
-      { key: 'reconnect', tone: 'primary' },
+      reconnectAction,
       { key: 'audit', tone: 'default' },
     ];
   }

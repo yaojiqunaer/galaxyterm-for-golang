@@ -200,6 +200,18 @@ assert.deepEqual(sessionActionItems.map((item) => ({
   { disabled: false, id: 'session-action:quickCommands', title: 'Quick Commands' },
 ]);
 
+const reconnectingPaletteAction = buildSessionActionPaletteItems({
+  activeSessionId: 'session-1',
+  activeSessionReconnecting: true,
+}).find((item) => item.id === 'session-action:reconnect');
+assert.deepEqual({
+  disabled: reconnectingPaletteAction.disabled,
+  reasonKey: reconnectingPaletteAction.reasonKey,
+}, {
+  disabled: true,
+  reasonKey: 'palette.reason.sessionReconnectInProgress',
+});
+
 assert.deepEqual(buildSessionActionPaletteItems({
   activeSessionId: '',
   canNavigate: false,

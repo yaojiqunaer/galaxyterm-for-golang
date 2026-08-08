@@ -109,6 +109,7 @@ export function buildSessionActionPaletteItems({
   activeSessionHasTarget = false,
   activeSessionId = '',
   activeSessionProtected = false,
+  activeSessionReconnecting = false,
   canNavigate = false,
   closableClosedCount,
   closableOtherCount,
@@ -146,13 +147,16 @@ export function buildSessionActionPaletteItems({
       reasonKey: canNavigate ? '' : 'palette.reason.noAdjacentSession',
       runAction,
     }),
-    sessionActionItem('reconnect', activeSessionActionOptions({
-      activeSessionId,
+    sessionActionItem('reconnect', {
+      disabled: !activeSessionId || activeSessionReconnecting,
       groupLabel,
       keywords: 'reconnect retry recover session terminal',
       labels,
+      reasonKey: !activeSessionId
+        ? 'palette.reason.noActiveSession'
+        : activeSessionReconnecting ? 'palette.reason.sessionReconnectInProgress' : '',
       runAction,
-    })),
+    }),
     sessionActionItem('renameSession', activeSessionActionOptions({
       activeSessionId,
       groupLabel,

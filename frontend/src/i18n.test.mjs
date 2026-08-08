@@ -85,6 +85,8 @@ assert.equal(t('palette.reason.noClosableSession'), 'Only protected sessions mat
 assert.equal(t('palette.reason.noSessionTarget'), 'This session does not expose a copyable target.');
 assert.equal(t('confirm.closeAllSessionsProtectedContent', { count: 1, protectedCount: 2 }), 'Close 1 unprotected sessions after saving their audit records; keep 2 protected sessions open.');
 assert.equal(t('message.terminalStartFailed'), 'Failed to start terminal');
+assert.equal(t('message.sessionReconnectInProgress'), 'This session is already reconnecting.');
+assert.equal(t('palette.reason.sessionReconnectInProgress'), 'Wait for the current reconnect to finish.');
 assert.equal(t('confirm.deleteAuditRecordTitle'), 'Delete this recording?');
 assert.equal(t('confirm.clearAuditRecordsContent', { count: 12 }), 'All 12 recordings and their audit events will be permanently removed.');
 assert.equal(t('confirm.uninstallExtensionContent', { name: 'SFTP', version: '1.2.0' }), 'SFTP 1.2.0 and its providers will be removed. Saved connections are kept.');
@@ -191,6 +193,8 @@ assert.equal(t('action.openSelectedConnections'), '打开已选连接');
 assert.equal(t('action.selectVisibleConnections'), '选择当前结果');
 assert.equal(t('action.clearSelection'), '清除选择');
 assert.equal(t('action.testSelectedConnections'), '检测已选连接');
+assert.equal(t('message.sessionReconnectInProgress'), '该会话正在重连，请稍候。');
+assert.equal(t('palette.reason.sessionReconnectInProgress'), '请等待当前重连完成。');
 assert.equal(t('action.insertCommand'), '填入终端');
 assert.equal(t('drawer.commandCenter'), '命令中心');
 assert.equal(t('command.librarySummary', { available: 2, total: 5 }), '当前终端可用 2 个 · 共 5 个');

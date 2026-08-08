@@ -36,6 +36,64 @@ export function synchronizeSessionTerminalStatus(
   return sessions.map((item) => (item.id === sessionId ? { ...item, status } : item));
 }
 
+export function synchronizeSessionTerminalSnapshot(
+  terminalStatuses = {},
+  sessions = [],
+  sessionId = '',
+  terminalStatus = {},
+  revision,
+) {
+  const session = sessions.find((item) => item.id === sessionId);
+  if (!session) return terminalStatuses;
+  if (revision !== undefined && (session.revision || 0) !== revision) return terminalStatuses;
+  if (terminalStatuses[sessionId] === terminalStatus) return terminalStatuses;
+  return { ...terminalStatuses, [sessionId]: terminalStatus };
+}
+
+export function synchronizeSessionCreated(
+  sessions = [],
+  sessionId = '',
+  backendSessionId = '',
+  revision,
+) {
+  const session = sessions.find((item) => item.id === sessionId);
+  if (!session) return sessions;
+  if (revision !== undefined && (session.revision || 0) !== revision) return sessions;
+  if (session.backendSessionId === backendSessionId && session.status === 'connected') return sessions;
+  return sessions.map((item) => (
+    item.id === sessionId ? { ...item, backendSessionId, status: 'connected' } : item
+  ));
+}
+
+export function reserveSessionReconnect(reconnects = {}, sessionId = '', revision = 0) {
+  if (!sessionId || Object.prototype.hasOwnProperty.call(reconnects, sessionId)) {
+    return { reconnects, reserved: false };
+  }
+  return {
+    reconnects: { ...reconnects, [sessionId]: Number(revision) || 0 },
+    reserved: true,
+  };
+}
+
+export function releaseSessionReconnect(
+  reconnects = {},
+  sessionId = '',
+  revision = 0,
+  status = '',
+) {
+  if (reconnects[sessionId] !== Number(revision) || status === 'connecting' || !status) return reconnects;
+  const next = { ...reconnects };
+  delete next[sessionId];
+  return next;
+}
+
+export function reconcileSessionReconnects(reconnects = {}, sessionIds = []) {
+  const available = new Set(sessionIds.filter(Boolean));
+  const entries = Object.entries(reconnects).filter(([sessionId]) => available.has(sessionId));
+  if (entries.length === Object.keys(reconnects).length) return reconnects;
+  return Object.fromEntries(entries);
+}
+
 export function appendClosedSessions(stack = [], sessions = [], limit = 10) {
   const capacity = Math.max(1, Number(limit) || 10);
   const entries = sessions
@@ -113,12 +171,14 @@ export function buildSessionToolbarModel(options = {}) {
     ? options.terminalStatus
     : options.terminalStatus?.status;
   const canInterrupt = terminalStatus === 'busy' || terminalStatus === 'interrupting';
+  const reconnecting = options.reconnecting === true;
   const reconnectPrimary = hasActiveSession
-    && (terminalStatus === 'error' || terminalStatus === 'closed');
+    && (reconnecting || terminalStatus === 'error' || terminalStatus === 'closed');
   const reconnectAction = {
     key: 'reconnect',
     labelKey: 'action.reconnect',
-    disabled: !hasActiveSession || canInterrupt || terminalStatus === 'connecting',
+    disabled: !hasActiveSession || reconnecting || canInterrupt || terminalStatus === 'connecting',
+    ...(reconnecting ? { loading: true } : {}),
   };
   const viewAction = options.view === 'grid'
     ? { key: 'tabs', labelKey: 'action.tabs', disabled: false }
@@ -266,7 +326,7 @@ export function buildSessionTabMenuModel(options = {}) {
       key: options.protected ? 'unprotect' : 'protect',
       labelKey: options.protected ? 'action.unprotectSession' : 'action.protectSession',
     },
-    { key: 'reconnect', labelKey: 'action.reconnect' },
+    { key: 'reconnect', labelKey: 'action.reconnect', ...(options.reconnecting ? { disabled: true } : {}) },
     { key: 'duplicate', labelKey: 'action.duplicate' },
   ];
   if (Object.prototype.hasOwnProperty.call(options, 'hasTarget')) {

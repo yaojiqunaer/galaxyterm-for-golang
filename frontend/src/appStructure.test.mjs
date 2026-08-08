@@ -354,8 +354,9 @@ assert.ok(
   'session tabs must expose a familiar new-terminal button through the existing drawer flow',
 );
 assert.ok(
-  source.includes('icon: sessionTabActionIcon(action.key)'),
-  'session toolbar overflow actions must use semantic icons, including reconnect',
+  source.includes("action.key === 'reconnect' && reconnecting")
+    && source.includes(': sessionTabActionIcon(action.key)'),
+  'session menus must keep semantic icons and expose reconnect progress',
 );
 assert.ok(
   /\.terminal-tabs \.ant-tabs-nav-add\s*\{[\s\S]*?width:\s*32px;[\s\S]*?height:\s*32px;/.test(styles),
@@ -910,10 +911,25 @@ assert.ok(
 );
 assert.ok(
   source.includes('synchronizeSessionTerminalStatus')
+    && source.includes('synchronizeSessionTerminalSnapshot')
+    && source.includes('synchronizeSessionCreated')
     && source.includes('const updateTerminalStatus = (sessionId, status, revision) =>')
     && source.includes('synchronizeSessionTerminalStatus(current, sessionId, status, revision)')
+    && source.includes('synchronizeSessionTerminalSnapshot(')
+    && source.includes('synchronizeSessionCreated(')
     && source.includes('updateTerminalStatus(session.id, status, session.revision || 0)'),
-  'terminal lifecycle changes must update the matching current session without accepting stale reconnect events',
+  'terminal lifecycle changes must update session and presentation state only for the current revision',
+);
+assert.ok(
+  source.includes('const [sessionReconnects, setSessionReconnects] = useState({});')
+    && source.includes('reserveSessionReconnect(sessionReconnectsRef.current, sessionId, revision)')
+    && source.includes('releaseSessionReconnect(')
+    && source.includes('message.sessionReconnectInProgress')
+    && source.includes('activeSessionReconnecting: isSessionReconnecting(activeKey)')
+    && source.includes('reconnecting={isSessionReconnecting(session.id)}')
+    && source.includes('buildTerminalRecoveryActions(status || {}, { reconnecting })')
+    && source.includes('loading={action.loading}'),
+  'all reconnect entry points must share immediate duplicate protection and visible progress',
 );
 assert.ok(
   terminalPaneSource.includes('interrupt: () =>')

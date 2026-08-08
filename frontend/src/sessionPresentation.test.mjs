@@ -24,14 +24,72 @@ import {
   pruneSessionActivity,
   recordSessionAttention,
   recordSessionOutputActivity,
+  reconcileSessionReconnects,
+  releaseSessionReconnect,
+  reserveSessionReconnect,
   reorderSessions,
   sessionTabDisplay,
   sessionStatusLabel,
   sessionStatusTone,
   sessionSummary,
+  synchronizeSessionCreated,
+  synchronizeSessionTerminalSnapshot,
   takeClosedSession,
   toggleSessionProtection,
 } from './sessionPresentation.js';
+
+const firstReconnect = reserveSessionReconnect({}, 'session-1', 3);
+assert.equal(firstReconnect.reserved, true);
+assert.deepEqual(firstReconnect.reconnects, { 'session-1': 3 });
+const duplicateReconnect = reserveSessionReconnect(firstReconnect.reconnects, 'session-1', 4);
+assert.equal(duplicateReconnect.reserved, false);
+assert.equal(duplicateReconnect.reconnects, firstReconnect.reconnects);
+assert.equal(
+  releaseSessionReconnect(firstReconnect.reconnects, 'session-1', 2, 'closed'),
+  firstReconnect.reconnects,
+);
+assert.equal(
+  releaseSessionReconnect(firstReconnect.reconnects, 'session-1', 3, 'connecting'),
+  firstReconnect.reconnects,
+);
+assert.deepEqual(
+  releaseSessionReconnect(firstReconnect.reconnects, 'session-1', 3, 'connected'),
+  {},
+);
+assert.deepEqual(reconcileSessionReconnects({ 'session-1': 3, missing: 1 }, ['session-1']), {
+  'session-1': 3,
+});
+
+const reconnectingSessions = [{ id: 'session-1', revision: 3, status: 'connecting' }];
+const reconnectingTerminalStatuses = { 'session-1': { status: 'connecting' } };
+assert.equal(
+  synchronizeSessionTerminalSnapshot(
+    reconnectingTerminalStatuses,
+    reconnectingSessions,
+    'session-1',
+    { status: 'closed' },
+    2,
+  ),
+  reconnectingTerminalStatuses,
+);
+assert.deepEqual(
+  synchronizeSessionTerminalSnapshot(
+    reconnectingTerminalStatuses,
+    reconnectingSessions,
+    'session-1',
+    { status: 'connected' },
+    3,
+  ),
+  { 'session-1': { status: 'connected' } },
+);
+assert.equal(
+  synchronizeSessionCreated(reconnectingSessions, 'session-1', 'backend-old', 2),
+  reconnectingSessions,
+);
+assert.deepEqual(
+  synchronizeSessionCreated(reconnectingSessions, 'session-1', 'backend-new', 3),
+  [{ id: 'session-1', revision: 3, status: 'connected', backendSessionId: 'backend-new' }],
+);
 
 assert.equal(sessionStatusTone({ status: 'connected' }), 'success');
 assert.equal(sessionStatusTone({ status: 'closed' }), 'closed');
@@ -196,6 +254,16 @@ assert.deepEqual(buildSessionToolbarModel({
     { key: 'closeCurrent', labelKey: 'action.closeSession', disabled: false, danger: true },
   ],
 });
+
+assert.deepEqual(buildSessionToolbarModel({
+  activeKey: 's1',
+  reconnecting: true,
+  sessionCount: 1,
+  terminalStatus: 'connected',
+  view: 'tabs',
+}).primary, [
+  { key: 'reconnect', labelKey: 'action.reconnect', disabled: true, loading: true },
+]);
 
 assert.deepEqual(buildSessionToolbarContext({
   providerType: 'ssh',
@@ -410,6 +478,11 @@ assert.deepEqual(buildSessionTabMenuModel({ sessionCount: 1 }), [
   { key: 'closeOthers', labelKey: 'action.closeOthers', disabled: true, danger: true },
   { key: 'closeCurrent', labelKey: 'action.closeSession', danger: true },
 ]);
+assert.deepEqual(
+  buildSessionTabMenuModel({ reconnecting: true, sessionCount: 1 })
+    .find((action) => action.key === 'reconnect'),
+  { key: 'reconnect', labelKey: 'action.reconnect', disabled: true },
+);
 
 assert.deepEqual(
   buildSessionTabMenuModel({ hasTarget: true, sessionCount: 1 })
