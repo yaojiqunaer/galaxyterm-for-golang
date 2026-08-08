@@ -19,7 +19,6 @@ import {
   DeleteOutlined,
   EditOutlined,
   EnterOutlined,
-  HistoryOutlined,
   MoreOutlined,
   PlusOutlined,
   SafetyCertificateOutlined,
@@ -50,7 +49,6 @@ export default function QuickCommandLibrary({
   onFavorite,
   onInsert,
   onNew,
-  onOpenHistory,
   onRun,
   onSave,
   providerLabel,
@@ -74,9 +72,6 @@ export default function QuickCommandLibrary({
           })}
         </span>
         <Space size={6} className="quick-command-context-actions">
-          <Button icon={<HistoryOutlined />} size="small" onClick={onOpenHistory}>
-            <span className="quick-command-action-label">{t('action.commandHistory')}</span>
-          </Button>
           <Button icon={<PlusOutlined />} size="small" type="primary" onClick={onNew}>
             {t('action.addCommand')}
           </Button>

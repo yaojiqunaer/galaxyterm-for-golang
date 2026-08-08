@@ -12,6 +12,7 @@ const commandPaletteSource = await readFile(new URL('./components/CommandPalette
 const connectionGroupDialogSource = await readFile(new URL('./components/ConnectionGroupDialog.jsx', import.meta.url), 'utf8').catch(() => '');
 const connectionSelectionToolbarSource = await readFile(new URL('./components/ConnectionSelectionToolbar.jsx', import.meta.url), 'utf8').catch(() => '');
 const quickCommandLibrarySource = await readFile(new URL('./components/QuickCommandLibrary.jsx', import.meta.url), 'utf8').catch(() => '');
+const commandHistoryPanelSource = await readFile(new URL('./components/CommandHistoryPanel.jsx', import.meta.url), 'utf8').catch(() => '');
 const terminalPaneSource = await readFile(new URL('./components/TerminalPane.jsx', import.meta.url), 'utf8');
 const terminalSearchControlSource = await readFile(new URL('./components/TerminalSearchControl.jsx', import.meta.url), 'utf8').catch(() => '');
 const terminalSearchSource = await readFile(new URL('./terminalSearch.js', import.meta.url), 'utf8').catch(() => '');
@@ -131,14 +132,32 @@ assert.ok(
     && source.includes('quickCommandCanRun: quickCommandSummary.canRun')
     && source.includes('disabled: !safety.canRun || !actions.quickCommandCanRun,')
     && source.includes("reasonKey: safety.warningKey || 'palette.reason.noReadySession',")
-    && source.includes('if (runQuickCommand(item.command)) setHistoryOpen(false);')
-    && source.includes('disabled={!quickCommandSummary.canRun}')
+    && source.includes('const runHistoryCommand = (item) => {')
+    && source.includes('runQuickCommand(item.command);')
+    && commandHistoryPanelSource.includes('disabled={!canRun}')
     && source.includes('<QuickCommandLibrary')
     && quickCommandLibrarySource.includes('quick-command-context')
     && quickCommandLibrarySource.includes('action.insertCommand')
     && quickCommandLibrarySource.includes('<Dropdown')
     && quickCommandLibrarySource.includes('editorOpen && ('),
   'quick commands must use a compact on-demand editor and one guarded run-or-insert dispatch path',
+);
+assert.ok(
+  source.includes("import CommandHistoryPanel from './components/CommandHistoryPanel.jsx';")
+    && source.includes("const [commandCenterOpen, setCommandCenterOpen] = useState(false);")
+    && source.includes("const [commandCenterTab, setCommandCenterTab] = useState('library');")
+    && source.includes("const openCommandCenter = (tab = 'library') => {")
+    && source.includes("openCommandCenter('library')")
+    && source.includes("openCommandCenter('history')")
+    && source.includes('className="command-center-drawer"')
+    && source.includes('activeKey={commandCenterTab}')
+    && source.includes('<CommandHistoryPanel')
+    && !source.includes('const [commandsOpen, setCommandsOpen]')
+    && !source.includes('const [historyOpen, setHistoryOpen]')
+    && commandHistoryPanelSource.includes('action.insertCommand')
+    && commandHistoryPanelSource.includes('<Dropdown')
+    && commandHistoryPanelSource.includes('onClear'),
+  'quick commands and command history must share one directly addressable command center',
 );
 
 assert.ok(

@@ -339,6 +339,7 @@ import ConnectionGroupDialog from './components/ConnectionGroupDialog.jsx';
 import ConnectionSelectionToolbar from './components/ConnectionSelectionToolbar.jsx';
 import ConnectionHealthStatus from './components/ConnectionHealthStatus.jsx';
 import QuickCommandLibrary from './components/QuickCommandLibrary.jsx';
+import CommandHistoryPanel from './components/CommandHistoryPanel.jsx';
 import SessionQuickSwitcher from './components/SessionQuickSwitcher.jsx';
 import SavedSSHProfileSelect from './components/SavedSSHProfileSelect.jsx';
 import FileProviderFormFields from './components/FileProviderFormFields.jsx';
@@ -466,7 +467,8 @@ function App() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [terminalDrawerIntent, setTerminalDrawerIntent] = useState('session');
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [commandsOpen, setCommandsOpen] = useState(false);
+  const [commandCenterOpen, setCommandCenterOpen] = useState(false);
+  const [commandCenterTab, setCommandCenterTab] = useState('library');
   const [helpOpen, setHelpOpen] = useState(false);
   const [extensionSourceOpen, setExtensionSourceOpen] = useState(false);
   const [extensionSourceName, setExtensionSourceName] = useState('');
@@ -517,7 +519,6 @@ function App() {
   const [commandScope, setCommandScope] = useState('current');
   const [commandEditorOpen, setCommandEditorOpen] = useState(false);
   const [editingQuickCommandId, setEditingQuickCommandId] = useState('');
-  const [historyOpen, setHistoryOpen] = useState(false);
   const [historyQuery, setHistoryQuery] = useState('');
   const [historyScope, setHistoryScope] = useState('provider');
   const [broadcastOpen, setBroadcastOpen] = useState(false);
@@ -921,11 +922,6 @@ function App() {
     setWorkspaceSummary(loadWorkspaceSummary());
   }, [activeKey, sessionView, sessions, settings.autoSaveWorkspace, workspaceHydrated]);
 
-  useEffect(() => {
-    if (!commandsOpen) return;
-    commandForm.setFieldValue('providerType', activeSession?.providerType || 'all');
-  }, [activeSession?.providerType, commandForm, commandsOpen]);
-
   useLayoutEffect(() => {
     const layer = contentPageRef.current;
     const previousPage = previousContentPageRef.current;
@@ -960,7 +956,7 @@ function App() {
       }
       if (configurableShortcutAction === 'quickCommands') {
         event.preventDefault();
-        setCommandsOpen(true);
+        openCommandCenter('library');
         return;
       }
       if (configurableShortcutAction === 'commandPalette') {
@@ -1615,6 +1611,10 @@ function App() {
   const quickCommandSummary = useMemo(() => (
     buildQuickCommandSummary(quickCommands, { activeSession, terminalStatus: activeTerminalStatus })
   ), [activeSession, activeTerminalStatus, quickCommands]);
+  const openCommandCenter = (tab = 'library') => {
+    setCommandCenterTab(tab);
+    setCommandCenterOpen(true);
+  };
   useEffect(() => {
     if (!commandEditorOpen) return;
     const command = quickCommands.find((item) => item.id === editingQuickCommandId);
@@ -2942,8 +2942,8 @@ function App() {
     if (action === 'closeClosed') confirmCloseClosedSessions();
     if (action === 'closeOthers') confirmCloseOtherSessions();
     if (action === 'closeAll') confirmCloseAllSessions();
-    if (action === 'commandHistory') setHistoryOpen(true);
-    if (action === 'quickCommands') setCommandsOpen(true);
+    if (action === 'commandHistory') openCommandCenter('history');
+    if (action === 'quickCommands') openCommandCenter('library');
   };
 
   const runConnectionPaletteAction = (action) => {
@@ -3456,7 +3456,7 @@ function App() {
     activeTerminal.send(dispatch.data);
     appendAuditEvent(activeKey, `quick-command.${dispatch.mode}`, command);
     if (dispatch.mode === 'insert') messageApi.success(t('message.commandInserted'));
-    setCommandsOpen(false);
+    closeCommandCenter();
     setPaletteOpen(false);
     return true;
   };
@@ -3484,7 +3484,7 @@ function App() {
 
   const runHistoryCommand = (item) => {
     if (!item?.command) return;
-    if (runQuickCommand(item.command)) setHistoryOpen(false);
+    runQuickCommand(item.command);
   };
 
   const toggleCommandHistoryFavorite = (item) => {
@@ -3594,14 +3594,9 @@ function App() {
     setCommandEditorOpen(false);
   };
 
-  const closeQuickCommandLibrary = () => {
+  const closeCommandCenter = () => {
     closeQuickCommandEditor();
-    setCommandsOpen(false);
-  };
-
-  const openCommandHistoryFromLibrary = () => {
-    setCommandsOpen(false);
-    setHistoryOpen(true);
+    setCommandCenterOpen(false);
   };
 
   const deleteQuickCommand = (id) => {
@@ -6719,7 +6714,7 @@ function App() {
     runConnectionAction: runConnectionPaletteAction,
     runSessionAction: runSessionPaletteAction,
     savedConnectionCount: profiles.length,
-    setCommandsOpen,
+    openQuickCommands: () => openCommandCenter('library'),
     openLanguageSettings,
     setHelpOpen,
     saveWorkspace,
@@ -6741,8 +6736,8 @@ function App() {
   const workspaceMenuActions = {
     saveWorkspace,
     restoreWorkspace: () => restoreWorkspace(),
-    quickCommands: () => setCommandsOpen(true),
-    commandHistory: () => setHistoryOpen(true),
+    quickCommands: () => openCommandCenter('library'),
+    commandHistory: () => openCommandCenter('history'),
     language: openLanguageSettings,
     help: () => setHelpOpen(true),
     extensions: () => setSelectedNav('extensions'),
@@ -6779,7 +6774,7 @@ function App() {
     reset: resetActiveTerminal,
     copyTranscript: copyTerminalTranscript,
     exportTranscript: exportTerminalTranscript,
-    history: () => setHistoryOpen(true),
+    history: () => openCommandCenter('history'),
     broadcast: openBroadcastCommand,
     saveAudit: () => {
       saveCurrentAuditSnapshot(activeKey);
@@ -7608,36 +7603,72 @@ function App() {
         {renderHelpPanel()}
       </Drawer>
       <Drawer
-        className="quick-command-drawer"
-        title={t('drawer.commands')}
-        width={screens.sm === false ? '100%' : 680}
-        open={commandsOpen}
+        className="command-center-drawer"
+        title={t('drawer.commandCenter')}
+        width={screens.sm === false ? '100%' : 700}
+        open={commandCenterOpen}
         destroyOnHidden
-        onClose={closeQuickCommandLibrary}
+        onClose={closeCommandCenter}
       >
-        <QuickCommandLibrary
-          canRun={quickCommandSummary.canRun}
-          commandForm={commandForm}
-          commands={visibleQuickCommands}
-          editing={Boolean(editingQuickCommandId)}
-          editorOpen={commandEditorOpen}
-          onCancelEditor={cancelQuickCommandEdit}
-          onChangeQuery={setCommandQuery}
-          onChangeScope={setCommandScope}
-          onCopy={copyQuickCommand}
-          onDelete={confirmDeleteQuickCommand}
-          onEdit={editQuickCommand}
-          onFavorite={toggleQuickCommandFavorite}
-          onInsert={insertQuickCommand}
-          onNew={openNewQuickCommand}
-          onOpenHistory={openCommandHistoryFromLibrary}
-          onRun={runQuickCommand}
-          onSave={addQuickCommand}
-          providerLabel={(type) => quickCommandProviderLabel(type, providers)}
-          providerOptions={quickCommandProviderOptions}
-          query={commandQuery}
-          scope={commandScope}
-          summary={quickCommandSummary}
+        <Tabs
+          activeKey={commandCenterTab}
+          className="command-center-tabs"
+          onChange={setCommandCenterTab}
+          items={[
+            {
+              key: 'library',
+              label: t('action.commands'),
+              children: (
+                <QuickCommandLibrary
+                  canRun={quickCommandSummary.canRun}
+                  commandForm={commandForm}
+                  commands={visibleQuickCommands}
+                  editing={Boolean(editingQuickCommandId)}
+                  editorOpen={commandEditorOpen}
+                  onCancelEditor={cancelQuickCommandEdit}
+                  onChangeQuery={setCommandQuery}
+                  onChangeScope={setCommandScope}
+                  onCopy={copyQuickCommand}
+                  onDelete={confirmDeleteQuickCommand}
+                  onEdit={editQuickCommand}
+                  onFavorite={toggleQuickCommandFavorite}
+                  onInsert={insertQuickCommand}
+                  onNew={openNewQuickCommand}
+                  onRun={runQuickCommand}
+                  onSave={addQuickCommand}
+                  providerLabel={(type) => quickCommandProviderLabel(type, providers)}
+                  providerOptions={quickCommandProviderOptions}
+                  query={commandQuery}
+                  scope={commandScope}
+                  summary={quickCommandSummary}
+                />
+              ),
+            },
+            {
+              key: 'history',
+              label: t('action.commandHistory'),
+              children: (
+                <CommandHistoryPanel
+                  canRun={quickCommandSummary.canRun}
+                  entries={visibleCommandHistory}
+                  formatTimestamp={formatProfileLastUsed}
+                  hasActiveSession={Boolean(activeKey)}
+                  historyCount={commandHistory.length}
+                  onChangeQuery={setHistoryQuery}
+                  onChangeScope={setHistoryScope}
+                  onClear={clearVisibleCommandHistory}
+                  onCopy={copyQuickCommand}
+                  onFavorite={toggleCommandHistoryFavorite}
+                  onInsert={insertQuickCommand}
+                  onRun={runHistoryCommand}
+                  onSave={saveHistoryAsQuickCommand}
+                  query={historyQuery}
+                  scope={historyScope}
+                  target={quickCommandSummary.target}
+                />
+              ),
+            },
+          ]}
         />
       </Drawer>
       <Modal
@@ -7731,105 +7762,6 @@ function App() {
           )}
         </div>
       </Modal>
-      <Drawer
-        title={t('drawer.commandHistory')}
-        width={620}
-        open={historyOpen}
-        destroyOnHidden
-        onClose={() => setHistoryOpen(false)}
-      >
-        <div className="command-history-tools">
-          <Segmented
-            value={historyScope}
-            onChange={setHistoryScope}
-            options={[
-              { value: 'provider', label: t('history.scope.provider') },
-              { value: 'session', label: t('history.scope.session'), disabled: !activeKey },
-              { value: 'all', label: t('history.scope.all') },
-            ]}
-          />
-          <Input.Search
-            allowClear
-            value={historyQuery}
-            onChange={(event) => setHistoryQuery(event.target.value)}
-            placeholder={t('placeholder.searchHistory')}
-          />
-          <Button
-            danger
-            disabled={visibleCommandHistory.length === 0}
-            onClick={clearVisibleCommandHistory}
-          >
-            {t('action.clear')}
-          </Button>
-        </div>
-        <Alert type="info" showIcon message={t('history.drawerHint')} />
-        <List
-          className="command-history-list"
-          dataSource={visibleCommandHistory}
-          locale={{
-            emptyText: (
-              <Empty
-                image={Empty.PRESENTED_IMAGE_SIMPLE}
-                description={commandHistory.length === 0 ? t('empty.noCommandHistory') : t('empty.noCommands')}
-              />
-            ),
-          }}
-          renderItem={(item) => (
-            <List.Item
-              className="command-history-row"
-              actions={[
-                <Button
-                  key="favorite"
-                  size="small"
-                  icon={item.favorite ? <StarFilled /> : <StarOutlined />}
-                  onClick={() => toggleCommandHistoryFavorite(item)}
-                />,
-                <Tooltip key="run" title={quickCommandSummary.canRun ? '' : t('command.targetUnavailable')}>
-                  <span className="tooltip-button-wrapper">
-                    <Button
-                      size="small"
-                      type="primary"
-                      disabled={!quickCommandSummary.canRun}
-                      onClick={() => runHistoryCommand(item)}
-                    >
-                      {t('action.run')}
-                    </Button>
-                  </span>
-                </Tooltip>,
-                <Button
-                  key="saveQuickCommand"
-                  size="small"
-                  onClick={() => saveHistoryAsQuickCommand(item)}
-                >
-                  {t('action.saveQuickCommand')}
-                </Button>,
-                <Button
-                  key="copy"
-                  size="small"
-                  onClick={async () => {
-                    await writeClipboardText(item.command);
-                    messageApi.success(t('message.copied'));
-                  }}
-                >
-                  {t('action.copy')}
-                </Button>,
-              ]}
-            >
-              <List.Item.Meta
-                avatar={<span className="provider-icon">{providerIcons[item.providerType] || <CodeOutlined />}</span>}
-                title={<pre className="command-history-code">{item.command}</pre>}
-                description={(
-                  <span className="command-history-meta">
-                    <span>{item.sessionLabel || item.providerType}</span>
-                    <span>{item.providerType}</span>
-                    {item.updatedAt && <span>{formatProfileLastUsed(item.updatedAt)}</span>}
-                  </span>
-                )}
-              />
-            </List.Item>
-          )}
-        />
-      </Drawer>
       <Drawer
         title={t('drawer.renameSession')}
         width={360}
@@ -9045,7 +8977,7 @@ function buildPaletteItems(actions) {
       description: t('section.quickCommands'),
       icon: <ThunderboltOutlined />,
       keywords: 'quick commands manage',
-      run: () => actions.setCommandsOpen(true),
+      run: actions.openQuickCommands,
     },
   ];
 

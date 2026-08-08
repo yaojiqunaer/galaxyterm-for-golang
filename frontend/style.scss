@@ -4452,8 +4452,22 @@ code {
   margin-bottom: 10px;
 }
 
-.quick-command-drawer .ant-drawer-body {
+.command-center-drawer .ant-drawer-body {
   padding: 0 20px 20px;
+}
+
+.command-center-tabs > .ant-tabs-nav {
+  position: sticky;
+  z-index: 4;
+  top: 0;
+  margin: 0 -20px;
+  padding: 0 20px;
+  background: var(--panel);
+}
+
+.command-center-tabs > .ant-tabs-content-holder,
+.command-center-tabs .ant-tabs-tabpane {
+  min-width: 0;
 }
 
 .quick-command-library {
@@ -4624,7 +4638,12 @@ code {
 }
 
 @media (max-width: 720px) {
-  .quick-command-drawer .ant-drawer-body {
+  .command-center-drawer .ant-drawer-body {
+    padding-inline: 16px;
+  }
+
+  .command-center-tabs > .ant-tabs-nav {
+    margin-inline: -16px;
     padding-inline: 16px;
   }
 
@@ -4652,11 +4671,30 @@ code {
   }
 }
 
-.command-history-tools {
+.command-history-panel {
+  min-width: 0;
+}
+
+.command-history-toolbar {
   display: grid;
-  grid-template-columns: minmax(220px, auto) minmax(220px, 1fr) auto;
+  grid-template-columns: minmax(220px, auto) minmax(180px, 1fr) auto;
+  align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
+  padding: 12px 0 8px;
+}
+
+.command-history-guidance {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  padding: 2px 0 10px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.command-history-guidance > .anticon {
+  margin-top: 3px;
+  color: var(--accent);
 }
 
 .broadcast-command-body {
@@ -4689,29 +4727,30 @@ code {
 }
 
 .command-history-list {
-  margin-top: 12px;
-  max-height: calc(100vh - 260px);
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--panel);
-}
-
-.command-history-list .ant-list-items {
-  max-height: inherit;
-  overflow: auto;
+  min-width: 0;
+  border-top: 1px solid var(--border-subtle);
 }
 
 .command-history-row {
   align-items: flex-start !important;
+  padding-inline: 4px !important;
 }
 
 .command-history-row .ant-list-item-meta {
   min-width: 0;
 }
 
+.command-history-row .ant-list-item-action {
+  margin-inline-start: 12px;
+}
+
+.command-history-row .ant-list-item-action > li {
+  padding: 0 3px;
+}
+
 .command-history-code {
   max-width: 100%;
+  max-height: 4.5em;
   margin: 0;
   overflow: auto;
   color: var(--text);
@@ -4737,8 +4776,17 @@ code {
 }
 
 @media (max-width: 720px) {
-  .command-history-tools {
+  .command-history-toolbar {
     grid-template-columns: 1fr;
+  }
+
+  .command-history-toolbar .tooltip-button-wrapper,
+  .command-history-toolbar .ant-btn {
+    width: 100%;
+  }
+
+  .command-history-row .command-history-action-label {
+    display: none;
   }
 }
 
