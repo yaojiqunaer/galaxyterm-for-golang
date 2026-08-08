@@ -23,8 +23,9 @@ export function buildSavedSshConnections(profiles = []) {
         group: profile.group || '',
         hasSavedSecret: authType === 'privateKey'
           ? !!credentialRef?.hasPrivateKey
-          : !!credentialRef?.hasPassword,
+          : authType === 'password' && !!credentialRef?.hasPassword,
         id: profile.id,
+        usesAgent: authType === 'agent',
       };
     });
 }
@@ -33,6 +34,7 @@ export function buildSshProfileFields(profile = {}) {
   if (profile.providerType !== 'ssh') return null;
   return {
     authType: profile.auth?.authType || 'password',
+    agentSocketPath: profile.config?.agentSocketPath || '',
     displayName: profile.displayName || '',
     host: profile.config?.host || '',
     hostKeyPolicy: profile.config?.hostKeyPolicy || 'accept-new',
@@ -40,6 +42,15 @@ export function buildSshProfileFields(profile = {}) {
     port: profile.config?.port || 22,
     profileId: profile.id || '',
     username: profile.auth?.username || '',
+  };
+}
+
+export function buildSshAgentConfig(fields = {}, resolvedProfileRequest = null) {
+  const resolvedConfig = resolvedProfileRequest?.config || {};
+  return {
+    agentSocketPath: String(
+      fields.agentSocketPath ?? resolvedConfig.agentSocketPath ?? '',
+    ).trim(),
   };
 }
 

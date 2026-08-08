@@ -18,9 +18,12 @@ func (api *API) TestSSHConnection(req session.CreateSessionRequest) error {
 	if err != nil {
 		return err
 	}
-	authMethods, err := driver.authMethods()
+	authMethods, authCloser, err := driver.authMethods()
 	if err != nil {
 		return err
+	}
+	if authCloser != nil {
+		defer authCloser.Close()
 	}
 	config, err := driver.clientConfig(authMethods)
 	if err != nil {

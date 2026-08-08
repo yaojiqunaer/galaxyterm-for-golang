@@ -15,7 +15,7 @@ const reasonMatchers = [
   },
   {
     reason: 'authentication',
-    pattern: /\b(?:authenticate|authentication|credential|unauthorized|invalid password|login failed)\b/i,
+    pattern: /\b(?:authenticate|authentication|credential|unauthorized|invalid password|login failed|ssh agent|ssh_auth_sock)\b/i,
     retryable: false,
   },
   {

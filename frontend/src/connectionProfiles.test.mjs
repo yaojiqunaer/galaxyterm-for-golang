@@ -1,9 +1,35 @@
 import assert from 'node:assert/strict';
 import {
   buildConnectionProfilesExport,
+  hasStoredSshCredential,
   normalizeImportedConnectionProfile,
   normalizeStoredConnectionProfile,
+  shouldClearStoredSshCredential,
 } from './connectionProfiles.js';
+
+assert.equal(hasStoredSshCredential({ id: 'profile-1' }), false);
+assert.equal(hasStoredSshCredential({ id: 'profile-1', hasJumpPassword: true }), true);
+
+assert.equal(shouldClearStoredSshCredential({
+  authType: 'agent',
+  editingProfileId: 'profile-1',
+  rememberCredential: true,
+}), false);
+assert.equal(shouldClearStoredSshCredential({
+  authType: 'password',
+  editingProfileId: 'profile-1',
+  rememberCredential: false,
+}), true);
+assert.equal(shouldClearStoredSshCredential({
+  authType: 'privateKey',
+  editingProfileId: 'profile-1',
+  rememberCredential: true,
+}), false);
+assert.equal(shouldClearStoredSshCredential({
+  authType: 'agent',
+  editingProfileId: '',
+  rememberCredential: true,
+}), false);
 
 const storedFileProfile = {
   id: 's3-production',

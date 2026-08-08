@@ -78,7 +78,7 @@ func NewHostKeyCallback(policyValue Policy, knownHostsPath string) (ssh.HostKeyC
 			return nil, err
 		}
 	} else {
-		path, err = resolveKnownHostsPath(path)
+		path, err = resolveUserPath(path)
 		if err != nil {
 			return nil, err
 		}
@@ -130,6 +130,10 @@ func NewHostKeyCallback(policyValue Policy, knownHostsPath string) (ssh.HostKeyC
 }
 
 func resolveKnownHostsPath(path string) (string, error) {
+	return resolveUserPath(path)
+}
+
+func resolveUserPath(path string) (string, error) {
 	if path != "~" && !strings.HasPrefix(path, "~/") && !strings.HasPrefix(path, `~\`) {
 		return path, nil
 	}

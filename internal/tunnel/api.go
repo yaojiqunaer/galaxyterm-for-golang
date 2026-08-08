@@ -24,20 +24,21 @@ func NewAPI() *API {
 }
 
 type StartRequest struct {
-	Name              string `json:"name"`
-	SSHHost           string `json:"sshHost"`
-	SSHPort           int    `json:"sshPort"`
-	SSHUser           string `json:"sshUser"`
-	SSHAuthType       string `json:"sshAuthType"`
-	SSHPassword       string `json:"sshPassword"`
-	SSHPrivateKey     string `json:"sshPrivateKey"`
-	SSHPassphrase     string `json:"sshPassphrase"`
-	SSHHostKeyPolicy  string `json:"sshHostKeyPolicy"`
-	SSHKnownHostsPath string `json:"sshKnownHostsPath"`
-	LocalHost         string `json:"localHost"`
-	LocalPort         int    `json:"localPort"`
-	RemoteHost        string `json:"remoteHost"`
-	RemotePort        int    `json:"remotePort"`
+	Name               string `json:"name"`
+	SSHHost            string `json:"sshHost"`
+	SSHPort            int    `json:"sshPort"`
+	SSHUser            string `json:"sshUser"`
+	SSHAuthType        string `json:"sshAuthType"`
+	SSHPassword        string `json:"sshPassword"`
+	SSHPrivateKey      string `json:"sshPrivateKey"`
+	SSHPassphrase      string `json:"sshPassphrase"`
+	SSHAgentSocketPath string `json:"sshAgentSocketPath"`
+	SSHHostKeyPolicy   string `json:"sshHostKeyPolicy"`
+	SSHKnownHostsPath  string `json:"sshKnownHostsPath"`
+	LocalHost          string `json:"localHost"`
+	LocalPort          int    `json:"localPort"`
+	RemoteHost         string `json:"remoteHost"`
+	RemotePort         int    `json:"remotePort"`
 }
 
 type Info struct {
@@ -60,9 +61,12 @@ func (api *API) Start(req StartRequest) (Info, error) {
 		return Info{}, err
 	}
 
-	authMethods, err := tunnelAuthMethods(normalized)
+	authMethods, authCloser, err := tunnelAuthMethods(normalized)
 	if err != nil {
 		return Info{}, err
+	}
+	if authCloser != nil {
+		defer authCloser.Close()
 	}
 	hostKeyCallback, err := sshsecurity.NewHostKeyCallback(
 		sshsecurity.Policy(normalized.SSHHostKeyPolicy),
@@ -199,6 +203,7 @@ func validateStartRequest(req StartRequest) (StartRequest, error) {
 	req.SSHHost = strings.TrimSpace(req.SSHHost)
 	req.SSHUser = strings.TrimSpace(req.SSHUser)
 	req.SSHAuthType = strings.TrimSpace(req.SSHAuthType)
+	req.SSHAgentSocketPath = strings.TrimSpace(req.SSHAgentSocketPath)
 	req.SSHHostKeyPolicy = strings.TrimSpace(req.SSHHostKeyPolicy)
 	req.SSHKnownHostsPath = strings.TrimSpace(req.SSHKnownHostsPath)
 	req.LocalHost = strings.TrimSpace(req.LocalHost)
@@ -215,6 +220,9 @@ func validateStartRequest(req StartRequest) (StartRequest, error) {
 	}
 	if req.SSHAuthType == "" {
 		req.SSHAuthType = "password"
+	}
+	if req.SSHAuthType != "password" && req.SSHAuthType != "privateKey" && req.SSHAuthType != "agent" {
+		return req, fmt.Errorf("unsupported ssh authentication type %q", req.SSHAuthType)
 	}
 	hostKeyPolicy, err := sshsecurity.NormalizePolicy(req.SSHHostKeyPolicy)
 	if err != nil {
@@ -239,10 +247,17 @@ func validateStartRequest(req StartRequest) (StartRequest, error) {
 	return req, nil
 }
 
-func tunnelAuthMethods(req StartRequest) ([]ssh.AuthMethod, error) {
+func tunnelAuthMethods(req StartRequest) ([]ssh.AuthMethod, io.Closer, error) {
+	if strings.EqualFold(req.SSHAuthType, "agent") {
+		auth, err := sshsecurity.NewAgentAuth(req.SSHAgentSocketPath)
+		if err != nil {
+			return nil, nil, err
+		}
+		return []ssh.AuthMethod{auth.Method}, auth, nil
+	}
 	if strings.EqualFold(req.SSHAuthType, "privateKey") {
 		if strings.TrimSpace(req.SSHPrivateKey) == "" {
-			return nil, fmt.Errorf("missing ssh private key")
+			return nil, nil, fmt.Errorf("missing ssh private key")
 		}
 		var (
 			signer ssh.Signer
@@ -254,9 +269,9 @@ func tunnelAuthMethods(req StartRequest) ([]ssh.AuthMethod, error) {
 			signer, err = ssh.ParsePrivateKey([]byte(req.SSHPrivateKey))
 		}
 		if err != nil {
-			return nil, fmt.Errorf("parse ssh private key: %w", err)
+			return nil, nil, fmt.Errorf("parse ssh private key: %w", err)
 		}
-		return []ssh.AuthMethod{ssh.PublicKeys(signer)}, nil
+		return []ssh.AuthMethod{ssh.PublicKeys(signer)}, nil, nil
 	}
-	return []ssh.AuthMethod{ssh.Password(req.SSHPassword)}, nil
+	return []ssh.AuthMethod{ssh.Password(req.SSHPassword)}, nil, nil
 }

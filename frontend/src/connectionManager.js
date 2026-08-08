@@ -549,6 +549,7 @@ export function buildConnectionProfileFacts(profile = {}, { defaultShellLabel = 
       { key: 'host', value: profile.config?.host || '-' },
       { key: 'port', value: profile.config?.port || 22 },
       { key: 'username', value: profile.auth?.username || '-' },
+      { key: 'authType', value: profile.auth?.authType || 'password' },
       { key: 'hostKeyPolicy', value: profile.config?.hostKeyPolicy || 'accept-new' },
       { key: 'lastUsed', value: profile.lastUsedAt || '' },
       profile.config?.jumpHost && { key: 'jumpHost', value: profile.config.jumpHost },

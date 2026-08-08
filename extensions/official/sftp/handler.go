@@ -90,7 +90,7 @@ func normalizeRequest(request protocolRequest) (normalizedRequest, error) {
 	if authType == "" {
 		authType = "password"
 	}
-	if authType != "password" && authType != "privateKey" {
+	if authType != "password" && authType != "privateKey" && authType != "agent" {
 		return normalizedRequest{}, &requestError{code: "invalid_request", message: "unsupported authentication type"}
 	}
 	privateKey := secretValue(request.Auth, "privateKey")
@@ -138,6 +138,7 @@ func normalizeRequest(request protocolRequest) (normalizedRequest, error) {
 		Port:            port,
 		HostKeyPolicy:   hostKeyPolicy,
 		KnownHostsPath:  stringValue(request.Config, "knownHostsPath"),
+		AgentSocketPath: stringValue(request.Config, "agentSocketPath"),
 		Username:        username,
 		AuthType:        authType,
 		Password:        secretValue(request.Auth, "password"),
@@ -328,9 +329,12 @@ func (writer *progressWriter) Write(value []byte) (int, error) {
 }
 
 func dial(request normalizedRequest) (*ssh.Client, *sftp.Client, error) {
-	authMethods, err := sshAuthMethods(request)
+	authMethods, authCloser, err := sshAuthMethods(request)
 	if err != nil {
 		return nil, nil, err
+	}
+	if authCloser != nil {
+		defer authCloser.Close()
 	}
 	hostKeyCallback, err := hostKeyCallback(request)
 	if err != nil {
@@ -353,9 +357,16 @@ func dial(request normalizedRequest) (*ssh.Client, *sftp.Client, error) {
 	return sshClient, sftpClient, nil
 }
 
-func sshAuthMethods(request normalizedRequest) ([]ssh.AuthMethod, error) {
+func sshAuthMethods(request normalizedRequest) ([]ssh.AuthMethod, io.Closer, error) {
+	if request.AuthType == "agent" {
+		auth, err := sshsecurity.NewAgentAuth(request.AgentSocketPath)
+		if err != nil {
+			return nil, nil, &requestError{code: "invalid_credentials", message: err.Error()}
+		}
+		return []ssh.AuthMethod{auth.Method}, auth, nil
+	}
 	if request.AuthType == "password" {
-		return []ssh.AuthMethod{ssh.Password(request.Password)}, nil
+		return []ssh.AuthMethod{ssh.Password(request.Password)}, nil, nil
 	}
 	var signer ssh.Signer
 	var err error
@@ -365,9 +376,9 @@ func sshAuthMethods(request normalizedRequest) ([]ssh.AuthMethod, error) {
 		signer, err = ssh.ParsePrivateKey([]byte(request.PrivateKey))
 	}
 	if err != nil {
-		return nil, &requestError{code: "invalid_credentials", message: "private key could not be parsed"}
+		return nil, nil, &requestError{code: "invalid_credentials", message: "private key could not be parsed"}
 	}
-	return []ssh.AuthMethod{ssh.PublicKeys(signer)}, nil
+	return []ssh.AuthMethod{ssh.PublicKeys(signer)}, nil, nil
 }
 
 func hostKeyCallback(request normalizedRequest) (ssh.HostKeyCallback, error) {

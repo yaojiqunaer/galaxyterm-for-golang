@@ -84,6 +84,69 @@ func TestResolveSSHRequestKeepsExplicitOneTimeSecret(t *testing.T) {
 	}
 }
 
+func TestSaveSSHCredentialMigratesToAgentAndPreservesJumpPassword(t *testing.T) {
+	store := newMemoryStore()
+	api := NewAPIWithStore(store)
+	_, err := api.SaveSSHCredential(SaveSSHCredentialRequest{
+		ID:           "profile-1",
+		Password:     "target-secret",
+		PrivateKey:   "target-key",
+		Passphrase:   "target-passphrase",
+		JumpPassword: "jump-secret",
+	})
+	if err != nil {
+		t.Fatalf("seed SSH credential: %v", err)
+	}
+
+	ref, err := api.SaveSSHCredential(SaveSSHCredentialRequest{
+		ID:               "profile-1",
+		AuthType:         "agent",
+		PreserveExisting: true,
+	})
+	if err != nil {
+		t.Fatalf("migrate SSH credential to agent: %v", err)
+	}
+	if ref.HasPassword || ref.HasPrivateKey || ref.HasPassphrase || !ref.HasJumpPassword {
+		t.Fatalf("unexpected migrated ref: %+v", ref)
+	}
+	for _, field := range []string{"password", "privateKey", "passphrase"} {
+		if _, getErr := store.Get(serviceName, secretKey(ref.ID, field)); !errors.Is(getErr, ErrNotFound) {
+			t.Fatalf("inactive target credential %s must be deleted, got %v", field, getErr)
+		}
+	}
+	if value, getErr := store.Get(serviceName, secretKey(ref.ID, "jumpPassword")); getErr != nil || value != "jump-secret" {
+		t.Fatalf("jump password = %q, %v; want preserved value", value, getErr)
+	}
+}
+
+func TestSaveSSHCredentialPreservesActivePasswordDuringJumpPasswordUpdate(t *testing.T) {
+	store := newMemoryStore()
+	api := NewAPIWithStore(store)
+	_, err := api.SaveSSHCredential(SaveSSHCredentialRequest{
+		ID:       "profile-1",
+		Password: "target-secret",
+	})
+	if err != nil {
+		t.Fatalf("seed SSH credential: %v", err)
+	}
+
+	ref, err := api.SaveSSHCredential(SaveSSHCredentialRequest{
+		ID:               "profile-1",
+		AuthType:         "password",
+		JumpPassword:     "new-jump-secret",
+		PreserveExisting: true,
+	})
+	if err != nil {
+		t.Fatalf("update jump password: %v", err)
+	}
+	if !ref.HasPassword || !ref.HasJumpPassword {
+		t.Fatalf("unexpected updated ref: %+v", ref)
+	}
+	if value, getErr := store.Get(serviceName, secretKey(ref.ID, "password")); getErr != nil || value != "target-secret" {
+		t.Fatalf("target password = %q, %v; want preserved value", value, getErr)
+	}
+}
+
 func TestSaveResolveAndDeleteProviderCredential(t *testing.T) {
 	store := newMemoryStore()
 	api := NewAPIWithStore(store)

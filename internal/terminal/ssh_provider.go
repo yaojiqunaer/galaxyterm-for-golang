@@ -16,18 +16,19 @@ import (
 )
 
 type sshDriver struct {
-	addr           string
-	username       string
-	authType       string
-	password       string
-	privateKey     string
-	passphrase     string
-	jumpHost       string
-	jumpPort       int
-	jumpUser       string
-	jumpPass       string
-	hostKeyPolicy  string
-	knownHostsPath string
+	addr            string
+	username        string
+	authType        string
+	password        string
+	privateKey      string
+	passphrase      string
+	jumpHost        string
+	jumpPort        int
+	jumpUser        string
+	jumpPass        string
+	agentSocketPath string
+	hostKeyPolicy   string
+	knownHostsPath  string
 
 	client  *ssh.Client
 	session *ssh.Session
@@ -72,6 +73,9 @@ func newSSHDriver(req session.CreateSessionRequest) (*sshDriver, error) {
 	if authType == "" {
 		authType = "password"
 	}
+	if authType != "password" && authType != "privateKey" && authType != "agent" {
+		return nil, fmt.Errorf("unsupported ssh authentication type %q", authType)
+	}
 
 	hostKeyPolicy, err := sshsecurity.NormalizePolicy(stringValue(req.Config, "hostKeyPolicy"))
 	if err != nil {
@@ -79,25 +83,29 @@ func newSSHDriver(req session.CreateSessionRequest) (*sshDriver, error) {
 	}
 
 	return &sshDriver{
-		addr:           fmt.Sprintf("%s:%d", host, port),
-		username:       username,
-		authType:       authType,
-		password:       password,
-		privateKey:     stringValue(req.Auth, "privateKey"),
-		passphrase:     stringValue(req.Auth, "passphrase"),
-		jumpHost:       stringValue(req.Config, "jumpHost"),
-		jumpPort:       intValue(req.Config, "jumpPort", 22),
-		jumpUser:       stringValue(req.Auth, "jumpUsername"),
-		jumpPass:       stringValue(req.Auth, "jumpPassword"),
-		hostKeyPolicy:  string(hostKeyPolicy),
-		knownHostsPath: stringValue(req.Config, "knownHostsPath"),
+		addr:            fmt.Sprintf("%s:%d", host, port),
+		username:        username,
+		authType:        authType,
+		password:        password,
+		privateKey:      stringValue(req.Auth, "privateKey"),
+		passphrase:      stringValue(req.Auth, "passphrase"),
+		jumpHost:        stringValue(req.Config, "jumpHost"),
+		jumpPort:        intValue(req.Config, "jumpPort", 22),
+		jumpUser:        stringValue(req.Auth, "jumpUsername"),
+		jumpPass:        stringValue(req.Auth, "jumpPassword"),
+		agentSocketPath: stringValue(req.Config, "agentSocketPath"),
+		hostKeyPolicy:   string(hostKeyPolicy),
+		knownHostsPath:  stringValue(req.Config, "knownHostsPath"),
 	}, nil
 }
 
 func (d *sshDriver) Start(ctx context.Context, emit session.Emitter) error {
-	authMethods, err := d.authMethods()
+	authMethods, authCloser, err := d.authMethods()
 	if err != nil {
 		return err
+	}
+	if authCloser != nil {
+		defer authCloser.Close()
 	}
 	config, err := d.clientConfig(authMethods)
 	if err != nil {
@@ -229,10 +237,17 @@ func (d *sshDriver) clientConfig(authMethods []ssh.AuthMethod) (*ssh.ClientConfi
 	}, nil
 }
 
-func (d *sshDriver) authMethods() ([]ssh.AuthMethod, error) {
+func (d *sshDriver) authMethods() ([]ssh.AuthMethod, io.Closer, error) {
+	if d.authType == "agent" {
+		auth, err := sshsecurity.NewAgentAuth(d.agentSocketPath)
+		if err != nil {
+			return nil, nil, err
+		}
+		return []ssh.AuthMethod{auth.Method}, auth, nil
+	}
 	if d.authType == "privateKey" {
 		if d.privateKey == "" {
-			return nil, configError("privateKey")
+			return nil, nil, configError("privateKey")
 		}
 		var signer ssh.Signer
 		var err error
@@ -242,11 +257,11 @@ func (d *sshDriver) authMethods() ([]ssh.AuthMethod, error) {
 			signer, err = ssh.ParsePrivateKey([]byte(d.privateKey))
 		}
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return []ssh.AuthMethod{ssh.PublicKeys(signer)}, nil
+		return []ssh.AuthMethod{ssh.PublicKeys(signer)}, nil, nil
 	}
-	return []ssh.AuthMethod{ssh.Password(d.password)}, nil
+	return []ssh.AuthMethod{ssh.Password(d.password)}, nil, nil
 }
 
 func (d *sshDriver) Send(data string) error {

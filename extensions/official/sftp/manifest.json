@@ -1,7 +1,7 @@
 {
   "id": "galaxyterm-extension-sftp",
   "name": "SFTP",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "apiVersion": "v1",
   "description": "Official SFTP file provider for GalaxyTerm",
   "runtime": {
@@ -15,7 +15,7 @@
       "nameKey": "extension.sftp",
       "description": "Browse and manage remote files over SSH File Transfer Protocol",
       "capabilities": ["list", "stat", "read", "write", "upload", "download", "mkdir", "rename", "delete"],
-      "authMethods": ["password", "privateKey"],
+      "authMethods": ["password", "privateKey", "agent"],
       "configFields": [
         {
           "key": "host",
@@ -50,6 +50,13 @@
           "type": "string",
           "labelKey": "extension.sftp.field.knownHostsPath",
           "label": "Known hosts file"
+        },
+        {
+          "key": "agentSocketPath",
+          "type": "string",
+          "labelKey": "field.agentSocketPath",
+          "label": "Agent socket",
+          "placeholderKey": "placeholder.agentSocketPath"
         }
       ],
       "authFields": [
@@ -68,7 +75,8 @@
           "default": "password",
           "options": [
             {"value": "password", "labelKey": "auth.password", "label": "Password"},
-            {"value": "privateKey", "labelKey": "auth.privateKey", "label": "Private key"}
+            {"value": "privateKey", "labelKey": "auth.privateKey", "label": "Private key"},
+            {"value": "agent", "labelKey": "auth.agent", "label": "SSH Agent"}
           ]
         },
         {

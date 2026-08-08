@@ -1,3 +1,20 @@
+export function shouldClearStoredSshCredential({
+  editingProfileId = '',
+  rememberCredential = false,
+} = {}) {
+  if (!editingProfileId) return false;
+  return rememberCredential !== true;
+}
+
+export function hasStoredSshCredential(credentialRef = null) {
+  return !!(
+    credentialRef?.hasPassword
+    || credentialRef?.hasPrivateKey
+    || credentialRef?.hasPassphrase
+    || credentialRef?.hasJumpPassword
+  );
+}
+
 export function normalizeStoredConnectionProfile(profile = {}, options = {}) {
   const kind = profile.kind === 'file' ? 'file' : 'terminal';
   const preserveCredentialRef = options.preserveCredentialRef !== false;

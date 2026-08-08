@@ -138,6 +138,7 @@ Current implementation:
 
 - Password authentication
 - Private-key and passphrase authentication
+- SSH Agent authentication on macOS/Linux through `SSH_AUTH_SOCK` or a connection-specific socket; Agent connections are released after the SSH handshake
 - Session-scoped shell
 - Resize support
 - Clean close
@@ -151,7 +152,7 @@ Current implementation:
 
 The core owns one protocol-neutral remote-file workspace. It renders navigation, transfer progress, conflict handling, errors, credential selection, and audit events without importing a protocol SDK.
 
-Installed extensions contribute file providers such as SFTP, FTP, S3, or WebDAV. SFTP reuses the SSH connection profile, credential reference, host-key policy, and known-hosts path, while object stores expose buckets and prefixes through the same navigation model.
+Installed extensions contribute file providers such as SFTP, FTP, S3, or WebDAV. SFTP reuses the SSH connection profile, credential reference or SSH Agent, host-key policy, and known-hosts path, while object stores expose buckets and prefixes through the same navigation model.
 
 ## Official Extensions
 

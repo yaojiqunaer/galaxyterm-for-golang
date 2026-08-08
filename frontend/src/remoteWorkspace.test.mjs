@@ -13,6 +13,7 @@ import {
   createFileTransferID,
   updateFileTransferProgress,
   buildSavedSshConnections,
+  buildSshAgentConfig,
   buildSshConnectionAuth,
   buildSshProfileFields,
   buildSshSecurityConfig,
@@ -130,6 +131,7 @@ assert.deepEqual(savedConnections, [
     group: 'Operations',
     hasSavedSecret: true,
     id: 'favorite',
+    usesAgent: false,
   },
   {
     authType: 'password',
@@ -140,15 +142,39 @@ assert.deepEqual(savedConnections, [
     group: 'Development',
     hasSavedSecret: false,
     id: 'recent',
+    usesAgent: false,
   },
 ]);
 assert.equal(JSON.stringify(savedConnections).includes('must-not-leak'), false);
+
+assert.deepEqual(buildSavedSshConnections([{
+  id: 'agent',
+  providerType: 'ssh',
+  displayName: 'Agent SSH',
+  config: { host: 'agent.example.com' },
+  auth: {
+    username: 'deploy',
+    authType: 'agent',
+    credentialRef: { id: 'legacy', hasPassword: true },
+  },
+}]), [{
+  authType: 'agent',
+  credentialSaved: true,
+  description: 'deploy@agent.example.com:22',
+  displayName: 'Agent SSH',
+  favorite: false,
+  group: '',
+  hasSavedSecret: false,
+  id: 'agent',
+  usesAgent: true,
+}]);
 
 assert.deepEqual(buildSshProfileFields({
   id: 'favorite',
   displayName: 'Production',
   providerType: 'ssh',
   config: {
+    agentSocketPath: '~/.ssh/agent.sock',
     host: 'prod.example.com',
     hostKeyPolicy: 'strict',
     knownHostsPath: '/Users/me/.ssh/known_hosts',
@@ -157,6 +183,7 @@ assert.deepEqual(buildSshProfileFields({
   auth: { username: 'root', authType: 'privateKey', privateKey: 'must-not-leak' },
 }), {
   authType: 'privateKey',
+  agentSocketPath: '~/.ssh/agent.sock',
   displayName: 'Production',
   host: 'prod.example.com',
   hostKeyPolicy: 'strict',
@@ -166,6 +193,14 @@ assert.deepEqual(buildSshProfileFields({
   username: 'root',
 });
 assert.equal(buildSshProfileFields({ providerType: 'local' }), null);
+
+assert.deepEqual(buildSshAgentConfig({}, null), { agentSocketPath: '' });
+assert.deepEqual(buildSshAgentConfig({}, {
+  config: { agentSocketPath: '/shared/agent.sock' },
+}), { agentSocketPath: '/shared/agent.sock' });
+assert.deepEqual(buildSshAgentConfig({ agentSocketPath: ' ~/.ssh/custom-agent.sock ' }, {
+  config: { agentSocketPath: '/shared/agent.sock' },
+}), { agentSocketPath: '~/.ssh/custom-agent.sock' });
 
 assert.deepEqual(buildSshSecurityConfig({}, null), {
   hostKeyPolicy: 'accept-new',
@@ -218,6 +253,23 @@ assert.deepEqual(buildSshConnectionAuth({
   passphrase: 'one-time-passphrase',
   password: '',
   privateKey: 'saved-private-key',
+});
+
+assert.deepEqual(buildSshConnectionAuth({
+  authType: 'agent',
+  password: 'must-not-win',
+  privateKey: 'must-not-win',
+}, {
+  auth: {
+    authType: 'password',
+    password: 'saved-password',
+    privateKey: 'saved-private-key',
+  },
+}), {
+  authType: 'agent',
+  passphrase: '',
+  password: '',
+  privateKey: '',
 });
 
 const files = [

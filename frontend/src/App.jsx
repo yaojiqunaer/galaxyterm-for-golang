@@ -207,6 +207,7 @@ import {
   buildRemoteRenameDestination,
   buildRemoteFileSummary,
   buildSavedSshConnections,
+  buildSshAgentConfig,
   buildSshConnectionAuth,
   buildSshProfileFields,
   buildSshSecurityConfig,
@@ -219,8 +220,10 @@ import {
 import {
   buildConnectionProfilesExport,
   createProfileID,
+  hasStoredSshCredential,
   normalizeImportedConnectionProfile,
   normalizeStoredConnectionProfile,
+  shouldClearStoredSshCredential,
 } from './connectionProfiles.js';
 import {
   beginConnectionProbes,
@@ -349,6 +352,7 @@ import QuickCommandLibrary from './components/QuickCommandLibrary.jsx';
 import CommandHistoryPanel from './components/CommandHistoryPanel.jsx';
 import SessionQuickSwitcher from './components/SessionQuickSwitcher.jsx';
 import SavedSSHProfileSelect from './components/SavedSSHProfileSelect.jsx';
+import SshAgentSocketField from './components/SshAgentSocketField.jsx';
 import SshSecurityFields from './components/SshSecurityFields.jsx';
 import FileProviderFormFields from './components/FileProviderFormFields.jsx';
 import OperationErrorDescription from './components/OperationErrorDescription.jsx';
@@ -578,6 +582,7 @@ function App() {
   const [tunnelForm] = Form.useForm();
   const [commandForm] = Form.useForm();
   const watchedFilePath = Form.useWatch('path', fileForm);
+  const watchedJumpHost = Form.useWatch('jumpHost', form);
   const pasteConfirmationPending = useRef(false);
   const fileTransferCleanupRef = useRef(null);
   const canceledTransferIdsRef = useRef(new Set());
@@ -1685,6 +1690,7 @@ function App() {
       username: profile?.auth?.username || '',
       password: '',
       authType: profile?.auth?.authType || 'password',
+      agentSocketPath: profile?.config?.agentSocketPath || '',
       privateKey: '',
       passphrase: '',
       jumpHost: profile?.config?.jumpHost || '',
@@ -1717,6 +1723,7 @@ function App() {
       : {
         config: {},
         auth: {},
+        agentSocketPath: '',
         hostKeyPolicy: providerType === 'ssh' ? 'accept-new' : undefined,
         knownHostsPath: '',
         rememberCredential: false,
@@ -1768,36 +1775,43 @@ function App() {
     setCreatingSession(true);
     try {
       if (submitPlan.persistProfile) {
+        const existingCredentialRef = parseCredentialRef(values.credentialRef);
         const hasNewCredentialSecret = !!(
-          values.password
-          || values.privateKey
-          || values.passphrase
+          (values.authType === 'password' && values.password)
+          || (values.authType === 'privateKey' && (values.privateKey || values.passphrase))
           || values.jumpPassword
         );
-        if (newType === 'ssh' && values.rememberCredential && hasNewCredentialSecret) {
-          profileId = profileId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`);
-          const credentialRef = await CredentialsAPI.SaveSSHCredential({
-            id: profileId,
-            password: values.password || '',
-            privateKey: values.privateKey || '',
-            passphrase: values.passphrase || '',
-            jumpPassword: values.jumpPassword || '',
-          });
-          request = {
-            ...request,
-            auth: {
-              ...request.auth,
-              credentialRef,
-            },
-          };
-        }
-        if (newType === 'ssh' && !values.rememberCredential && editingProfileId) {
+        if (newType === 'ssh' && shouldClearStoredSshCredential({
+          editingProfileId,
+          rememberCredential: values.rememberCredential,
+        })) {
           await CredentialsAPI.DeleteSSHCredential(editingProfileId);
           request = {
             ...request,
             auth: {
               ...request.auth,
               credentialRef: null,
+            },
+          };
+        }
+        const shouldMigrateAgentCredential = values.authType === 'agent' && !!existingCredentialRef;
+        if (newType === 'ssh' && values.rememberCredential
+          && (hasNewCredentialSecret || shouldMigrateAgentCredential)) {
+          profileId = profileId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`);
+          const credentialRef = await CredentialsAPI.SaveSSHCredential({
+            id: profileId,
+            authType: values.authType || 'password',
+            password: values.authType === 'password' ? values.password || '' : '',
+            privateKey: values.authType === 'privateKey' ? values.privateKey || '' : '',
+            passphrase: values.authType === 'privateKey' ? values.passphrase || '' : '',
+            jumpPassword: values.jumpPassword || '',
+            preserveExisting: !!existingCredentialRef,
+          });
+          request = {
+            ...request,
+            auth: {
+              ...request.auth,
+              credentialRef: hasStoredSshCredential(credentialRef) ? credentialRef : null,
             },
           };
         }
@@ -5121,6 +5135,7 @@ function App() {
     setFileProfileId(fields.profileId);
     setFileAuthType(fields.authType);
     fileForm.setFieldsValue({
+      agentSocketPath: fields.agentSocketPath,
       authType: fields.authType,
       host: fields.host,
       hostKeyPolicy: fields.hostKeyPolicy,
@@ -5231,6 +5246,7 @@ function App() {
     tunnelForm.setFieldsValue({
       name: fields.displayName,
       profileId: fields.profileId,
+      sshAgentSocketPath: fields.agentSocketPath,
       sshAuthType: fields.authType,
       sshHost: fields.host,
       sshHostKeyPolicy: fields.hostKeyPolicy,
@@ -5287,12 +5303,14 @@ function App() {
     }
     const resolvedProfile = await resolveSelectedSshProfile(fileProfileId);
     const connectionAuth = buildSshConnectionAuth(values, resolvedProfile);
+    const sshAgent = buildSshAgentConfig(values, resolvedProfile);
     const sshSecurity = buildSshSecurityConfig(values, resolvedProfile);
     return {
       providerType: selectedFileProvider.type,
       config: {
         host: values.host,
         port: values.port || 22,
+        ...sshAgent,
         ...sshSecurity,
       },
       auth: {
@@ -5628,7 +5646,7 @@ function App() {
               layout="vertical"
               className="remote-context-form"
               disabled={fileBusy}
-              initialValues={{ hostKeyPolicy: 'accept-new', port: 22, path: '.', profileId: '' }}
+              initialValues={{ agentSocketPath: '', hostKeyPolicy: 'accept-new', port: 22, path: '.', profileId: '' }}
             >
               <Form.Item label={t('field.fileProvider')}>
                 <Select
@@ -5676,6 +5694,7 @@ function App() {
                     options={[
                       { value: 'password', label: t('auth.password') },
                       { value: 'privateKey', label: t('auth.privateKey') },
+                      { value: 'agent', label: t('auth.agent') },
                     ]}
                   />
                 </Form.Item>
@@ -5695,6 +5714,7 @@ function App() {
                   </Form.Item>
                 </>
               )}
+              {fileAuthType === 'agent' && <SshAgentSocketField />}
               <Collapse
                 className="ssh-advanced-collapse"
                 ghost
@@ -6404,6 +6424,9 @@ function App() {
         password: values.sshPassword,
         privateKey: values.sshPrivateKey,
       }, resolvedProfile);
+      const sshAgent = buildSshAgentConfig({
+        agentSocketPath: values.sshAgentSocketPath,
+      }, resolvedProfile);
       const sshSecurity = buildSshSecurityConfig({
         hostKeyPolicy: values.sshHostKeyPolicy,
         knownHostsPath: values.sshKnownHostsPath,
@@ -6414,6 +6437,7 @@ function App() {
         sshPort: values.sshPort || 22,
         sshUser: values.sshUser,
         sshAuthType: auth.authType,
+        sshAgentSocketPath: sshAgent.agentSocketPath,
         sshPassphrase: auth.passphrase,
         sshPassword: auth.password,
         sshPrivateKey: auth.privateKey,
@@ -6487,6 +6511,7 @@ function App() {
               className="remote-context-form"
               initialValues={{
                 sshPort: 22,
+                sshAgentSocketPath: '',
                 sshHostKeyPolicy: 'accept-new',
                 localHost: '127.0.0.1',
                 profileId: '',
@@ -6523,6 +6548,7 @@ function App() {
                     options={[
                       { value: 'password', label: t('auth.password') },
                       { value: 'privateKey', label: t('auth.privateKey') },
+                      { value: 'agent', label: t('auth.agent') },
                     ]}
                   />
                 </Form.Item>
@@ -6542,6 +6568,7 @@ function App() {
                   </Form.Item>
                 </>
               )}
+              {tunnelAuthType === 'agent' && <SshAgentSocketField name="sshAgentSocketPath" />}
               <Collapse
                 className="ssh-advanced-collapse"
                 ghost
@@ -7653,6 +7680,7 @@ function App() {
                   options={[
                     { value: 'password', label: t('auth.password') },
                     { value: 'privateKey', label: t('auth.privateKey') },
+                    { value: 'agent', label: t('auth.agent') },
                   ]}
                 />
               </Form.Item>
@@ -7671,6 +7699,7 @@ function App() {
                   </Form.Item>
                 </>
               )}
+              {sshAuthType === 'agent' && <SshAgentSocketField />}
               <Collapse
                 className="ssh-advanced-collapse"
                 ghost
@@ -7698,10 +7727,14 @@ function App() {
                 }]}
                 size="small"
               />
-              <Form.Item name="rememberCredential" valuePropName="checked">
-                <Checkbox>{t('field.rememberCredential')}</Checkbox>
-              </Form.Item>
-              <Alert type="info" showIcon message={t('settings.credentialHint')} />
+              {(sshAuthType !== 'agent' || watchedJumpHost) && (
+                <>
+                  <Form.Item name="rememberCredential" valuePropName="checked">
+                    <Checkbox>{t('field.rememberCredential')}</Checkbox>
+                  </Form.Item>
+                  <Alert type="info" showIcon message={t('settings.credentialHint')} />
+                </>
+              )}
             </>
           )}
           {selectedProvider.category === 'extension' && (
@@ -9229,6 +9262,7 @@ function connectionProfileFactLabel(key) {
   if (key === 'workingDirectory') return t('field.workingDirectory');
   if (key === 'lastUsed') return t('label.lastUsed');
   if (key === 'jumpHost') return t('field.jumpHost');
+  if (key === 'authType') return t('field.authType');
   if (key === 'hostKeyPolicy') return t('field.hostKeyPolicy');
   return key;
 }
@@ -9236,6 +9270,11 @@ function connectionProfileFactLabel(key) {
 function connectionProfileFactValue(fact) {
   if (fact.key === 'lastUsed') return fact.value ? formatProfileLastUsed(fact.value) : '-';
   if (fact.key === 'hostKeyPolicy') return t(`ssh.hostKeyPolicy.${fact.value === 'strict' ? 'strict' : 'acceptNew'}`);
+  if (fact.key === 'authType') {
+    if (fact.value === 'privateKey') return t('auth.privateKey');
+    if (fact.value === 'agent') return t('auth.agent');
+    return t('auth.password');
+  }
   return fact.value || '-';
 }
 
@@ -9489,6 +9528,7 @@ function buildRequest(type, displayName, values, provider = null) {
       displayName,
       group: values.group || '',
       config: {
+        agentSocketPath: String(values.agentSocketPath || '').trim(),
         host: values.host,
         hostKeyPolicy: values.hostKeyPolicy || 'accept-new',
         knownHostsPath: String(values.knownHostsPath || '').trim(),

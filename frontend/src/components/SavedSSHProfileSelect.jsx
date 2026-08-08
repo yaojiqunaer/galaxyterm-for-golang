@@ -2,6 +2,7 @@ import React from 'react';
 import { Button, Empty, Select, Tag, Typography } from 'antd';
 import {
   CloudServerOutlined,
+  KeyOutlined,
   LockOutlined,
   SettingOutlined,
   StarFilled,
@@ -68,7 +69,7 @@ export default function SavedSSHProfileSelect({
               </span>
               <span className="saved-ssh-option-state">
                 {connection.favorite && <StarFilled />}
-                {connection.credentialSaved && <LockOutlined />}
+                {connectionAuthenticationIcon(connection)}
               </span>
             </div>
           );
@@ -85,13 +86,23 @@ export default function SavedSSHProfileSelect({
             <strong>{selected.displayName}</strong>
             <small>{selected.description}</small>
           </span>
-          <Tag icon={selected.hasSavedSecret ? <LockOutlined /> : null}>
-            {selected.hasSavedSecret
-              ? t('label.credentialSaved')
-              : t('label.oneTimeCredentialRequired')}
+          <Tag icon={connectionAuthenticationIcon(selected)}>
+            {connectionAuthenticationLabel(selected)}
           </Tag>
         </div>
       )}
     </div>
   );
+}
+
+function connectionAuthenticationIcon(connection) {
+  if (connection?.usesAgent) return <KeyOutlined />;
+  if (connection?.credentialSaved || connection?.hasSavedSecret) return <LockOutlined />;
+  return null;
+}
+
+function connectionAuthenticationLabel(connection) {
+  if (connection?.usesAgent) return t('auth.agent');
+  if (connection?.hasSavedSecret) return t('label.credentialSaved');
+  return t('label.oneTimeCredentialRequired');
 }

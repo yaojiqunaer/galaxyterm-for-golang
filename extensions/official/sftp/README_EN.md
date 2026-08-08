@@ -10,7 +10,7 @@ The official SFTP file provider. It runs through GalaxyTerm's `stdio-json-v1` fi
 - Let GalaxyTerm cancel active transfers while always cleaning host-owned staging files
 - Stage uploads beside the remote target and rename only after a complete write, avoiding partial destination files after interruption
 - Create directories, rename entries, and delete files or empty directories
-- Password and private-key authentication
+- Password, private-key, and SSH Agent authentication on macOS/Linux through `SSH_AUTH_SOCK` or a connection-specific agent socket
 - Reuse saved GalaxyTerm SSH connections and system credential references
 - TOFU host-key verification by default: the first key is recorded and later changes are rejected
 

@@ -19,6 +19,7 @@ const terminalSearchSource = await readFile(new URL('./terminalSearch.js', impor
 const workspaceStateSource = await readFile(new URL('./workspaceState.js', import.meta.url), 'utf8');
 const savedSshProfileSource = await readFile(new URL('./components/SavedSSHProfileSelect.jsx', import.meta.url), 'utf8');
 const sshSecurityFieldsSource = await readFile(new URL('./components/SshSecurityFields.jsx', import.meta.url), 'utf8').catch(() => '');
+const sshAgentSocketFieldSource = await readFile(new URL('./components/SshAgentSocketField.jsx', import.meta.url), 'utf8').catch(() => '');
 const sessionQuickSwitcherSource = await readFile(new URL('./components/SessionQuickSwitcher.jsx', import.meta.url), 'utf8').catch(() => '');
 const activeSessionDeclaration = source.indexOf('const activeSession =');
 const firstActiveSessionUsage = source.indexOf('activeSession?.providerType');
@@ -42,6 +43,12 @@ assert.ok(
     && /@media \(max-width: 960px\)[\s\S]*?\.connection-manager-layout,\s*\.connection-manager-layout\.no-detail\s*\{[\s\S]*?grid-template-columns:\s*minmax\(0, 1fr\)/.test(styles)
     && !/\.connection-detail-panel\s*\{[^}]*order:\s*-1;/.test(styles),
   'connection details, group navigation, and list columns must use aligned responsive breakpoints',
+);
+assert.ok(
+  source.includes('const shouldMigrateAgentCredential = values.authType === \'agent\' && !!existingCredentialRef;')
+    && source.includes('preserveExisting: !!existingCredentialRef')
+    && source.includes('credentialRef: hasStoredSshCredential(credentialRef) ? credentialRef : null'),
+  'switching a saved SSH connection to Agent must clear inactive target secrets without dropping a saved jump password',
 );
 
 assert.ok(
@@ -942,6 +949,17 @@ assert.ok(
     && source.includes('sshHostKeyPolicy: sshSecurity.hostKeyPolicy')
     && source.includes('sshKnownHostsPath: sshSecurity.knownHostsPath'),
   'SSH terminals, SFTP, and tunnels must share explicit host identity settings',
+);
+assert.ok(
+  source.includes("import SshAgentSocketField from './components/SshAgentSocketField.jsx';")
+    && source.match(/<SshAgentSocketField/g)?.length >= 3
+    && source.match(/value: 'agent'/g)?.length >= 3
+    && sshAgentSocketFieldSource.includes("t('ssh.agentHint')")
+    && source.includes('buildSshAgentConfig(values, resolvedProfile)')
+    && source.includes('sshAgentSocketPath: sshAgent.agentSocketPath')
+    && source.includes("agentSocketPath: String(values.agentSocketPath || '').trim()")
+    && source.includes("sshAuthType !== 'agent' || watchedJumpHost"),
+  'SSH terminals, SFTP, and tunnels must share SSH agent authentication settings',
 );
 assert.ok(
   terminalPaneSource.includes('interrupt: () =>')

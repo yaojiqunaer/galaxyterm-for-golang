@@ -26,11 +26,13 @@ type Store interface {
 }
 
 type SaveSSHCredentialRequest struct {
-	ID           string `json:"id"`
-	Password     string `json:"password"`
-	PrivateKey   string `json:"privateKey"`
-	Passphrase   string `json:"passphrase"`
-	JumpPassword string `json:"jumpPassword"`
+	ID               string `json:"id"`
+	AuthType         string `json:"authType"`
+	Password         string `json:"password"`
+	PrivateKey       string `json:"privateKey"`
+	Passphrase       string `json:"passphrase"`
+	JumpPassword     string `json:"jumpPassword"`
+	PreserveExisting bool   `json:"preserveExisting"`
 }
 
 type SSHCredentialRef struct {
@@ -70,24 +72,70 @@ func (api *API) SaveSSHCredential(req SaveSSHCredentialRequest) (SSHCredentialRe
 	if req.ID == "" {
 		return SSHCredentialRef{}, errors.New("credential id is required")
 	}
+	if req.AuthType != "" && req.AuthType != "password" && req.AuthType != "privateKey" && req.AuthType != "agent" {
+		return SSHCredentialRef{}, fmt.Errorf("invalid ssh authentication type %q", req.AuthType)
+	}
 	ref := SSHCredentialRef{ID: req.ID}
-	if err := api.setOrDelete(secretKey(req.ID, "password"), req.Password); err != nil {
+	var err error
+	ref.HasPassword, err = api.saveSSHCredentialField(
+		req.ID,
+		"password",
+		req.Password,
+		req.PreserveExisting && req.AuthType == "password",
+	)
+	if err != nil {
 		return ref, err
 	}
-	ref.HasPassword = req.Password != ""
-	if err := api.setOrDelete(secretKey(req.ID, "privateKey"), req.PrivateKey); err != nil {
+	ref.HasPrivateKey, err = api.saveSSHCredentialField(
+		req.ID,
+		"privateKey",
+		req.PrivateKey,
+		req.PreserveExisting && req.AuthType == "privateKey",
+	)
+	if err != nil {
 		return ref, err
 	}
-	ref.HasPrivateKey = req.PrivateKey != ""
-	if err := api.setOrDelete(secretKey(req.ID, "passphrase"), req.Passphrase); err != nil {
+	ref.HasPassphrase, err = api.saveSSHCredentialField(
+		req.ID,
+		"passphrase",
+		req.Passphrase,
+		req.PreserveExisting && req.AuthType == "privateKey",
+	)
+	if err != nil {
 		return ref, err
 	}
-	ref.HasPassphrase = req.Passphrase != ""
-	if err := api.setOrDelete(secretKey(req.ID, "jumpPassword"), req.JumpPassword); err != nil {
+	ref.HasJumpPassword, err = api.saveSSHCredentialField(
+		req.ID,
+		"jumpPassword",
+		req.JumpPassword,
+		req.PreserveExisting,
+	)
+	if err != nil {
 		return ref, err
 	}
-	ref.HasJumpPassword = req.JumpPassword != ""
 	return ref, nil
+}
+
+func (api *API) saveSSHCredentialField(id string, field string, value string, preserve bool) (bool, error) {
+	key := secretKey(id, field)
+	if value != "" {
+		if err := api.store.Set(serviceName, key, value); err != nil {
+			return false, err
+		}
+		return true, nil
+	}
+	if preserve {
+		if _, err := api.store.Get(serviceName, key); err == nil {
+			return true, nil
+		} else if !errors.Is(err, ErrNotFound) {
+			return false, err
+		}
+		return false, nil
+	}
+	if err := api.store.Delete(serviceName, key); err != nil && !errors.Is(err, ErrNotFound) {
+		return false, err
+	}
+	return false, nil
 }
 
 func (api *API) DeleteSSHCredential(id string) error {

@@ -520,6 +520,7 @@ assert.deepEqual(buildConnectionProfileFacts(profiles[0]), [
   { key: 'host', value: '10.0.0.10' },
   { key: 'port', value: 22 },
   { key: 'username', value: '-' },
+  { key: 'authType', value: 'password' },
   { key: 'hostKeyPolicy', value: 'accept-new' },
   { key: 'lastUsed', value: '2026-06-25T10:00:00.000Z' },
 ]);
@@ -530,6 +531,7 @@ assert.deepEqual(buildConnectionProfileFacts({
   { key: 'host', value: '10.0.0.20' },
   { key: 'port', value: 22 },
   { key: 'username', value: 'deploy' },
+  { key: 'authType', value: 'password' },
   { key: 'hostKeyPolicy', value: 'accept-new' },
   { key: 'lastUsed', value: '2026-06-26T10:00:00.000Z' },
   { key: 'jumpHost', value: 'jump.example.com' },

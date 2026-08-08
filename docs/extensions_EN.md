@@ -112,7 +112,7 @@ Installed extensions show how many saved connections and active sessions current
 
 The active terminal status rail always identifies the provider runtime source. Core terminals are marked Core; extension terminals report enabled, disabled, or missing state. Disabling does not force an existing session to close, and a session whose extension was removed remains available until the user closes it, but reconnecting requires the extension to be enabled or installed again. Selecting the extension state opens Extensions with the extension ID or provider type already filtered. Audit and recording states open the current session record directly.
 
-The SFTP provider reuses the host-key policy and known-hosts path from a saved SSH connection. The default policy records the first key and rejects later changes, while strict mode accepts only hosts already in the file. The current location of a non-SFTP file provider can be saved as a file connection and appears alongside terminal connections in groups, favorites, search, and the command palette. `configFields` are stored in the profile, while `authFields` are written only to the system credential store. Import and export remove credential references so another device never presents an unavailable secret as saved. Opening a file connection without a stored credential stops at its authentication form for one-time input.
+The SFTP provider reuses password, private-key, or SSH Agent authentication from a saved SSH connection together with its host-key policy and known-hosts path. On macOS/Linux, a blank Agent Socket reads `SSH_AUTH_SOCK`, so private keys never enter GalaxyTerm. The default host-key policy records the first key and rejects later changes, while strict mode accepts only hosts already in the file. The current location of a non-SFTP file provider can be saved as a file connection and appears alongside terminal connections in groups, favorites, search, and the command palette. `configFields` are stored in the profile, while `authFields` are written only to the system credential store. Import and export remove credential references so another device never presents an unavailable secret as saved. Opening a file connection without a stored credential stops at its authentication form for one-time input.
 
 ## Release Index
 
@@ -126,7 +126,7 @@ Upload `.gtx` packages and an index named `galaxyterm-index.json` to each Releas
       "manifest": {
         "id": "galaxyterm-extension-sftp",
         "name": "SFTP",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "apiVersion": "v1",
         "description": "SFTP file provider for GalaxyTerm",
         "runtime": {
@@ -138,7 +138,7 @@ Upload `.gtx` packages and an index named `galaxyterm-index.json` to each Releas
             "type": "sftp",
             "protocol": "sftp",
             "capabilities": ["list", "stat", "read", "write", "upload", "download", "mkdir", "rename", "delete"],
-            "authMethods": ["password", "privateKey"]
+            "authMethods": ["password", "privateKey", "agent"]
           }
         ],
         "locales": ["zh-CN", "en-US"]
@@ -147,13 +147,13 @@ Upload `.gtx` packages and an index named `galaxyterm-index.json` to each Releas
         {
           "os": "darwin",
           "arch": "arm64",
-          "url": "galaxyterm-extension-sftp_0.3.0_darwin_arm64.gtx",
+          "url": "galaxyterm-extension-sftp_0.4.0_darwin_arm64.gtx",
           "sha256": "<64-character hexadecimal SHA-256>"
         },
         {
           "os": "linux",
           "arch": "amd64",
-          "url": "galaxyterm-extension-sftp_0.3.0_linux_amd64.gtx",
+          "url": "galaxyterm-extension-sftp_0.4.0_linux_amd64.gtx",
           "sha256": "<64-character hexadecimal SHA-256>"
         }
       ]

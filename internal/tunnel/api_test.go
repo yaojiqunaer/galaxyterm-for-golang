@@ -2,6 +2,7 @@ package tunnel
 
 import (
 	"net"
+	"path/filepath"
 	"testing"
 )
 
@@ -50,9 +51,12 @@ func TestValidateStartRequestRejectsUnsupportedHostKeyPolicy(t *testing.T) {
 }
 
 func TestTunnelAuthMethodsSupportPassword(t *testing.T) {
-	methods, err := tunnelAuthMethods(StartRequest{SSHPassword: "secret"})
+	methods, closer, err := tunnelAuthMethods(StartRequest{SSHPassword: "secret"})
 	if err != nil {
 		t.Fatalf("tunnelAuthMethods returned error: %v", err)
+	}
+	if closer != nil {
+		t.Fatal("password authentication returned an unexpected closer")
 	}
 	if len(methods) != 1 {
 		t.Fatalf("len(methods) = %d, want 1", len(methods))
@@ -60,9 +64,20 @@ func TestTunnelAuthMethodsSupportPassword(t *testing.T) {
 }
 
 func TestTunnelAuthMethodsRequirePrivateKeyContent(t *testing.T) {
-	_, err := tunnelAuthMethods(StartRequest{SSHAuthType: "privateKey"})
+	_, _, err := tunnelAuthMethods(StartRequest{SSHAuthType: "privateKey"})
 	if err == nil {
 		t.Fatal("expected private key validation error")
+	}
+}
+
+func TestTunnelAuthMethodsUseConfiguredAgentSocket(t *testing.T) {
+	t.Setenv("SSH_AUTH_SOCK", "")
+	_, _, err := tunnelAuthMethods(StartRequest{
+		SSHAuthType:        "agent",
+		SSHAgentSocketPath: filepath.Join(t.TempDir(), "missing-agent.sock"),
+	})
+	if err == nil {
+		t.Fatal("tunnelAuthMethods accepted an unavailable agent socket")
 	}
 }
 

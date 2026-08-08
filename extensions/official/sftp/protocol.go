@@ -51,6 +51,7 @@ type normalizedRequest struct {
 	Port            int
 	HostKeyPolicy   string
 	KnownHostsPath  string
+	AgentSocketPath string
 	Username        string
 	AuthType        string
 	Password        string

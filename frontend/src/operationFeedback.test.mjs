@@ -25,6 +25,14 @@ assert.deepEqual(buildOperationError({ defaultMessage: 'ssh: handshake failed: u
   suggestionKey: 'operation.error.suggestion.authentication',
 });
 
+assert.deepEqual(buildOperationError('ssh agent has no identities'), {
+  detail: 'ssh agent has no identities',
+  reason: 'authentication',
+  reasonKey: 'operation.error.reason.authentication',
+  retryable: false,
+  suggestionKey: 'operation.error.suggestion.authentication',
+});
+
 assert.deepEqual(buildOperationError({ message: 'permission denied while writing /srv/app' }), {
   detail: 'permission denied while writing /srv/app',
   reason: 'permission',

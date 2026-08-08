@@ -1,6 +1,7 @@
 package terminal
 
 import (
+	"path/filepath"
 	"testing"
 
 	"galaxyterm/internal/session"
@@ -104,6 +105,30 @@ func TestNewSSHDriverRejectsUnsupportedHostKeyPolicy(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("newSSHDriver accepted unsupported host key policy")
+	}
+}
+
+func TestNewSSHDriverAcceptsAgentAuthenticationConfig(t *testing.T) {
+	t.Setenv("SSH_AUTH_SOCK", "")
+	agentSocketPath := filepath.Join(t.TempDir(), "missing-agent.sock")
+	driver, err := newSSHDriver(session.CreateSessionRequest{
+		Config: map[string]interface{}{
+			"host":            "example.com",
+			"agentSocketPath": agentSocketPath,
+		},
+		Auth: map[string]interface{}{
+			"username": "root",
+			"authType": "agent",
+		},
+	})
+	if err != nil {
+		t.Fatalf("newSSHDriver returned error: %v", err)
+	}
+	if driver.authType != "agent" || driver.agentSocketPath != agentSocketPath {
+		t.Fatalf("agent settings = %q, %q", driver.authType, driver.agentSocketPath)
+	}
+	if _, _, err := driver.authMethods(); err == nil {
+		t.Fatal("authMethods accepted an unavailable agent socket")
 	}
 }
 

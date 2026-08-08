@@ -24,6 +24,7 @@ export function parseSshConfigProfiles(content, options = {}) {
           displayName: alias,
           group: sshConfigGroup,
           config: {
+            agentSocketPath: '',
             host: alias,
             port: 22,
             identityFile: '',
@@ -46,6 +47,10 @@ export function parseSshConfigProfiles(content, options = {}) {
       if (key === 'identityfile') {
         profile.config.identityFile = value;
         profile.auth.authType = 'privateKey';
+      }
+      if (key === 'identityagent' && !profile.config.identityFile) {
+        profile.config.agentSocketPath = value;
+        profile.auth.authType = 'agent';
       }
     });
   });

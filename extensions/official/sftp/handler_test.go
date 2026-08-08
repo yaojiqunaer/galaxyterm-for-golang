@@ -9,6 +9,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -30,6 +31,20 @@ func TestManifestMatchesCoreFileProviderContract(t *testing.T) {
 	}
 	if len(manifest.FileProviders) != 1 || len(manifest.FileProviders[0].ConfigFields) == 0 || len(manifest.FileProviders[0].AuthFields) == 0 {
 		t.Fatalf("manifest does not contribute file provider fields: %#v", manifest.FileProviders)
+	}
+	provider := manifest.FileProviders[0]
+	if !slices.Contains(provider.AuthMethods, "agent") {
+		t.Fatalf("manifest auth methods = %#v, want agent", provider.AuthMethods)
+	}
+	hasAgentSocket := false
+	for _, field := range provider.ConfigFields {
+		if field.Key == "agentSocketPath" {
+			hasAgentSocket = true
+			break
+		}
+	}
+	if !hasAgentSocket {
+		t.Fatalf("manifest config fields = %#v, want agentSocketPath", provider.ConfigFields)
 	}
 }
 
@@ -109,6 +124,35 @@ func TestNormalizeRequestAcceptsPrivateKeyAndValidatesMutationPaths(t *testing.T
 	base.Path = ""
 	if _, err := normalizeRequest(base); err == nil {
 		t.Fatal("delete without path returned nil error")
+	}
+}
+
+func TestNormalizeRequestAcceptsAgentAuthentication(t *testing.T) {
+	agentSocketPath := filepath.Join(t.TempDir(), "missing-agent.sock")
+	request, err := normalizeRequest(protocolRequest{
+		APIVersion:   "v1",
+		RequestID:    "request-1",
+		ProviderType: "sftp",
+		Operation:    "list",
+		Config: map[string]any{
+			"host":            "example.com",
+			"agentSocketPath": agentSocketPath,
+		},
+		Auth: map[string]any{
+			"username": "deploy",
+			"authType": "agent",
+		},
+	})
+	if err != nil {
+		t.Fatalf("normalizeRequest returned error: %v", err)
+	}
+	if request.AuthType != "agent" || request.AgentSocketPath != agentSocketPath {
+		t.Fatalf("agent settings = %q, %q", request.AuthType, request.AgentSocketPath)
+	}
+	if _, _, err := sshAuthMethods(request); err == nil {
+		t.Fatal("sshAuthMethods accepted an unavailable agent socket")
+	} else if responseError := structuredError(err); responseError.Code != "invalid_credentials" {
+		t.Fatalf("agent error code = %q, want invalid_credentials", responseError.Code)
 	}
 }
 

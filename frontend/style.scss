@@ -5392,6 +5392,18 @@ code {
   cursor: help;
 }
 
+.ssh-agent-field {
+  margin-bottom: 14px;
+}
+
+.ssh-agent-field .ant-form-item {
+  margin-bottom: 10px;
+}
+
+.ssh-agent-field .ant-alert {
+  padding: 8px 10px;
+}
+
 .connection-test-result {
   margin-bottom: 16px;
 }

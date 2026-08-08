@@ -112,7 +112,7 @@ https://github.com/<owner>/<repo>/releases/latest/download/galaxyterm-index.json
 
 活动终端的状态栏始终显示 Provider 运行来源。核心终端标记为“核心”；扩展终端显示扩展已启用、已停用或缺失。停用不会强制关闭已有会话，卸载后的会话也会保留到用户关闭，但重新连接前必须重新启用或安装扩展。点击扩展状态会打开扩展页面并自动按扩展 ID 或 Provider 类型筛选；审计和录屏状态可直接打开当前会话记录。
 
-SFTP Provider 复用已保存 SSH 连接的主机密钥策略和 Known Hosts 路径；默认首次记录密钥，之后拒绝密钥变化，严格模式只接受文件中已有的主机。非 SFTP 文件 Provider 的当前位置可保存为文件连接，并与终端连接一起出现在连接管理、分组、收藏、搜索和命令面板中。`configFields` 保存到连接档案，`authFields` 只写入系统凭据库；连接导入和导出都会移除凭据引用，避免在另一台设备上误显示为“凭据已保存”。未保存凭据的文件连接打开后会停留在认证表单，由用户输入一次性凭据。
+SFTP Provider 复用已保存 SSH 连接的密码、私钥或 SSH Agent 认证，以及主机密钥策略和 Known Hosts 路径。macOS/Linux 上的 Agent Socket 留空时读取 `SSH_AUTH_SOCK`，私钥不会进入 GalaxyTerm；默认首次记录主机密钥，之后拒绝密钥变化，严格模式只接受文件中已有的主机。非 SFTP 文件 Provider 的当前位置可保存为文件连接，并与终端连接一起出现在连接管理、分组、收藏、搜索和命令面板中。`configFields` 保存到连接档案，`authFields` 只写入系统凭据库；连接导入和导出都会移除凭据引用，避免在另一台设备上误显示为“凭据已保存”。未保存凭据的文件连接打开后会停留在认证表单，由用户输入一次性凭据。
 
 ## Release 索引
 
@@ -126,7 +126,7 @@ SFTP Provider 复用已保存 SSH 连接的主机密钥策略和 Known Hosts 路
       "manifest": {
         "id": "galaxyterm-extension-sftp",
         "name": "SFTP",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "apiVersion": "v1",
         "description": "SFTP file provider for GalaxyTerm",
         "runtime": {
@@ -138,7 +138,7 @@ SFTP Provider 复用已保存 SSH 连接的主机密钥策略和 Known Hosts 路
             "type": "sftp",
             "protocol": "sftp",
             "capabilities": ["list", "stat", "read", "write", "upload", "download", "mkdir", "rename", "delete"],
-            "authMethods": ["password", "privateKey"]
+            "authMethods": ["password", "privateKey", "agent"]
           }
         ],
         "locales": ["zh-CN", "en-US"]
@@ -147,13 +147,13 @@ SFTP Provider 复用已保存 SSH 连接的主机密钥策略和 Known Hosts 路
         {
           "os": "darwin",
           "arch": "arm64",
-          "url": "galaxyterm-extension-sftp_0.3.0_darwin_arm64.gtx",
+          "url": "galaxyterm-extension-sftp_0.4.0_darwin_arm64.gtx",
           "sha256": "<64 位十六进制 SHA-256>"
         },
         {
           "os": "linux",
           "arch": "amd64",
-          "url": "galaxyterm-extension-sftp_0.3.0_linux_amd64.gtx",
+          "url": "galaxyterm-extension-sftp_0.4.0_linux_amd64.gtx",
           "sha256": "<64 位十六进制 SHA-256>"
         }
       ]
