@@ -5,6 +5,7 @@ import {
   Button,
   Card,
   Checkbox,
+  Collapse,
   ConfigProvider,
   Divider,
   Drawer,
@@ -208,6 +209,7 @@ import {
   buildSavedSshConnections,
   buildSshConnectionAuth,
   buildSshProfileFields,
+  buildSshSecurityConfig,
   buildTunnelDisplay,
   buildTunnelSummary,
   createFileTransferID,
@@ -347,6 +349,7 @@ import QuickCommandLibrary from './components/QuickCommandLibrary.jsx';
 import CommandHistoryPanel from './components/CommandHistoryPanel.jsx';
 import SessionQuickSwitcher from './components/SessionQuickSwitcher.jsx';
 import SavedSSHProfileSelect from './components/SavedSSHProfileSelect.jsx';
+import SshSecurityFields from './components/SshSecurityFields.jsx';
 import FileProviderFormFields from './components/FileProviderFormFields.jsx';
 import OperationErrorDescription from './components/OperationErrorDescription.jsx';
 import TerminalSearchControl from './components/TerminalSearchControl.jsx';
@@ -1688,6 +1691,8 @@ function App() {
       jumpPort: profile?.config?.jumpPort || 22,
       jumpUsername: profile?.auth?.jumpUsername || '',
       jumpPassword: '',
+      hostKeyPolicy: profile?.config?.hostKeyPolicy || 'accept-new',
+      knownHostsPath: profile?.config?.knownHostsPath || '',
       credentialRef: profile?.auth?.credentialRef ? JSON.stringify(profile.auth.credentialRef) : '',
       rememberCredential: !!profile?.auth?.credentialRef,
       shell: profile?.config?.shell || '',
@@ -1709,7 +1714,13 @@ function App() {
     setConnectionTestResult(null);
     form.setFieldsValue(provider?.category === 'extension'
       ? { ...buildExtensionTerminalFormValues(provider), rememberCredential: false }
-      : { config: {}, auth: {}, rememberCredential: false });
+      : {
+        config: {},
+        auth: {},
+        hostKeyPolicy: providerType === 'ssh' ? 'accept-new' : undefined,
+        knownHostsPath: '',
+        rememberCredential: false,
+      });
   };
 
   const openConnectionDrawer = (
@@ -5112,6 +5123,8 @@ function App() {
     fileForm.setFieldsValue({
       authType: fields.authType,
       host: fields.host,
+      hostKeyPolicy: fields.hostKeyPolicy,
+      knownHostsPath: fields.knownHostsPath,
       passphrase: '',
       password: '',
       port: fields.port,
@@ -5220,6 +5233,8 @@ function App() {
       profileId: fields.profileId,
       sshAuthType: fields.authType,
       sshHost: fields.host,
+      sshHostKeyPolicy: fields.hostKeyPolicy,
+      sshKnownHostsPath: fields.knownHostsPath,
       sshPassphrase: '',
       sshPassword: '',
       sshPort: fields.port,
@@ -5272,11 +5287,13 @@ function App() {
     }
     const resolvedProfile = await resolveSelectedSshProfile(fileProfileId);
     const connectionAuth = buildSshConnectionAuth(values, resolvedProfile);
+    const sshSecurity = buildSshSecurityConfig(values, resolvedProfile);
     return {
       providerType: selectedFileProvider.type,
       config: {
         host: values.host,
         port: values.port || 22,
+        ...sshSecurity,
       },
       auth: {
         username: values.username,
@@ -5606,7 +5623,13 @@ function App() {
           <div className="remote-context-panel">
             <Text strong>{t('section.quickConnect')}</Text>
             <Text type="secondary">{t('file.browserHint')}</Text>
-            <Form form={fileForm} layout="vertical" className="remote-context-form" disabled={fileBusy} initialValues={{ port: 22, path: '.', profileId: '' }}>
+            <Form
+              form={fileForm}
+              layout="vertical"
+              className="remote-context-form"
+              disabled={fileBusy}
+              initialValues={{ hostKeyPolicy: 'accept-new', port: 22, path: '.', profileId: '' }}
+            >
               <Form.Item label={t('field.fileProvider')}>
                 <Select
                   value={selectedFileProvider.type}
@@ -5672,6 +5695,16 @@ function App() {
                   </Form.Item>
                 </>
               )}
+              <Collapse
+                className="ssh-advanced-collapse"
+                ghost
+                items={[{
+                  key: 'sftp-security',
+                  label: t('section.sshSecurity'),
+                  children: <SshSecurityFields />,
+                }]}
+                size="small"
+              />
                 </>
               ) : (
                 <>
@@ -6371,6 +6404,10 @@ function App() {
         password: values.sshPassword,
         privateKey: values.sshPrivateKey,
       }, resolvedProfile);
+      const sshSecurity = buildSshSecurityConfig({
+        hostKeyPolicy: values.sshHostKeyPolicy,
+        knownHostsPath: values.sshKnownHostsPath,
+      }, resolvedProfile);
       const info = await TunnelAPI.Start({
         name: values.name || 'Tunnel',
         sshHost: values.sshHost,
@@ -6380,6 +6417,8 @@ function App() {
         sshPassphrase: auth.passphrase,
         sshPassword: auth.password,
         sshPrivateKey: auth.privateKey,
+        sshHostKeyPolicy: sshSecurity.hostKeyPolicy,
+        sshKnownHostsPath: sshSecurity.knownHostsPath,
         localHost: values.localHost || '127.0.0.1',
         localPort: values.localPort,
         remoteHost: values.remoteHost,
@@ -6442,7 +6481,18 @@ function App() {
           <div className="remote-context-panel">
             <Text strong>{t('section.quickConnect')}</Text>
             <Text type="secondary">{t('tunnel.formHint')}</Text>
-            <Form form={tunnelForm} layout="vertical" className="remote-context-form" initialValues={{ sshPort: 22, localHost: '127.0.0.1', profileId: '', sshAuthType: 'password' }}>
+            <Form
+              form={tunnelForm}
+              layout="vertical"
+              className="remote-context-form"
+              initialValues={{
+                sshPort: 22,
+                sshHostKeyPolicy: 'accept-new',
+                localHost: '127.0.0.1',
+                profileId: '',
+                sshAuthType: 'password',
+              }}
+            >
               <Form.Item name="profileId" hidden><Input /></Form.Item>
               <SavedSSHProfileSelect
                 disabled={tunnelBusy}
@@ -6492,6 +6542,21 @@ function App() {
                   </Form.Item>
                 </>
               )}
+              <Collapse
+                className="ssh-advanced-collapse"
+                ghost
+                items={[{
+                  key: 'tunnel-security',
+                  label: t('section.sshSecurity'),
+                  children: (
+                    <SshSecurityFields
+                      pathName="sshKnownHostsPath"
+                      policyName="sshHostKeyPolicy"
+                    />
+                  ),
+                }]}
+                size="small"
+              />
               <Space size={8} className="remote-form-row">
                 <Form.Item name="localHost" label={t('field.localHost')} initialValue="127.0.0.1">
                   <Input />
@@ -7606,19 +7671,33 @@ function App() {
                   </Form.Item>
                 </>
               )}
-              <Divider />
-              <Form.Item name="jumpHost" label={t('field.jumpHost')}>
-                <Input placeholder={t('placeholder.host')} />
-              </Form.Item>
-              <Form.Item name="jumpPort" label={t('field.jumpPort')} initialValue={22}>
-                <InputNumber min={1} max={65535} style={{ width: '100%' }} />
-              </Form.Item>
-              <Form.Item name="jumpUsername" label={t('field.jumpUsername')}>
-                <Input />
-              </Form.Item>
-              <Form.Item name="jumpPassword" label={t('field.jumpPassword')}>
-                <Input.Password />
-              </Form.Item>
+              <Collapse
+                className="ssh-advanced-collapse"
+                ghost
+                items={[{
+                  key: 'ssh-advanced',
+                  label: t('section.advancedSSH'),
+                  children: (
+                    <>
+                      <SshSecurityFields />
+                      <Divider />
+                      <Form.Item name="jumpHost" label={t('field.jumpHost')}>
+                        <Input placeholder={t('placeholder.host')} />
+                      </Form.Item>
+                      <Form.Item name="jumpPort" label={t('field.jumpPort')} initialValue={22}>
+                        <InputNumber min={1} max={65535} style={{ width: '100%' }} />
+                      </Form.Item>
+                      <Form.Item name="jumpUsername" label={t('field.jumpUsername')}>
+                        <Input />
+                      </Form.Item>
+                      <Form.Item name="jumpPassword" label={t('field.jumpPassword')}>
+                        <Input.Password />
+                      </Form.Item>
+                    </>
+                  ),
+                }]}
+                size="small"
+              />
               <Form.Item name="rememberCredential" valuePropName="checked">
                 <Checkbox>{t('field.rememberCredential')}</Checkbox>
               </Form.Item>
@@ -9150,11 +9229,13 @@ function connectionProfileFactLabel(key) {
   if (key === 'workingDirectory') return t('field.workingDirectory');
   if (key === 'lastUsed') return t('label.lastUsed');
   if (key === 'jumpHost') return t('field.jumpHost');
+  if (key === 'hostKeyPolicy') return t('field.hostKeyPolicy');
   return key;
 }
 
 function connectionProfileFactValue(fact) {
   if (fact.key === 'lastUsed') return fact.value ? formatProfileLastUsed(fact.value) : '-';
+  if (fact.key === 'hostKeyPolicy') return t(`ssh.hostKeyPolicy.${fact.value === 'strict' ? 'strict' : 'acceptNew'}`);
   return fact.value || '-';
 }
 
@@ -9409,6 +9490,8 @@ function buildRequest(type, displayName, values, provider = null) {
       group: values.group || '',
       config: {
         host: values.host,
+        hostKeyPolicy: values.hostKeyPolicy || 'accept-new',
+        knownHostsPath: String(values.knownHostsPath || '').trim(),
         port: values.port || 22,
         jumpHost: values.jumpHost || '',
         jumpPort: values.jumpPort || 22,

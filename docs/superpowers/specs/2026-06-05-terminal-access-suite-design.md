@@ -134,26 +134,24 @@ Local shell remains a stream provider backed by a PTY. It must support multiple 
 
 SSH is a stream provider implemented with `golang.org/x/crypto/ssh`.
 
-First implementation:
+Current implementation:
 
 - Password authentication
+- Private-key and passphrase authentication
 - Session-scoped shell
 - Resize support
 - Clean close
-- Known extension points for private key and passphrase authentication
-
-Later hardening:
-
-- Known hosts verification
-- Host fingerprint prompts
-- SSH agent support
-- Jump host support
+- Jump-host routing
+- Shared host-key verification for terminals, connection tests, jump hosts, SFTP, and port forwarding
+- `accept-new` policy that persists the first key and rejects changed keys
+- `strict` policy that only accepts keys already present in the selected known-hosts file
+- A protected application known-hosts file by default, with an optional custom path
 
 ### Remote File Workspace
 
 The core owns one protocol-neutral remote-file workspace. It renders navigation, transfer progress, conflict handling, errors, credential selection, and audit events without importing a protocol SDK.
 
-Installed extensions contribute file providers such as SFTP, FTP, S3, or WebDAV. SFTP can reuse an SSH connection profile and credential reference, while object stores can expose buckets and prefixes through the same navigation model.
+Installed extensions contribute file providers such as SFTP, FTP, S3, or WebDAV. SFTP reuses the SSH connection profile, credential reference, host-key policy, and known-hosts path, while object stores expose buckets and prefixes through the same navigation model.
 
 ## Official Extensions
 

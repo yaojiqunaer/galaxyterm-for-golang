@@ -33,6 +33,14 @@ assert.deepEqual(buildOperationError({ message: 'permission denied while writing
   suggestionKey: 'operation.error.suggestion.permission',
 });
 
+assert.deepEqual(buildOperationError('ssh host key changed for prod.example.com'), {
+  detail: 'ssh host key changed for prod.example.com',
+  reason: 'hostIdentity',
+  reasonKey: 'operation.error.reason.hostIdentity',
+  retryable: false,
+  suggestionKey: 'operation.error.suggestion.hostIdentity',
+});
+
 assert.deepEqual(buildOperationError('checksum mismatch: manifest.json', { scope: 'extension' }), {
   detail: 'checksum mismatch: manifest.json',
   reason: 'package',

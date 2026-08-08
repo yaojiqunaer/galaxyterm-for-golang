@@ -4,6 +4,11 @@ const maxOperationErrorDetailLength = 480;
 
 const reasonMatchers = [
   {
+    reason: 'hostIdentity',
+    pattern: /\b(?:host key|known[_ ]hosts?|server fingerprint)\b/i,
+    retryable: false,
+  },
+  {
     reason: 'timeout',
     pattern: /\b(?:context deadline exceeded|timed? out|timeout)\b/i,
     retryable: true,

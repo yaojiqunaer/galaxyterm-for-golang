@@ -6,6 +6,9 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"time"
+
+	"galaxyterm/internal/sshsecurity"
 
 	"github.com/google/uuid"
 	"golang.org/x/crypto/ssh"
@@ -21,18 +24,20 @@ func NewAPI() *API {
 }
 
 type StartRequest struct {
-	Name          string `json:"name"`
-	SSHHost       string `json:"sshHost"`
-	SSHPort       int    `json:"sshPort"`
-	SSHUser       string `json:"sshUser"`
-	SSHAuthType   string `json:"sshAuthType"`
-	SSHPassword   string `json:"sshPassword"`
-	SSHPrivateKey string `json:"sshPrivateKey"`
-	SSHPassphrase string `json:"sshPassphrase"`
-	LocalHost     string `json:"localHost"`
-	LocalPort     int    `json:"localPort"`
-	RemoteHost    string `json:"remoteHost"`
-	RemotePort    int    `json:"remotePort"`
+	Name              string `json:"name"`
+	SSHHost           string `json:"sshHost"`
+	SSHPort           int    `json:"sshPort"`
+	SSHUser           string `json:"sshUser"`
+	SSHAuthType       string `json:"sshAuthType"`
+	SSHPassword       string `json:"sshPassword"`
+	SSHPrivateKey     string `json:"sshPrivateKey"`
+	SSHPassphrase     string `json:"sshPassphrase"`
+	SSHHostKeyPolicy  string `json:"sshHostKeyPolicy"`
+	SSHKnownHostsPath string `json:"sshKnownHostsPath"`
+	LocalHost         string `json:"localHost"`
+	LocalPort         int    `json:"localPort"`
+	RemoteHost        string `json:"remoteHost"`
+	RemotePort        int    `json:"remotePort"`
 }
 
 type Info struct {
@@ -59,10 +64,18 @@ func (api *API) Start(req StartRequest) (Info, error) {
 	if err != nil {
 		return Info{}, err
 	}
+	hostKeyCallback, err := sshsecurity.NewHostKeyCallback(
+		sshsecurity.Policy(normalized.SSHHostKeyPolicy),
+		normalized.SSHKnownHostsPath,
+	)
+	if err != nil {
+		return Info{}, err
+	}
 	config := &ssh.ClientConfig{
 		User:            normalized.SSHUser,
 		Auth:            authMethods,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: hostKeyCallback,
+		Timeout:         10 * time.Second,
 	}
 	sshAddr := fmt.Sprintf("%s:%d", normalized.SSHHost, normalized.SSHPort)
 	client, err := ssh.Dial("tcp", sshAddr, config)
@@ -186,6 +199,8 @@ func validateStartRequest(req StartRequest) (StartRequest, error) {
 	req.SSHHost = strings.TrimSpace(req.SSHHost)
 	req.SSHUser = strings.TrimSpace(req.SSHUser)
 	req.SSHAuthType = strings.TrimSpace(req.SSHAuthType)
+	req.SSHHostKeyPolicy = strings.TrimSpace(req.SSHHostKeyPolicy)
+	req.SSHKnownHostsPath = strings.TrimSpace(req.SSHKnownHostsPath)
 	req.LocalHost = strings.TrimSpace(req.LocalHost)
 	req.RemoteHost = strings.TrimSpace(req.RemoteHost)
 
@@ -201,6 +216,11 @@ func validateStartRequest(req StartRequest) (StartRequest, error) {
 	if req.SSHAuthType == "" {
 		req.SSHAuthType = "password"
 	}
+	hostKeyPolicy, err := sshsecurity.NormalizePolicy(req.SSHHostKeyPolicy)
+	if err != nil {
+		return req, err
+	}
+	req.SSHHostKeyPolicy = string(hostKeyPolicy)
 	if req.LocalHost == "" {
 		req.LocalHost = "127.0.0.1"
 	}

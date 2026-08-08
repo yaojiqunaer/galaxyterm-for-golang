@@ -23,12 +23,29 @@ func TestValidateStartRequestDefaultsPorts(t *testing.T) {
 	if normalized.SSHPort != 22 {
 		t.Fatalf("SSHPort = %d, want 22", normalized.SSHPort)
 	}
+	if normalized.SSHHostKeyPolicy != "accept-new" {
+		t.Fatalf("SSHHostKeyPolicy = %q, want accept-new", normalized.SSHHostKeyPolicy)
+	}
 }
 
 func TestValidateStartRequestRequiresCoreFields(t *testing.T) {
 	_, err := validateStartRequest(StartRequest{})
 	if err == nil {
 		t.Fatal("expected validation error")
+	}
+}
+
+func TestValidateStartRequestRejectsUnsupportedHostKeyPolicy(t *testing.T) {
+	_, err := validateStartRequest(StartRequest{
+		SSHHost:          "127.0.0.1",
+		SSHUser:          "root",
+		SSHHostKeyPolicy: "insecure",
+		LocalPort:        13306,
+		RemoteHost:       "127.0.0.1",
+		RemotePort:       3306,
+	})
+	if err == nil {
+		t.Fatal("validateStartRequest accepted unsupported host key policy")
 	}
 }
 

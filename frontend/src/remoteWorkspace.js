@@ -35,9 +35,22 @@ export function buildSshProfileFields(profile = {}) {
     authType: profile.auth?.authType || 'password',
     displayName: profile.displayName || '',
     host: profile.config?.host || '',
+    hostKeyPolicy: profile.config?.hostKeyPolicy || 'accept-new',
+    knownHostsPath: profile.config?.knownHostsPath || '',
     port: profile.config?.port || 22,
     profileId: profile.id || '',
     username: profile.auth?.username || '',
+  };
+}
+
+export function buildSshSecurityConfig(fields = {}, resolvedProfileRequest = null) {
+  const resolvedConfig = resolvedProfileRequest?.config || {};
+  const requestedPolicy = fields.hostKeyPolicy || resolvedConfig.hostKeyPolicy;
+  return {
+    hostKeyPolicy: requestedPolicy === 'strict' ? 'strict' : 'accept-new',
+    knownHostsPath: String(
+      fields.knownHostsPath ?? resolvedConfig.knownHostsPath ?? '',
+    ).trim(),
   };
 }
 

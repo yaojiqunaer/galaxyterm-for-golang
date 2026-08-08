@@ -5363,6 +5363,35 @@ code {
   margin-bottom: 14px;
 }
 
+.ssh-advanced-collapse {
+  margin: 2px 0 14px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.ssh-advanced-collapse > .ant-collapse-item > .ant-collapse-header {
+  min-height: 38px;
+  align-items: center;
+  padding: 8px 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ssh-advanced-collapse .ant-collapse-content-box {
+  padding: 6px 0 2px;
+}
+
+.form-label-with-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-label-with-help .anticon {
+  color: var(--muted);
+  cursor: help;
+}
+
 .connection-test-result {
   margin-bottom: 16px;
 }

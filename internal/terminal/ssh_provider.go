@@ -3,26 +3,31 @@ package terminal
 import (
 	"context"
 	"fmt"
-	"galaxyterm/internal"
-	"galaxyterm/internal/session"
 	"io"
 	"strconv"
 	"sync"
+	"time"
+
+	"galaxyterm/internal"
+	"galaxyterm/internal/session"
+	"galaxyterm/internal/sshsecurity"
 
 	"golang.org/x/crypto/ssh"
 )
 
 type sshDriver struct {
-	addr       string
-	username   string
-	authType   string
-	password   string
-	privateKey string
-	passphrase string
-	jumpHost   string
-	jumpPort   int
-	jumpUser   string
-	jumpPass   string
+	addr           string
+	username       string
+	authType       string
+	password       string
+	privateKey     string
+	passphrase     string
+	jumpHost       string
+	jumpPort       int
+	jumpUser       string
+	jumpPass       string
+	hostKeyPolicy  string
+	knownHostsPath string
 
 	client  *ssh.Client
 	session *ssh.Session
@@ -68,17 +73,24 @@ func newSSHDriver(req session.CreateSessionRequest) (*sshDriver, error) {
 		authType = "password"
 	}
 
+	hostKeyPolicy, err := sshsecurity.NormalizePolicy(stringValue(req.Config, "hostKeyPolicy"))
+	if err != nil {
+		return nil, err
+	}
+
 	return &sshDriver{
-		addr:       fmt.Sprintf("%s:%d", host, port),
-		username:   username,
-		authType:   authType,
-		password:   password,
-		privateKey: stringValue(req.Auth, "privateKey"),
-		passphrase: stringValue(req.Auth, "passphrase"),
-		jumpHost:   stringValue(req.Config, "jumpHost"),
-		jumpPort:   intValue(req.Config, "jumpPort", 22),
-		jumpUser:   stringValue(req.Auth, "jumpUsername"),
-		jumpPass:   stringValue(req.Auth, "jumpPassword"),
+		addr:           fmt.Sprintf("%s:%d", host, port),
+		username:       username,
+		authType:       authType,
+		password:       password,
+		privateKey:     stringValue(req.Auth, "privateKey"),
+		passphrase:     stringValue(req.Auth, "passphrase"),
+		jumpHost:       stringValue(req.Config, "jumpHost"),
+		jumpPort:       intValue(req.Config, "jumpPort", 22),
+		jumpUser:       stringValue(req.Auth, "jumpUsername"),
+		jumpPass:       stringValue(req.Auth, "jumpPassword"),
+		hostKeyPolicy:  string(hostKeyPolicy),
+		knownHostsPath: stringValue(req.Config, "knownHostsPath"),
 	}, nil
 }
 
@@ -87,10 +99,9 @@ func (d *sshDriver) Start(ctx context.Context, emit session.Emitter) error {
 	if err != nil {
 		return err
 	}
-	config := &ssh.ClientConfig{
-		User:            d.username,
-		Auth:            authMethods,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	config, err := d.clientConfig(authMethods)
+	if err != nil {
+		return err
 	}
 
 	client, err := d.dial(config)
@@ -177,7 +188,8 @@ func (d *sshDriver) dial(config *ssh.ClientConfig) (*ssh.Client, error) {
 		Auth: []ssh.AuthMethod{
 			ssh.Password(d.jumpPass),
 		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		HostKeyCallback: config.HostKeyCallback,
+		Timeout:         config.Timeout,
 	}
 
 	jumpClient, err := ssh.Dial("tcp", fmt.Sprintf("%s:%d", d.jumpHost, d.jumpPort), jumpConfig)
@@ -199,6 +211,22 @@ func (d *sshDriver) dial(config *ssh.ClientConfig) (*ssh.Client, error) {
 	}
 
 	return ssh.NewClient(clientConn, chans, reqs), nil
+}
+
+func (d *sshDriver) clientConfig(authMethods []ssh.AuthMethod) (*ssh.ClientConfig, error) {
+	hostKeyCallback, err := sshsecurity.NewHostKeyCallback(
+		sshsecurity.Policy(d.hostKeyPolicy),
+		d.knownHostsPath,
+	)
+	if err != nil {
+		return nil, err
+	}
+	return &ssh.ClientConfig{
+		User:            d.username,
+		Auth:            authMethods,
+		HostKeyCallback: hostKeyCallback,
+		Timeout:         10 * time.Second,
+	}, nil
 }
 
 func (d *sshDriver) authMethods() ([]ssh.AuthMethod, error) {

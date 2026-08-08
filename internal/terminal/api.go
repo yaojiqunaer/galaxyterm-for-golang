@@ -5,8 +5,6 @@ import (
 	"time"
 
 	"galaxyterm/internal/session"
-
-	"golang.org/x/crypto/ssh"
 )
 
 type API struct{}
@@ -24,12 +22,11 @@ func (api *API) TestSSHConnection(req session.CreateSessionRequest) error {
 	if err != nil {
 		return err
 	}
-	config := &ssh.ClientConfig{
-		User:            driver.username,
-		Auth:            authMethods,
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         8 * time.Second,
+	config, err := driver.clientConfig(authMethods)
+	if err != nil {
+		return err
 	}
+	config.Timeout = 8 * time.Second
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

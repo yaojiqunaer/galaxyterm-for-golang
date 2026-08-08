@@ -18,6 +18,7 @@ const terminalSearchControlSource = await readFile(new URL('./components/Termina
 const terminalSearchSource = await readFile(new URL('./terminalSearch.js', import.meta.url), 'utf8').catch(() => '');
 const workspaceStateSource = await readFile(new URL('./workspaceState.js', import.meta.url), 'utf8');
 const savedSshProfileSource = await readFile(new URL('./components/SavedSSHProfileSelect.jsx', import.meta.url), 'utf8');
+const sshSecurityFieldsSource = await readFile(new URL('./components/SshSecurityFields.jsx', import.meta.url), 'utf8').catch(() => '');
 const sessionQuickSwitcherSource = await readFile(new URL('./components/SessionQuickSwitcher.jsx', import.meta.url), 'utf8').catch(() => '');
 const activeSessionDeclaration = source.indexOf('const activeSession =');
 const firstActiveSessionUsage = source.indexOf('activeSession?.providerType');
@@ -930,6 +931,17 @@ assert.ok(
     && source.includes('buildTerminalRecoveryActions(status || {}, { reconnecting })')
     && source.includes('loading={action.loading}'),
   'all reconnect entry points must share immediate duplicate protection and visible progress',
+);
+assert.ok(
+  source.includes("import SshSecurityFields from './components/SshSecurityFields.jsx';")
+    && source.match(/<SshSecurityFields/g)?.length >= 3
+    && sshSecurityFieldsSource.includes('name={policyName}')
+    && sshSecurityFieldsSource.includes('name={pathName}')
+    && source.includes("hostKeyPolicy: values.hostKeyPolicy || 'accept-new'")
+    && source.includes('buildSshSecurityConfig(values, resolvedProfile)')
+    && source.includes('sshHostKeyPolicy: sshSecurity.hostKeyPolicy')
+    && source.includes('sshKnownHostsPath: sshSecurity.knownHostsPath'),
+  'SSH terminals, SFTP, and tunnels must share explicit host identity settings',
 );
 assert.ok(
   terminalPaneSource.includes('interrupt: () =>')

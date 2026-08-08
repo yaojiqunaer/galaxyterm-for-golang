@@ -55,6 +55,58 @@ func TestNewSSHDriverAcceptsJumpHostConfig(t *testing.T) {
 	}
 }
 
+func TestNewSSHDriverDefaultsHostKeyPolicyToAcceptNew(t *testing.T) {
+	driver, err := newSSHDriver(session.CreateSessionRequest{
+		Config: map[string]interface{}{"host": "example.com"},
+		Auth: map[string]interface{}{
+			"username": "root",
+			"password": "secret",
+		},
+	})
+	if err != nil {
+		t.Fatalf("newSSHDriver returned error: %v", err)
+	}
+	if driver.hostKeyPolicy != "accept-new" {
+		t.Fatalf("hostKeyPolicy = %q, want accept-new", driver.hostKeyPolicy)
+	}
+}
+
+func TestNewSSHDriverPreservesStrictHostKeySettings(t *testing.T) {
+	driver, err := newSSHDriver(session.CreateSessionRequest{
+		Config: map[string]interface{}{
+			"host":           "example.com",
+			"hostKeyPolicy":  "strict",
+			"knownHostsPath": "/tmp/galaxyterm-known-hosts",
+		},
+		Auth: map[string]interface{}{
+			"username": "root",
+			"password": "secret",
+		},
+	})
+	if err != nil {
+		t.Fatalf("newSSHDriver returned error: %v", err)
+	}
+	if driver.hostKeyPolicy != "strict" || driver.knownHostsPath != "/tmp/galaxyterm-known-hosts" {
+		t.Fatalf("host key settings = %q, %q", driver.hostKeyPolicy, driver.knownHostsPath)
+	}
+}
+
+func TestNewSSHDriverRejectsUnsupportedHostKeyPolicy(t *testing.T) {
+	_, err := newSSHDriver(session.CreateSessionRequest{
+		Config: map[string]interface{}{
+			"host":          "example.com",
+			"hostKeyPolicy": "insecure",
+		},
+		Auth: map[string]interface{}{
+			"username": "root",
+			"password": "secret",
+		},
+	})
+	if err == nil {
+		t.Fatal("newSSHDriver accepted unsupported host key policy")
+	}
+}
+
 func TestTestSSHConnectionValidatesConfig(t *testing.T) {
 	api := NewAPI()
 	err := api.TestSSHConnection(session.CreateSessionRequest{

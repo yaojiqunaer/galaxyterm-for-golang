@@ -15,6 +15,7 @@ import {
   buildSavedSshConnections,
   buildSshConnectionAuth,
   buildSshProfileFields,
+  buildSshSecurityConfig,
   buildTunnelDisplay,
   buildTunnelSummary,
 } from './remoteWorkspace.js';
@@ -147,17 +148,44 @@ assert.deepEqual(buildSshProfileFields({
   id: 'favorite',
   displayName: 'Production',
   providerType: 'ssh',
-  config: { host: 'prod.example.com', port: 2222 },
+  config: {
+    host: 'prod.example.com',
+    hostKeyPolicy: 'strict',
+    knownHostsPath: '/Users/me/.ssh/known_hosts',
+    port: 2222,
+  },
   auth: { username: 'root', authType: 'privateKey', privateKey: 'must-not-leak' },
 }), {
   authType: 'privateKey',
   displayName: 'Production',
   host: 'prod.example.com',
+  hostKeyPolicy: 'strict',
+  knownHostsPath: '/Users/me/.ssh/known_hosts',
   port: 2222,
   profileId: 'favorite',
   username: 'root',
 });
 assert.equal(buildSshProfileFields({ providerType: 'local' }), null);
+
+assert.deepEqual(buildSshSecurityConfig({}, null), {
+  hostKeyPolicy: 'accept-new',
+  knownHostsPath: '',
+});
+assert.deepEqual(buildSshSecurityConfig({}, {
+  config: { hostKeyPolicy: 'strict', knownHostsPath: '/shared/known_hosts' },
+}), {
+  hostKeyPolicy: 'strict',
+  knownHostsPath: '/shared/known_hosts',
+});
+assert.deepEqual(buildSshSecurityConfig({
+  hostKeyPolicy: 'accept-new',
+  knownHostsPath: '/one-time/known_hosts',
+}, {
+  config: { hostKeyPolicy: 'strict', knownHostsPath: '/shared/known_hosts' },
+}), {
+  hostKeyPolicy: 'accept-new',
+  knownHostsPath: '/one-time/known_hosts',
+});
 
 assert.deepEqual(buildSshConnectionAuth({
   authType: 'password',

@@ -5,16 +5,16 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"net"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
 	"time"
 
+	"galaxyterm/internal/sshsecurity"
+
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
-	"golang.org/x/crypto/ssh/knownhosts"
 )
 
 const maxTextFileSize = 12 << 20
@@ -371,49 +371,10 @@ func sshAuthMethods(request normalizedRequest) ([]ssh.AuthMethod, error) {
 }
 
 func hostKeyCallback(request normalizedRequest) (ssh.HostKeyCallback, error) {
-	knownHostsPath := request.KnownHostsPath
-	if knownHostsPath == "" {
-		configDir, err := os.UserConfigDir()
-		if err != nil {
-			return nil, err
-		}
-		knownHostsPath = filepath.Join(configDir, "GalaxyTerm", "security", "known_hosts")
-	}
-	if err := os.MkdirAll(filepath.Dir(knownHostsPath), 0o700); err != nil {
-		return nil, err
-	}
-	file, err := os.OpenFile(knownHostsPath, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0o600)
-	if err != nil {
-		return nil, err
-	}
-	if err := file.Close(); err != nil {
-		return nil, err
-	}
-	verify, err := knownhosts.New(knownHostsPath)
-	if err != nil {
-		return nil, err
-	}
-	return func(hostname string, remote net.Addr, key ssh.PublicKey) error {
-		err := verify(hostname, remote, key)
-		if err == nil || request.HostKeyPolicy == "strict" {
-			return err
-		}
-		var keyError *knownhosts.KeyError
-		if !errors.As(err, &keyError) || len(keyError.Want) > 0 {
-			return err
-		}
-		line := knownhosts.Line([]string{knownhosts.Normalize(hostname)}, key) + "\n"
-		handle, openErr := os.OpenFile(knownHostsPath, os.O_APPEND|os.O_WRONLY, 0o600)
-		if openErr != nil {
-			return openErr
-		}
-		_, writeErr := handle.WriteString(line)
-		closeErr := handle.Close()
-		if writeErr != nil {
-			return writeErr
-		}
-		return closeErr
-	}, nil
+	return sshsecurity.NewHostKeyCallback(
+		sshsecurity.Policy(request.HostKeyPolicy),
+		request.KnownHostsPath,
+	)
 }
 
 func newFileEntry(parent string, info fs.FileInfo) fileEntry {
