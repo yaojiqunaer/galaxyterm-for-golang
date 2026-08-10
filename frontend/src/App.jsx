@@ -359,7 +359,16 @@ import SshSecurityFields from './components/SshSecurityFields.jsx';
 import FileProviderFormFields from './components/FileProviderFormFields.jsx';
 import OperationErrorDescription from './components/OperationErrorDescription.jsx';
 import TerminalSearchControl from './components/TerminalSearchControl.jsx';
+import TunnelWorkspaceList from './components/TunnelWorkspaceList.jsx';
 import { buildOperationError } from './operationFeedback.js';
+import {
+  buildTunnelPreset,
+  duplicateTunnelPreset,
+  loadTunnelPresets,
+  persistTunnelPresets,
+  removeTunnelPreset,
+  upsertTunnelPreset,
+} from './tunnelPresets.js';
 import {
   defaultTerminalSearchPreferences,
   emptyTerminalSearchResult,
@@ -478,6 +487,9 @@ function App() {
   const [remoteExtensionCatalog, setRemoteExtensionCatalog] = useState([]);
   const [extensionSourceStates, setExtensionSourceStates] = useState({});
   const [tunnels, setTunnels] = useState([]);
+  const [tunnelPresets, setTunnelPresets] = useState(() => loadTunnelPresets());
+  const [editingTunnelPresetId, setEditingTunnelPresetId] = useState('');
+  const [tunnelPresetQuery, setTunnelPresetQuery] = useState('');
   const [activeKey, setActiveKey] = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [terminalDrawerIntent, setTerminalDrawerIntent] = useState('session');
@@ -586,6 +598,7 @@ function App() {
   const watchedFilePath = Form.useWatch('path', fileForm);
   const watchedJumpHost = Form.useWatch('jumpHost', form);
   const pasteConfirmationPending = useRef(false);
+  const tunnelBusyRef = useRef(false);
   const fileTransferCleanupRef = useRef(null);
   const canceledTransferIdsRef = useRef(new Set());
   const extensionOperationBusy = extensionOfflineInstalling
@@ -876,7 +889,11 @@ function App() {
     const syncTunnels = () => Promise.resolve()
       .then(() => TunnelAPI.List())
       .then((items) => {
-        if (active) setTunnels(Array.isArray(items) ? items : []);
+        if (!active) return;
+        setTunnels((current) => (Array.isArray(items) ? items : []).map((item) => ({
+          ...item,
+          presetId: current.find((existing) => existing.id === item.id)?.presetId || '',
+        })));
       })
       .catch(() => {});
     syncTunnels();
@@ -3261,6 +3278,7 @@ function App() {
     if (action === 'connect') runConnectionProfileNewAction(profile);
     if (action === 'test') testConnectionProfile(profile);
     if (action === 'edit') openProfileEditor(profile);
+    if (action === 'portForwarding') openTunnelForProfile(profile);
     if (action === 'rename') openProfileEditor(profile);
     if (action === 'duplicate') duplicateProfile(profile);
     if (action === 'favorite' || action === 'unfavorite') toggleProfileFavorite(profile.id);
@@ -4158,6 +4176,7 @@ function App() {
       launching={isProfileConnectionLaunching(profile, connectionLaunchKeys)}
       providers={connectionProviders}
       openProfileEditor={openProfileEditor}
+      openTunnelForProfile={openTunnelForProfile}
       duplicateProfile={duplicateProfile}
       profileSessionSummary={profileSessionSummary}
       runConnectionProfileLaunchAction={runConnectionProfileLaunchAction}
@@ -5325,6 +5344,122 @@ function App() {
     });
   };
 
+  const resetTunnelEditor = (profileId = '') => {
+    setEditingTunnelPresetId('');
+    setTunnelProfileId('');
+    setTunnelAuthType('password');
+    tunnelForm.resetFields();
+    tunnelForm.setFieldsValue({
+      name: '',
+      profileId: '',
+      sshAgentSocketPath: '',
+      sshAuthType: 'password',
+      sshConnectTimeoutSeconds: 10,
+      sshHost: '',
+      sshHostKeyPolicy: 'accept-new',
+      sshKeepAliveIntervalSeconds: 0,
+      sshKeepAliveMaxFailures: 3,
+      sshKnownHostsPath: '',
+      sshPassphrase: '',
+      sshPassword: '',
+      sshPort: 22,
+      sshPrivateKey: '',
+      sshUser: '',
+      localHost: '127.0.0.1',
+      localPort: undefined,
+      remoteHost: '',
+      remotePort: undefined,
+    });
+    if (profileId) selectTunnelSshProfile(profileId);
+  };
+
+  const openTunnelForProfile = (profile) => {
+    setSelectedNav('tunnels');
+    resetTunnelEditor(profile?.providerType === 'ssh' ? profile.id : '');
+  };
+
+  const editTunnelPreset = (preset) => {
+    resetTunnelEditor(preset.profileId);
+    setEditingTunnelPresetId(preset.id);
+    tunnelForm.setFieldsValue({
+      name: preset.name,
+      localHost: preset.localHost,
+      localPort: preset.localPort,
+      remoteHost: preset.remoteHost,
+      remotePort: preset.remotePort,
+    });
+  };
+
+  const commitTunnelPresets = (nextPresets, successKey, successValues = {}) => {
+    const result = persistTunnelPresets(nextPresets);
+    setTunnelPresets(result.presets);
+    messageApi.success(t(successKey, successValues));
+    if (!result.persisted) messageApi.warning(t('message.tunnelPresetStorageFailed'));
+    return result.presets;
+  };
+
+  const saveTunnelPreset = async () => {
+    let values;
+    try {
+      values = await tunnelForm.validateFields([
+        'name',
+        'profileId',
+        'localHost',
+        'localPort',
+        'remoteHost',
+        'remotePort',
+      ]);
+    } catch {
+      return;
+    }
+    if (!tunnelProfileId) {
+      messageApi.warning(t('message.tunnelPresetRequiresProfile'));
+      return;
+    }
+    const existing = tunnelPresets.find((item) => item.id === editingTunnelPresetId);
+    const preset = buildTunnelPreset({
+      ...values,
+      profileId: tunnelProfileId,
+    }, { existing });
+    if (!preset) {
+      messageApi.warning(t('validation.tunnelPresetIncomplete'));
+      return;
+    }
+    const next = upsertTunnelPreset(tunnelPresets, preset);
+    commitTunnelPresets(
+      next,
+      existing ? 'message.tunnelPresetUpdated' : 'message.tunnelPresetSaved',
+      { name: preset.name },
+    );
+    setEditingTunnelPresetId(preset.id);
+  };
+
+  const duplicateTunnelPresetConfig = (preset) => {
+    const copy = duplicateTunnelPreset(preset, {
+      name: t('tunnel.copyName', { name: preset.name }),
+    });
+    if (!copy) return;
+    commitTunnelPresets(
+      upsertTunnelPreset(tunnelPresets, copy),
+      'message.tunnelPresetDuplicated',
+      { name: copy.name },
+    );
+  };
+
+  const confirmRemoveTunnelPreset = (preset) => requestDangerousAction({
+    contentKey: 'confirm.deleteTunnelPresetContent',
+    contentValues: { name: preset.name },
+    onConfirm: () => {
+      commitTunnelPresets(
+        removeTunnelPreset(tunnelPresets, preset.id),
+        'message.tunnelPresetRemoved',
+        { name: preset.name },
+      );
+      if (editingTunnelPresetId === preset.id) resetTunnelEditor();
+    },
+    titleKey: 'confirm.deleteTunnelPresetTitle',
+  });
+
   const loadFiles = async (overridePath = null) => {
     if (!selectedFileProvider) {
       messageApi.warning(t('file.noProviderHint'));
@@ -6486,11 +6621,12 @@ function App() {
     </div>
   );
 
-  const startTunnel = async () => {
-    const values = await tunnelForm.validateFields();
+  const executeTunnelStart = async (values, selectedProfileId = '', presetId = '') => {
+    if (tunnelBusyRef.current) return;
+    tunnelBusyRef.current = true;
     setTunnelBusy(true);
     try {
-      const resolvedProfile = await resolveSelectedSshProfile(tunnelProfileId);
+      const resolvedProfile = await resolveSelectedSshProfile(selectedProfileId);
       const auth = buildSshConnectionAuth({
         authType: values.sshAuthType,
         passphrase: values.sshPassphrase,
@@ -6529,16 +6665,56 @@ function App() {
         remoteHost: values.remoteHost,
         remotePort: values.remotePort,
       });
-      setTunnels((current) => [...current, info]);
+      setTunnels((current) => [...current, { ...info, presetId }]);
       messageApi.success(t('message.tunnelStarted'));
     } catch (error) {
       showOperationError('message.tunnelFailed', error);
     } finally {
+      tunnelBusyRef.current = false;
       setTunnelBusy(false);
     }
   };
 
+  const startTunnel = async () => {
+    let values;
+    try {
+      values = await tunnelForm.validateFields();
+    } catch {
+      return;
+    }
+    return executeTunnelStart(values, tunnelProfileId, editingTunnelPresetId);
+  };
+
+  const startTunnelPreset = (preset) => {
+    const profile = profiles.find((item) => item.id === preset.profileId && item.providerType === 'ssh');
+    const fields = buildSshProfileFields(profile);
+    if (!fields) {
+      messageApi.warning(t('tunnel.profileUnavailable'));
+      return;
+    }
+    const values = {
+      name: preset.name,
+      localHost: preset.localHost,
+      localPort: preset.localPort,
+      remoteHost: preset.remoteHost,
+      remotePort: preset.remotePort,
+      sshAgentSocketPath: fields.agentSocketPath,
+      sshAuthType: fields.authType,
+      sshConnectTimeoutSeconds: fields.connectTimeoutSeconds,
+      sshHost: fields.host,
+      sshHostKeyPolicy: fields.hostKeyPolicy,
+      sshKeepAliveIntervalSeconds: fields.keepAliveIntervalSeconds,
+      sshKeepAliveMaxFailures: fields.keepAliveMaxFailures,
+      sshKnownHostsPath: fields.knownHostsPath,
+      sshPort: fields.port,
+      sshUser: fields.username,
+    };
+    return executeTunnelStart(values, preset.profileId, preset.id);
+  };
+
   const stopTunnel = async (id) => {
+    if (!id || tunnelBusyRef.current) return;
+    tunnelBusyRef.current = true;
     setTunnelBusy(true);
     try {
       await TunnelAPI.Stop(id);
@@ -6549,6 +6725,7 @@ function App() {
         retry: () => stopTunnel(id),
       });
     } finally {
+      tunnelBusyRef.current = false;
       setTunnelBusy(false);
     }
   };
@@ -6575,7 +6752,7 @@ function App() {
             <Text type="secondary">{t('nav.tunnels')}</Text>
             <Title level={3}>{t('section.tunnels')}</Title>
           </div>
-          <Button type="primary" onClick={startTunnel} loading={tunnelBusy}>{t('action.create')}</Button>
+          <Button icon={<PlusOutlined />} onClick={() => resetTunnelEditor()}>{t('action.newForwardingRule')}</Button>
         </div>
         <div className="remote-summary-grid">
           <MetricCard
@@ -6583,12 +6760,12 @@ function App() {
             value={tunnelSummary.active}
             meta={tunnelSummary.failed > 0 ? t('tunnel.failedCount', { count: tunnelSummary.failed }) : ''}
           />
+          <MetricCard label={t('metric.savedTunnelRules')} value={tunnelPresets.length} />
           <MetricCard label={t('metric.localPorts')} value={tunnelSummary.localPorts.length || 0} meta={tunnelSummary.localPorts.join(', ')} />
-          <MetricCard label={t('metric.remoteHosts')} value={tunnelSummary.remoteHosts.length || 0} meta={tunnelSummary.remoteHosts.join(', ')} />
         </div>
         <div className="tunnel-workbench">
           <div className="remote-context-panel">
-            <Text strong>{t('section.quickConnect')}</Text>
+            <Text strong>{t(editingTunnelPresetId ? 'section.editTunnelRule' : 'section.newTunnelRule')}</Text>
             <Text type="secondary">{t('tunnel.formHint')}</Text>
             <Form
               form={tunnelForm}
@@ -6695,59 +6872,33 @@ function App() {
                   <InputNumber min={1} max={65535} />
                 </Form.Item>
               </Space>
+              <div className="tunnel-form-actions">
+                <Button type="primary" loading={tunnelBusy} onClick={() => startTunnel()}>{t('action.start')}</Button>
+                <Button
+                  disabled={!tunnelProfileId}
+                  icon={<SaveOutlined />}
+                  onClick={saveTunnelPreset}
+                >
+                  {t(editingTunnelPresetId ? 'action.updateForwardingRule' : 'action.saveForwardingRule')}
+                </Button>
+              </div>
             </Form>
           </div>
-          <div className="remote-file-panel">
-            <div className="remote-file-toolbar">
-              <div>
-                <Text strong>{t('section.tunnels')}</Text>
-                <Text type="secondary">{t('tunnel.listHint')}</Text>
-              </div>
-            </div>
-            <List
-              className="profile-list tunnel-list"
-              dataSource={tunnels}
-              locale={{
-                emptyText: (
-                  <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description={t('empty.noTunnels')}>
-                    <Button type="primary" onClick={startTunnel} loading={tunnelBusy}>{t('action.create')}</Button>
-                  </Empty>
-                ),
-              }}
-              renderItem={(item) => {
-                const display = buildTunnelDisplay(item);
-                const failed = display.status === 'error';
-                return (
-                  <List.Item
-                    className={failed ? 'tunnel-row is-error' : 'tunnel-row'}
-                    actions={[
-                      failed
-                        ? <Button key="remove" danger size="small" icon={<DeleteOutlined />} loading={tunnelBusy} onClick={() => stopTunnel(item.id)}>{t('action.remove')}</Button>
-                        : <Button key="stop" danger size="small" icon={<StopOutlined />} loading={tunnelBusy} onClick={() => confirmStopTunnel(item, display)}>{t('action.stop')}</Button>,
-                    ]}
-                  >
-                    <List.Item.Meta
-                      avatar={<span className="provider-icon"><ApiOutlined /></span>}
-                      title={(
-                        <span className="remote-file-title">
-                          <strong>{display.name}</strong>
-                          <span className="connection-profile-badge tone-success">{display.localPort}</span>
-                          {failed && <Tag color="error">{t('session.status.error')}</Tag>}
-                        </span>
-                      )}
-                      description={(
-                        <span className="tunnel-route">
-                          <span>{display.route}</span>
-                          <small>{t('tunnel.via')} {display.via}</small>
-                          {failed && <small className="tunnel-error" title={display.error}>{display.error || t('message.tunnelFailed')}</small>}
-                        </span>
-                      )}
-                    />
-                  </List.Item>
-                );
-              }}
-            />
-          </div>
+          <TunnelWorkspaceList
+            busy={tunnelBusy}
+            onDuplicatePreset={duplicateTunnelPresetConfig}
+            onEditPreset={editTunnelPreset}
+            onNewPreset={() => resetTunnelEditor()}
+            onQueryChange={setTunnelPresetQuery}
+            onRemovePreset={confirmRemoveTunnelPreset}
+            onRemoveRuntime={(item) => stopTunnel(item.id)}
+            onStartPreset={startTunnelPreset}
+            onStopRuntime={(item) => confirmStopTunnel(item, buildTunnelDisplay(item))}
+            presets={tunnelPresets}
+            profiles={profiles}
+            query={tunnelPresetQuery}
+            tunnels={tunnels}
+          />
         </div>
       </div>
     );
@@ -8387,6 +8538,7 @@ function ConnectionProfilePreview({
   health = null,
   launching = false,
   openProfileEditor,
+  openTunnelForProfile,
   profile,
   profileSessionSummary,
   providers,
@@ -8452,6 +8604,9 @@ function ConnectionProfilePreview({
           </Button>
         )}
         <Button size="small" icon={<EditOutlined />} onClick={() => openProfileEditor(profile)}>{t('action.edit')}</Button>
+        {profile.providerType === 'ssh' && (
+          <Button size="small" icon={<ApiOutlined />} onClick={() => openTunnelForProfile(profile)}>{t('action.portForwarding')}</Button>
+        )}
         <Button
           disabled={profile.providerType === 'local' || !providerAvailable || health?.status === 'checking'}
           icon={<ApiOutlined />}
@@ -8550,6 +8705,7 @@ function SessionTabLabel({
 function connectionProfileActionIcon(action) {
   if (action === 'connect') return <PlusOutlined />;
   if (action === 'edit' || action === 'rename') return <EditOutlined />;
+  if (action === 'portForwarding') return <ApiOutlined />;
   if (action === 'duplicate') return <CopyOutlined />;
   if (action === 'favorite') return <StarOutlined />;
   if (action === 'unfavorite') return <StarFilled />;

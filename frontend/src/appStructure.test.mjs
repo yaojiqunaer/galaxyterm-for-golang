@@ -16,6 +16,7 @@ const commandHistoryPanelSource = await readFile(new URL('./components/CommandHi
 const terminalPaneSource = await readFile(new URL('./components/TerminalPane.jsx', import.meta.url), 'utf8');
 const terminalSearchControlSource = await readFile(new URL('./components/TerminalSearchControl.jsx', import.meta.url), 'utf8').catch(() => '');
 const terminalSearchSource = await readFile(new URL('./terminalSearch.js', import.meta.url), 'utf8').catch(() => '');
+const tunnelWorkspaceListSource = await readFile(new URL('./components/TunnelWorkspaceList.jsx', import.meta.url), 'utf8').catch(() => '');
 const workspaceStateSource = await readFile(new URL('./workspaceState.js', import.meta.url), 'utf8');
 const savedSshProfileSource = await readFile(new URL('./components/SavedSSHProfileSelect.jsx', import.meta.url), 'utf8');
 const sshSecurityFieldsSource = await readFile(new URL('./components/SshSecurityFields.jsx', import.meta.url), 'utf8').catch(() => '');
@@ -821,7 +822,8 @@ assert.ok(
     && source.includes('return requestDangerousAction({')
     && source.includes('const confirmDeleteExtensionSource = (source) => requestDangerousAction({')
     && source.includes('const confirmDeleteQuickCommand = (command) => requestDangerousAction({')
-    && source.includes('const confirmStopTunnel = (tunnel, display) => requestDangerousAction({'),
+    && source.includes('const confirmStopTunnel = (tunnel, display) => requestDangerousAction({')
+    && source.includes('const confirmRemoveTunnelPreset = (preset) => requestDangerousAction({'),
   'persistent data removal, extension uninstall, and tunnel stop must share the dangerous-action preference',
 );
 assert.ok(
@@ -831,8 +833,9 @@ assert.ok(
     && source.includes('onClick={() => confirmDeleteExtensionSource(source)}')
     && source.includes('onDelete={confirmDeleteQuickCommand}')
     && quickCommandLibrarySource.includes("if (key === 'delete') onDelete?.(item);")
-    && source.includes('onClick={() => confirmStopTunnel(item, display)}')
-    && source.includes("{t('action.stop')}</Button>"),
+    && source.includes('onStopRuntime={(item) => confirmStopTunnel(item, buildTunnelDisplay(item))}')
+    && tunnelWorkspaceListSource.includes('onClick={() => onStopRuntime?.(item)}')
+    && tunnelWorkspaceListSource.includes("{t('action.stop')}"),
   'all destructive controls must call their contextual confirmation wrapper',
 );
 assert.ok(
@@ -975,9 +978,22 @@ assert.ok(
   source.includes("if (selectedNav !== 'tunnels') return undefined;")
     && source.includes('TunnelAPI.List()')
     && source.includes('window.setInterval(syncTunnels, 5000)')
-    && source.includes("const failed = display.status === 'error';")
+    && tunnelWorkspaceListSource.includes("const failed = display.status === 'error';")
     && source.includes("t('tunnel.failedCount', { count: tunnelSummary.failed })"),
   'the tunnel workspace must reconcile backend keepalive failures without requiring a page reload',
+);
+assert.ok(
+  source.includes("const [tunnelPresets, setTunnelPresets] = useState(() => loadTunnelPresets());")
+    && source.includes("if (action === 'portForwarding') openTunnelForProfile(profile);")
+    && source.includes('persistTunnelPresets(nextPresets)')
+    && source.includes('executeTunnelStart(values, tunnelProfileId, editingTunnelPresetId)')
+    && source.includes('executeTunnelStart(values, preset.profileId, preset.id)')
+    && source.includes('<TunnelWorkspaceList')
+    && source.includes('onDuplicatePreset={duplicateTunnelPresetConfig}')
+    && source.includes('onEditPreset={editTunnelPreset}')
+    && source.includes('onRemovePreset={confirmRemoveTunnelPreset}')
+    && source.includes('onStartPreset={startTunnelPreset}'),
+  'saved SSH connections must provide credential-safe reusable port-forwarding rules',
 );
 assert.ok(
   source.includes("confirmCloseDirectionalSessions('left', session.id)")

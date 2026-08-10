@@ -33,6 +33,7 @@
     "test:terminal-interaction": "node src/terminalInteraction.test.mjs",
     "test:terminal-providers": "node src/terminalProviders.test.mjs",
     "test:terminal-execution": "node src/terminalExecution.test.mjs",
+    "test:tunnel-presets": "node src/tunnelPresets.test.mjs",
     "test:workspace": "node src/workspaceState.test.mjs",
     "test:ssh-config": "node src/sshConfigProfiles.test.mjs"
   },

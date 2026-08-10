@@ -1087,5 +1087,6 @@ assert.deepEqual(reorderSessions(orderedSessions, 's3', 's1').map((session) => s
 ]);
 assert.equal(reorderSessions(orderedSessions, 'missing', 's1'), orderedSessions);
 
-assert.deepEqual(profileActionModel({ favorite: false }), ['connect', 'edit', 'rename', 'duplicate', 'favorite', 'delete']);
+assert.deepEqual(profileActionModel({ providerType: 'ssh', favorite: false }), ['connect', 'edit', 'portForwarding', 'rename', 'duplicate', 'favorite', 'delete']);
+assert.deepEqual(profileActionModel({ providerType: 'redis', favorite: false }), ['connect', 'edit', 'rename', 'duplicate', 'favorite', 'delete']);
 assert.deepEqual(profileActionModel({ favorite: true }), ['connect', 'edit', 'rename', 'duplicate', 'unfavorite', 'delete']);

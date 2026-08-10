@@ -700,11 +700,12 @@ export function profileActionModel(profile = {}) {
   return [
     'connect',
     'edit',
+    profile.providerType === 'ssh' && 'portForwarding',
     'rename',
     'duplicate',
     profile.favorite ? 'unfavorite' : 'favorite',
     'delete',
-  ];
+  ].filter(Boolean);
 }
 
 function matchesSessionStatus(session, status) {

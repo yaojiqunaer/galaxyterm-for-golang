@@ -32,7 +32,7 @@ The core provides one shared file workspace while SFTP, FTP, S3, and future prot
 
 <details>
 <summary><b>🔀 SSH port forwarding</b></summary>
-Reuse saved SSH connections for local port forwarding with password, private-key, passphrase, or SSH Agent authentication. When no credential is stored, enter a password or private key for the current operation only. Port forwarding reuses the connection's authentication, connection timeout, SSH keepalive, and host-identity policy and never bypasses SSH verification.
+Reuse saved SSH connections for local port forwarding with password, private-key, passphrase, or SSH Agent authentication. Forwarding rules can be saved, searched, edited, duplicated, removed, and started with one click, or created directly from an SSH connection menu or detail view. A rule stores only the connection reference and forwarding endpoints, never passwords or private keys. Running, missing-connection, credential-required, and keepalive-failure states remain distinct. When no credential is stored, enter a password or private key for the current operation only. Port forwarding reuses the connection's authentication, connection timeout, SSH keepalive, and host-identity policy and never bypasses SSH verification.
 </details>
 
 <details>
