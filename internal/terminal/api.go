@@ -29,8 +29,8 @@ func (api *API) TestSSHConnection(req session.CreateSessionRequest) error {
 	if err != nil {
 		return err
 	}
-	config.Timeout = 8 * time.Second
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	config.Timeout = driver.network.ConnectTimeout
+	ctx, cancel := context.WithTimeout(context.Background(), driver.network.ConnectTimeout+2*time.Second)
 	defer cancel()
 
 	result := make(chan error, 1)

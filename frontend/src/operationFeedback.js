@@ -35,7 +35,7 @@ const reasonMatchers = [
   },
   {
     reason: 'network',
-    pattern: /\b(?:connection refused|connection reset|network|no route|host unreachable|dial tcp|dns|socket)\b/i,
+    pattern: /\b(?:connection refused|connection reset|network|no route|host unreachable|dial tcp|dns|socket|keepalive)\b/i,
     retryable: true,
   },
 ];

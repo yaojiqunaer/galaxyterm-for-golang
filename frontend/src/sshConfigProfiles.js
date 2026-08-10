@@ -25,7 +25,10 @@ export function parseSshConfigProfiles(content, options = {}) {
           group: sshConfigGroup,
           config: {
             agentSocketPath: '',
+            connectTimeoutSeconds: 10,
             host: alias,
+            keepAliveIntervalSeconds: 0,
+            keepAliveMaxFailures: 3,
             port: 22,
             identityFile: '',
           },
@@ -52,6 +55,15 @@ export function parseSshConfigProfiles(content, options = {}) {
         profile.config.agentSocketPath = value;
         profile.auth.authType = 'agent';
       }
+      if (key === 'connecttimeout') {
+        profile.config.connectTimeoutSeconds = normalizeInteger(value, 1, 120, 10);
+      }
+      if (key === 'serveraliveinterval') {
+        profile.config.keepAliveIntervalSeconds = normalizeKeepAliveInterval(value);
+      }
+      if (key === 'serveralivecountmax') {
+        profile.config.keepAliveMaxFailures = normalizeInteger(value, 1, 10, 3);
+      }
     });
   });
 
@@ -62,6 +74,19 @@ function normalizePort(value) {
   const port = Number(value);
   if (!Number.isInteger(port) || port < 1 || port > 65535) return 22;
   return port;
+}
+
+function normalizeInteger(value, min, max, fallback) {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < min || parsed > max) return fallback;
+  return parsed;
+}
+
+function normalizeKeepAliveInterval(value) {
+  const parsed = Number(value);
+  if (parsed === 0) return 0;
+  if (!Number.isInteger(parsed) || parsed < 5 || parsed > 300) return 0;
+  return parsed;
 }
 
 function stripInlineComment(line) {

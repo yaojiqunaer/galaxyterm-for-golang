@@ -35,14 +35,44 @@ export function buildSshProfileFields(profile = {}) {
   return {
     authType: profile.auth?.authType || 'password',
     agentSocketPath: profile.config?.agentSocketPath || '',
+    connectTimeoutSeconds: profile.config?.connectTimeoutSeconds ?? 10,
     displayName: profile.displayName || '',
     host: profile.config?.host || '',
     hostKeyPolicy: profile.config?.hostKeyPolicy || 'accept-new',
     knownHostsPath: profile.config?.knownHostsPath || '',
+    keepAliveIntervalSeconds: profile.config?.keepAliveIntervalSeconds ?? 0,
+    keepAliveMaxFailures: profile.config?.keepAliveMaxFailures ?? 3,
     port: profile.config?.port || 22,
     profileId: profile.id || '',
     username: profile.auth?.username || '',
   };
+}
+
+export function buildSshNetworkConfig(fields = {}, resolvedProfileRequest = null) {
+  const resolvedConfig = resolvedProfileRequest?.config || {};
+  return {
+    connectTimeoutSeconds: numericConfigValue(
+      fields.connectTimeoutSeconds,
+      resolvedConfig.connectTimeoutSeconds,
+      10,
+    ),
+    keepAliveIntervalSeconds: numericConfigValue(
+      fields.keepAliveIntervalSeconds,
+      resolvedConfig.keepAliveIntervalSeconds,
+      0,
+    ),
+    keepAliveMaxFailures: numericConfigValue(
+      fields.keepAliveMaxFailures,
+      resolvedConfig.keepAliveMaxFailures,
+      3,
+    ),
+  };
+}
+
+function numericConfigValue(primary, secondary, fallback) {
+  const value = primary ?? secondary ?? fallback;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
 }
 
 export function buildSshAgentConfig(fields = {}, resolvedProfileRequest = null) {
@@ -301,11 +331,14 @@ function splitAddress(address = '') {
 }
 
 export function buildTunnelSummary(tunnels = []) {
+  const activeTunnels = tunnels.filter((item) => item?.status !== 'error');
   return {
     total: tunnels.length,
-    localPorts: tunnels.map((item) => splitAddress(item.localAddr).port).filter(Boolean),
-    remoteHosts: [...new Set(tunnels.map((item) => splitAddress(item.remoteAddr).host).filter(Boolean))],
-    sshHosts: [...new Set(tunnels.map((item) => splitAddress(item.sshAddr).host).filter(Boolean))],
+    active: activeTunnels.length,
+    failed: tunnels.length - activeTunnels.length,
+    localPorts: activeTunnels.map((item) => splitAddress(item.localAddr).port).filter(Boolean),
+    remoteHosts: [...new Set(activeTunnels.map((item) => splitAddress(item.remoteAddr).host).filter(Boolean))],
+    sshHosts: [...new Set(activeTunnels.map((item) => splitAddress(item.sshAddr).host).filter(Boolean))],
   };
 }
 
@@ -324,5 +357,7 @@ export function buildTunnelDisplay(tunnel = {}) {
     remoteHost: remote.host,
     remotePort: remote.port,
     sshHost: ssh.host,
+    status: tunnel.status === 'error' ? 'error' : 'active',
+    error: String(tunnel.error || '').trim(),
   };
 }

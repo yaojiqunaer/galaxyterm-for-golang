@@ -551,6 +551,11 @@ export function buildConnectionProfileFacts(profile = {}, { defaultShellLabel = 
       { key: 'username', value: profile.auth?.username || '-' },
       { key: 'authType', value: profile.auth?.authType || 'password' },
       { key: 'hostKeyPolicy', value: profile.config?.hostKeyPolicy || 'accept-new' },
+      { key: 'connectTimeout', value: profile.config?.connectTimeoutSeconds || 10 },
+      profile.config?.keepAliveIntervalSeconds > 0 && {
+        key: 'keepAlive',
+        value: profile.config.keepAliveIntervalSeconds,
+      },
       { key: 'lastUsed', value: profile.lastUsedAt || '' },
       profile.config?.jumpHost && { key: 'jumpHost', value: profile.config.jumpHost },
     ].filter(Boolean);

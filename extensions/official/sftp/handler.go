@@ -131,23 +131,36 @@ func normalizeRequest(request protocolRequest) (normalizedRequest, error) {
 	if hostKeyPolicy != "accept-new" && hostKeyPolicy != "strict" {
 		return normalizedRequest{}, &requestError{code: "invalid_request", message: "unsupported host key policy"}
 	}
+	connectTimeoutSeconds := intValue(request.Config, "connectTimeoutSeconds")
+	if connectTimeoutSeconds == 0 {
+		connectTimeoutSeconds = 30
+	}
+	network, err := sshsecurity.NormalizeNetworkConfig(
+		connectTimeoutSeconds,
+		0,
+		0,
+	)
+	if err != nil {
+		return normalizedRequest{}, &requestError{code: "invalid_request", message: err.Error()}
+	}
 	return normalizedRequest{
-		RequestID:       request.RequestID,
-		Operation:       request.Operation,
-		Host:            host,
-		Port:            port,
-		HostKeyPolicy:   hostKeyPolicy,
-		KnownHostsPath:  stringValue(request.Config, "knownHostsPath"),
-		AgentSocketPath: stringValue(request.Config, "agentSocketPath"),
-		Username:        username,
-		AuthType:        authType,
-		Password:        secretValue(request.Auth, "password"),
-		PrivateKey:      privateKey,
-		Passphrase:      secretValue(request.Auth, "passphrase"),
-		Path:            operationPath,
-		DestinationPath: destinationPath,
-		Content:         request.Content,
-		LocalPath:       localPath,
+		RequestID:             request.RequestID,
+		Operation:             request.Operation,
+		Host:                  host,
+		Port:                  port,
+		HostKeyPolicy:         hostKeyPolicy,
+		KnownHostsPath:        stringValue(request.Config, "knownHostsPath"),
+		AgentSocketPath:       stringValue(request.Config, "agentSocketPath"),
+		ConnectTimeoutSeconds: int(network.ConnectTimeout / time.Second),
+		Username:              username,
+		AuthType:              authType,
+		Password:              secretValue(request.Auth, "password"),
+		PrivateKey:            privateKey,
+		Passphrase:            secretValue(request.Auth, "passphrase"),
+		Path:                  operationPath,
+		DestinationPath:       destinationPath,
+		Content:               request.Content,
+		LocalPath:             localPath,
 	}, nil
 }
 
@@ -344,7 +357,7 @@ func dial(request normalizedRequest) (*ssh.Client, *sftp.Client, error) {
 		User:            request.Username,
 		Auth:            authMethods,
 		HostKeyCallback: hostKeyCallback,
-		Timeout:         30 * time.Second,
+		Timeout:         time.Duration(request.ConnectTimeoutSeconds) * time.Second,
 	})
 	if err != nil {
 		return nil, nil, err

@@ -126,7 +126,7 @@ SFTP Provider 复用已保存 SSH 连接的密码、私钥或 SSH Agent 认证�
       "manifest": {
         "id": "galaxyterm-extension-sftp",
         "name": "SFTP",
-        "version": "0.4.0",
+        "version": "0.5.0",
         "apiVersion": "v1",
         "description": "SFTP file provider for GalaxyTerm",
         "runtime": {
@@ -147,13 +147,13 @@ SFTP Provider 复用已保存 SSH 连接的密码、私钥或 SSH Agent 认证�
         {
           "os": "darwin",
           "arch": "arm64",
-          "url": "galaxyterm-extension-sftp_0.4.0_darwin_arm64.gtx",
+          "url": "galaxyterm-extension-sftp_0.5.0_darwin_arm64.gtx",
           "sha256": "<64 位十六进制 SHA-256>"
         },
         {
           "os": "linux",
           "arch": "amd64",
-          "url": "galaxyterm-extension-sftp_0.4.0_linux_amd64.gtx",
+          "url": "galaxyterm-extension-sftp_0.5.0_linux_amd64.gtx",
           "sha256": "<64 位十六进制 SHA-256>"
         }
       ]

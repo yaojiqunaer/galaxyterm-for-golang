@@ -19,6 +19,7 @@ import {
 } from '../terminalExecution.js';
 import { terminalSearchOptions } from '../terminalSearch.js';
 import {
+  buildTerminalEventError,
   isTerminalViewportAtBottom,
   normalizeTerminalExternalLink,
   shouldActivateTerminalLink,
@@ -357,7 +358,10 @@ function TerminalPane({
       });
       cleanupError = runtime.EventsOn(`terminal:error:${createdSessionId}`, (event) => {
         stopDurationTicker();
-        const message = event?.Error?.defaultMessage || event?.error?.defaultMessage || t('terminal.error.disconnected');
+        const eventError = buildTerminalEventError(event);
+        const message = eventError.messageKey
+          ? t(eventError.messageKey, eventError.fallback || t('terminal.error.disconnected'))
+          : eventError.fallback || t('terminal.error.disconnected');
         transcript.current.push(`\r\n${message}`);
         outputEvents.current.push({ time: elapsedSeconds(startedAt.current), data: `\r\n${message}` });
         emitStatus({

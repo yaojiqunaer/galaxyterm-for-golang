@@ -350,6 +350,21 @@ export function buildSessionTabMenuModel(options = {}) {
         disabled: options.sessionIndex >= sessionCount - 1,
       },
     );
+    actions.push(
+      {
+        key: 'closeLeft',
+        labelKey: 'action.closeLeftSessions',
+        disabled: Math.max(0, Number(options.closableLeftCount) || 0) <= 0,
+        danger: true,
+        dividerBefore: true,
+      },
+      {
+        key: 'closeRight',
+        labelKey: 'action.closeRightSessions',
+        disabled: Math.max(0, Number(options.closableRightCount) || 0) <= 0,
+        danger: true,
+      },
+    );
   }
   actions.push(
     {
@@ -499,31 +514,44 @@ export function buildSessionCloseConfirm(target) {
       titleKey: 'confirm.closeAllSessionsTitle',
     };
   }
-  if (target?.mode === 'all' || target?.mode === 'others' || target?.mode === 'closed') {
+  if (['all', 'others', 'closed', 'left', 'right'].includes(target?.mode)) {
     const sessions = target.sessions || [];
     if (sessions.length === 0) return null;
     const protectedCount = Math.max(0, Number(target.protectedCount) || 0);
     const mode = target.mode;
-    const config = mode === 'others'
-      ? {
+    const configs = {
+      others: {
         contentKey: 'confirm.closeOtherSessionsContent',
         protectedContentKey: 'confirm.closeOtherSessionsProtectedContent',
         okActionKey: 'action.closeOthers',
         titleKey: 'confirm.closeOtherSessionsTitle',
-      }
-      : mode === 'closed'
-        ? {
-          contentKey: 'confirm.closeClosedSessionsContent',
-          protectedContentKey: 'confirm.closeClosedSessionsProtectedContent',
-          okActionKey: 'action.closeClosed',
-          titleKey: 'confirm.closeClosedSessionsTitle',
-        }
-        : {
-          contentKey: 'confirm.closeAllSessionsContent',
-          protectedContentKey: 'confirm.closeAllSessionsProtectedContent',
-          okActionKey: 'action.closeAll',
-          titleKey: 'confirm.closeAllSessionsTitle',
-        };
+      },
+      closed: {
+        contentKey: 'confirm.closeClosedSessionsContent',
+        protectedContentKey: 'confirm.closeClosedSessionsProtectedContent',
+        okActionKey: 'action.closeClosed',
+        titleKey: 'confirm.closeClosedSessionsTitle',
+      },
+      left: {
+        contentKey: 'confirm.closeLeftSessionsContent',
+        protectedContentKey: 'confirm.closeLeftSessionsProtectedContent',
+        okActionKey: 'action.closeLeftSessions',
+        titleKey: 'confirm.closeLeftSessionsTitle',
+      },
+      right: {
+        contentKey: 'confirm.closeRightSessionsContent',
+        protectedContentKey: 'confirm.closeRightSessionsProtectedContent',
+        okActionKey: 'action.closeRightSessions',
+        titleKey: 'confirm.closeRightSessionsTitle',
+      },
+      all: {
+        contentKey: 'confirm.closeAllSessionsContent',
+        protectedContentKey: 'confirm.closeAllSessionsProtectedContent',
+        okActionKey: 'action.closeAll',
+        titleKey: 'confirm.closeAllSessionsTitle',
+      },
+    };
+    const config = configs[mode];
     return {
       contentKey: protectedCount > 0 ? config.protectedContentKey : config.contentKey,
       contentValues: {
@@ -548,10 +576,14 @@ export function buildSessionCloseConfirm(target) {
 }
 
 export function buildSessionClosePlan(sessions = [], options = {}) {
-  const mode = options.mode === 'others' || options.mode === 'closed' ? options.mode : 'all';
-  const candidates = sessions.filter((session) => {
+  const supportedModes = ['others', 'closed', 'left', 'right'];
+  const mode = supportedModes.includes(options.mode) ? options.mode : 'all';
+  const anchorIndex = sessions.findIndex((session) => session.id === options.anchorSessionId);
+  const candidates = sessions.filter((session, index) => {
     if (mode === 'others') return session.id !== options.keepSessionId;
     if (mode === 'closed') return sessionStatusLabel(session) === 'closed';
+    if (mode === 'left') return anchorIndex >= 0 && index < anchorIndex;
+    if (mode === 'right') return anchorIndex >= 0 && index > anchorIndex;
     return true;
   });
   return {

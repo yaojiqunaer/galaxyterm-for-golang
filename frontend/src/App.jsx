@@ -209,6 +209,7 @@ import {
   buildSavedSshConnections,
   buildSshAgentConfig,
   buildSshConnectionAuth,
+  buildSshNetworkConfig,
   buildSshProfileFields,
   buildSshSecurityConfig,
   buildTunnelDisplay,
@@ -353,6 +354,7 @@ import CommandHistoryPanel from './components/CommandHistoryPanel.jsx';
 import SessionQuickSwitcher from './components/SessionQuickSwitcher.jsx';
 import SavedSSHProfileSelect from './components/SavedSSHProfileSelect.jsx';
 import SshAgentSocketField from './components/SshAgentSocketField.jsx';
+import SshNetworkFields from './components/SshNetworkFields.jsx';
 import SshSecurityFields from './components/SshSecurityFields.jsx';
 import FileProviderFormFields from './components/FileProviderFormFields.jsx';
 import OperationErrorDescription from './components/OperationErrorDescription.jsx';
@@ -867,6 +869,23 @@ function App() {
       .then((items) => setInstalledExtensions(Array.isArray(items) ? items : []))
       .catch(() => setInstalledExtensions([]));
   }, []);
+
+  useEffect(() => {
+    if (selectedNav !== 'tunnels') return undefined;
+    let active = true;
+    const syncTunnels = () => Promise.resolve()
+      .then(() => TunnelAPI.List())
+      .then((items) => {
+        if (active) setTunnels(Array.isArray(items) ? items : []);
+      })
+      .catch(() => {});
+    syncTunnels();
+    const interval = window.setInterval(syncTunnels, 5000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+    };
+  }, [selectedNav]);
 
   useEffect(() => {
     let active = true;
@@ -1691,6 +1710,7 @@ function App() {
       password: '',
       authType: profile?.auth?.authType || 'password',
       agentSocketPath: profile?.config?.agentSocketPath || '',
+      connectTimeoutSeconds: profile?.config?.connectTimeoutSeconds ?? 10,
       privateKey: '',
       passphrase: '',
       jumpHost: profile?.config?.jumpHost || '',
@@ -1699,6 +1719,8 @@ function App() {
       jumpPassword: '',
       hostKeyPolicy: profile?.config?.hostKeyPolicy || 'accept-new',
       knownHostsPath: profile?.config?.knownHostsPath || '',
+      keepAliveIntervalSeconds: profile?.config?.keepAliveIntervalSeconds ?? 0,
+      keepAliveMaxFailures: profile?.config?.keepAliveMaxFailures ?? 3,
       credentialRef: profile?.auth?.credentialRef ? JSON.stringify(profile.auth.credentialRef) : '',
       rememberCredential: !!profile?.auth?.credentialRef,
       shell: profile?.config?.shell || '',
@@ -1724,8 +1746,11 @@ function App() {
         config: {},
         auth: {},
         agentSocketPath: '',
+        connectTimeoutSeconds: 10,
         hostKeyPolicy: providerType === 'ssh' ? 'accept-new' : undefined,
         knownHostsPath: '',
+        keepAliveIntervalSeconds: 0,
+        keepAliveMaxFailures: 3,
         rememberCredential: false,
       });
   };
@@ -2183,6 +2208,29 @@ function App() {
     }
     const confirm = buildSessionCloseConfirm({
       mode: 'others',
+      protectedCount: plan.protectedSessions.length,
+      sessions: plan.closingSessions,
+    });
+    if (!confirm) return;
+    modalApi.confirm({
+      title: t(confirm.titleKey),
+      content: t(confirm.contentKey, confirm.contentValues),
+      okButtonProps: { danger: true },
+      okText: t(confirm.okActionKey),
+      cancelText: t('action.cancel'),
+      onOk: () => closeSessionSet(plan.closingSessions),
+    });
+  };
+
+  const confirmCloseDirectionalSessions = (mode, anchorSessionId) => {
+    const plan = buildSessionClosePlan(sessions, { anchorSessionId, mode });
+    if (stopProtectedOnlyClose(plan)) return;
+    if (settings.confirmDangerousActions === false) {
+      closeSessionSet(plan.closingSessions);
+      return;
+    }
+    const confirm = buildSessionCloseConfirm({
+      mode,
       protectedCount: plan.protectedSessions.length,
       sessions: plan.closingSessions,
     });
@@ -3823,6 +3871,8 @@ function App() {
     if (action === 'duplicate') duplicateSession(session);
     if (action === 'moveLeft') setSessions((current) => moveSessionInOrder(current, session.id, 'previous'));
     if (action === 'moveRight') setSessions((current) => moveSessionInOrder(current, session.id, 'next'));
+    if (action === 'closeLeft') confirmCloseDirectionalSessions('left', session.id);
+    if (action === 'closeRight') confirmCloseDirectionalSessions('right', session.id);
     if (action === 'closeOthers') confirmCloseOtherSessions(session.id);
     if (action === 'closeCurrent') confirmRemoveSession(session.id);
   };
@@ -3834,8 +3884,18 @@ function App() {
       keepSessionId: session.id,
       mode: 'others',
     });
+    const closeLeftPlan = buildSessionClosePlan(sessions, {
+      anchorSessionId: session.id,
+      mode: 'left',
+    });
+    const closeRightPlan = buildSessionClosePlan(sessions, {
+      anchorSessionId: session.id,
+      mode: 'right',
+    });
     const menuItems = buildSessionTabMenuModel({
+      closableLeftCount: closeLeftPlan.closingSessions.length,
       closableOtherCount: closeOtherPlan.closingSessions.length,
+      closableRightCount: closeRightPlan.closingSessions.length,
       hasTarget: Boolean(identityDisplay?.copyValue),
       protected: session.protected,
       reconnecting,
@@ -5139,6 +5199,9 @@ function App() {
       authType: fields.authType,
       host: fields.host,
       hostKeyPolicy: fields.hostKeyPolicy,
+      connectTimeoutSeconds: fields.connectTimeoutSeconds,
+      keepAliveIntervalSeconds: fields.keepAliveIntervalSeconds,
+      keepAliveMaxFailures: fields.keepAliveMaxFailures,
       knownHostsPath: fields.knownHostsPath,
       passphrase: '',
       password: '',
@@ -5250,6 +5313,9 @@ function App() {
       sshAuthType: fields.authType,
       sshHost: fields.host,
       sshHostKeyPolicy: fields.hostKeyPolicy,
+      sshConnectTimeoutSeconds: fields.connectTimeoutSeconds,
+      sshKeepAliveIntervalSeconds: fields.keepAliveIntervalSeconds,
+      sshKeepAliveMaxFailures: fields.keepAliveMaxFailures,
       sshKnownHostsPath: fields.knownHostsPath,
       sshPassphrase: '',
       sshPassword: '',
@@ -5304,6 +5370,7 @@ function App() {
     const resolvedProfile = await resolveSelectedSshProfile(fileProfileId);
     const connectionAuth = buildSshConnectionAuth(values, resolvedProfile);
     const sshAgent = buildSshAgentConfig(values, resolvedProfile);
+    const sshNetwork = buildSshNetworkConfig(values, resolvedProfile);
     const sshSecurity = buildSshSecurityConfig(values, resolvedProfile);
     return {
       providerType: selectedFileProvider.type,
@@ -5311,6 +5378,7 @@ function App() {
         host: values.host,
         port: values.port || 22,
         ...sshAgent,
+        ...sshNetwork,
         ...sshSecurity,
       },
       auth: {
@@ -5646,7 +5714,7 @@ function App() {
               layout="vertical"
               className="remote-context-form"
               disabled={fileBusy}
-              initialValues={{ agentSocketPath: '', hostKeyPolicy: 'accept-new', port: 22, path: '.', profileId: '' }}
+              initialValues={{ agentSocketPath: '', connectTimeoutSeconds: 10, hostKeyPolicy: 'accept-new', keepAliveIntervalSeconds: 0, keepAliveMaxFailures: 3, port: 22, path: '.', profileId: '' }}
             >
               <Form.Item label={t('field.fileProvider')}>
                 <Select
@@ -5721,7 +5789,12 @@ function App() {
                 items={[{
                   key: 'sftp-security',
                   label: t('section.sshSecurity'),
-                  children: <SshSecurityFields />,
+                  children: (
+                    <>
+                      <SshSecurityFields />
+                      <SshNetworkFields showKeepAlive={false} />
+                    </>
+                  ),
                 }]}
                 size="small"
               />
@@ -6427,6 +6500,11 @@ function App() {
       const sshAgent = buildSshAgentConfig({
         agentSocketPath: values.sshAgentSocketPath,
       }, resolvedProfile);
+      const sshNetwork = buildSshNetworkConfig({
+        connectTimeoutSeconds: values.sshConnectTimeoutSeconds,
+        keepAliveIntervalSeconds: values.sshKeepAliveIntervalSeconds,
+        keepAliveMaxFailures: values.sshKeepAliveMaxFailures,
+      }, resolvedProfile);
       const sshSecurity = buildSshSecurityConfig({
         hostKeyPolicy: values.sshHostKeyPolicy,
         knownHostsPath: values.sshKnownHostsPath,
@@ -6438,6 +6516,9 @@ function App() {
         sshUser: values.sshUser,
         sshAuthType: auth.authType,
         sshAgentSocketPath: sshAgent.agentSocketPath,
+        sshConnectTimeoutSeconds: sshNetwork.connectTimeoutSeconds,
+        sshKeepAliveIntervalSeconds: sshNetwork.keepAliveIntervalSeconds,
+        sshKeepAliveMaxFailures: sshNetwork.keepAliveMaxFailures,
         sshPassphrase: auth.passphrase,
         sshPassword: auth.password,
         sshPrivateKey: auth.privateKey,
@@ -6497,7 +6578,11 @@ function App() {
           <Button type="primary" onClick={startTunnel} loading={tunnelBusy}>{t('action.create')}</Button>
         </div>
         <div className="remote-summary-grid">
-          <MetricCard label={t('metric.activeTunnels')} value={tunnelSummary.total} />
+          <MetricCard
+            label={t('metric.activeTunnels')}
+            value={tunnelSummary.active}
+            meta={tunnelSummary.failed > 0 ? t('tunnel.failedCount', { count: tunnelSummary.failed }) : ''}
+          />
           <MetricCard label={t('metric.localPorts')} value={tunnelSummary.localPorts.length || 0} meta={tunnelSummary.localPorts.join(', ')} />
           <MetricCard label={t('metric.remoteHosts')} value={tunnelSummary.remoteHosts.length || 0} meta={tunnelSummary.remoteHosts.join(', ')} />
         </div>
@@ -6512,6 +6597,9 @@ function App() {
               initialValues={{
                 sshPort: 22,
                 sshAgentSocketPath: '',
+                sshConnectTimeoutSeconds: 10,
+                sshKeepAliveIntervalSeconds: 0,
+                sshKeepAliveMaxFailures: 3,
                 sshHostKeyPolicy: 'accept-new',
                 localHost: '127.0.0.1',
                 profileId: '',
@@ -6576,10 +6664,17 @@ function App() {
                   key: 'tunnel-security',
                   label: t('section.sshSecurity'),
                   children: (
-                    <SshSecurityFields
-                      pathName="sshKnownHostsPath"
-                      policyName="sshHostKeyPolicy"
-                    />
+                    <>
+                      <SshSecurityFields
+                        pathName="sshKnownHostsPath"
+                        policyName="sshHostKeyPolicy"
+                      />
+                      <SshNetworkFields
+                        connectTimeoutName="sshConnectTimeoutSeconds"
+                        keepAliveIntervalName="sshKeepAliveIntervalSeconds"
+                        keepAliveMaxFailuresName="sshKeepAliveMaxFailures"
+                      />
+                    </>
                   ),
                 }]}
                 size="small"
@@ -6621,10 +6716,15 @@ function App() {
               }}
               renderItem={(item) => {
                 const display = buildTunnelDisplay(item);
+                const failed = display.status === 'error';
                 return (
                   <List.Item
-                    className="tunnel-row"
-                    actions={[<Button key="stop" danger size="small" icon={<StopOutlined />} loading={tunnelBusy} onClick={() => confirmStopTunnel(item, display)}>{t('action.stop')}</Button>]}
+                    className={failed ? 'tunnel-row is-error' : 'tunnel-row'}
+                    actions={[
+                      failed
+                        ? <Button key="remove" danger size="small" icon={<DeleteOutlined />} loading={tunnelBusy} onClick={() => stopTunnel(item.id)}>{t('action.remove')}</Button>
+                        : <Button key="stop" danger size="small" icon={<StopOutlined />} loading={tunnelBusy} onClick={() => confirmStopTunnel(item, display)}>{t('action.stop')}</Button>,
+                    ]}
                   >
                     <List.Item.Meta
                       avatar={<span className="provider-icon"><ApiOutlined /></span>}
@@ -6632,12 +6732,14 @@ function App() {
                         <span className="remote-file-title">
                           <strong>{display.name}</strong>
                           <span className="connection-profile-badge tone-success">{display.localPort}</span>
+                          {failed && <Tag color="error">{t('session.status.error')}</Tag>}
                         </span>
                       )}
                       description={(
                         <span className="tunnel-route">
                           <span>{display.route}</span>
                           <small>{t('tunnel.via')} {display.via}</small>
+                          {failed && <small className="tunnel-error" title={display.error}>{display.error || t('message.tunnelFailed')}</small>}
                         </span>
                       )}
                     />
@@ -7709,6 +7811,7 @@ function App() {
                   children: (
                     <>
                       <SshSecurityFields />
+                      <SshNetworkFields />
                       <Divider />
                       <Form.Item name="jumpHost" label={t('field.jumpHost')}>
                         <Input placeholder={t('placeholder.host')} />
@@ -9263,6 +9366,8 @@ function connectionProfileFactLabel(key) {
   if (key === 'lastUsed') return t('label.lastUsed');
   if (key === 'jumpHost') return t('field.jumpHost');
   if (key === 'authType') return t('field.authType');
+  if (key === 'connectTimeout') return t('field.connectTimeout');
+  if (key === 'keepAlive') return t('field.keepAliveInterval');
   if (key === 'hostKeyPolicy') return t('field.hostKeyPolicy');
   return key;
 }
@@ -9274,6 +9379,9 @@ function connectionProfileFactValue(fact) {
     if (fact.value === 'privateKey') return t('auth.privateKey');
     if (fact.value === 'agent') return t('auth.agent');
     return t('auth.password');
+  }
+  if (fact.key === 'connectTimeout' || fact.key === 'keepAlive') {
+    return `${fact.value} ${t('unit.seconds')}`;
   }
   return fact.value || '-';
 }
@@ -9529,9 +9637,12 @@ function buildRequest(type, displayName, values, provider = null) {
       group: values.group || '',
       config: {
         agentSocketPath: String(values.agentSocketPath || '').trim(),
+        connectTimeoutSeconds: Number(values.connectTimeoutSeconds) || 10,
         host: values.host,
         hostKeyPolicy: values.hostKeyPolicy || 'accept-new',
         knownHostsPath: String(values.knownHostsPath || '').trim(),
+        keepAliveIntervalSeconds: Number(values.keepAliveIntervalSeconds) || 0,
+        keepAliveMaxFailures: Number(values.keepAliveMaxFailures) || 3,
         port: values.port || 22,
         jumpHost: values.jumpHost || '',
         jumpPort: values.jumpPort || 22,

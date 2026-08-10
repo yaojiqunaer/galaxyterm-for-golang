@@ -1,9 +1,11 @@
 package tunnel
 
 import (
+	"errors"
 	"net"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestValidateStartRequestDefaultsPorts(t *testing.T) {
@@ -26,6 +28,30 @@ func TestValidateStartRequestDefaultsPorts(t *testing.T) {
 	}
 	if normalized.SSHHostKeyPolicy != "accept-new" {
 		t.Fatalf("SSHHostKeyPolicy = %q, want accept-new", normalized.SSHHostKeyPolicy)
+	}
+	if normalized.SSHConnectTimeoutSeconds != 10 || normalized.SSHKeepAliveMaxFailures != 3 {
+		t.Fatalf("unexpected SSH reliability defaults: %+v", normalized)
+	}
+}
+
+func TestValidateStartRequestPreservesNetworkReliability(t *testing.T) {
+	normalized, err := validateStartRequest(StartRequest{
+		SSHHost:                     "127.0.0.1",
+		SSHUser:                     "root",
+		SSHConnectTimeoutSeconds:    40,
+		SSHKeepAliveIntervalSeconds: 15,
+		SSHKeepAliveMaxFailures:     4,
+		LocalPort:                   13306,
+		RemoteHost:                  "127.0.0.1",
+		RemotePort:                  3306,
+	})
+	if err != nil {
+		t.Fatalf("validateStartRequest returned error: %v", err)
+	}
+	if normalized.network.ConnectTimeout != 40*time.Second ||
+		normalized.network.KeepAliveInterval != 15*time.Second ||
+		normalized.network.KeepAliveMaxFailures != 4 {
+		t.Fatalf("unexpected normalized network config: %+v", normalized.network)
 	}
 }
 
@@ -97,5 +123,34 @@ func TestStopAllClosesAndClearsTunnels(t *testing.T) {
 	}
 	if _, err := listener.Accept(); err == nil {
 		t.Fatal("listener still accepts after StopAll")
+	}
+}
+
+func TestExpiredTunnelRemainsVisibleUntilRemoved(t *testing.T) {
+	api := NewAPI()
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	tunnel := &localTunnel{
+		info:     Info{ID: "one", Status: "active"},
+		listener: listener,
+	}
+	api.tunnels["one"] = tunnel
+
+	api.expire("one", tunnel, errors.New("keepalive timeout"))
+
+	infos := api.List()
+	if len(infos) != 1 || infos[0].Status != "error" || infos[0].Error != "keepalive timeout" {
+		t.Fatalf("List after expiration = %+v", infos)
+	}
+	if _, err := listener.Accept(); err == nil {
+		t.Fatal("listener still accepts after tunnel expiration")
+	}
+	if err := api.Stop("one"); err != nil {
+		t.Fatalf("Stop expired tunnel: %v", err)
+	}
+	if infos := api.List(); len(infos) != 0 {
+		t.Fatalf("List returned %d tunnels after removal, want 0", len(infos))
 	}
 }

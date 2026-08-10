@@ -6,7 +6,6 @@ import (
 	"io"
 	"strconv"
 	"sync"
-	"time"
 
 	"galaxyterm/internal"
 	"galaxyterm/internal/session"
@@ -29,11 +28,15 @@ type sshDriver struct {
 	agentSocketPath string
 	hostKeyPolicy   string
 	knownHostsPath  string
+	network         sshsecurity.NetworkConfig
 
-	client  *ssh.Client
-	session *ssh.Session
-	stdin   io.WriteCloser
-	mu      sync.Mutex
+	client          *ssh.Client
+	session         *ssh.Session
+	stdin           io.WriteCloser
+	keepAliveCancel context.CancelFunc
+	closing         bool
+	errorReported   bool
+	mu              sync.Mutex
 }
 
 func NewSSHProvider() session.Provider {
@@ -81,6 +84,14 @@ func newSSHDriver(req session.CreateSessionRequest) (*sshDriver, error) {
 	if err != nil {
 		return nil, err
 	}
+	network, err := sshsecurity.NormalizeNetworkConfig(
+		intValue(req.Config, "connectTimeoutSeconds", 0),
+		intValue(req.Config, "keepAliveIntervalSeconds", 0),
+		intValue(req.Config, "keepAliveMaxFailures", 0),
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	return &sshDriver{
 		addr:            fmt.Sprintf("%s:%d", host, port),
@@ -96,6 +107,7 @@ func newSSHDriver(req session.CreateSessionRequest) (*sshDriver, error) {
 		agentSocketPath: stringValue(req.Config, "agentSocketPath"),
 		hostKeyPolicy:   string(hostKeyPolicy),
 		knownHostsPath:  stringValue(req.Config, "knownHostsPath"),
+		network:         network,
 	}, nil
 }
 
@@ -157,18 +169,21 @@ func (d *sshDriver) Start(ctx context.Context, emit session.Emitter) error {
 	d.client = client
 	d.session = sshSession
 	d.stdin = stdin
+	d.closing = false
+	d.errorReported = false
 	d.mu.Unlock()
 
 	if err := sshSession.Shell(); err != nil {
 		_ = d.Close()
 		return err
 	}
+	d.startKeepAlive(ctx, emit, client)
 
 	go readStream(ctx, stdout, emit, false)
 	go readStream(ctx, stderr, emit, false)
 	go func() {
 		if err := sshSession.Wait(); err != nil {
-			emit(session.Event{
+			d.emitErrorOnce(emit, session.Event{
 				Type: session.EventError,
 				Error: &session.AppError{
 					Code:           "SSH_SESSION_WAIT_ERROR",
@@ -177,6 +192,7 @@ func (d *sshDriver) Start(ctx context.Context, emit session.Emitter) error {
 				},
 			})
 		}
+		d.stopKeepAlive()
 		emit(session.Event{Type: session.EventExit})
 	}()
 	return nil
@@ -233,8 +249,59 @@ func (d *sshDriver) clientConfig(authMethods []ssh.AuthMethod) (*ssh.ClientConfi
 		User:            d.username,
 		Auth:            authMethods,
 		HostKeyCallback: hostKeyCallback,
-		Timeout:         10 * time.Second,
+		Timeout:         d.network.ConnectTimeout,
 	}, nil
+}
+
+func (d *sshDriver) startKeepAlive(parent context.Context, emit session.Emitter, client *ssh.Client) {
+	if d.network.KeepAliveInterval <= 0 {
+		return
+	}
+	ctx, cancel := context.WithCancel(parent)
+	d.mu.Lock()
+	if d.client != client {
+		d.mu.Unlock()
+		cancel()
+		return
+	}
+	d.keepAliveCancel = cancel
+	d.mu.Unlock()
+
+	go func() {
+		if err := sshsecurity.RunKeepAlive(ctx, client, d.network); err != nil {
+			d.emitErrorOnce(emit, session.Event{
+				Type: session.EventError,
+				Error: &session.AppError{
+					Code:           "SSH_KEEPALIVE_FAILED",
+					MessageKey:     "error.ssh.keepalive",
+					DefaultMessage: err.Error(),
+					Cause:          err,
+				},
+			})
+			_ = d.Close()
+		}
+	}()
+}
+
+func (d *sshDriver) stopKeepAlive() {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.keepAliveCancel != nil {
+		d.keepAliveCancel()
+		d.keepAliveCancel = nil
+	}
+}
+
+func (d *sshDriver) emitErrorOnce(emit session.Emitter, event session.Event) bool {
+	d.mu.Lock()
+	if d.closing || d.errorReported {
+		d.mu.Unlock()
+		return false
+	}
+	d.errorReported = true
+	d.mu.Unlock()
+	emit(event)
+	return true
 }
 
 func (d *sshDriver) authMethods() ([]ssh.AuthMethod, io.Closer, error) {
@@ -286,8 +353,13 @@ func (d *sshDriver) Resize(cols uint16, rows uint16) error {
 func (d *sshDriver) Close() error {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	d.closing = true
 
 	var firstErr error
+	if d.keepAliveCancel != nil {
+		d.keepAliveCancel()
+		d.keepAliveCancel = nil
+	}
 	if d.stdin != nil {
 		firstErr = d.stdin.Close()
 		d.stdin = nil

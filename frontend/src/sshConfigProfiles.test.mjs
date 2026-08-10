@@ -22,6 +22,9 @@ Host agent-host
   HostName agent.example.com
   User deploy
   IdentityAgent ~/.ssh/agent.sock
+  ConnectTimeout 40
+  ServerAliveInterval 15
+  ServerAliveCountMax 4
 `;
 
 const profiles = parseSshConfigProfiles(sampleConfig, { idFactory: (name) => `id-${name}` });
@@ -36,6 +39,9 @@ assert.deepEqual(
     username: profile.auth.username,
     authType: profile.auth.authType,
     agentSocketPath: profile.config.agentSocketPath,
+    connectTimeoutSeconds: profile.config.connectTimeoutSeconds,
+    keepAliveIntervalSeconds: profile.config.keepAliveIntervalSeconds,
+    keepAliveMaxFailures: profile.config.keepAliveMaxFailures,
     identityFile: profile.config.identityFile,
     group: profile.group,
   })),
@@ -48,6 +54,9 @@ assert.deepEqual(
       username: 'deploy',
       authType: 'privateKey',
       agentSocketPath: '',
+      connectTimeoutSeconds: 10,
+      keepAliveIntervalSeconds: 0,
+      keepAliveMaxFailures: 3,
       identityFile: '~/.ssh/prod_ed25519',
       group: 'SSH Config',
     },
@@ -59,6 +68,9 @@ assert.deepEqual(
       username: 'deploy',
       authType: 'privateKey',
       agentSocketPath: '',
+      connectTimeoutSeconds: 10,
+      keepAliveIntervalSeconds: 0,
+      keepAliveMaxFailures: 3,
       identityFile: '~/.ssh/prod_ed25519',
       group: 'SSH Config',
     },
@@ -70,6 +82,9 @@ assert.deepEqual(
       username: 'ops',
       authType: 'password',
       agentSocketPath: '',
+      connectTimeoutSeconds: 10,
+      keepAliveIntervalSeconds: 0,
+      keepAliveMaxFailures: 3,
       identityFile: '',
       group: 'SSH Config',
     },
@@ -81,8 +96,15 @@ assert.deepEqual(
       username: 'deploy',
       authType: 'agent',
       agentSocketPath: '~/.ssh/agent.sock',
+      connectTimeoutSeconds: 40,
+      keepAliveIntervalSeconds: 15,
+      keepAliveMaxFailures: 4,
       identityFile: '',
       group: 'SSH Config',
     },
   ],
 );
+
+const invalidKeepAlive = parseSshConfigProfiles(`Host short-keepalive
+  ServerAliveInterval 3`, { idFactory: (alias) => alias });
+assert.equal(invalidKeepAlive[0].config.keepAliveIntervalSeconds, 0);

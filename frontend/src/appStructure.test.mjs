@@ -20,6 +20,7 @@ const workspaceStateSource = await readFile(new URL('./workspaceState.js', impor
 const savedSshProfileSource = await readFile(new URL('./components/SavedSSHProfileSelect.jsx', import.meta.url), 'utf8');
 const sshSecurityFieldsSource = await readFile(new URL('./components/SshSecurityFields.jsx', import.meta.url), 'utf8').catch(() => '');
 const sshAgentSocketFieldSource = await readFile(new URL('./components/SshAgentSocketField.jsx', import.meta.url), 'utf8').catch(() => '');
+const sshNetworkFieldsSource = await readFile(new URL('./components/SshNetworkFields.jsx', import.meta.url), 'utf8').catch(() => '');
 const sessionQuickSwitcherSource = await readFile(new URL('./components/SessionQuickSwitcher.jsx', import.meta.url), 'utf8').catch(() => '');
 const activeSessionDeclaration = source.indexOf('const activeSession =');
 const firstActiveSessionUsage = source.indexOf('activeSession?.providerType');
@@ -960,6 +961,29 @@ assert.ok(
     && source.includes("agentSocketPath: String(values.agentSocketPath || '').trim()")
     && source.includes("sshAuthType !== 'agent' || watchedJumpHost"),
   'SSH terminals, SFTP, and tunnels must share SSH agent authentication settings',
+);
+assert.ok(
+  source.includes("import SshNetworkFields from './components/SshNetworkFields.jsx';")
+    && source.match(/<SshNetworkFields/g)?.length >= 3
+    && sshNetworkFieldsSource.includes("'ssh.connectTimeoutHint'")
+    && sshNetworkFieldsSource.includes("'ssh.keepAliveHint'")
+    && source.includes('sshConnectTimeoutSeconds: sshNetwork.connectTimeoutSeconds')
+    && source.includes('keepAliveIntervalSeconds: Number(values.keepAliveIntervalSeconds) || 0'),
+  'SSH terminals, SFTP, and tunnels must share bounded connection reliability settings',
+);
+assert.ok(
+  source.includes("if (selectedNav !== 'tunnels') return undefined;")
+    && source.includes('TunnelAPI.List()')
+    && source.includes('window.setInterval(syncTunnels, 5000)')
+    && source.includes("const failed = display.status === 'error';")
+    && source.includes("t('tunnel.failedCount', { count: tunnelSummary.failed })"),
+  'the tunnel workspace must reconcile backend keepalive failures without requiring a page reload',
+);
+assert.ok(
+  source.includes("confirmCloseDirectionalSessions('left', session.id)")
+    && source.includes("confirmCloseDirectionalSessions('right', session.id)")
+    && source.includes('closeSessionSet(plan.closingSessions)'),
+  'session tab menus must close either side through the audited protected-session close path',
 );
 assert.ok(
   terminalPaneSource.includes('interrupt: () =>')

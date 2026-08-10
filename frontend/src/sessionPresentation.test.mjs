@@ -525,6 +525,40 @@ assert.deepEqual(
   ],
 );
 
+assert.deepEqual(
+  buildSessionTabMenuModel({
+    closableLeftCount: 1,
+    closableRightCount: 2,
+    sessionCount: 4,
+    sessionIndex: 1,
+  }).filter((action) => action.key === 'closeLeft' || action.key === 'closeRight'),
+  [
+    { key: 'closeLeft', labelKey: 'action.closeLeftSessions', disabled: false, danger: true, dividerBefore: true },
+    { key: 'closeRight', labelKey: 'action.closeRightSessions', disabled: false, danger: true },
+  ],
+);
+
+const directionalCloseSessions = [
+  { id: 'left-open', status: 'connected' },
+  { id: 'left-protected', protected: true, status: 'connected' },
+  { id: 'anchor', status: 'connected' },
+  { id: 'right-open', status: 'connected' },
+];
+assert.deepEqual(buildSessionClosePlan(directionalCloseSessions, {
+  anchorSessionId: 'anchor',
+  mode: 'left',
+}), {
+  closingSessions: [directionalCloseSessions[0]],
+  protectedSessions: [directionalCloseSessions[1]],
+});
+assert.deepEqual(buildSessionClosePlan(directionalCloseSessions, {
+  anchorSessionId: 'anchor',
+  mode: 'right',
+}), {
+  closingSessions: [directionalCloseSessions[3]],
+  protectedSessions: [],
+});
+
 assert.deepEqual(buildSessionToolbarModel({
   activeKey: '',
   canNavigate: false,

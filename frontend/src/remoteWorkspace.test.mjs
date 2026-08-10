@@ -15,6 +15,7 @@ import {
   buildSavedSshConnections,
   buildSshAgentConfig,
   buildSshConnectionAuth,
+  buildSshNetworkConfig,
   buildSshProfileFields,
   buildSshSecurityConfig,
   buildTunnelDisplay,
@@ -184,10 +185,13 @@ assert.deepEqual(buildSshProfileFields({
 }), {
   authType: 'privateKey',
   agentSocketPath: '~/.ssh/agent.sock',
+  connectTimeoutSeconds: 10,
   displayName: 'Production',
   host: 'prod.example.com',
   hostKeyPolicy: 'strict',
   knownHostsPath: '/Users/me/.ssh/known_hosts',
+  keepAliveIntervalSeconds: 0,
+  keepAliveMaxFailures: 3,
   port: 2222,
   profileId: 'favorite',
   username: 'root',
@@ -201,6 +205,23 @@ assert.deepEqual(buildSshAgentConfig({}, {
 assert.deepEqual(buildSshAgentConfig({ agentSocketPath: ' ~/.ssh/custom-agent.sock ' }, {
   config: { agentSocketPath: '/shared/agent.sock' },
 }), { agentSocketPath: '~/.ssh/custom-agent.sock' });
+
+assert.deepEqual(buildSshNetworkConfig({}, null), {
+  connectTimeoutSeconds: 10,
+  keepAliveIntervalSeconds: 0,
+  keepAliveMaxFailures: 3,
+});
+assert.deepEqual(buildSshNetworkConfig({}, {
+  config: {
+    connectTimeoutSeconds: 45,
+    keepAliveIntervalSeconds: 20,
+    keepAliveMaxFailures: 5,
+  },
+}), {
+  connectTimeoutSeconds: 45,
+  keepAliveIntervalSeconds: 20,
+  keepAliveMaxFailures: 5,
+});
 
 assert.deepEqual(buildSshSecurityConfig({}, null), {
   hostKeyPolicy: 'accept-new',
@@ -395,14 +416,18 @@ const tunnels = [
     localAddr: '127.0.0.1:3307',
     remoteAddr: 'db.prod:3306',
     sshAddr: 'prod-gw:2222',
+    status: 'error',
+    error: 'keepalive timeout',
   },
 ];
 
 assert.deepEqual(buildTunnelSummary(tunnels), {
   total: 2,
-  localPorts: ['6379', '3307'],
-  remoteHosts: ['10.0.0.5', 'db.prod'],
-  sshHosts: ['bastion.dev', 'prod-gw'],
+  active: 1,
+  failed: 1,
+  localPorts: ['6379'],
+  remoteHosts: ['10.0.0.5'],
+  sshHosts: ['bastion.dev'],
 });
 
 assert.deepEqual(buildTunnelDisplay(tunnels[1]), {
@@ -415,4 +440,6 @@ assert.deepEqual(buildTunnelDisplay(tunnels[1]), {
   remoteHost: 'db.prod',
   remotePort: '3306',
   sshHost: 'prod-gw',
+  status: 'error',
+  error: 'keepalive timeout',
 });

@@ -126,7 +126,7 @@ Upload `.gtx` packages and an index named `galaxyterm-index.json` to each Releas
       "manifest": {
         "id": "galaxyterm-extension-sftp",
         "name": "SFTP",
-        "version": "0.4.0",
+        "version": "0.5.0",
         "apiVersion": "v1",
         "description": "SFTP file provider for GalaxyTerm",
         "runtime": {
@@ -147,13 +147,13 @@ Upload `.gtx` packages and an index named `galaxyterm-index.json` to each Releas
         {
           "os": "darwin",
           "arch": "arm64",
-          "url": "galaxyterm-extension-sftp_0.4.0_darwin_arm64.gtx",
+          "url": "galaxyterm-extension-sftp_0.5.0_darwin_arm64.gtx",
           "sha256": "<64-character hexadecimal SHA-256>"
         },
         {
           "os": "linux",
           "arch": "amd64",
-          "url": "galaxyterm-extension-sftp_0.4.0_linux_amd64.gtx",
+          "url": "galaxyterm-extension-sftp_0.5.0_linux_amd64.gtx",
           "sha256": "<64-character hexadecimal SHA-256>"
         }
       ]

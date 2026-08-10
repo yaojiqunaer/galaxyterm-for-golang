@@ -5247,6 +5247,10 @@ code {
   min-width: 0;
 }
 
+.tunnel-row.is-error {
+  background: color-mix(in srgb, var(--danger) 5%, transparent);
+}
+
 .tunnel-route {
   flex-direction: column;
   color: var(--muted);
@@ -5258,6 +5262,10 @@ code {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tunnel-route .tunnel-error {
+  color: var(--danger);
 }
 
 .remote-file-editor {
@@ -5402,6 +5410,23 @@ code {
 
 .ssh-agent-field .ant-alert {
   padding: 8px 10px;
+}
+
+.ssh-network-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 10px;
+}
+
+.ssh-network-fields .ant-input-number,
+.ssh-network-fields .ant-input-number-group-wrapper {
+  width: 100%;
+}
+
+@media (max-width: 640px) {
+  .ssh-network-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .connection-test-result {

@@ -45,22 +45,23 @@ type providerError struct {
 }
 
 type normalizedRequest struct {
-	RequestID       string
-	Operation       string
-	Host            string
-	Port            int
-	HostKeyPolicy   string
-	KnownHostsPath  string
-	AgentSocketPath string
-	Username        string
-	AuthType        string
-	Password        string
-	PrivateKey      string
-	Passphrase      string
-	Path            string
-	DestinationPath string
-	Content         string
-	LocalPath       string
+	RequestID             string
+	Operation             string
+	Host                  string
+	Port                  int
+	HostKeyPolicy         string
+	KnownHostsPath        string
+	AgentSocketPath       string
+	ConnectTimeoutSeconds int
+	Username              string
+	AuthType              string
+	Password              string
+	PrivateKey            string
+	Passphrase            string
+	Path                  string
+	DestinationPath       string
+	Content               string
+	LocalPath             string
 }
 
 type fileEntry struct {

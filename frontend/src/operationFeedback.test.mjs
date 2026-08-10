@@ -9,6 +9,14 @@ assert.deepEqual(buildOperationError(new Error('dial tcp 10.0.0.2:22: connection
   suggestionKey: 'operation.error.suggestion.network',
 });
 
+assert.deepEqual(buildOperationError('ssh keepalive failed after 3 consecutive failures'), {
+  detail: 'ssh keepalive failed after 3 consecutive failures',
+  reason: 'network',
+  reasonKey: 'operation.error.reason.network',
+  retryable: true,
+  suggestionKey: 'operation.error.suggestion.network',
+});
+
 assert.deepEqual(buildOperationError('context deadline exceeded while opening session'), {
   detail: 'context deadline exceeded while opening session',
   reason: 'timeout',

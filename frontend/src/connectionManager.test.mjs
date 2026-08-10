@@ -522,17 +522,20 @@ assert.deepEqual(buildConnectionProfileFacts(profiles[0]), [
   { key: 'username', value: '-' },
   { key: 'authType', value: 'password' },
   { key: 'hostKeyPolicy', value: 'accept-new' },
+  { key: 'connectTimeout', value: 10 },
   { key: 'lastUsed', value: '2026-06-25T10:00:00.000Z' },
 ]);
 assert.deepEqual(buildConnectionProfileFacts({
   ...profiles[1],
-  config: { ...profiles[1].config, jumpHost: 'jump.example.com' },
+  config: { ...profiles[1].config, jumpHost: 'jump.example.com', keepAliveIntervalSeconds: 20 },
 }), [
   { key: 'host', value: '10.0.0.20' },
   { key: 'port', value: 22 },
   { key: 'username', value: 'deploy' },
   { key: 'authType', value: 'password' },
   { key: 'hostKeyPolicy', value: 'accept-new' },
+  { key: 'connectTimeout', value: 10 },
+  { key: 'keepAlive', value: 20 },
   { key: 'lastUsed', value: '2026-06-26T10:00:00.000Z' },
   { key: 'jumpHost', value: 'jump.example.com' },
 ]);

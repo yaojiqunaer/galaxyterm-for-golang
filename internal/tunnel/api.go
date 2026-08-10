@@ -1,9 +1,11 @@
 package tunnel
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -24,21 +26,26 @@ func NewAPI() *API {
 }
 
 type StartRequest struct {
-	Name               string `json:"name"`
-	SSHHost            string `json:"sshHost"`
-	SSHPort            int    `json:"sshPort"`
-	SSHUser            string `json:"sshUser"`
-	SSHAuthType        string `json:"sshAuthType"`
-	SSHPassword        string `json:"sshPassword"`
-	SSHPrivateKey      string `json:"sshPrivateKey"`
-	SSHPassphrase      string `json:"sshPassphrase"`
-	SSHAgentSocketPath string `json:"sshAgentSocketPath"`
-	SSHHostKeyPolicy   string `json:"sshHostKeyPolicy"`
-	SSHKnownHostsPath  string `json:"sshKnownHostsPath"`
-	LocalHost          string `json:"localHost"`
-	LocalPort          int    `json:"localPort"`
-	RemoteHost         string `json:"remoteHost"`
-	RemotePort         int    `json:"remotePort"`
+	Name                        string `json:"name"`
+	SSHHost                     string `json:"sshHost"`
+	SSHPort                     int    `json:"sshPort"`
+	SSHUser                     string `json:"sshUser"`
+	SSHAuthType                 string `json:"sshAuthType"`
+	SSHPassword                 string `json:"sshPassword"`
+	SSHPrivateKey               string `json:"sshPrivateKey"`
+	SSHPassphrase               string `json:"sshPassphrase"`
+	SSHAgentSocketPath          string `json:"sshAgentSocketPath"`
+	SSHConnectTimeoutSeconds    int    `json:"sshConnectTimeoutSeconds"`
+	SSHKeepAliveIntervalSeconds int    `json:"sshKeepAliveIntervalSeconds"`
+	SSHKeepAliveMaxFailures     int    `json:"sshKeepAliveMaxFailures"`
+	SSHHostKeyPolicy            string `json:"sshHostKeyPolicy"`
+	SSHKnownHostsPath           string `json:"sshKnownHostsPath"`
+	LocalHost                   string `json:"localHost"`
+	LocalPort                   int    `json:"localPort"`
+	RemoteHost                  string `json:"remoteHost"`
+	RemotePort                  int    `json:"remotePort"`
+
+	network sshsecurity.NetworkConfig
 }
 
 type Info struct {
@@ -47,12 +54,17 @@ type Info struct {
 	LocalAddr  string `json:"localAddr"`
 	RemoteAddr string `json:"remoteAddr"`
 	SSHAddr    string `json:"sshAddr"`
+	Status     string `json:"status"`
+	Error      string `json:"error,omitempty"`
 }
 
 type localTunnel struct {
-	info     Info
-	listener net.Listener
-	client   *ssh.Client
+	info            Info
+	listener        net.Listener
+	client          *ssh.Client
+	keepAliveCancel context.CancelFunc
+	closeOnce       sync.Once
+	closeErr        error
 }
 
 func (api *API) Start(req StartRequest) (Info, error) {
@@ -79,7 +91,7 @@ func (api *API) Start(req StartRequest) (Info, error) {
 		User:            normalized.SSHUser,
 		Auth:            authMethods,
 		HostKeyCallback: hostKeyCallback,
-		Timeout:         10 * time.Second,
+		Timeout:         normalized.network.ConnectTimeout,
 	}
 	sshAddr := fmt.Sprintf("%s:%d", normalized.SSHHost, normalized.SSHPort)
 	client, err := ssh.Dial("tcp", sshAddr, config)
@@ -100,15 +112,44 @@ func (api *API) Start(req StartRequest) (Info, error) {
 		LocalAddr:  listener.Addr().String(),
 		RemoteAddr: fmt.Sprintf("%s:%d", normalized.RemoteHost, normalized.RemotePort),
 		SSHAddr:    sshAddr,
+		Status:     "active",
 	}
-	t := &localTunnel{info: info, listener: listener, client: client}
+	keepAliveCtx, keepAliveCancel := context.WithCancel(context.Background())
+	t := &localTunnel{
+		info:            info,
+		listener:        listener,
+		client:          client,
+		keepAliveCancel: keepAliveCancel,
+	}
 
 	api.mu.Lock()
 	api.tunnels[info.ID] = t
 	api.mu.Unlock()
 
 	go t.accept()
+	if normalized.network.KeepAliveInterval > 0 {
+		go func() {
+			if err := sshsecurity.RunKeepAlive(keepAliveCtx, client, normalized.network); err != nil {
+				api.expire(info.ID, t, err)
+			}
+		}()
+	}
 	return info, nil
+}
+
+func (api *API) expire(id string, expected *localTunnel, cause error) {
+	api.mu.Lock()
+	current, ok := api.tunnels[id]
+	if ok && current == expected {
+		current.info.Status = "error"
+		if cause != nil {
+			current.info.Error = cause.Error()
+		}
+	}
+	api.mu.Unlock()
+	if ok && current == expected {
+		_ = expected.close()
+	}
 }
 
 func (api *API) Stop(id string) error {
@@ -150,6 +191,17 @@ func (api *API) List() []Info {
 	for _, t := range api.tunnels {
 		infos = append(infos, t.info)
 	}
+	sort.Slice(infos, func(i, j int) bool {
+		if infos[i].Status != infos[j].Status {
+			return infos[i].Status < infos[j].Status
+		}
+		leftName := strings.ToLower(infos[i].Name)
+		rightName := strings.ToLower(infos[j].Name)
+		if leftName != rightName {
+			return leftName < rightName
+		}
+		return infos[i].ID < infos[j].ID
+	})
 	return infos
 }
 
@@ -164,18 +216,22 @@ func (t *localTunnel) accept() {
 }
 
 func (t *localTunnel) close() error {
-	var firstErr error
-	if t.listener != nil {
-		if err := t.listener.Close(); err != nil {
-			firstErr = err
+	t.closeOnce.Do(func() {
+		if t.keepAliveCancel != nil {
+			t.keepAliveCancel()
 		}
-	}
-	if t.client != nil {
-		if err := t.client.Close(); err != nil && firstErr == nil {
-			firstErr = err
+		if t.listener != nil {
+			if err := t.listener.Close(); err != nil {
+				t.closeErr = err
+			}
 		}
-	}
-	return firstErr
+		if t.client != nil {
+			if err := t.client.Close(); err != nil && t.closeErr == nil {
+				t.closeErr = err
+			}
+		}
+	})
+	return t.closeErr
 }
 
 func (t *localTunnel) forward(localConn net.Conn) {
@@ -224,6 +280,18 @@ func validateStartRequest(req StartRequest) (StartRequest, error) {
 	if req.SSHAuthType != "password" && req.SSHAuthType != "privateKey" && req.SSHAuthType != "agent" {
 		return req, fmt.Errorf("unsupported ssh authentication type %q", req.SSHAuthType)
 	}
+	network, err := sshsecurity.NormalizeNetworkConfig(
+		req.SSHConnectTimeoutSeconds,
+		req.SSHKeepAliveIntervalSeconds,
+		req.SSHKeepAliveMaxFailures,
+	)
+	if err != nil {
+		return req, err
+	}
+	req.network = network
+	req.SSHConnectTimeoutSeconds = int(network.ConnectTimeout / time.Second)
+	req.SSHKeepAliveIntervalSeconds = int(network.KeepAliveInterval / time.Second)
+	req.SSHKeepAliveMaxFailures = network.KeepAliveMaxFailures
 	hostKeyPolicy, err := sshsecurity.NormalizePolicy(req.SSHHostKeyPolicy)
 	if err != nil {
 		return req, err

@@ -139,6 +139,7 @@ Current implementation:
 - Password authentication
 - Private-key and passphrase authentication
 - SSH Agent authentication on macOS/Linux through `SSH_AUTH_SOCK` or a connection-specific socket; Agent connections are released after the SSH handshake
+- Per-profile SSH connection timeout and optional keepalive interval/failure threshold, shared by terminals, connection probes, and port forwarding; SFTP reuses the connection timeout
 - Session-scoped shell
 - Resize support
 - Clean close

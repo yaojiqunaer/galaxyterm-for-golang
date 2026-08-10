@@ -17,3 +17,11 @@ export function isTerminalViewportAtBottom(viewportY, baseY) {
   if (!Number.isFinite(viewportY) || !Number.isFinite(baseY)) return true;
   return viewportY >= baseY;
 }
+
+export function buildTerminalEventError(event = {}) {
+  const error = event?.Error || event?.error || {};
+  return {
+    fallback: String(error.defaultMessage || ''),
+    messageKey: String(error.messageKey || ''),
+  };
+}

@@ -75,6 +75,29 @@ func TestNormalizeRequestDefaultsPortPathAndHostKeyPolicy(t *testing.T) {
 	if request.HostKeyPolicy != "accept-new" {
 		t.Fatalf("HostKeyPolicy = %q, want accept-new", request.HostKeyPolicy)
 	}
+	if request.ConnectTimeoutSeconds != 30 {
+		t.Fatalf("ConnectTimeoutSeconds = %d, want 30", request.ConnectTimeoutSeconds)
+	}
+}
+
+func TestNormalizeRequestUsesConfiguredConnectTimeout(t *testing.T) {
+	request, err := normalizeRequest(protocolRequest{
+		APIVersion:   "v1",
+		RequestID:    "request-1",
+		ProviderType: "sftp",
+		Operation:    "list",
+		Config: map[string]any{
+			"host":                  "example.com",
+			"connectTimeoutSeconds": float64(45),
+		},
+		Auth: map[string]any{"username": "deploy", "authType": "password", "password": "secret"},
+	})
+	if err != nil {
+		t.Fatalf("normalizeRequest returned error: %v", err)
+	}
+	if request.ConnectTimeoutSeconds != 45 {
+		t.Fatalf("ConnectTimeoutSeconds = %d, want 45", request.ConnectTimeoutSeconds)
+	}
 }
 
 func TestNormalizeRequestRequiresCompatibleEnvelopeAndCredentials(t *testing.T) {

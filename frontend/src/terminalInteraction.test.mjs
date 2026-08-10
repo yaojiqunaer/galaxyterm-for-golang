@@ -9,10 +9,22 @@ assert.equal(
 );
 
 const {
+  buildTerminalEventError,
   isTerminalViewportAtBottom,
   normalizeTerminalExternalLink,
   shouldActivateTerminalLink,
 } = interactionModule;
+
+assert.deepEqual(buildTerminalEventError({
+  Error: {
+    messageKey: 'error.ssh.keepalive',
+    defaultMessage: 'raw keepalive failure',
+  },
+}), {
+  fallback: 'raw keepalive failure',
+  messageKey: 'error.ssh.keepalive',
+});
+assert.deepEqual(buildTerminalEventError({}), { fallback: '', messageKey: '' });
 
 assert.equal(normalizeTerminalExternalLink('https://example.com/docs?q=terminal'), 'https://example.com/docs?q=terminal');
 assert.equal(normalizeTerminalExternalLink('http://localhost:8080/health'), 'http://localhost:8080/health');

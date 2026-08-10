@@ -30,6 +30,9 @@ assert.equal(t('operation.error.reason.hostIdentity'), 'Server identity verifica
 assert.equal(t('operation.error.suggestion.hostIdentity'), 'Verify the server fingerprint before updating the known hosts file.');
 assert.equal(t('auth.agent'), 'SSH Agent');
 assert.equal(t('ssh.agentHint'), 'Uses an SSH_AUTH_SOCK-compatible agent on macOS or Linux. Blank uses SSH_AUTH_SOCK; private keys never enter GalaxyTerm.');
+assert.equal(t('field.connectTimeout'), 'Connection Timeout');
+assert.equal(t('action.closeRightSessions'), 'Close Sessions to the Right');
+assert.equal(t('error.ssh.keepalive'), 'The SSH connection stopped responding to keepalive requests.');
 assert.equal(t('terminal.status.preparing'), 'Preparing terminal');
 assert.equal(t('action.clearSearch'), 'Clear search');
 assert.equal(t('terminal.search.noMatches'), 'No matches');
@@ -109,6 +112,7 @@ assert.equal(t('confirm.uninstallExtensionImpactContent', {
 assert.equal(t('extension.usage.connections', { count: 2 }), '2 connections');
 assert.equal(t('confirm.deleteExtensionSourceContent', { name: 'Official', url: 'https://example.com/index.json' }), 'Official · https://example.com/index.json. Installed extensions are not removed.');
 assert.equal(t('confirm.stopTunnelContent', { name: 'Database', route: '127.0.0.1:3307 → mysql:3306' }), 'Database · 127.0.0.1:3307 → mysql:3306. Connections using this tunnel will be interrupted.');
+assert.equal(t('tunnel.failedCount', { count: 2 }), '2 failed');
 assert.equal(t('replay.keyboardHint'), 'Space/K play or pause · Left/Right 5s · Home/End');
 assert.equal(t('replay.eventProgress', { current: 3, total: 8 }), '3 / 8 output events');
 assert.equal(t('replay.seekEvent', { time: '0:05.0', type: 'command' }), 'Seek to 0:05.0: command');
@@ -160,6 +164,7 @@ assert.equal(t('terminal.search.useRegex'), '使用正则表达式');
 assert.equal(t('terminal.search.invalidRegex'), '正则表达式无效');
 assert.equal(t('action.scrollToBottom'), '滚动到底部');
 assert.equal(t('message.connectionFavorited', { name: '生产环境' }), '已将“生产环境”加入收藏');
+assert.equal(t('tunnel.failedCount', { count: 2 }), '2 个异常');
 assert.equal(t('terminal.scrollToBottomHint'), '滚动到最新输出');
 assert.equal(t('action.restoreClosedSession'), '恢复最近关闭的会话');
 assert.equal(t('session.empty.restoreAvailable', { count: 3, updatedAt: '12:00' }), '恢复 12:00 保存的 3 个会话');
@@ -229,6 +234,9 @@ assert.equal(t('connection.hint.secondaryOpenNew'), '使用 + 新开一个连接
 assert.equal(t('placeholder.searchExtensions'), '搜索扩展、Provider 或能力');
 assert.equal(t('action.protectSession'), '保护会话');
 assert.equal(t('action.unprotectSession'), '取消会话保护');
+assert.equal(t('field.connectTimeout'), '连接超时');
+assert.equal(t('action.closeRightSessions'), '关闭右侧会话');
+assert.equal(t('error.ssh.keepalive'), 'SSH 连接未响应保活请求。');
 assert.equal(t('palette.reason.protectedSession'), '请先取消会话保护，再关闭该会话。');
 assert.equal(t('palette.reason.noClosableSession'), '符合条件的会话均受保护。');
 assert.equal(t('palette.reason.noSessionTarget'), '当前会话没有可复制的目标信息。');
