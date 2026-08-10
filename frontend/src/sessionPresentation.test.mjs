@@ -25,6 +25,7 @@ import {
   profileActionModel,
   pruneSessionActivity,
   recordSessionAttention,
+  recordSessionCommandResult,
   recordSessionOutputActivity,
   reconcileSessionReconnects,
   releaseSessionReconnect,
@@ -1160,6 +1161,51 @@ assert.deepEqual(buildSessionAttentionSummary({
   error: { kind: 'error', unread: true },
   read: { kind: 'error', unread: false },
 }), { errors: 1, total: 2 });
+
+const failedCommandActivity = recordSessionCommandResult({}, {
+  activeKey: 's1',
+  exitCode: 2,
+  occurredAt: '2026-07-16T01:00:06.000Z',
+  sessionId: 's2',
+  visibleSessionIds: ['s1'],
+});
+assert.deepEqual(failedCommandActivity, {
+  s2: {
+    kind: 'error',
+    occurredAt: '2026-07-16T01:00:06.000Z',
+    unread: true,
+  },
+});
+assert.equal(recordSessionCommandResult(failedCommandActivity, {
+  exitCode: 0,
+  occurredAt: '2026-07-16T01:00:07.000Z',
+  sessionId: 's2',
+}), failedCommandActivity);
+assert.deepEqual(recordSessionCommandResult({}, {
+  exitCode: 1,
+  occurredAt: '2026-07-16T01:00:08.000Z',
+  sessionId: 's1',
+  visibleSessionIds: ['s1'],
+}), {
+  s1: {
+    kind: 'error',
+    occurredAt: '2026-07-16T01:00:08.000Z',
+    unread: false,
+  },
+});
+
+const attentionSidebarState = buildSessionSidebarState([
+  { id: 's1', label: 'Failed Build', status: 'connected' },
+  { id: 's2', label: 'Streaming Logs', status: 'connected' },
+], {
+  activity: {
+    s1: { kind: 'error', unread: true },
+    s2: { kind: 'output', unread: true },
+  },
+  scope: 'attention',
+});
+assert.deepEqual(attentionSidebarState.sessions.map((session) => session.id), ['s1']);
+assert.deepEqual(attentionSidebarState.scopeCounts, { all: 2, attention: 1, healthy: 1 });
 
 const mixedAttention = {
   s1: { kind: 'output', occurredAt: '2026-07-16T01:00:00.000Z', unread: true },

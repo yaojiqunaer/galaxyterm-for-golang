@@ -526,22 +526,25 @@ export function filterSessions(sessions = [], options = {}) {
 export function buildSessionSidebarState(sessions = [], options = {}) {
   const query = String(options.query || '').trim();
   const scope = ['all', 'healthy', 'attention'].includes(options.scope) ? options.scope : 'all';
+  const activity = options.activity || {};
+  const attentionSessions = sessions.filter((session) => sessionNeedsAttention(session, activity));
+  const healthySessions = filterSessions(sessions, {
+    prioritizeActive: false,
+    status: 'healthy',
+  }).filter((session) => !sessionNeedsAttention(session, activity));
   const scopeCounts = {
     all: sessions.length,
-    attention: filterSessions(sessions, {
-      prioritizeActive: false,
-      status: 'attention',
-    }).length,
-    healthy: filterSessions(sessions, {
-      prioritizeActive: false,
-      status: 'healthy',
-    }).length,
+    attention: attentionSessions.length,
+    healthy: healthySessions.length,
   };
-  const visibleSessions = filterSessions(sessions, {
+  const scopedSessions = scope === 'attention'
+    ? attentionSessions
+    : scope === 'healthy' ? healthySessions : sessions;
+  const visibleSessions = filterSessions(scopedSessions, {
     activeKey: options.activeKey,
     prioritizeActive: false,
     query,
-    status: scope,
+    status: 'all',
   });
   return {
     filtered: query.length > 0 || scope !== 'all',
@@ -672,6 +675,14 @@ export function recordSessionOutputActivity(activity = {}, options = {}) {
   });
 }
 
+export function recordSessionCommandResult(activity = {}, options = {}) {
+  if (!Number.isSafeInteger(options.exitCode) || options.exitCode === 0) return activity;
+  return recordSessionAttention(activity, {
+    ...options,
+    kind: 'error',
+  });
+}
+
 export function recordSessionAttention(activity = {}, options = {}) {
   const sessionId = String(options.sessionId || '').trim();
   const occurredAt = String(options.occurredAt || '').trim();
@@ -789,6 +800,12 @@ function matchesSessionStatus(session, status) {
   if (status === 'healthy') return ['connected', 'connecting'].includes(sessionStatusLabel(session));
   if (status === 'attention') return ['error', 'closed'].includes(sessionStatusLabel(session));
   return sessionStatusLabel(session) === status;
+}
+
+function sessionNeedsAttention(session, activity = {}) {
+  if (['error', 'closed'].includes(sessionStatusLabel(session))) return true;
+  const item = activity[session.id];
+  return item?.unread === true && item.kind === 'error';
 }
 
 function matchesSessionQuery(session = {}, queryTokens = []) {

@@ -59,7 +59,7 @@
 
 <details>
   <summary><b>⏱ 命令执行状态与中断</b></summary>
-  交互式终端会展示当前命令、实时耗时和运行状态；运行期间可通过工具栏、中断按钮或 `Ctrl+C` 发送标准 PTY 中断。Shell 提供 OSC 133 集成时会同时展示真实退出码，常见 Shell、PowerShell、MySQL、Redis 和 PostgreSQL 提示符可用于识别命令完成。
+  交互式终端会展示当前命令、实时耗时和运行状态；运行期间可通过工具栏、中断按钮或 `Ctrl+C` 发送标准 PTY 中断。Shell 提供 OSC 133 集成时会同时展示真实退出码和明确的成功/失败结果，常见 Shell、PowerShell、MySQL、Redis 和 PostgreSQL 提示符可用于识别命令完成。后台命令以非零退出码结束时会升级为需关注异常，并进入会话侧栏的“异常”筛选；切回会话后仍可直接查看退出码和耗时。命令完成审计只记录退出码与耗时摘要，不重复保存命令正文，录屏格式保持不变。
 </details>
 
 <details>

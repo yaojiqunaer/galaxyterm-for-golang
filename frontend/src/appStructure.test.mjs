@@ -1279,5 +1279,14 @@ assert.ok(
     && source.includes('nextAttention: <BellOutlined />'),
   'background activity must be actionable from the session toolbar, menu, and command palette',
 );
+assert.ok(
+  terminalPaneSource.includes('buildCommandCompletionAuditDetail({ durationMs, exitCode })')
+    && terminalPaneSource.includes("type: 'command.complete'")
+    && source.includes('recordSessionCommandResult(next, {')
+    && source.includes('activity: sessionActivity')
+    && source.includes("if (fact.key === 'result') return t(`terminal.result.${fact.value}`)")
+    && source.includes("return fact.value ?? '-';"),
+  'completed commands must expose explicit results and promote background failures without storing command text',
+);
 
 console.log('app structure tests passed');

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import {
   appendTerminalOutputTail,
+  buildCommandCompletionAuditDetail,
   buildTerminalPasteRisk,
   parseShellIntegrationExitCode,
   shouldNotifyTerminalActivity,
@@ -26,6 +27,9 @@ assert.equal(appendTerminalOutputTail('abc', 'def', 20), 'abcdef');
 assert.equal(parseShellIntegrationExitCode('\u001b]133;D;0\u0007'), 0);
 assert.equal(parseShellIntegrationExitCode('\u001b]133;D;127\u001b\\'), 127);
 assert.equal(parseShellIntegrationExitCode('plain terminal output'), null);
+assert.equal(buildCommandCompletionAuditDetail({ durationMs: 1250, exitCode: 2 }), 'exitCode=2; durationMs=1250');
+assert.equal(buildCommandCompletionAuditDetail({ durationMs: 80 }), 'durationMs=80');
+assert.equal(buildCommandCompletionAuditDetail({ durationMs: -1, exitCode: 'secret command' }), 'durationMs=0');
 
 assert.equal(buildTerminalPasteRisk('echo hello'), null);
 assert.equal(buildTerminalPasteRisk('\r'), null);

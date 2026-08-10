@@ -18,6 +18,13 @@ export function buildTerminalStatusFacts(state = {}) {
   const facts = [
     { key: 'status', value: status, tone: terminalStatusTone(status) },
   ];
+  if (status === 'idle' && Number.isSafeInteger(state.exitCode)) {
+    facts.push({
+      key: 'result',
+      value: state.exitCode === 0 ? 'success' : 'failed',
+      tone: state.exitCode === 0 ? 'success' : 'danger',
+    });
+  }
   const lastCommand = String(state.lastCommand || '').trim();
   if (lastCommand) {
     facts.push({ key: 'lastCommand', value: lastCommand, tone: 'neutral' });

@@ -12,6 +12,7 @@ import { readClipboardText, writeClipboardText } from '../desktopBridge.js';
 import { t } from '../i18n.js';
 import {
   appendTerminalOutputTail,
+  buildCommandCompletionAuditDetail,
   buildTerminalPasteRisk,
   parseShellIntegrationExitCode,
   shouldNotifyTerminalActivity,
@@ -348,11 +349,18 @@ function TerminalPane({
           && (exitCode !== null || terminalOutputIndicatesPrompt(outputTail.current))
         ) {
           stopDurationTicker();
+          const durationMs = commandDurationMs(lastCommandStartedAt.current);
           emitStatus({
-            durationMs: commandDurationMs(lastCommandStartedAt.current),
+            durationMs,
             ...(exitCode !== null ? { exitCode } : {}),
             status: lastCommand.current ? 'idle' : 'connected',
           });
+          if (lastCommand.current) {
+            callbacksRef.current.onAuditEvent?.({
+              detail: buildCommandCompletionAuditDetail({ durationMs, exitCode }),
+              type: 'command.complete',
+            });
+          }
         }
         term.current?.write(data, syncTerminalViewportState);
       });

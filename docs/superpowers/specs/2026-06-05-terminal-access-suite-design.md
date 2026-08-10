@@ -393,6 +393,7 @@ Current connection and command UX:
 - The session sidebar mirrors every still-open tab, including failed and closed sessions. A compact All, Active, and Issues scope appears when the list is large or needs attention, composes with text search, and disables drag ordering while filtered so hidden rows cannot make ordering ambiguous.
 - The connection workspace retains only presentation preferences: sort order plus the visibility of recent connections and the desktop detail pane. Clearing filters preserves sorting, individual recent entries can be removed without clearing the full list, and no query, endpoint, or credential is stored in these preferences.
 - Background session attention can be handled without scanning tabs. The toolbar, session menu, and command palette navigate unread errors before ordinary output and otherwise follow tab order; marking all activity read clears indicators only and preserves terminal output, runtime errors, audit events, and recordings.
+- OSC 133 command completion exposes an explicit success or failure result beside duration and exit code. Nonzero background results upgrade ordinary unread output to error attention and participate in the sidebar Issues scope. The appended `command.complete` audit event contains only exit-code and duration metadata, while terminal recording output and provider protocols remain unchanged.
 
 ### Backend And Provider Messages
 

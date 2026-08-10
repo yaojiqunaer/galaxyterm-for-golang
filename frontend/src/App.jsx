@@ -162,6 +162,7 @@ import {
   pruneSessionActivity,
   reconcileSessionReconnects,
   recordSessionAttention,
+  recordSessionCommandResult,
   recordSessionOutputActivity,
   releaseSessionReconnect,
   resolveNextAttentionSessionId,
@@ -1246,13 +1247,23 @@ function App() {
   useEffect(() => {
     setSessionActivity((current) => sessions.reduce((next, session) => {
       const terminalStatus = terminalStatuses[session.id];
-      if (terminalStatus?.status !== 'error') return next;
-      return recordSessionAttention(next, {
-        kind: 'error',
-        occurredAt: terminalStatus.updatedAt,
-        sessionId: session.id,
-        visibleSessionIds,
-      });
+      if (terminalStatus?.status === 'error') {
+        return recordSessionAttention(next, {
+          kind: 'error',
+          occurredAt: terminalStatus.updatedAt,
+          sessionId: session.id,
+          visibleSessionIds,
+        });
+      }
+      if (terminalStatus?.status === 'idle') {
+        return recordSessionCommandResult(next, {
+          exitCode: terminalStatus.exitCode,
+          occurredAt: terminalStatus.updatedAt,
+          sessionId: session.id,
+          visibleSessionIds,
+        });
+      }
+      return next;
     }, current));
   }, [sessions, terminalStatuses, visibleSessionIds]);
 
@@ -1748,9 +1759,10 @@ function App() {
   ), [activeKey, sessions]);
   const sidebarSessionState = useMemo(() => buildSessionSidebarState(sessions, {
     activeKey,
+    activity: sessionActivity,
     query: sidebarSessionQuery,
     scope: sidebarSessionScope,
-  }), [activeKey, sessions, sidebarSessionQuery, sidebarSessionScope]);
+  }), [activeKey, sessionActivity, sessions, sidebarSessionQuery, sidebarSessionScope]);
   const sidebarSessions = sidebarSessionState.sessions;
   const sessionIds = useMemo(() => sessions.map((session) => session.id), [sessions]);
   useEffect(() => {
@@ -10092,6 +10104,7 @@ function providerRuntimeDescription(runtimeState = {}) {
 
 function terminalStatusFactLabel(fact) {
   if (fact.key === 'status') return t('terminal.fact.status');
+  if (fact.key === 'result') return t('terminal.fact.result');
   if (fact.key === 'lastCommand') return t('terminal.fact.lastCommand');
   if (fact.key === 'duration') return t('label.duration');
   if (fact.key === 'exitCode') return t('terminal.fact.exitCode');
@@ -10102,7 +10115,8 @@ function terminalStatusFactLabel(fact) {
 
 function terminalStatusFactValue(fact) {
   if (fact.key === 'status') return t(`terminal.runStatus.${fact.value}`);
-  return fact.value || '-';
+  if (fact.key === 'result') return t(`terminal.result.${fact.value}`);
+  return fact.value ?? '-';
 }
 
 function terminalRecoveryActionLabel(action) {

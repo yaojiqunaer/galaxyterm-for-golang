@@ -60,7 +60,7 @@ Saved and exported audit records and recordings redact common passwords, tokens,
 
 <details>
 <summary><b>⏱ Command status and interruption</b></summary>
-Interactive terminals show the current command, live duration, and execution state. Running commands can receive a standard PTY interrupt from the toolbar, terminal status bar, or `Ctrl+C`. A real exit code is shown when the shell exposes OSC 133 integration, while common shell, PowerShell, MySQL, Redis, and PostgreSQL prompts are recognized as command completion.
+Interactive terminals show the current command, live duration, and execution state. Running commands can receive a standard PTY interrupt from the toolbar, terminal status bar, or `Ctrl+C`. Shells with OSC 133 integration expose the real exit code plus an explicit succeeded or failed result, while common shell, PowerShell, MySQL, Redis, and PostgreSQL prompts are recognized as command completion. A nonzero exit code in a background session is promoted to attention and appears in the sidebar Issues filter; returning to the session keeps the exit code and duration visible. Command-completion audit events store only exit-code and duration metadata, do not duplicate command text, and leave the recording format unchanged.
 </details>
 
 <details>

@@ -32,6 +32,28 @@ assert.deepEqual(buildTerminalStatusFacts({
 ]);
 
 assert.deepEqual(buildTerminalStatusFacts({
+  durationMs: 2400,
+  exitCode: 0,
+  lastCommand: 'go test ./...',
+  status: 'idle',
+}), [
+  { key: 'status', value: 'idle', tone: 'success' },
+  { key: 'result', value: 'success', tone: 'success' },
+  { key: 'lastCommand', value: 'go test ./...', tone: 'neutral' },
+  { key: 'duration', value: '2.4s', tone: 'neutral' },
+  { key: 'exitCode', value: 0, tone: 'success' },
+]);
+
+assert.deepEqual(buildTerminalStatusFacts({
+  durationMs: 400,
+  exitCode: 2,
+  status: 'idle',
+}).slice(0, 2), [
+  { key: 'status', value: 'idle', tone: 'success' },
+  { key: 'result', value: 'failed', tone: 'danger' },
+]);
+
+assert.deepEqual(buildTerminalStatusFacts({
   durationMs: 920,
   exitCode: 130,
   lastCommand: 'sleep 30',

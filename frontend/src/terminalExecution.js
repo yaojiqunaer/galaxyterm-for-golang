@@ -37,6 +37,14 @@ export function parseShellIntegrationExitCode(output = '') {
   return Number.isSafeInteger(exitCode) ? exitCode : null;
 }
 
+export function buildCommandCompletionAuditDetail(result = {}) {
+  const durationMs = Math.max(0, Math.round(Number(result.durationMs) || 0));
+  const parts = [];
+  if (Number.isSafeInteger(result.exitCode)) parts.push(`exitCode=${result.exitCode}`);
+  parts.push(`durationMs=${durationMs}`);
+  return parts.join('; ');
+}
+
 export function shouldNotifyTerminalActivity(previousAt, currentAt = Date.now(), intervalMs = 750) {
   const current = Number(currentAt);
   const previous = Number(previousAt);
