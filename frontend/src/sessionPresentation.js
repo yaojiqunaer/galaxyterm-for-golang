@@ -211,6 +211,13 @@ export function buildSessionToolbarModel(options = {}) {
 
   const primary = [];
   if (options.view === 'grid' || sessionCount > 1) primary.push(viewAction);
+  if ((Number(options.attentionCount) || 0) > 0) {
+    primary.push({
+      key: 'nextAttention',
+      labelKey: 'action.nextAttentionSession',
+      disabled: false,
+    });
+  }
   if (canInterrupt) {
     primary.push({
       key: 'interrupt',
@@ -239,6 +246,11 @@ export function buildSessionToolbarModel(options = {}) {
       ...((Number(options.recoverableCount) || 0) > 0 ? [{
         key: 'reconnectDisconnected',
         labelKey: 'action.reconnectDisconnectedSessions',
+        disabled: false,
+      }] : []),
+      ...((Number(options.attentionCount) || 0) > 0 ? [{
+        key: 'markAllAttentionRead',
+        labelKey: 'action.markAllSessionActivityRead',
         disabled: false,
       }] : []),
       { key: 'closeClosed', labelKey: 'action.closeClosed', disabled: closedCount === 0 },
@@ -692,6 +704,28 @@ export function markSessionActivityRead(activity = {}, sessionId = '') {
     ...activity,
     [sessionId]: { ...activity[sessionId], unread: false },
   };
+}
+
+export function markAllSessionActivityRead(activity = {}) {
+  let changed = false;
+  const entries = Object.entries(activity).map(([sessionId, item]) => {
+    if (!item?.unread) return [sessionId, item];
+    changed = true;
+    return [sessionId, { ...item, unread: false }];
+  });
+  return changed ? Object.fromEntries(entries) : activity;
+}
+
+export function resolveNextAttentionSessionId(sessionIds = [], activity = {}, activeSessionId = '') {
+  const orderedIds = sessionIds.filter(Boolean);
+  if (orderedIds.length === 0) return '';
+  const activeIndex = orderedIds.indexOf(activeSessionId);
+  const rotatedIds = activeIndex < 0
+    ? orderedIds
+    : [...orderedIds.slice(activeIndex + 1), ...orderedIds.slice(0, activeIndex + 1)];
+  const unreadIds = rotatedIds.filter((sessionId) => activity[sessionId]?.unread);
+  const errorId = unreadIds.find((sessionId) => activity[sessionId]?.kind === 'error');
+  return errorId || unreadIds[0] || '';
 }
 
 export function pruneSessionActivity(activity = {}, sessionIds = []) {

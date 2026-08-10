@@ -150,6 +150,7 @@ assert.deepEqual(filterPaletteItems([
 const sessionActionItems = buildSessionActionPaletteItems({
   activeSessionHasTarget: true,
   activeSessionId: 's1',
+  attentionCount: 2,
   canNavigate: true,
   groupLabel: 'Session Actions',
   labels: {
@@ -162,7 +163,9 @@ const sessionActionItems = buildSessionActionPaletteItems({
     copyTranscript: 'Copy Terminal Output',
     copySessionTarget: 'Copy Session Target',
     exportTranscript: 'Export Terminal Output',
+    markAllAttentionRead: 'Mark All Activity Read',
     nextSession: 'Next Session',
+    nextAttention: 'Next Session Needing Attention',
     previousSession: 'Previous Session',
     protectSession: 'Protect Session',
     quickCommands: 'Quick Commands',
@@ -186,6 +189,8 @@ assert.deepEqual(sessionActionItems.map((item) => ({
 })), [
   { disabled: false, id: 'session-action:previousSession', title: 'Previous Session' },
   { disabled: false, id: 'session-action:nextSession', title: 'Next Session' },
+  { disabled: false, id: 'session-action:nextAttention', title: 'Next Session Needing Attention' },
+  { disabled: false, id: 'session-action:markAllAttentionRead', title: 'Mark All Activity Read' },
   { disabled: false, id: 'session-action:reconnect', title: 'Reconnect' },
   { disabled: false, id: 'session-action:reconnectDisconnected', title: 'Reconnect Disconnected Sessions' },
   { disabled: false, id: 'session-action:renameSession', title: 'Rename Session' },

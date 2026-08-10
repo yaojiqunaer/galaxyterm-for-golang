@@ -110,6 +110,7 @@ export function buildSessionActionPaletteItems({
   activeSessionId = '',
   activeSessionProtected = false,
   activeSessionReconnecting = false,
+  attentionCount = 0,
   canNavigate = false,
   closableClosedCount,
   closableOtherCount,
@@ -146,6 +147,18 @@ export function buildSessionActionPaletteItems({
       keywords: 'next session tab switch',
       labels,
       reasonKey: canNavigate ? '' : 'palette.reason.noAdjacentSession',
+      runAction,
+    }),
+    attentionCount > 0 && sessionActionItem('nextAttention', {
+      groupLabel,
+      keywords: 'next unread attention activity error output background session',
+      labels,
+      runAction,
+    }),
+    attentionCount > 0 && sessionActionItem('markAllAttentionRead', {
+      groupLabel,
+      keywords: 'mark all read clear unread attention activity sessions',
+      labels,
       runAction,
     }),
     sessionActionItem('reconnect', {

@@ -392,6 +392,7 @@ Current connection and command UX:
 - Explicit batch recovery includes only failed or closed sessions that are not already reconnecting. It preserves tab order and the active workspace context, reuses the single-session audit and recording lifecycle, and emits one aggregate user notification instead of one notification per session.
 - The session sidebar mirrors every still-open tab, including failed and closed sessions. A compact All, Active, and Issues scope appears when the list is large or needs attention, composes with text search, and disables drag ordering while filtered so hidden rows cannot make ordering ambiguous.
 - The connection workspace retains only presentation preferences: sort order plus the visibility of recent connections and the desktop detail pane. Clearing filters preserves sorting, individual recent entries can be removed without clearing the full list, and no query, endpoint, or credential is stored in these preferences.
+- Background session attention can be handled without scanning tabs. The toolbar, session menu, and command palette navigate unread errors before ordinary output and otherwise follow tab order; marking all activity read clears indicators only and preserves terminal output, runtime errors, audit events, and recordings.
 
 ### Backend And Provider Messages
 

@@ -38,6 +38,7 @@ import {
   AppstoreOutlined,
   AuditOutlined,
   AppstoreAddOutlined,
+  BellOutlined,
   CloudServerOutlined,
   CodeOutlined,
   ClearOutlined,
@@ -154,6 +155,7 @@ import {
   buildSessionTabMenuModel,
   buildSessionToolbarContext,
   buildSessionToolbarModel,
+  markAllSessionActivityRead,
   markSessionActivityRead,
   moveSessionInOrder,
   profileActionModel,
@@ -162,6 +164,7 @@ import {
   recordSessionAttention,
   recordSessionOutputActivity,
   releaseSessionReconnect,
+  resolveNextAttentionSessionId,
   reserveSessionReconnect,
   reorderSessions,
   sessionTabDisplay,
@@ -3259,10 +3262,31 @@ function App() {
     activateSession(nextId);
   };
 
+  const activateNextAttentionSession = () => {
+    const nextId = resolveNextAttentionSessionId(
+      sessions.map((session) => session.id),
+      sessionActivity,
+      activeKey,
+    );
+    if (!nextId) {
+      messageApi.info(t('message.noUnreadSessionActivity'));
+      return;
+    }
+    setSessionActivity((current) => markSessionActivityRead(current, nextId));
+    activateSession(nextId);
+  };
+
+  const markAllSessionAttentionRead = () => {
+    setSessionActivity((current) => markAllSessionActivityRead(current));
+    messageApi.success(t('message.sessionActivityMarkedRead'));
+  };
+
   const runSessionPaletteAction = (action) => {
     if (action === 'restoreClosed') restoreLastClosedSession();
     if (action === 'previousSession') switchSession('previous');
     if (action === 'nextSession') switchSession('next');
+    if (action === 'nextAttention') activateNextAttentionSession();
+    if (action === 'markAllAttentionRead') markAllSessionAttentionRead();
     if (action === 'reconnect') reconnectSession();
     if (action === 'reconnectDisconnected') reconnectDisconnectedSessions();
     if (action === 'renameSession') openRenameSession();
@@ -4313,6 +4337,7 @@ function App() {
     const sessionToolbarModel = buildSessionToolbarModel({
       activeKey,
       activeProtected: activeSession?.protected,
+      attentionCount: unreadSessionCount,
       broadcastReadyCount: broadcastTargets.length,
       canNavigate: sessionNavigationState.canNavigate,
       closableOtherCount: sessionClosePlans.others.closingSessions.length,
@@ -4331,6 +4356,8 @@ function App() {
     const runSessionToolbarAction = (action) => {
       if (action === 'grid') setSessionView('grid');
       if (action === 'tabs') setSessionView('tabs');
+      if (action === 'nextAttention') activateNextAttentionSession();
+      if (action === 'markAllAttentionRead') markAllSessionAttentionRead();
       if (action === 'interrupt') interruptSession();
       if (action === 'reconnect') reconnectSession();
       if (action === 'reconnectDisconnected') reconnectDisconnectedSessions();
@@ -7480,6 +7507,7 @@ function App() {
     activeSessionHasTarget: Boolean(sessionIdentityDisplays[activeKey]?.copyValue),
     activeSessionProtected: Boolean(activeSession?.protected),
     activeSessionReconnecting: isSessionReconnecting(activeKey),
+    attentionCount: unreadSessionCount,
     canNavigateSessions: sessionNavigationState.canNavigate,
     closableClosedCount: sessionClosePlans.closed.closingSessions.length,
     closableOtherCount: sessionClosePlans.others.closingSessions.length,
@@ -7578,6 +7606,8 @@ function App() {
     zoomReset: resetTerminalFont,
     previousSession: () => switchSession('previous'),
     nextSession: () => switchSession('next'),
+    nextAttention: activateNextAttentionSession,
+    markAllAttentionRead: markAllSessionAttentionRead,
     rename: () => openRenameSession(),
     protect: () => toggleProtectedSession(),
     unprotect: () => toggleProtectedSession(),
@@ -7605,6 +7635,17 @@ function App() {
       icon: focusMode ? <FullscreenExitOutlined /> : <FullscreenOutlined />,
       label: focusMode ? t('action.exitFocus') : t('action.focusMode'),
       disabled: sessions.length === 0,
+    },
+    unreadSessionCount > 0 && { type: 'divider' },
+    unreadSessionCount > 0 && {
+      key: 'nextAttention',
+      icon: <BellOutlined />,
+      label: t('action.nextAttentionSessionCount', { count: unreadSessionCount }),
+    },
+    unreadSessionCount > 0 && {
+      key: 'markAllAttentionRead',
+      icon: <ClearOutlined />,
+      label: t('action.markAllSessionActivityRead'),
     },
     activeKey && { type: 'divider' },
     activeKey && {
@@ -9142,6 +9183,7 @@ function sessionTabActionIcon(action) {
   if (action === 'unprotect') return <UnlockOutlined />;
   if (action === 'reconnect' || action === 'reconnectDisconnected') return <ReloadOutlined />;
   if (action === 'broadcast') return <SendOutlined />;
+  if (action === 'markAllAttentionRead') return <ClearOutlined />;
   if (action === 'duplicate' || action === 'copyTarget') return <CopyOutlined />;
   if (action === 'moveLeft') return <LeftOutlined />;
   if (action === 'moveRight') return <RightOutlined />;
@@ -9199,6 +9241,7 @@ function SessionToolbarActions({ model, onAction }) {
   const icons = {
     grid: <AppstoreOutlined />,
     interrupt: <StopOutlined />,
+    nextAttention: <BellOutlined />,
     reconnect: <ReloadOutlined />,
     tabs: <CodeOutlined />,
   };
@@ -9753,6 +9796,7 @@ function buildPaletteItems(actions) {
     activeSessionId: actions.activeSessionId,
     activeSessionProtected: actions.activeSessionProtected,
     activeSessionReconnecting: actions.activeSessionReconnecting,
+    attentionCount: actions.attentionCount,
     canNavigate: actions.canNavigateSessions,
     closableClosedCount: actions.closableClosedCount,
     closableOtherCount: actions.closableOtherCount,
@@ -9771,7 +9815,9 @@ function buildPaletteItems(actions) {
       copyTranscript: t('action.copyTranscript'),
       copySessionTarget: t('action.copySessionTarget'),
       exportTranscript: t('action.exportTranscript'),
+      markAllAttentionRead: t('action.markAllSessionActivityRead'),
       nextSession: t('action.nextSession'),
+      nextAttention: t('action.nextAttentionSession'),
       previousSession: t('action.previousSession'),
       protectSession: t('action.protectSession'),
       quickCommands: t('action.commands'),

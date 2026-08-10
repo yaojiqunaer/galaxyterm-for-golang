@@ -1269,5 +1269,15 @@ assert.ok(
     && styles.includes('.recent-connection-remove'),
   'the connection workspace must retain presentation choices and allow precise recent-history cleanup',
 );
+assert.ok(
+  source.includes('resolveNextAttentionSessionId(')
+    && source.includes('markAllSessionActivityRead(current)')
+    && source.includes('attentionCount: unreadSessionCount')
+    && source.includes("if (action === 'nextAttention') activateNextAttentionSession()")
+    && source.includes("key: 'markAllAttentionRead'")
+    && source.includes("nextAttention: t('action.nextAttentionSession')")
+    && source.includes('nextAttention: <BellOutlined />'),
+  'background activity must be actionable from the session toolbar, menu, and command palette',
+);
 
 console.log('app structure tests passed');

@@ -19,6 +19,7 @@ import {
   buildDesktopWindowTitle,
   countUnreadSessions,
   filterSessions,
+  markAllSessionActivityRead,
   markSessionActivityRead,
   moveSessionInOrder,
   profileActionModel,
@@ -27,6 +28,7 @@ import {
   recordSessionOutputActivity,
   reconcileSessionReconnects,
   releaseSessionReconnect,
+  resolveNextAttentionSessionId,
   reserveSessionReconnect,
   reorderSessions,
   sessionTabDisplay,
@@ -1158,6 +1160,43 @@ assert.deepEqual(buildSessionAttentionSummary({
   error: { kind: 'error', unread: true },
   read: { kind: 'error', unread: false },
 }), { errors: 1, total: 2 });
+
+const mixedAttention = {
+  s1: { kind: 'output', occurredAt: '2026-07-16T01:00:00.000Z', unread: true },
+  s2: { kind: 'output', occurredAt: '2026-07-16T01:00:01.000Z', unread: true },
+  s3: { kind: 'error', occurredAt: '2026-07-16T01:00:02.000Z', unread: true },
+  s4: { kind: 'error', occurredAt: '2026-07-16T01:00:03.000Z', unread: false },
+};
+assert.equal(resolveNextAttentionSessionId(['s1', 's2', 's3', 's4'], mixedAttention, 's1'), 's3');
+assert.equal(resolveNextAttentionSessionId(['s1', 's2', 's3', 's4'], mixedAttention, 's3'), 's3');
+assert.equal(resolveNextAttentionSessionId(['s1', 's2'], {
+  s1: mixedAttention.s1,
+  s2: mixedAttention.s2,
+}, 's1'), 's2');
+assert.equal(resolveNextAttentionSessionId(['s1', 's2'], {
+  s1: mixedAttention.s1,
+  s2: mixedAttention.s2,
+}, 's2'), 's1');
+assert.equal(resolveNextAttentionSessionId(['s1'], {}, 's1'), '');
+
+assert.deepEqual(markAllSessionActivityRead(mixedAttention), {
+  s1: { ...mixedAttention.s1, unread: false },
+  s2: { ...mixedAttention.s2, unread: false },
+  s3: { ...mixedAttention.s3, unread: false },
+  s4: mixedAttention.s4,
+});
+const readOnlyAttention = { s4: mixedAttention.s4 };
+assert.equal(markAllSessionActivityRead(readOnlyAttention), readOnlyAttention);
+
+assert.deepEqual(buildSessionToolbarModel({
+  activeKey: 's1',
+  attentionCount: 2,
+  sessionCount: 3,
+  view: 'tabs',
+}).primary, [
+  { key: 'grid', labelKey: 'action.grid', disabled: false },
+  { key: 'nextAttention', labelKey: 'action.nextAttentionSession', disabled: false },
+]);
 
 const orderedSessions = [{ id: 's1' }, { id: 's2' }, { id: 's3' }];
 assert.deepEqual(moveSessionInOrder(orderedSessions, 's2', 'previous').map((session) => session.id), [
