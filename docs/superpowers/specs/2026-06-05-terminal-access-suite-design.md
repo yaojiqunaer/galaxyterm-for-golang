@@ -391,6 +391,7 @@ Current connection and command UX:
 - Automatic recovery is opt-in and applies only to saved, non-local terminal profiles after unexpected errors. Retry delay and maximum attempts are bounded, repeated error events cannot create duplicate timers, ordinary exits never retry, and background recovery never changes the active workspace or tab. Each attempt closes the preceding audit and recording segment before creating the next one.
 - Explicit batch recovery includes only failed or closed sessions that are not already reconnecting. It preserves tab order and the active workspace context, reuses the single-session audit and recording lifecycle, and emits one aggregate user notification instead of one notification per session.
 - The session sidebar mirrors every still-open tab, including failed and closed sessions. A compact All, Active, and Issues scope appears when the list is large or needs attention, composes with text search, and disables drag ordering while filtered so hidden rows cannot make ordering ambiguous.
+- The connection workspace retains only presentation preferences: sort order plus the visibility of recent connections and the desktop detail pane. Clearing filters preserves sorting, individual recent entries can be removed without clearing the full list, and no query, endpoint, or credential is stored in these preferences.
 
 ### Backend And Provider Messages
 

@@ -41,6 +41,7 @@ import {
   CloudServerOutlined,
   CodeOutlined,
   ClearOutlined,
+  CloseOutlined,
   CopyOutlined,
   DatabaseOutlined,
   DeleteOutlined,
@@ -403,6 +404,12 @@ import {
   buildTerminalProviderSummary,
   extensionTerminalDescription,
 } from './terminalProviders.js';
+import {
+  loadConnectionWorkspacePreferences,
+  persistConnectionWorkspacePreferences,
+  removeRecentConnection,
+  updateConnectionWorkspacePreferences,
+} from './connectionWorkspace.js';
 
 const TerminalPane = lazy(() => import('./components/TerminalPane.jsx'));
 const AuditReplayPlayer = lazy(() => import('./components/AuditReplayPlayer.jsx'));
@@ -552,7 +559,10 @@ function App() {
   const [groupQuery, setGroupQuery] = useState('all');
   const [providerFilter, setProviderFilter] = useState('all');
   const [tagFilter, setTagFilter] = useState('');
-  const [profileSort, setProfileSort] = useState('favorites');
+  const [connectionWorkspacePreferences, setConnectionWorkspacePreferences] = useState(
+    () => loadConnectionWorkspacePreferences(),
+  );
+  const profileSort = connectionWorkspacePreferences.sortBy;
   const [selectedProfileId, setSelectedProfileId] = useState('');
   const [selectedProfileIds, setSelectedProfileIds] = useState([]);
   const [connectionDetailProfileId, setConnectionDetailProfileId] = useState('');
@@ -1409,12 +1419,14 @@ function App() {
   }, [selectedProfileIds, visibleProfileIds]);
   const explicitlySelectedProfile = visibleProfiles.find((profile) => profile.id === selectedProfileId) || null;
   const selectedProfile = explicitlySelectedProfile || (compactConnectionDetail ? null : visibleProfiles[0] || null);
+  const showInlineConnectionDetail = Boolean(
+    selectedProfile && !compactConnectionDetail && connectionWorkspacePreferences.showDetails,
+  );
   const connectionDetailProfile = visibleProfiles.find((profile) => profile.id === connectionDetailProfileId) || null;
   const hasProfileFilters = profileQuery.trim()
     || groupQuery !== 'all'
     || providerFilter !== 'all'
-    || tagFilter
-    || profileSort !== 'favorites';
+    || tagFilter;
   const connectionEmptyState = useMemo(() => buildConnectionEmptyState({
     profileCount: profiles.length,
     visibleCount: visibleProfiles.length,
@@ -3638,7 +3650,12 @@ function App() {
     setGroupQuery('all');
     setProviderFilter('all');
     setTagFilter('');
-    setProfileSort('favorites');
+  };
+
+  const updateConnectionWorkspace = (patch) => {
+    setConnectionWorkspacePreferences((current) => persistConnectionWorkspacePreferences(
+      updateConnectionWorkspacePreferences(current, patch),
+    ));
   };
 
   const openBatchProfiles = async (options) => {
@@ -3734,6 +3751,16 @@ function App() {
     persistRecentConnections([]);
     setRecentConnections([]);
     messageApi.success(t('message.recentCleared'));
+  };
+
+  const dismissRecentConnection = (connection) => {
+    setRecentConnections((current) => {
+      const next = removeRecentConnection(current, connection.id);
+      if (next === current) return current;
+      persistRecentConnections(next);
+      return next;
+    });
+    messageApi.success(t('message.recentRemoved', { name: connection.displayName }));
   };
 
   const exportProfiles = (profilesToExport = profiles, filename = 'galaxyterm-profiles.json') => {
@@ -4466,7 +4493,7 @@ function App() {
         </Space>
       </div>
 
-      <div className={selectedProfile && !compactConnectionDetail ? 'connection-manager-layout' : 'connection-manager-layout no-detail'}>
+      <div className={showInlineConnectionDetail ? 'connection-manager-layout' : 'connection-manager-layout no-detail'}>
         <aside className="connection-groups-panel">
           <div className="connection-panel-head">
             <Text strong>{t('section.connectionGroups')}</Text>
@@ -4640,7 +4667,7 @@ function App() {
             <Select
               className="connection-sort-select"
               value={profileSort}
-              onChange={setProfileSort}
+              onChange={(sortBy) => updateConnectionWorkspace({ sortBy })}
               options={[
                 { value: 'favorites', label: t('sort.favorites') },
                 { value: 'recent', label: t('sort.recent') },
@@ -4649,6 +4676,45 @@ function App() {
                 { value: 'group', label: t('sort.group') },
               ]}
             />
+            <div className="connection-view-controls">
+              <Tooltip title={t(connectionWorkspacePreferences.showRecent
+                ? 'action.hideRecentConnections'
+                : 'action.showRecentConnections')}>
+                <Button
+                  aria-label={t(connectionWorkspacePreferences.showRecent
+                    ? 'action.hideRecentConnections'
+                    : 'action.showRecentConnections')}
+                  aria-pressed={connectionWorkspacePreferences.showRecent}
+                  disabled={recentConnections.length === 0}
+                  icon={<HistoryOutlined />}
+                  size="small"
+                  type={connectionWorkspacePreferences.showRecent ? 'default' : 'text'}
+                  onClick={() => updateConnectionWorkspace({
+                    showRecent: !connectionWorkspacePreferences.showRecent,
+                  })}
+                />
+              </Tooltip>
+              {!compactConnectionDetail && (
+                <Tooltip title={t(connectionWorkspacePreferences.showDetails
+                  ? 'action.hideConnectionDetails'
+                  : 'action.showConnectionDetails')}>
+                  <Button
+                    aria-label={t(connectionWorkspacePreferences.showDetails
+                      ? 'action.hideConnectionDetails'
+                      : 'action.showConnectionDetails')}
+                    aria-pressed={connectionWorkspacePreferences.showDetails}
+                    icon={connectionWorkspacePreferences.showDetails
+                      ? <MenuFoldOutlined />
+                      : <MenuUnfoldOutlined />}
+                    size="small"
+                    type={connectionWorkspacePreferences.showDetails ? 'default' : 'text'}
+                    onClick={() => updateConnectionWorkspace({
+                      showDetails: !connectionWorkspacePreferences.showDetails,
+                    })}
+                  />
+                </Tooltip>
+              )}
+            </div>
             {visibleProfiles.length > 0 && (
               <Text type="secondary" className="connection-list-hint">{t('hint.connectionListKeyboard')}</Text>
             )}
@@ -4673,7 +4739,7 @@ function App() {
             testingCount={selectedConnectionProbeCheckingCount}
           />
 
-          {visibleRecentConnections.length > 0 && (
+          {connectionWorkspacePreferences.showRecent && visibleRecentConnections.length > 0 && (
             <div className="recent-connection-rail">
               <Text type="secondary">{t('section.recentConnections')}</Text>
               <div className="recent-connection-list compact">
@@ -4681,27 +4747,37 @@ function App() {
                   const request = connection.request || profileToRequest(recentToProfile(connection));
                   const launching = connectionLaunchKeys.includes(buildConnectionLaunchKey(request));
                   return (
-                    <button
-                      aria-busy={launching}
-                      key={connection.id}
-                      className={`recent-connection-chip${launching ? ' launching' : ''}`}
-                      disabled={launching}
-                      onClick={() => openRecentConnection(connection)}
-                    >
-                      <span className="provider-icon">
-                        {launching
-                          ? <LoadingOutlined spin />
-                          : providerIcons[connection.providerType] || <CodeOutlined />}
-                      </span>
-                      <span>
-                        <strong>{connection.displayName}</strong>
-                        <small>
+                    <span className="recent-connection-item" key={connection.id}>
+                      <button
+                        aria-busy={launching}
+                        className={`recent-connection-chip${launching ? ' launching' : ''}`}
+                        disabled={launching}
+                        onClick={() => openRecentConnection(connection)}
+                      >
+                        <span className="provider-icon">
                           {launching
-                            ? t('action.openingConnection')
-                            : localizedConnectionProfileSubtitle(recentToProfile(connection))}
-                        </small>
-                      </span>
-                    </button>
+                            ? <LoadingOutlined spin />
+                            : providerIcons[connection.providerType] || <CodeOutlined />}
+                        </span>
+                        <span>
+                          <strong>{connection.displayName}</strong>
+                          <small>
+                            {launching
+                              ? t('action.openingConnection')
+                              : localizedConnectionProfileSubtitle(recentToProfile(connection))}
+                          </small>
+                        </span>
+                      </button>
+                      <Tooltip title={t('action.removeRecentConnection')}>
+                        <button
+                          aria-label={t('action.removeRecentConnection')}
+                          className="recent-connection-remove"
+                          onClick={() => dismissRecentConnection(connection)}
+                        >
+                          <CloseOutlined />
+                        </button>
+                      </Tooltip>
+                    </span>
                   );
                 })}
               </div>
@@ -4915,7 +4991,7 @@ function App() {
             />
           )}
         </section>
-        {selectedProfile && !compactConnectionDetail && (
+        {showInlineConnectionDetail && (
           <aside className="connection-detail-panel">
             {renderConnectionProfilePreview(selectedProfile)}
           </aside>

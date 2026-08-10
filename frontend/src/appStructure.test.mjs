@@ -1258,5 +1258,16 @@ assert.ok(
     && styles.includes('.sidebar-session-scope .ant-segmented-item-label'),
   'the sidebar must keep disconnected tabs visible and provide a compact session status scope',
 );
+assert.ok(
+  source.includes('loadConnectionWorkspacePreferences()')
+    && source.includes('persistConnectionWorkspacePreferences(')
+    && source.includes('updateConnectionWorkspace({ sortBy })')
+    && source.includes("'action.hideRecentConnections'")
+    && source.includes("'action.showConnectionDetails'")
+    && source.includes('removeRecentConnection(current, connection.id)')
+    && styles.includes('.connection-view-controls')
+    && styles.includes('.recent-connection-remove'),
+  'the connection workspace must retain presentation choices and allow precise recent-history cleanup',
+);
 
 console.log('app structure tests passed');
