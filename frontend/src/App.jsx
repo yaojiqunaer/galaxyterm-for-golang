@@ -148,6 +148,7 @@ import {
   buildSessionDisplayLabels,
   buildSessionIdentityDisplay,
   buildSessionNavigationState,
+  buildSessionReconnectBatch,
   buildSessionSidebarState,
   buildSessionTabMenuModel,
   buildSessionToolbarContext,
@@ -166,6 +167,7 @@ import {
   sessionStatusLabel,
   sessionStatusTone,
   sessionSummary,
+  shouldOfferSessionReconnectBatch,
   synchronizeSessionCreated,
   synchronizeSessionTerminalSnapshot,
   synchronizeSessionTerminalStatus,
@@ -1711,6 +1713,15 @@ function App() {
     setAuditSessionFilter('all');
   }, [auditSessionFilter, auditSessionOptions]);
   const currentSessionSummary = useMemo(() => sessionSummary(sessions), [sessions]);
+  const sessionReconnectBatch = useMemo(() => buildSessionReconnectBatch(
+    sessions,
+    terminalStatuses,
+    sessionReconnects,
+  ), [sessionReconnects, sessions, terminalStatuses]);
+  const sessionReconnectBatchActionCount = shouldOfferSessionReconnectBatch(
+    sessionReconnectBatch.sessionIds,
+    activeKey,
+  ) ? sessionReconnectBatch.sessionIds.length : 0;
   const workspaceActionState = buildWorkspaceActionState({
     hasSnapshot: buildWorkspaceSnapshotSummary(workspaceSummary).hasSnapshot,
     sessionCount: sessions.length,
@@ -2471,21 +2482,23 @@ function App() {
 
   const reconnectSession = (sessionId = activeKey, options = {}) => {
     const automatic = options.automatic === true;
+    const preserveContext = options.preserveContext === true;
+    const silent = options.silent === true;
     if (automatic && settings.autoReconnect !== true) return { started: false };
     if (!automatic) clearSessionRecovery(sessionId);
     if (!sessionId) {
-      if (!automatic) messageApi.warning(t('message.noActiveSession'));
+      if (!automatic && !silent) messageApi.warning(t('message.noActiveSession'));
       return { started: false };
     }
     const session = sessionsRef.current.find((item) => item.id === sessionId);
     if (!session) {
-      if (!automatic) messageApi.warning(t('message.noActiveSession'));
+      if (!automatic && !silent) messageApi.warning(t('message.noActiveSession'));
       return { started: false };
     }
     const revision = (session.revision || 0) + 1;
     const reservation = reserveSessionReconnect(sessionReconnectsRef.current, sessionId, revision);
     if (!reservation.reserved) {
-      if (!automatic) messageApi.info(t('message.sessionReconnectInProgress'));
+      if (!automatic && !silent) messageApi.info(t('message.sessionReconnectInProgress'));
       return { started: false };
     }
     updateSessionReconnects(reservation.reconnects);
@@ -2517,12 +2530,34 @@ function App() {
         }
         : item
     )));
-    if (!automatic) {
+    if (!automatic && !preserveContext) {
       setActiveKey(sessionId);
       setSelectedNav('sessions');
+    }
+    if (!automatic && !silent) {
       messageApi.success(t('terminal.status.connecting'));
     }
     return { revision, started: true };
+  };
+
+  const reconnectDisconnectedSessions = () => {
+    const plan = buildSessionReconnectBatch(
+      sessionsRef.current,
+      terminalStatuses,
+      sessionReconnectsRef.current,
+    );
+    const startedCount = plan.sessionIds.reduce((count, sessionId) => {
+      const result = reconnectSession(sessionId, {
+        preserveContext: true,
+        silent: true,
+      });
+      return result.started ? count + 1 : count;
+    }, 0);
+    if (startedCount === 0) {
+      messageApi.info(t('message.noDisconnectedSessions'));
+      return;
+    }
+    messageApi.success(t('message.sessionsReconnectStarted', { count: startedCount }));
   };
 
   const findInTerminal = (direction = 'next') => {
@@ -3214,6 +3249,7 @@ function App() {
     if (action === 'previousSession') switchSession('previous');
     if (action === 'nextSession') switchSession('next');
     if (action === 'reconnect') reconnectSession();
+    if (action === 'reconnectDisconnected') reconnectDisconnectedSessions();
     if (action === 'renameSession') openRenameSession();
     if (action === 'protectSession' || action === 'unprotectSession') toggleProtectedSession();
     if (action === 'copySessionTarget') copySessionTarget();
@@ -4252,6 +4288,7 @@ function App() {
       closableOtherCount: sessionClosePlans.others.closingSessions.length,
       closedCount: sessionClosePlans.closed.closingSessions.length,
       reconnecting: isSessionReconnecting(activeKey),
+      recoverableCount: sessionReconnectBatchActionCount,
       sessionCount: sessions.length,
       terminalStatus: activeTerminalStatus,
       view: sessionView,
@@ -4266,6 +4303,7 @@ function App() {
       if (action === 'tabs') setSessionView('tabs');
       if (action === 'interrupt') interruptSession();
       if (action === 'reconnect') reconnectSession();
+      if (action === 'reconnectDisconnected') reconnectDisconnectedSessions();
       if (action === 'rename') openRenameSession();
       if (action === 'protect' || action === 'unprotect') toggleProtectedSession();
       if (action === 'broadcast') openBroadcastCommand();
@@ -7369,6 +7407,7 @@ function App() {
     closableSessionCount: sessionClosePlans.all.closingSessions.length,
     closedSessionCount: currentSessionSummary.closed,
     restorableSessionCount: closedSessions.length,
+    reconnectableSessionCount: sessionReconnectBatchActionCount,
     favoriteConnectionCount: profiles.filter((profile) => profile.favorite).length,
     fileProviders,
     profiles,
@@ -7464,6 +7503,7 @@ function App() {
     protect: () => toggleProtectedSession(),
     unprotect: () => toggleProtectedSession(),
     reconnect: () => reconnectSession(),
+    reconnectDisconnected: reconnectDisconnectedSessions,
     closeClosed: confirmCloseClosedSessions,
     closeOthers: confirmCloseOtherSessions,
     closeAll: confirmCloseAllSessions,
@@ -7582,6 +7622,13 @@ function App() {
       disabled: isSessionReconnecting(activeKey),
       icon: isSessionReconnecting(activeKey) ? <LoadingOutlined spin /> : <ReloadOutlined />,
       label: t('action.reconnect'),
+    },
+    sessionReconnectBatchActionCount > 0 && {
+      key: 'reconnectDisconnected',
+      icon: <ReloadOutlined />,
+      label: t('action.reconnectDisconnectedSessionsCount', {
+        count: sessionReconnectBatchActionCount,
+      }),
     },
     currentSessionSummary.closed > 0 && {
       key: 'closeClosed',
@@ -9027,7 +9074,7 @@ function sessionTabActionIcon(action) {
   if (action === 'rename') return <EditOutlined />;
   if (action === 'protect') return <LockOutlined />;
   if (action === 'unprotect') return <UnlockOutlined />;
-  if (action === 'reconnect') return <ReloadOutlined />;
+  if (action === 'reconnect' || action === 'reconnectDisconnected') return <ReloadOutlined />;
   if (action === 'broadcast') return <SendOutlined />;
   if (action === 'duplicate' || action === 'copyTarget') return <CopyOutlined />;
   if (action === 'moveLeft') return <LeftOutlined />;
@@ -9645,6 +9692,7 @@ function buildPaletteItems(actions) {
     closableOtherCount: actions.closableOtherCount,
     closableSessionCount: actions.closableSessionCount,
     closedSessionCount: actions.closedSessionCount,
+    reconnectableSessionCount: actions.reconnectableSessionCount,
     restorableSessionCount: actions.restorableSessionCount,
     groupLabel: t('palette.group.sessionActions'),
     labels: {
@@ -9662,6 +9710,7 @@ function buildPaletteItems(actions) {
       protectSession: t('action.protectSession'),
       quickCommands: t('action.commands'),
       reconnect: t('action.reconnect'),
+      reconnectDisconnected: t('action.reconnectDisconnectedSessions'),
       restoreClosed: t('action.restoreClosedSession'),
       renameSession: t('action.renameSession'),
       saveAudit: t('action.saveAuditSnapshot'),

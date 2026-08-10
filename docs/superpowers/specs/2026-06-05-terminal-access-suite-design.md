@@ -389,6 +389,7 @@ Current connection and command UX:
 - Local command history is keyed by provider, session, and command. Sensitive commands are rejected before storage, individual entries can be removed, recording can be paused, and retention is configurable from 20 to 500 entries.
 - Command-history privacy settings do not disable or bypass session audit events or terminal recordings.
 - Automatic recovery is opt-in and applies only to saved, non-local terminal profiles after unexpected errors. Retry delay and maximum attempts are bounded, repeated error events cannot create duplicate timers, ordinary exits never retry, and background recovery never changes the active workspace or tab. Each attempt closes the preceding audit and recording segment before creating the next one.
+- Explicit batch recovery includes only failed or closed sessions that are not already reconnecting. It preserves tab order and the active workspace context, reuses the single-session audit and recording lifecycle, and emits one aggregate user notification instead of one notification per session.
 
 ### Backend And Provider Messages
 

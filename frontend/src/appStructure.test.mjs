@@ -1229,5 +1229,19 @@ assert.ok(
     && sessionRecoverySettingsSource.includes('autoReconnectMaxAttempts'),
   'saved remote sessions must expose bounded, cancellable auto reconnect without stealing manual reconnect behavior',
 );
+assert.ok(
+  source.includes('buildSessionReconnectBatch(')
+    && source.includes('const reconnectDisconnectedSessions = () => {')
+    && source.includes("preserveContext: true")
+    && source.includes("reconnectDisconnected: reconnectDisconnectedSessions")
+    && source.includes('const sessionReconnectBatchActionCount = shouldOfferSessionReconnectBatch(')
+    && source.includes('reconnectableSessionCount: sessionReconnectBatchActionCount')
+    && source.includes("reconnectableSessionCount: actions.reconnectableSessionCount")
+    && source.includes("reconnectDisconnected: t('action.reconnectDisconnectedSessions')")
+    && source.includes("key: 'reconnectDisconnected'")
+    && source.includes("action === 'reconnect' || action === 'reconnectDisconnected'")
+    && source.includes('recoverableCount: sessionReconnectBatchActionCount'),
+  'disconnected sessions must support one explicit context-preserving batch reconnect action',
+);
 
 console.log('app structure tests passed');

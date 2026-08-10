@@ -117,6 +117,7 @@ export function buildSessionActionPaletteItems({
   closedSessionCount = 0,
   groupLabel = 'Session Actions',
   labels = {},
+  reconnectableSessionCount = 0,
   restorableSessionCount = 0,
   runAction = () => {},
   sessionCount = 0,
@@ -155,6 +156,12 @@ export function buildSessionActionPaletteItems({
       reasonKey: !activeSessionId
         ? 'palette.reason.noActiveSession'
         : activeSessionReconnecting ? 'palette.reason.sessionReconnectInProgress' : '',
+      runAction,
+    }),
+    reconnectableSessionCount > 0 && sessionActionItem('reconnectDisconnected', {
+      groupLabel,
+      keywords: 'reconnect disconnected failed closed sessions retry recover terminals',
+      labels,
       runAction,
     }),
     sessionActionItem('renameSession', activeSessionActionOptions({

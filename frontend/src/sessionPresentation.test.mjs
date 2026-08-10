@@ -8,6 +8,7 @@ import {
   buildSessionDisplayLabels,
   buildSessionIdentityDisplay,
   buildSessionCloseConfirm,
+  buildSessionReconnectBatch,
   buildSessionNavigationState,
   buildSessionAttentionSummary,
   buildSessionSidebarState,
@@ -32,6 +33,7 @@ import {
   sessionStatusLabel,
   sessionStatusTone,
   sessionSummary,
+  shouldOfferSessionReconnectBatch,
   synchronizeSessionCreated,
   synchronizeSessionTerminalSnapshot,
   takeClosedSession,
@@ -59,6 +61,33 @@ assert.deepEqual(
 assert.deepEqual(reconcileSessionReconnects({ 'session-1': 3, missing: 1 }, ['session-1']), {
   'session-1': 3,
 });
+
+assert.deepEqual(buildSessionReconnectBatch([
+  { id: 'healthy', request: { providerType: 'ssh' }, status: 'connected' },
+  { id: 'failed', request: { providerType: 'ssh' }, status: 'connected' },
+  { id: 'closed', request: { providerType: 'local' }, status: 'closed' },
+  { id: 'connecting', request: { providerType: 'ssh' }, status: 'connecting' },
+  { id: 'reconnecting', request: { providerType: 'ssh' }, status: 'error' },
+  { id: 'missing-request', status: 'error' },
+], {
+  failed: { status: 'error' },
+  healthy: { status: 'idle' },
+}, {
+  reconnecting: 2,
+}), {
+  sessionIds: ['failed', 'closed'],
+  skippedCount: 4,
+  totalCount: 6,
+});
+assert.deepEqual(buildSessionReconnectBatch(), {
+  sessionIds: [],
+  skippedCount: 0,
+  totalCount: 0,
+});
+assert.equal(shouldOfferSessionReconnectBatch(['failed'], 'failed'), false);
+assert.equal(shouldOfferSessionReconnectBatch(['background'], 'active'), true);
+assert.equal(shouldOfferSessionReconnectBatch(['one', 'two'], 'one'), true);
+assert.equal(shouldOfferSessionReconnectBatch([], 'active'), false);
 
 const reconnectingSessions = [{ id: 'session-1', revision: 3, status: 'connecting' }];
 const reconnectingTerminalStatuses = { 'session-1': { status: 'connecting' } };
@@ -308,6 +337,27 @@ assert.equal(buildSessionToolbarModel({
   terminalStatus: 'connected',
   view: 'tabs',
 }).overflow.find((action) => action.key === 'broadcast')?.disabled, true);
+
+assert.deepEqual(
+  buildSessionToolbarModel({
+    activeKey: 's1',
+    recoverableCount: 2,
+    sessionCount: 3,
+    terminalStatus: 'connected',
+    view: 'tabs',
+  }).overflow.find((action) => action.key === 'reconnectDisconnected'),
+  { key: 'reconnectDisconnected', labelKey: 'action.reconnectDisconnectedSessions', disabled: false },
+);
+assert.equal(
+  buildSessionToolbarModel({
+    activeKey: 's1',
+    recoverableCount: 0,
+    sessionCount: 3,
+    terminalStatus: 'connected',
+    view: 'tabs',
+  }).overflow.some((action) => action.key === 'reconnectDisconnected'),
+  false,
+);
 
 const duplicateSessionLabels = buildSessionDisplayLabels([
   { id: 'local-1', label: 'Local Terminal', providerType: 'local' },

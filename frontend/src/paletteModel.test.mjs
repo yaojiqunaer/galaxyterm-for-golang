@@ -167,6 +167,7 @@ const sessionActionItems = buildSessionActionPaletteItems({
     protectSession: 'Protect Session',
     quickCommands: 'Quick Commands',
     reconnect: 'Reconnect',
+    reconnectDisconnected: 'Reconnect Disconnected Sessions',
     restoreClosed: 'Reopen Closed Session',
     renameSession: 'Rename Session',
     saveAudit: 'Save Audit Record',
@@ -176,6 +177,7 @@ const sessionActionItems = buildSessionActionPaletteItems({
   sessionCount: 3,
   closedSessionCount: 1,
   restorableSessionCount: 1,
+  reconnectableSessionCount: 2,
 });
 assert.deepEqual(sessionActionItems.map((item) => ({
   disabled: item.disabled,
@@ -185,6 +187,7 @@ assert.deepEqual(sessionActionItems.map((item) => ({
   { disabled: false, id: 'session-action:previousSession', title: 'Previous Session' },
   { disabled: false, id: 'session-action:nextSession', title: 'Next Session' },
   { disabled: false, id: 'session-action:reconnect', title: 'Reconnect' },
+  { disabled: false, id: 'session-action:reconnectDisconnected', title: 'Reconnect Disconnected Sessions' },
   { disabled: false, id: 'session-action:renameSession', title: 'Rename Session' },
   { disabled: false, id: 'session-action:protectSession', title: 'Protect Session' },
   { disabled: false, id: 'session-action:copySessionTarget', title: 'Copy Session Target' },
@@ -304,8 +307,10 @@ assert.equal(unavailableCopyTargetAction.reasonKey, 'palette.reason.noSessionTar
 assert.deepEqual(filterPaletteItems(sessionActionItems, 'close closed').map((item) => item.id), [
   'session-action:closeClosed',
   'session-action:restoreClosed',
+  'session-action:reconnectDisconnected',
 ]);
 assert.deepEqual(filterPaletteItems(sessionActionItems, 'reopen closed').map((item) => item.id), ['session-action:restoreClosed']);
+assert.deepEqual(filterPaletteItems(sessionActionItems, 'reconnect disconnected').map((item) => item.id), ['session-action:reconnectDisconnected']);
 
 const connectionActionItems = buildConnectionActionPaletteItems({
   favoriteCount: 2,

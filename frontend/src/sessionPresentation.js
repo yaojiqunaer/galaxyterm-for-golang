@@ -94,6 +94,31 @@ export function reconcileSessionReconnects(reconnects = {}, sessionIds = []) {
   return Object.fromEntries(entries);
 }
 
+export function buildSessionReconnectBatch(
+  sessions = [],
+  terminalStatuses = {},
+  reconnects = {},
+) {
+  const sessionIds = sessions
+    .filter((session) => {
+      if (!session?.id || !session.request) return false;
+      if (Object.prototype.hasOwnProperty.call(reconnects, session.id)) return false;
+      const status = terminalStatuses[session.id]?.status || session.status;
+      return status === 'error' || status === 'closed';
+    })
+    .map((session) => session.id);
+  return {
+    sessionIds,
+    skippedCount: Math.max(0, sessions.length - sessionIds.length),
+    totalCount: sessions.length,
+  };
+}
+
+export function shouldOfferSessionReconnectBatch(sessionIds = [], activeSessionId = '') {
+  return sessionIds.length > 1
+    || (sessionIds.length === 1 && sessionIds[0] !== activeSessionId);
+}
+
 export function appendClosedSessions(stack = [], sessions = [], limit = 10) {
   const capacity = Math.max(1, Number(limit) || 10);
   const entries = sessions
@@ -211,6 +236,11 @@ export function buildSessionToolbarModel(options = {}) {
         disabled: Number(options.broadcastReadyCount) < 2,
       }]),
       ...(!reconnectPrimary ? [reconnectAction] : []),
+      ...((Number(options.recoverableCount) || 0) > 0 ? [{
+        key: 'reconnectDisconnected',
+        labelKey: 'action.reconnectDisconnectedSessions',
+        disabled: false,
+      }] : []),
       { key: 'closeClosed', labelKey: 'action.closeClosed', disabled: closedCount === 0 },
       {
         key: 'closeOthers',
