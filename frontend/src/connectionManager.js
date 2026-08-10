@@ -1,3 +1,5 @@
+import { normalizeConnectionTags } from './connectionProfiles.js';
+
 export const ungroupedKey = '__ungrouped__';
 const groupFilterPrefix = 'group:';
 
@@ -188,6 +190,33 @@ export function updateConnectionProfilesFavorite(profiles = [], profileIds = [],
   };
 }
 
+export function updateConnectionProfilesTag(
+  profiles = [],
+  profileIds = [],
+  value = '',
+  action = 'add',
+) {
+  const tag = normalizeConnectionTags([value])[0];
+  if (!tag || !['add', 'remove'].includes(action)) return { changedCount: 0, profiles };
+  const ids = new Set(profileIds.filter(Boolean));
+  const target = tag.toLocaleLowerCase();
+  let changedCount = 0;
+  const nextProfiles = profiles.map((profile) => {
+    if (!ids.has(profile.id)) return profile;
+    const tags = normalizeConnectionTags(profile.tags);
+    const hasTag = tags.some((item) => item.toLocaleLowerCase() === target);
+    if ((action === 'add' && hasTag) || (action === 'remove' && !hasTag)) return profile;
+    const nextTags = action === 'add'
+      ? normalizeConnectionTags([...tags, tag])
+      : tags.filter((item) => item.toLocaleLowerCase() !== target);
+    if (nextTags.length === tags.length
+      && nextTags.every((item, index) => item === tags[index])) return profile;
+    changedCount += 1;
+    return { ...profile, tags: nextTags };
+  });
+  return { changedCount, profiles: changedCount > 0 ? nextProfiles : profiles };
+}
+
 export function removeConnectionProfiles(profiles = [], profileIds = []) {
   const ids = new Set(profileIds.filter(Boolean));
   const removedProfiles = profiles.filter((profile) => ids.has(profile.id));
@@ -324,6 +353,7 @@ export function selectBatchProfiles(
     group = 'all',
     providerType = 'all',
     sortBy = 'favorites',
+    tag = '',
   } = {},
 ) {
   const groupFilter = resolveConnectionGroupFilter(group);
@@ -334,12 +364,13 @@ export function selectBatchProfiles(
     if (profile.kind === 'file') return false;
     const matchesFavorite = !favoritesOnly || profile.favorite;
     const matchesProvider = providerType === 'all' || profile.providerType === providerType;
+    const matchesTag = !tag || profileHasTag(profile, tag);
     const matchesAvailableProvider = !availableProviderTypes || availableProviderTypes.has(profile.providerType);
     const profileGroup = profile.group || ungroupedKey;
     const matchesGroup = groupFilter.type === 'all'
       || (groupFilter.type === 'favorites' && profile.favorite)
       || (groupFilter.type === 'group' && profileGroup === groupFilter.group);
-    return matchesFavorite && matchesProvider && matchesAvailableProvider && matchesGroup;
+    return matchesFavorite && matchesProvider && matchesTag && matchesAvailableProvider && matchesGroup;
   }), sortBy);
 }
 
@@ -349,6 +380,7 @@ export function filterConnectionProfiles(
     group = 'all',
     providerType = 'all',
     query = '',
+    tag = '',
   } = {},
 ) {
   const groupFilter = resolveConnectionGroupFilter(group);
@@ -360,6 +392,7 @@ export function filterConnectionProfiles(
       || profileGroup === groupFilter.group;
     if (!groupMatched) return false;
     if (providerType !== 'all' && profile.providerType !== providerType) return false;
+    if (tag && !profileHasTag(profile, tag)) return false;
     if (tokens.length === 0) return true;
     const searchable = [
       profile.displayName,
@@ -369,6 +402,7 @@ export function filterConnectionProfiles(
       profile.config?.shell,
       profile.config?.workingDirectory,
       profile.filePath,
+      ...connectionProfileTags(profile),
       ...Object.values(profile.config || {}),
       profile.auth?.username,
     ].filter(Boolean).join(' ').toLowerCase();
@@ -376,8 +410,29 @@ export function filterConnectionProfiles(
   });
 }
 
+export function collectConnectionTags(profiles = []) {
+  const tags = new Map();
+  profiles.forEach((profile) => connectionProfileTags(profile).forEach((value) => {
+    const tag = String(value || '').trim();
+    const key = tag.toLocaleLowerCase();
+    if (tag && !tags.has(key)) tags.set(key, tag);
+  }));
+  return [...tags.values()].sort((left, right) => left.localeCompare(right));
+}
+
 function normalizeConnectionGroupKey(group = '') {
   return normalizeConnectionGroupName(group) || ungroupedKey;
+}
+
+function profileHasTag(profile = {}, value = '') {
+  const target = String(value || '').trim().toLocaleLowerCase();
+  return Boolean(target) && connectionProfileTags(profile).some((tag) => (
+    String(tag || '').trim().toLocaleLowerCase() === target
+  ));
+}
+
+function connectionProfileTags(profile = {}) {
+  return normalizeConnectionTags(profile.tags);
 }
 
 function updateConnectionProfileGroups(profiles, { matches, targetGroup }) {

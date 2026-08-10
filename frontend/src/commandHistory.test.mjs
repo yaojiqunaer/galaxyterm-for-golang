@@ -6,6 +6,9 @@ import {
   filterCommandHistory,
   isSensitiveCommand,
   normalizeCommandHistoryItem,
+  pruneCommandHistory,
+  removeCommandHistoryItem,
+  toggleCommandHistoryFavorite,
   upsertCommandHistory,
 } from './commandHistory.js';
 
@@ -60,7 +63,7 @@ const history = upsertCommandHistory([
 assert.deepEqual(history, [
   {
     command: 'kubectl get pods',
-    favorite: true,
+    favorite: false,
     providerType: 'ssh',
     sessionId: 'session-1',
     sessionLabel: 'Prod Shell',
@@ -73,7 +76,25 @@ assert.deepEqual(history, [
     sessionLabel: 'Local',
     updatedAt: '2026-07-01T00:00:00.000Z',
   },
+  {
+    command: 'kubectl get pods',
+    favorite: true,
+    providerType: 'ssh',
+    sessionId: 'old',
+    sessionLabel: 'Old',
+    updatedAt: '2026-07-01T00:00:01.000Z',
+  },
 ]);
+
+assert.deepEqual(
+  toggleCommandHistoryFavorite(history, history[0]).map((item) => item.favorite === true),
+  [true, false, true],
+);
+assert.deepEqual(
+  removeCommandHistoryItem(history, history[0]).map((item) => item.sessionId),
+  ['local-1', 'old'],
+);
+assert.deepEqual(pruneCommandHistory(history, 2).map((item) => item.sessionId), ['session-1', 'local-1']);
 
 assert.deepEqual(upsertCommandHistory([
   { command: 'one', providerType: 'local', updatedAt: '1' },

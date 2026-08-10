@@ -33,12 +33,28 @@ export function normalizeStoredConnectionProfile(profile = {}, options = {}) {
     providerType: profile.providerType,
     displayName: profile.displayName,
     group: profile.group || '',
+    tags: normalizeConnectionTags(profile.tags),
     ...(kind === 'file' ? { filePath: profile.filePath || '.' } : {}),
     config: { ...(profile.config || {}) },
     favorite: !!profile.favorite,
     lastUsedAt: profile.lastUsedAt || '',
     auth,
   };
+}
+
+export function normalizeConnectionTags(value = [], { limit = 12, maxLength = 32 } = {}) {
+  const source = Array.isArray(value) ? value : String(value || '').split(/[,，;]/);
+  const seen = new Set();
+  const tags = [];
+  source.forEach((item) => {
+    if (tags.length >= limit) return;
+    const tag = String(item || '').trim().slice(0, maxLength);
+    const key = tag.toLocaleLowerCase();
+    if (!tag || seen.has(key)) return;
+    seen.add(key);
+    tags.push(tag);
+  });
+  return tags;
 }
 
 export function normalizeImportedConnectionProfile(profile = {}) {
@@ -48,7 +64,7 @@ export function normalizeImportedConnectionProfile(profile = {}) {
 
 export function buildConnectionProfilesExport(profiles = [], exportedAt = new Date().toISOString()) {
   return {
-    version: 2,
+    version: 3,
     exportedAt,
     secrets: 'omitted',
     profiles: profiles.map((profile) => normalizeStoredConnectionProfile(profile, {

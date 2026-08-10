@@ -85,7 +85,7 @@ assert.deepEqual(buildPaletteSummary([]), {
 const profilePaletteItems = buildProfilePaletteItems({
   groupLabel: 'Connections',
   profiles: [
-    { id: 'ssh-prod', providerType: 'ssh', displayName: 'Prod SSH', group: 'Production', config: { host: '10.0.0.2', port: 22 } },
+    { id: 'ssh-prod', providerType: 'ssh', displayName: 'Prod SSH', group: 'Production', tags: ['critical'], config: { host: '10.0.0.2', port: 22 } },
     { id: 'mysql-prod', providerType: 'mysql', displayName: 'Prod MySQL', group: 'Production', config: { host: '10.0.0.3', port: 3306 } },
   ],
   providers: [{ type: 'ssh' }],
@@ -99,6 +99,7 @@ assert.deepEqual(profilePaletteItems.map((item) => ({
   { disabled: false, id: 'profile:ssh-prod', reasonKey: '' },
   { disabled: true, id: 'profile:mysql-prod', reasonKey: 'palette.reason.providerUnavailable' },
 ]);
+assert.equal(profilePaletteItems[0].keywords.includes('critical'), true);
 
 let recoveredProviderType = '';
 const recoverableProfileItem = buildProfilePaletteItems({

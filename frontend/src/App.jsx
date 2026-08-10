@@ -108,6 +108,7 @@ import {
   buildConnectionProfileSubtitle,
   buildConnectionSelectionActionState,
   buildConnectionTransferActions,
+  collectConnectionTags,
   buildDefaultTerminalLaunch,
   buildTerminalSubmitPlan,
   filterConnectionProfiles,
@@ -133,6 +134,7 @@ import {
   sortSidebarProfiles,
   ungroupedKey,
   updateConnectionProfilesFavorite,
+  updateConnectionProfilesTag,
 } from './connectionManager.js';
 import {
   appendClosedSessions,
@@ -223,6 +225,7 @@ import {
   createProfileID,
   hasStoredSshCredential,
   normalizeImportedConnectionProfile,
+  normalizeConnectionTags,
   normalizeStoredConnectionProfile,
   shouldClearStoredSshCredential,
 } from './connectionProfiles.js';
@@ -263,6 +266,9 @@ import {
   clearCommandHistory,
   filterCommandHistory,
   normalizeCommandHistoryItem,
+  pruneCommandHistory,
+  removeCommandHistoryItem,
+  toggleCommandHistoryFavorite as toggleCommandHistoryFavoriteItem,
   upsertCommandHistory,
 } from './commandHistory.js';
 import {
@@ -349,6 +355,7 @@ import CommandPalette from './components/CommandPalette.jsx';
 import ConnectionGroupDialog from './components/ConnectionGroupDialog.jsx';
 import ConnectionSelectionToolbar from './components/ConnectionSelectionToolbar.jsx';
 import ConnectionHealthStatus from './components/ConnectionHealthStatus.jsx';
+import ConnectionMetadataFields from './components/ConnectionMetadataFields.jsx';
 import QuickCommandLibrary from './components/QuickCommandLibrary.jsx';
 import CommandHistoryPanel from './components/CommandHistoryPanel.jsx';
 import SessionQuickSwitcher from './components/SessionQuickSwitcher.jsx';
@@ -398,7 +405,7 @@ const commandHistoryStorageKey = 'galaxyterm.commandHistory';
 const recentConnectionStorageKey = 'galaxyterm.recentConnections';
 const auditRecordStorageKey = 'galaxyterm.auditRecords';
 const extensionSourceStorageKey = 'galaxyterm.extensionSources';
-const profileSchemaVersion = 2;
+const profileSchemaVersion = 3;
 
 const defaultSettings = {
   appTheme: 'dark',
@@ -411,6 +418,8 @@ const defaultSettings = {
   autoSaveWorkspace: true,
   autoRestoreWorkspace: false,
   confirmDangerousActions: true,
+  recordCommandHistory: true,
+  commandHistoryLimit: 80,
   defaultProviderType: 'local',
   defaultWorkingDirectory: '',
   disabledExtensionIds: [],
@@ -526,11 +535,13 @@ function App() {
   const [profileQuery, setProfileQuery] = useState('');
   const [groupQuery, setGroupQuery] = useState('all');
   const [providerFilter, setProviderFilter] = useState('all');
+  const [tagFilter, setTagFilter] = useState('');
   const [profileSort, setProfileSort] = useState('favorites');
   const [selectedProfileId, setSelectedProfileId] = useState('');
   const [selectedProfileIds, setSelectedProfileIds] = useState([]);
   const [connectionDetailProfileId, setConnectionDetailProfileId] = useState('');
   const [connectionGroupEditor, setConnectionGroupEditor] = useState(null);
+  const [connectionTagEditor, setConnectionTagEditor] = useState(null);
   const [connectionDragState, setConnectionDragState] = useState({ profileId: '', targetKey: '' });
   const [connectionLaunchKeys, setConnectionLaunchKeys] = useState([]);
   const [connectionHealth, setConnectionHealth] = useState({});
@@ -541,7 +552,7 @@ function App() {
   const [workspaceSummary, setWorkspaceSummary] = useState(() => loadWorkspaceSummary());
   const [workspaceHydrated, setWorkspaceHydrated] = useState(false);
   const [quickCommands, setQuickCommands] = useState(() => loadQuickCommands());
-  const [commandHistory, setCommandHistory] = useState(() => loadCommandHistory());
+  const [commandHistory, setCommandHistory] = useState(() => loadCommandHistory(settings.commandHistoryLimit));
   const [commandQuery, setCommandQuery] = useState('');
   const [commandScope, setCommandScope] = useState('current');
   const [commandEditorOpen, setCommandEditorOpen] = useState(false);
@@ -1324,8 +1335,9 @@ function App() {
       group: groupQuery,
       providerType: providerFilter,
       query: profileQuery,
+      tag: tagFilter,
     }), profileSort),
-    [profiles, profileQuery, groupQuery, providerFilter, profileSort],
+    [profiles, profileQuery, groupQuery, providerFilter, profileSort, tagFilter],
   );
   const visibleProfileIds = useMemo(
     () => visibleProfiles.map((profile) => profile.id),
@@ -1335,6 +1347,10 @@ function App() {
     const ids = new Set(selectedProfileIds);
     return profiles.filter((profile) => ids.has(profile.id));
   }, [profiles, selectedProfileIds]);
+  const selectedConnectionTags = useMemo(
+    () => collectConnectionTags(selectedConnectionProfiles),
+    [selectedConnectionProfiles],
+  );
   const connectionSelectionState = useMemo(() => buildConnectionSelectionActionState(
     profiles,
     selectedProfileIds,
@@ -1356,7 +1372,11 @@ function App() {
   const explicitlySelectedProfile = visibleProfiles.find((profile) => profile.id === selectedProfileId) || null;
   const selectedProfile = explicitlySelectedProfile || (compactConnectionDetail ? null : visibleProfiles[0] || null);
   const connectionDetailProfile = visibleProfiles.find((profile) => profile.id === connectionDetailProfileId) || null;
-  const hasProfileFilters = profileQuery.trim() || groupQuery !== 'all' || providerFilter !== 'all' || profileSort !== 'favorites';
+  const hasProfileFilters = profileQuery.trim()
+    || groupQuery !== 'all'
+    || providerFilter !== 'all'
+    || tagFilter
+    || profileSort !== 'favorites';
   const connectionEmptyState = useMemo(() => buildConnectionEmptyState({
     profileCount: profiles.length,
     visibleCount: visibleProfiles.length,
@@ -1479,6 +1499,10 @@ function App() {
   const connectionGroupNames = useMemo(() => buildConnectionGroups(profiles)
     .map((group) => group.key)
     .filter((group) => group !== ungroupedKey), [profiles]);
+  const connectionTags = useMemo(() => collectConnectionTags(profiles), [profiles]);
+  useEffect(() => {
+    if (tagFilter && !connectionTags.includes(tagFilter)) setTagFilter('');
+  }, [connectionTags, tagFilter]);
   const resolvedGroupQuery = resolveConnectionGroupFilter(groupQuery);
   const activeConnectionGroup = connectionGroupNav.find((item) => item.key === groupQuery) || {
     ...resolvedGroupQuery,
@@ -1588,7 +1612,14 @@ function App() {
       ? { config: {}, auth: {} }
       : savedProfile
         ? buildFileConnectionFormValues(nextProvider, savedProfile)
-        : { ...buildFileProviderFormValues(nextProvider), displayName: '', group: '', path: '.', rememberCredential: false };
+        : {
+          ...buildFileProviderFormValues(nextProvider),
+          displayName: '',
+          group: '',
+          tags: [],
+          path: '.',
+          rememberCredential: false,
+        };
     fileForm.setFieldValue('auth', {});
     fileForm.setFieldsValue(values);
     setFileCredentialEditing(false);
@@ -1721,6 +1752,7 @@ function App() {
     form.setFieldsValue({
       displayName: profile?.displayName || '',
       group: profile?.group || initialGroup,
+      tags: normalizeConnectionTags(profile?.tags),
       host: profile?.config?.host || '',
       port: profile?.config?.port || 22,
       username: profile?.auth?.username || '',
@@ -3359,6 +3391,45 @@ function App() {
     },
   };
 
+  const openConnectionTagEditor = () => {
+    setConnectionTagEditor({ action: 'add', values: [] });
+  };
+
+  const applySelectedConnectionTags = () => {
+    if (!connectionTagEditor) return;
+    const values = normalizeConnectionTags(connectionTagEditor.values);
+    if (values.length === 0) {
+      messageApi.warning(t('validation.connectionTagRequired'));
+      return;
+    }
+    const result = values.reduce((current, tag) => {
+      const update = updateConnectionProfilesTag(
+        current.profiles,
+        selectedProfileIds,
+        tag,
+        connectionTagEditor.action,
+      );
+      return {
+        changedCount: current.changedCount + update.changedCount,
+        profiles: update.profiles,
+      };
+    }, { changedCount: 0, profiles });
+    if (result.changedCount === 0) {
+      messageApi.info(t('message.connectionTagsUnchanged'));
+      setConnectionTagEditor(null);
+      return;
+    }
+    persistProfiles(result.profiles);
+    setProfiles(result.profiles);
+    setConnectionTagEditor(null);
+    messageApi.success(t(
+      connectionTagEditor.action === 'remove'
+        ? 'message.connectionTagsRemoved'
+        : 'message.connectionTagsAdded',
+      { count: result.changedCount },
+    ));
+  };
+
   const buildConnectionGroupActionMenu = (item) => ({
     items: [
       {
@@ -3399,6 +3470,7 @@ function App() {
     setProfileQuery('');
     setGroupQuery('all');
     setProviderFilter('all');
+    setTagFilter('');
     setProfileSort('favorites');
   };
 
@@ -3591,6 +3663,7 @@ function App() {
   const insertQuickCommand = (command) => dispatchQuickCommand(command, false);
 
   const recordCommandHistory = (command, session = activeSession) => {
+    if (settings.recordCommandHistory === false) return;
     const result = buildCommandHistoryEntryResult(command, {
       providerType: session?.providerType,
       sessionId: session?.id || activeKey,
@@ -3602,8 +3675,8 @@ function App() {
     }
     if (!entry) return;
     setCommandHistory((current) => {
-      const nextHistory = upsertCommandHistory(current, entry);
-      persistCommandHistory(nextHistory);
+      const nextHistory = upsertCommandHistory(current, entry, { limit: settings.commandHistoryLimit });
+      persistCommandHistory(nextHistory, settings.commandHistoryLimit);
       return nextHistory;
     });
   };
@@ -3614,13 +3687,24 @@ function App() {
   };
 
   const toggleCommandHistoryFavorite = (item) => {
-    const nextHistory = commandHistory.map((historyItem) => (
-      historyItem.command === item.command && historyItem.providerType === item.providerType
-        ? { ...historyItem, favorite: !historyItem.favorite }
-        : historyItem
-    ));
-    persistCommandHistory(nextHistory);
+    const nextHistory = toggleCommandHistoryFavoriteItem(commandHistory, item);
+    persistCommandHistory(nextHistory, settings.commandHistoryLimit);
     setCommandHistory(nextHistory);
+  };
+
+  const deleteCommandHistoryItem = (item) => {
+    const nextHistory = removeCommandHistoryItem(commandHistory, item);
+    persistCommandHistory(nextHistory, settings.commandHistoryLimit);
+    setCommandHistory(nextHistory);
+    messageApi.success(t('message.commandHistoryItemDeleted'));
+  };
+
+  const updateCommandHistoryLimit = (value) => {
+    const limit = clampNumber(value, 20, 500, defaultSettings.commandHistoryLimit);
+    const nextHistory = pruneCommandHistory(commandHistory, limit);
+    persistCommandHistory(nextHistory, limit);
+    setCommandHistory(nextHistory);
+    setSettings((current) => ({ ...current, commandHistoryLimit: limit }));
   };
 
   const clearVisibleCommandHistory = () => {
@@ -3631,7 +3715,7 @@ function App() {
         query: historyQuery,
         sessionId: historyScope === 'session' ? activeKey : '',
       });
-      persistCommandHistory(nextHistory);
+      persistCommandHistory(nextHistory, settings.commandHistoryLimit);
       setCommandHistory(nextHistory);
       messageApi.success(t('message.commandHistoryCleared'));
     };
@@ -4307,6 +4391,7 @@ function App() {
                 onClick={() => openBatchProfiles({
                   ...(groupQuery === 'favorites' ? { favoritesOnly: true } : { group: groupQuery }),
                   providerType: providerFilter,
+                  tag: tagFilter,
                 })}
                 disabled={
                   broadcastSending
@@ -4370,6 +4455,15 @@ function App() {
               ]}
             />
             <Select
+              className="connection-tag-filter"
+              value={tagFilter}
+              onChange={setTagFilter}
+              options={[
+                { label: t('filter.allTags'), value: '' },
+                ...connectionTags.map((tag) => ({ label: tag, value: tag })),
+              ]}
+            />
+            <Select
               className="connection-sort-select"
               value={profileSort}
               onChange={setProfileSort}
@@ -4394,6 +4488,7 @@ function App() {
             onDelete={confirmDeleteSelectedProfiles}
             onExport={exportSelectedProfiles}
             onFavorite={setSelectedProfilesFavorite}
+            onTags={openConnectionTagEditor}
             onOpen={openSelectedProfiles}
             onTest={testSelectedConnections}
             onToggleVisible={toggleVisibleConnectionProfiles}
@@ -4627,6 +4722,12 @@ function App() {
                               </span>
                             )}
                           </span>
+                          {profile.tags?.length > 0 && (
+                            <span className="connection-profile-user-tags">
+                              {profile.tags.slice(0, 3).map((tag) => <Tag key={tag}>{tag}</Tag>)}
+                              {profile.tags.length > 3 && <Tag>{`+${profile.tags.length - 3}`}</Tag>}
+                            </span>
+                          )}
                           {profile.providerType === 'ssh' && profile.config?.jumpHost && (
                             <small>{`${t('field.jumpHost')}: ${profile.config.jumpHost}`}</small>
                           )}
@@ -5248,6 +5349,7 @@ function App() {
       ...buildFileProviderFormValues(selectedFileProvider),
       displayName: '',
       group: '',
+      tags: [],
       path: '.',
       rememberCredential: false,
     });
@@ -5259,6 +5361,7 @@ function App() {
     const fieldsToValidate = [
       'displayName',
       'group',
+      'tags',
       'path',
       ...selectedFileProvider.configFields.map((field) => ['config', field.key]),
       ...(draft.rememberCredential
@@ -5961,9 +6064,7 @@ function App() {
                   <Form.Item name="displayName" label={t('field.name')}>
                     <Input placeholder={t('placeholder.connectionName')} />
                   </Form.Item>
-                  <Form.Item name="group" label={t('field.group')}>
-                    <Input placeholder={t('placeholder.group')} />
-                  </Form.Item>
+                  <ConnectionMetadataFields groups={connectionGroupNames} tags={connectionTags} />
                   <FileProviderFormFields
                     hideAuthFields={!!selectedFileConnectionProfile?.auth?.credentialRef && !fileCredentialEditing}
                     provider={selectedFileProvider}
@@ -6473,6 +6574,37 @@ function App() {
                 onChange={(checked) => setSettings((current) => ({ ...current, confirmDangerousActions: checked }))}
               />
             </Space>
+            <Space align="center" className="settings-row command-history-setting-row">
+              <div>
+                <Text strong>{t('field.recordCommandHistory')}</Text>
+                <Text type="secondary">{t('settings.commandHistoryHint')}</Text>
+              </div>
+              <Space size={8}>
+                <InputNumber
+                  aria-label={t('field.commandHistoryLimit')}
+                  min={20}
+                  max={500}
+                  step={20}
+                  value={settings.commandHistoryLimit}
+                  onChange={updateCommandHistoryLimit}
+                />
+                <Switch
+                  checked={settings.recordCommandHistory !== false}
+                  onChange={(checked) => setSettings((current) => ({
+                    ...current,
+                    recordCommandHistory: checked,
+                  }))}
+                />
+              </Space>
+            </Space>
+            <Button
+              icon={<HistoryOutlined />}
+              size="small"
+              type="text"
+              onClick={() => openCommandCenter('history')}
+            >
+              {t('action.manageCommandHistory')}
+            </Button>
             <Form layout="vertical">
               <Form.Item label={t('field.logLevel')}>
                 <Select
@@ -7778,6 +7910,43 @@ function App() {
         onSubmit={saveConnectionGroupEdit}
       />
 
+      <Modal
+        destroyOnHidden
+        open={Boolean(connectionTagEditor)}
+        title={t('connection.tagsEditorTitle', { count: selectedProfileIds.length })}
+        okText={t('action.apply')}
+        cancelText={t('action.cancel')}
+        onCancel={() => setConnectionTagEditor(null)}
+        onOk={applySelectedConnectionTags}
+      >
+        <div className="connection-tag-editor">
+          <Segmented
+            block
+            value={connectionTagEditor?.action || 'add'}
+            options={[
+              { value: 'add', label: t('action.addTags') },
+              { value: 'remove', label: t('action.removeTags'), disabled: selectedConnectionTags.length === 0 },
+            ]}
+            onChange={(action) => setConnectionTagEditor({ action, values: [] })}
+          />
+          <Select
+            autoFocus
+            mode={connectionTagEditor?.action === 'remove' ? 'multiple' : 'tags'}
+            maxCount={connectionTagEditor?.action === 'remove' ? undefined : 12}
+            maxTagCount="responsive"
+            value={connectionTagEditor?.values || []}
+            options={(connectionTagEditor?.action === 'remove' ? selectedConnectionTags : connectionTags)
+              .map((tag) => ({ label: tag, value: tag }))}
+            placeholder={t(connectionTagEditor?.action === 'remove'
+              ? 'placeholder.removeConnectionTags'
+              : 'placeholder.connectionTags')}
+            tokenSeparators={[',', '，', ';']}
+            onChange={(values) => setConnectionTagEditor((current) => ({ ...current, values }))}
+          />
+          <Text type="secondary">{t('connection.tagsBulkHint')}</Text>
+        </div>
+      </Modal>
+
       <Drawer
         className="terminal-drawer"
         title={t(terminalDrawerIntent === 'edit'
@@ -7900,9 +8069,7 @@ function App() {
           <Form.Item name="displayName" label={t('field.name')}>
             <Input placeholder={t('placeholder.sessionName')} />
           </Form.Item>
-          <Form.Item name="group" label={t('field.group')}>
-            <Input placeholder={t('placeholder.group')} />
-          </Form.Item>
+          <ConnectionMetadataFields groups={connectionGroupNames} tags={connectionTags} />
           {newType === 'local' && (
             <>
               <Form.Item name="shell" label={t('field.shell')}>
@@ -8087,11 +8254,13 @@ function App() {
                   onChangeScope={setHistoryScope}
                   onClear={clearVisibleCommandHistory}
                   onCopy={copyQuickCommand}
+                  onDelete={deleteCommandHistoryItem}
                   onFavorite={toggleCommandHistoryFavorite}
                   onInsert={insertQuickCommand}
                   onRun={runHistoryCommand}
                   onSave={saveHistoryAsQuickCommand}
                   query={historyQuery}
+                  recordingEnabled={settings.recordCommandHistory !== false}
                   scope={historyScope}
                   target={quickCommandSummary.target}
                 />
@@ -8635,6 +8804,11 @@ function ConnectionProfilePreview({
           </span>
         ))}
       </div>
+      {profile.tags?.length > 0 && (
+        <div className="connection-profile-user-tags detail">
+          {profile.tags.map((tag) => <Tag key={tag}>{tag}</Tag>)}
+        </div>
+      )}
       <div className="connection-profile-facts">
         {facts.map((fact) => (
           <span key={fact.key}>
@@ -9102,21 +9276,21 @@ function persistQuickCommands(commands) {
   localStorage.setItem(commandStorageKey, JSON.stringify(commands));
 }
 
-function loadCommandHistory() {
+function loadCommandHistory(limit = defaultSettings.commandHistoryLimit) {
   try {
     const parsed = JSON.parse(localStorage.getItem(commandHistoryStorageKey) || '[]');
     if (!Array.isArray(parsed)) return [];
     return parsed
       .filter((item) => item?.command && item?.providerType)
       .map(normalizeCommandHistoryItem)
-      .slice(0, 80);
+      .slice(0, clampNumber(limit, 20, 500, defaultSettings.commandHistoryLimit));
   } catch {
     return [];
   }
 }
 
-function persistCommandHistory(history) {
-  localStorage.setItem(commandHistoryStorageKey, JSON.stringify(history.slice(0, 80)));
+function persistCommandHistory(history, limit = defaultSettings.commandHistoryLimit) {
+  localStorage.setItem(commandHistoryStorageKey, JSON.stringify(pruneCommandHistory(history, limit)));
 }
 
 function loadExtensionSources() {
@@ -9206,6 +9380,7 @@ function profileFromRequest(request) {
     providerType: request.providerType,
     displayName: request.displayName,
     group: request.group || '',
+    tags: normalizeConnectionTags(request.tags),
     config: request.config || {},
     auth: request.auth || {},
   };
@@ -9217,6 +9392,7 @@ function profileToRequest(profile) {
     providerType: profile.providerType,
     displayName: profile.displayName,
     group: profile.group || '',
+    tags: normalizeConnectionTags(profile.tags),
     config: profile.config || {},
     auth: profile.auth || {},
   };
@@ -9677,6 +9853,7 @@ function saveProfile(profiles, request, editingProfileId = '', profileId = '') {
     providerType: request.providerType,
     displayName: request.displayName,
     group: request.group || '',
+    tags: normalizeConnectionTags(request.tags),
     config: request.config,
     favorite: !!existingProfile?.favorite,
     lastUsedAt: existingProfile?.lastUsedAt || '',
@@ -9726,6 +9903,13 @@ function normalizeSettings(settings) {
     ...defaultSettings,
     ...settings,
     confirmDangerousActions: settings.confirmDangerousActions !== false,
+    recordCommandHistory: settings.recordCommandHistory !== false,
+    commandHistoryLimit: clampNumber(
+      settings.commandHistoryLimit,
+      20,
+      500,
+      defaultSettings.commandHistoryLimit,
+    ),
     interfaceDensity,
     sidebarMode: normalizeSidebarMode(settings.sidebarMode),
     defaultProviderType: String(settings.defaultProviderType || defaultSettings.defaultProviderType).trim() || defaultSettings.defaultProviderType,
@@ -9791,6 +9975,7 @@ function buildRequest(type, displayName, values, provider = null) {
       providerType: type,
       displayName,
       group: values.group || '',
+      tags: normalizeConnectionTags(values.tags),
       config: {
         agentSocketPath: String(values.agentSocketPath || '').trim(),
         connectTimeoutSeconds: Number(values.connectTimeoutSeconds) || 10,
@@ -9820,6 +10005,8 @@ function buildRequest(type, displayName, values, provider = null) {
     const request = buildExtensionTerminalRequest(provider, displayName, values);
     return {
       ...request,
+      group: values.group || '',
+      tags: normalizeConnectionTags(values.tags),
       auth: {
         ...request.auth,
         credentialRef: parseCredentialRef(values.credentialRef),
@@ -9831,6 +10018,7 @@ function buildRequest(type, displayName, values, provider = null) {
     providerType: type,
     displayName,
     group: values.group || '',
+    tags: normalizeConnectionTags(values.tags),
     config: {
       shell: values.shell || '',
       workingDirectory: type === 'local'

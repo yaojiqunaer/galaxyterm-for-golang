@@ -41,6 +41,7 @@ const s3CredentialRef = {
 const s3Profile = buildFileConnectionProfile(s3Provider, {
   displayName: 'Production assets',
   group: 'Production',
+  tags: ['assets', 'critical'],
   path: '/releases',
   config: { endpoint: 'https://objects.example.com', bucket: 'assets' },
   auth: { accessKey: 'AKIAEXAMPLE', secretKey: 'secret', ignored: 'value' },
@@ -51,6 +52,7 @@ assert.deepEqual(s3Profile, {
   providerType: 's3',
   displayName: 'Production assets',
   group: 'Production',
+  tags: ['assets', 'critical'],
   filePath: '/releases',
   config: { endpoint: 'https://objects.example.com', bucket: 'assets' },
   favorite: false,
@@ -76,6 +78,7 @@ assert.deepEqual(buildFileProviderConfigValues(s3Provider, {
 assert.deepEqual(buildFileConnectionFormValues(s3Provider, s3Profile), {
   displayName: 'Production assets',
   group: 'Production',
+  tags: ['assets', 'critical'],
   path: '/releases',
   config: { endpoint: 'https://objects.example.com', bucket: 'assets' },
   auth: {},

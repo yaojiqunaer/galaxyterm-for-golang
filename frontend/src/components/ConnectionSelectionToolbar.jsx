@@ -13,6 +13,7 @@ import {
   FolderOpenOutlined,
   StarFilled,
   StarOutlined,
+  TagsOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
 import { t } from '../i18n.js';
@@ -26,6 +27,7 @@ export default function ConnectionSelectionToolbar({
   onExport,
   onFavorite,
   onOpen,
+  onTags,
   onTest,
   onToggleVisible,
   openableCount = 0,
@@ -91,6 +93,14 @@ export default function ConnectionSelectionToolbar({
           <span className="connection-selection-action-label">{t('action.moveToGroup')}</span>
         </Button>
       </Dropdown>
+      <Tooltip title={t('action.manageTags')}>
+        <Button
+          aria-label={t('action.manageTags')}
+          icon={<TagsOutlined />}
+          size="small"
+          onClick={onTags}
+        />
+      </Tooltip>
       <Tooltip title={t(allFavorite ? 'action.unfavoriteSelected' : 'action.favoriteSelected')}>
         <Button
           aria-label={t(allFavorite ? 'action.unfavoriteSelected' : 'action.favoriteSelected')}

@@ -11,6 +11,7 @@ const replaySource = await readFile(new URL('./components/AuditReplayPlayer.jsx'
 const commandPaletteSource = await readFile(new URL('./components/CommandPalette.jsx', import.meta.url), 'utf8');
 const connectionGroupDialogSource = await readFile(new URL('./components/ConnectionGroupDialog.jsx', import.meta.url), 'utf8').catch(() => '');
 const connectionSelectionToolbarSource = await readFile(new URL('./components/ConnectionSelectionToolbar.jsx', import.meta.url), 'utf8').catch(() => '');
+const connectionMetadataFieldsSource = await readFile(new URL('./components/ConnectionMetadataFields.jsx', import.meta.url), 'utf8').catch(() => '');
 const quickCommandLibrarySource = await readFile(new URL('./components/QuickCommandLibrary.jsx', import.meta.url), 'utf8').catch(() => '');
 const commandHistoryPanelSource = await readFile(new URL('./components/CommandHistoryPanel.jsx', import.meta.url), 'utf8').catch(() => '');
 const terminalPaneSource = await readFile(new URL('./components/TerminalPane.jsx', import.meta.url), 'utf8');
@@ -1193,6 +1194,27 @@ assert.ok(
     && sessionQuickSwitcherSource.includes('aria-live="polite"')
     && sessionQuickSwitcherSource.includes("scrollIntoView?.({ block: 'nearest' })"),
   'Ctrl+Tab must use a focus-preserving MRU switcher with explicit commit and cancellation',
+);
+assert.ok(
+  source.includes("const [tagFilter, setTagFilter] = useState('');")
+    && source.includes('collectConnectionTags(profiles)')
+    && source.includes('tag: tagFilter')
+    && source.includes('profile.tags.slice(0, 3)')
+    && source.includes('updateConnectionProfilesTag(')
+    && source.includes('open={Boolean(connectionTagEditor)}')
+    && connectionMetadataFieldsSource.includes('mode="tags"')
+    && connectionSelectionToolbarSource.includes('onTags')
+    && connectionSelectionToolbarSource.includes('<TagsOutlined />')
+    && connectionMetadataFieldsSource.includes('normalizeConnectionTags(value)'),
+  'saved connections must support normalized cross-group tags in forms, filtering, and list presentation',
+);
+assert.ok(
+  source.includes('if (settings.recordCommandHistory === false) return;')
+    && source.includes('commandHistoryLimit: 80')
+    && source.includes('removeCommandHistoryItem(commandHistory, item)')
+    && commandHistoryPanelSource.includes("key: 'delete'")
+    && commandHistoryPanelSource.includes("'history.recordingOn'"),
+  'command history must provide privacy controls, bounded retention, and precise item deletion',
 );
 
 console.log('app structure tests passed');

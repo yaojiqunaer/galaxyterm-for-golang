@@ -58,6 +58,25 @@ export function upsertCommandHistory(history = [], entry = null, {
   return [updated, ...deduped].slice(0, limit);
 }
 
+export function toggleCommandHistoryFavorite(history = [], target = null) {
+  if (!target?.command) return history;
+  const key = commandHistoryKey(target);
+  return history.map((item) => (
+    commandHistoryKey(item) === key ? { ...item, favorite: !item.favorite } : item
+  ));
+}
+
+export function removeCommandHistoryItem(history = [], target = null) {
+  if (!target?.command) return history;
+  const key = commandHistoryKey(target);
+  return history.filter((item) => commandHistoryKey(item) !== key);
+}
+
+export function pruneCommandHistory(history = [], limit = 80) {
+  const capacity = Math.max(1, Math.min(500, Number(limit) || 80));
+  return history.slice(0, capacity);
+}
+
 export function filterCommandHistory(history = [], {
   providerType = 'all',
   query = '',
@@ -102,7 +121,7 @@ export function normalizeCommandHistoryItem(item = {}) {
 }
 
 function sameCommandScope(left = {}, right = {}) {
-  return left.command === right.command && left.providerType === right.providerType;
+  return commandHistoryKey(left) === commandHistoryKey(right);
 }
 
 function commandHistoryKey(item = {}) {

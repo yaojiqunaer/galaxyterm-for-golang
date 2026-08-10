@@ -383,6 +383,12 @@ frontend/src/locales/en-US.json
 
 UI code should reference stable translation keys, not raw Chinese or English strings. Provider metadata exposed to the frontend should also be localizable.
 
+Current connection and command UX:
+
+- Saved terminal and file profiles support normalized, reusable tags. Tags survive non-secret import/export, participate in group-independent filtering, full-text search, and command-palette lookup, and can be added or removed across a multi-selection without affecting active sessions.
+- Local command history is keyed by provider, session, and command. Sensitive commands are rejected before storage, individual entries can be removed, recording can be paused, and retention is configurable from 20 to 500 entries.
+- Command-history privacy settings do not disable or bypass session audit events or terminal recordings.
+
 ### Backend And Provider Messages
 
 Backend code should not return only pre-rendered Chinese or English messages for user-facing errors. It should prefer structured errors:

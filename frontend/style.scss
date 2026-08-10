@@ -2566,12 +2566,28 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   line-height: 1;
 }
 
+.connection-tag-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.connection-tag-editor > .ant-select {
+  width: 100%;
+}
+
 .connection-list-tools .profile-search {
   width: clamp(240px, 36%, 320px);
 }
 
 .connection-provider-filter {
   width: 156px;
+  max-width: 100%;
+}
+
+.connection-tag-filter {
+  width: 148px;
   max-width: 100%;
 }
 
@@ -2898,6 +2914,31 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
+}
+
+.connection-profile-user-tags {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.connection-profile-user-tags .ant-tag {
+  max-width: 132px;
+  overflow: hidden;
+  margin: 0;
+  border-color: color-mix(in srgb, var(--accent) 20%, var(--border-subtle));
+  background: color-mix(in srgb, var(--accent) 6%, var(--panel));
+  color: var(--text);
+  text-overflow: ellipsis;
+}
+
+.connection-profile-user-tags.detail {
+  padding-top: 2px;
+}
+
+.connection-profile-description > .connection-profile-user-tags {
+  flex-basis: 100%;
 }
 
 .connection-profile-actions .ant-btn-primary {
@@ -4697,6 +4738,13 @@ code {
   color: var(--accent);
 }
 
+.command-history-guidance > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 1px;
+}
+
 .broadcast-command-body {
   display: flex;
   flex-direction: column;
@@ -4963,6 +5011,10 @@ code {
   display: block;
   margin-top: 2px;
   font-size: 12px;
+}
+
+.command-history-setting-row .ant-input-number {
+  width: 96px;
 }
 
 .terminal-settings-preview {

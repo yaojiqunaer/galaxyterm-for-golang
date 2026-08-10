@@ -95,7 +95,7 @@ export function buildProfilePaletteItems({
       group: groupLabel,
       id: `profile:${profile.id}`,
       icon: iconForProfile(profile),
-      keywords: `${profile.displayName || ''} ${profile.group || ''} ${description}`,
+      keywords: `${profile.displayName || ''} ${profile.group || ''} ${Array.isArray(profile.tags) ? profile.tags.join(' ') : ''} ${description}`,
       profile,
       reasonKey: providerAvailable || providerRecoverable ? '' : 'palette.reason.providerUnavailable',
       title: profile.displayName || profile.providerType || '',

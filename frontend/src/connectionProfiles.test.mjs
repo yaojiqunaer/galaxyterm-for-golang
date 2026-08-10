@@ -3,9 +3,17 @@ import {
   buildConnectionProfilesExport,
   hasStoredSshCredential,
   normalizeImportedConnectionProfile,
+  normalizeConnectionTags,
   normalizeStoredConnectionProfile,
   shouldClearStoredSshCredential,
 } from './connectionProfiles.js';
+
+assert.deepEqual(
+  normalizeConnectionTags([' Production ', 'critical', 'production', '', '数据库']),
+  ['Production', 'critical', '数据库'],
+);
+assert.deepEqual(normalizeConnectionTags('prod, database，critical'), ['prod', 'database', 'critical']);
+assert.equal(normalizeConnectionTags(Array.from({ length: 20 }, (_, index) => `tag-${index}`)).length, 12);
 
 assert.equal(hasStoredSshCredential({ id: 'profile-1' }), false);
 assert.equal(hasStoredSshCredential({ id: 'profile-1', hasJumpPassword: true }), true);
@@ -37,6 +45,7 @@ const storedFileProfile = {
   providerType: 's3',
   displayName: 'Production assets',
   group: 'Production',
+  tags: ['Assets', 'production', 'assets'],
   filePath: '/releases',
   config: { endpoint: 'https://s3.example.com', bucket: 'assets' },
   auth: {
@@ -56,6 +65,7 @@ assert.deepEqual(normalizeStoredConnectionProfile(storedFileProfile), {
   providerType: 's3',
   displayName: 'Production assets',
   group: 'Production',
+  tags: ['Assets', 'production'],
   filePath: '/releases',
   config: { endpoint: 'https://s3.example.com', bucket: 'assets' },
   favorite: false,
@@ -103,7 +113,9 @@ assert.equal(normalizedLegacySSH.kind, 'terminal');
 assert.equal(normalizedLegacySSH.auth.username, 'deploy');
 assert.equal(normalizedLegacySSH.auth.password, undefined);
 assert.deepEqual(normalizedLegacySSH.auth.credentialRef, { id: 'ssh-production', hasPassword: true });
+assert.deepEqual(normalizedLegacySSH.tags, []);
 const exported = buildConnectionProfilesExport([sshProfile, storedFileProfile], '2026-07-18T10:00:00.000Z');
+assert.equal(exported.version, 3);
 assert.equal(exported.secrets, 'omitted');
 assert.equal(exported.exportedAt, '2026-07-18T10:00:00.000Z');
 assert.equal(exported.profiles[0].auth.credentialRef, null);

@@ -31,6 +31,9 @@ assert.equal(t('operation.error.suggestion.hostIdentity'), 'Verify the server fi
 assert.equal(t('auth.agent'), 'SSH Agent');
 assert.equal(t('ssh.agentHint'), 'Uses an SSH_AUTH_SOCK-compatible agent on macOS or Linux. Blank uses SSH_AUTH_SOCK; private keys never enter GalaxyTerm.');
 assert.equal(t('field.connectTimeout'), 'Connection Timeout');
+assert.equal(t('field.tags'), 'Tags');
+assert.equal(t('filter.allTags'), 'All Tags');
+assert.equal(t('history.recordingOff'), 'History recording is paused');
 assert.equal(t('action.closeRightSessions'), 'Close Sessions to the Right');
 assert.equal(t('error.ssh.keepalive'), 'The SSH connection stopped responding to keepalive requests.');
 assert.equal(t('terminal.status.preparing'), 'Preparing terminal');
@@ -154,6 +157,9 @@ assert.equal(t('operation.error.suggestion.authentication'), '请检查用户名
 assert.equal(t('operation.error.reason.hostIdentity'), '服务器身份校验失败');
 assert.equal(t('operation.error.suggestion.hostIdentity'), '请先核对服务器指纹，再更新已知主机文件。');
 assert.equal(t('auth.agent'), 'SSH Agent');
+assert.equal(t('field.tags'), '标签');
+assert.equal(t('filter.allTags'), '全部标签');
+assert.equal(t('history.recordingOff'), '命令历史记录已暂停');
 assert.equal(t('ssh.agentHint'), '在 macOS 或 Linux 上使用兼容 SSH_AUTH_SOCK 的 Agent；留空读取 SSH_AUTH_SOCK，私钥不会进入 GalaxyTerm。');
 assert.equal(t('terminal.status.preparing'), '正在准备终端');
 assert.equal(t('action.clearSearch'), '清除搜索');

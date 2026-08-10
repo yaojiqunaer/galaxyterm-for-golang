@@ -13,6 +13,7 @@ import {
   ClearOutlined,
   CodeOutlined,
   CopyOutlined,
+  DeleteOutlined,
   EnterOutlined,
   MoreOutlined,
   SaveOutlined,
@@ -35,11 +36,13 @@ export default function CommandHistoryPanel({
   onChangeScope,
   onClear,
   onCopy,
+  onDelete,
   onFavorite,
   onInsert,
   onRun,
   onSave,
   query = '',
+  recordingEnabled = true,
   scope = 'provider',
   target = '',
 }) {
@@ -85,7 +88,10 @@ export default function CommandHistoryPanel({
       </div>
       <div className="command-history-guidance">
         <CodeOutlined />
-        <Text type="secondary">{t('history.drawerHint')}</Text>
+        <span>
+          <Text strong>{t(recordingEnabled ? 'history.recordingOn' : 'history.recordingOff')}</Text>
+          <Text type="secondary">{t('history.drawerHint')}</Text>
+        </span>
       </div>
       <List
         className="command-history-list"
@@ -105,6 +111,7 @@ export default function CommandHistoryPanel({
             item={item}
             key={`${item.providerType || 'terminal'}-${item.sessionId || ''}-${item.command}`}
             onCopy={onCopy}
+            onDelete={onDelete}
             onFavorite={onFavorite}
             onInsert={onInsert}
             onRun={onRun}
@@ -121,6 +128,7 @@ function CommandHistoryRow({
   formatTimestamp,
   item,
   onCopy,
+  onDelete,
   onFavorite,
   onInsert,
   onRun,
@@ -141,11 +149,14 @@ function CommandHistoryRow({
       },
       { key: 'save', icon: <SaveOutlined />, label: t('action.saveQuickCommand') },
       { key: 'copy', icon: <CopyOutlined />, label: t('action.copy') },
+      { type: 'divider' },
+      { key: 'delete', danger: true, icon: <DeleteOutlined />, label: t('action.delete') },
     ],
     onClick: ({ key }) => {
       if (key === 'favorite') onFavorite?.(item);
       if (key === 'save') onSave?.(item);
       if (key === 'copy') onCopy?.(item);
+      if (key === 'delete') onDelete?.(item);
     },
   };
   return (

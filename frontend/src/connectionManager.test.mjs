@@ -13,6 +13,7 @@ import {
   buildConnectionProfileSubtitle,
   buildConnectionSelectionActionState,
   buildConnectionTransferActions,
+  collectConnectionTags,
   buildDefaultTerminalLaunch,
   buildTerminalSubmitPlan,
   filterConnectionProfiles,
@@ -26,6 +27,7 @@ import {
   resolveConnectionProfileSelection,
   setVisibleConnectionProfileSelection,
   updateConnectionProfilesFavorite,
+  updateConnectionProfilesTag,
   resolveSelectedProfileId,
   selectBatchProfiles,
   shouldPersistConnection,
@@ -103,6 +105,7 @@ const profiles = [
     displayName: 'Prod DB',
     favorite: true,
     group: 'Production',
+    tags: ['production', 'database'],
     lastUsedAt: '2026-06-25T10:00:00.000Z',
     providerType: 'ssh',
     config: { host: '10.0.0.10', port: 22 },
@@ -113,6 +116,7 @@ const profiles = [
     displayName: 'Prod Web',
     favorite: false,
     group: 'Production',
+    tags: ['production', 'web'],
     lastUsedAt: '2026-06-26T10:00:00.000Z',
     providerType: 'ssh',
     config: { host: '10.0.0.20', port: 22 },
@@ -123,6 +127,7 @@ const profiles = [
     displayName: 'Dev Shell',
     favorite: true,
     group: '',
+    tags: ['development'],
     providerType: 'local',
     config: { shell: '/bin/zsh', workingDirectory: '/Users/me/dev' },
     auth: {},
@@ -230,6 +235,17 @@ const favoritedProfiles = updateConnectionProfilesFavorite(profiles, ['prod-web'
 assert.equal(favoritedProfiles.changedCount, 1);
 assert.equal(favoritedProfiles.profiles.find((profile) => profile.id === 'prod-web')?.favorite, true);
 assert.equal(favoritedProfiles.profiles.find((profile) => profile.id === 'prod-db'), profiles[0]);
+const taggedProfiles = updateConnectionProfilesTag(profiles, ['prod-web', 'dev-shell'], ' Critical ', 'add');
+assert.equal(taggedProfiles.changedCount, 2);
+assert.deepEqual(taggedProfiles.profiles.find((profile) => profile.id === 'prod-web')?.tags, ['production', 'web', 'Critical']);
+assert.deepEqual(taggedProfiles.profiles.find((profile) => profile.id === 'dev-shell')?.tags, ['development', 'Critical']);
+const untaggedProfiles = updateConnectionProfilesTag(taggedProfiles.profiles, ['prod-web'], 'critical', 'remove');
+assert.equal(untaggedProfiles.changedCount, 1);
+assert.deepEqual(untaggedProfiles.profiles.find((profile) => profile.id === 'prod-web')?.tags, ['production', 'web']);
+assert.equal(updateConnectionProfilesTag(profiles, ['prod-db'], 'database', 'add').changedCount, 0);
+assert.equal(updateConnectionProfilesTag([
+  { id: 'full', tags: Array.from({ length: 12 }, (_, index) => `tag-${index}`) },
+], ['full'], 'overflow', 'add').changedCount, 0);
 const removedProfiles = removeConnectionProfiles(profiles, ['prod-web', 'missing']);
 assert.deepEqual(removedProfiles.removedProfiles.map((profile) => profile.id), ['prod-web']);
 assert.deepEqual(removedProfiles.profiles.map((profile) => profile.id), ['prod-db', 'dev-shell']);
@@ -366,6 +382,20 @@ assert.deepEqual(
 assert.deepEqual(
   filterConnectionProfiles(profiles, { query: 'prod deploy' }).map((profile) => profile.id),
   ['prod-web'],
+);
+assert.deepEqual(collectConnectionTags(profiles), ['database', 'development', 'production', 'web']);
+assert.deepEqual(
+  filterConnectionProfiles(profiles, { tag: 'database' }).map((profile) => profile.id),
+  ['prod-db'],
+);
+assert.deepEqual(
+  filterConnectionProfiles([{ id: 'reserved-tag', tags: ['all'] }], { tag: 'all' })
+    .map((profile) => profile.id),
+  ['reserved-tag'],
+);
+assert.deepEqual(
+  filterConnectionProfiles(profiles, { query: 'development' }).map((profile) => profile.id),
+  ['dev-shell'],
 );
 assert.deepEqual(
   filterConnectionProfiles(profiles, { group: 'favorites', query: 'ssh' }).map((profile) => profile.id),
