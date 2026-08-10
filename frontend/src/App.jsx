@@ -369,6 +369,7 @@ import CommandHistoryPanel from './components/CommandHistoryPanel.jsx';
 import SessionQuickSwitcher from './components/SessionQuickSwitcher.jsx';
 import SessionRecoveryNotice from './components/SessionRecoveryNotice.jsx';
 import SessionRecoverySettings from './components/SessionRecoverySettings.jsx';
+import SessionSidebarFilter from './components/SessionSidebarFilter.jsx';
 import SavedSSHProfileSelect from './components/SavedSSHProfileSelect.jsx';
 import SshAgentSocketField from './components/SshAgentSocketField.jsx';
 import SshNetworkFields from './components/SshNetworkFields.jsx';
@@ -535,6 +536,7 @@ function App() {
   const [terminalSearchPreferences, setTerminalSearchPreferences] = useState(defaultTerminalSearchPreferences);
   const [terminalSearchResults, setTerminalSearchResults] = useState({});
   const [sidebarSessionQuery, setSidebarSessionQuery] = useState('');
+  const [sidebarSessionScope, setSidebarSessionScope] = useState('all');
   const [terminalStatuses, setTerminalStatuses] = useState({});
   const [sessionActivity, setSessionActivity] = useState({});
   const [focusMode, setFocusMode] = useState(false);
@@ -1732,7 +1734,8 @@ function App() {
   const sidebarSessionState = useMemo(() => buildSessionSidebarState(sessions, {
     activeKey,
     query: sidebarSessionQuery,
-  }), [activeKey, sessions, sidebarSessionQuery]);
+    scope: sidebarSessionScope,
+  }), [activeKey, sessions, sidebarSessionQuery, sidebarSessionScope]);
   const sidebarSessions = sidebarSessionState.sessions;
   const sessionIds = useMemo(() => sessions.map((session) => session.id), [sessions]);
   useEffect(() => {
@@ -7857,45 +7860,32 @@ function App() {
 
             <div className="sidebar-section sidebar-fill">
               <div className="section-title with-hint">
-                <span>{t('section.activeSessions')}</span>
+                <span>{t('nav.sessions')}</span>
                 {sessions.length > 0 && <Text code>{numberedSessionShortcut}</Text>}
               </div>
-              {sidebarSessionState.showSearch && (
-                <div className="sidebar-session-filter">
-                  <Input.Search
-                    allowClear
-                    aria-label={t('placeholder.searchSessions')}
-                    placeholder={t('placeholder.searchSessions')}
-                    size="small"
-                    value={sidebarSessionQuery}
-                    onChange={(event) => setSidebarSessionQuery(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key !== 'Escape' || !sidebarSessionQuery) return;
-                      event.preventDefault();
-                      setSidebarSessionQuery('');
-                    }}
-                    onSearch={(query) => {
-                      if (!String(query).trim() || sidebarSessions.length === 0) return;
-                      activateSession(sidebarSessions[0].id);
-                    }}
-                  />
-                  {sidebarSessionState.filtered && (
-                    <Text type="secondary">
-                      {t('session.filterSummary', {
-                        count: sidebarSessionState.visible,
-                        total: sidebarSessionState.total,
-                      })}
-                    </Text>
-                  )}
-                </div>
-              )}
+              <SessionSidebarFilter
+                query={sidebarSessionQuery}
+                scope={sidebarSessionScope}
+                state={sidebarSessionState}
+                onActivateFirst={() => activateSession(sidebarSessions[0]?.id)}
+                onQueryChange={setSidebarSessionQuery}
+                onScopeChange={setSidebarSessionScope}
+              />
               {sidebarSessions.length === 0 ? (
                 <Empty
                   image={Empty.PRESENTED_IMAGE_SIMPLE}
                   description={t(sidebarSessionState.filtered ? 'empty.noSessionMatches' : 'empty.noSessions')}
                 >
                   {sidebarSessionState.filtered && (
-                    <Button size="small" onClick={() => setSidebarSessionQuery('')}>{t('action.clearFilters')}</Button>
+                    <Button
+                      size="small"
+                      onClick={() => {
+                        setSidebarSessionQuery('');
+                        setSidebarSessionScope('all');
+                      }}
+                    >
+                      {t('action.clearFilters')}
+                    </Button>
                   )}
                 </Empty>
               ) : (

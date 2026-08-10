@@ -812,6 +812,22 @@ assert.deepEqual(filterSessions(sessionFilterFixture, {
   status: 'active',
 }).map((session) => session.id), ['1', '2']);
 
+assert.deepEqual(filterSessions([
+  ...sessionFilterFixture,
+  { id: '4', status: 'error' },
+], {
+  prioritizeActive: false,
+  status: 'healthy',
+}).map((session) => session.id), ['1', '2']);
+
+assert.deepEqual(filterSessions([
+  ...sessionFilterFixture,
+  { id: '4', status: 'error' },
+], {
+  prioritizeActive: false,
+  status: 'attention',
+}).map((session) => session.id), ['3', '4']);
+
 const sidebarState = buildSessionSidebarState([
   ...sessionFilterFixture,
   { id: '4', label: 'Docker Logs', providerType: 'docker', status: 'connected', request: { config: { host: 'node-1' } } },
@@ -824,16 +840,41 @@ assert.deepEqual(sidebarState.sessions.map((session) => session.id), ['1']);
 assert.deepEqual({
   filtered: sidebarState.filtered,
   showSearch: sidebarState.showSearch,
+  showScope: sidebarState.showScope,
+  scope: sidebarState.scope,
+  scopeCounts: sidebarState.scopeCounts,
   total: sidebarState.total,
   visible: sidebarState.visible,
 }, {
   filtered: true,
   showSearch: true,
-  total: 4,
+  showScope: true,
+  scope: 'all',
+  scopeCounts: { all: 5, attention: 1, healthy: 4 },
+  total: 5,
   visible: 1,
 });
 
-assert.equal(buildSessionSidebarState(sessionFilterFixture).showSearch, false);
+const compactSidebarState = buildSessionSidebarState(sessionFilterFixture);
+assert.equal(compactSidebarState.showSearch, false);
+assert.equal(compactSidebarState.showScope, true);
+assert.deepEqual(compactSidebarState.sessions.map((session) => session.id), ['1', '2', '3']);
+assert.deepEqual(buildSessionSidebarState([
+  ...sessionFilterFixture,
+  { id: '4', label: 'Failed SSH', status: 'error' },
+], { scope: 'attention' }), {
+  filtered: true,
+  scope: 'attention',
+  scopeCounts: { all: 4, attention: 2, healthy: 2 },
+  sessions: [
+    sessionFilterFixture[2],
+    { id: '4', label: 'Failed SSH', status: 'error' },
+  ],
+  showScope: true,
+  showSearch: true,
+  total: 4,
+  visible: 2,
+});
 assert.deepEqual(buildSessionSidebarState([
   ...sessionFilterFixture,
   {

@@ -476,6 +476,18 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   line-height: 16px;
 }
 
+.sidebar-session-scope {
+  width: 100%;
+  min-width: 0;
+}
+
+.sidebar-session-scope .ant-segmented-item-label {
+  overflow: hidden;
+  padding-inline: 5px;
+  font-size: 11px;
+  text-overflow: ellipsis;
+}
+
 .sidebar-session-filter .ant-input-search-button {
   width: 28px;
   padding-inline: 0;

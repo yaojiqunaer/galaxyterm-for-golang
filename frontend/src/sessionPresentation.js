@@ -496,7 +496,7 @@ export function filterSessions(sessions = [], options = {}) {
     .toLowerCase()
     .split(/\s+/)
     .filter(Boolean);
-  const status = ['all', 'active', 'connected', 'connecting', 'closed'].includes(options.status)
+  const status = ['all', 'active', 'healthy', 'attention', 'connected', 'connecting', 'closed'].includes(options.status)
     ? options.status
     : 'all';
 
@@ -513,22 +513,33 @@ export function filterSessions(sessions = [], options = {}) {
 
 export function buildSessionSidebarState(sessions = [], options = {}) {
   const query = String(options.query || '').trim();
-  const activeSessions = filterSessions(sessions, {
+  const scope = ['all', 'healthy', 'attention'].includes(options.scope) ? options.scope : 'all';
+  const scopeCounts = {
+    all: sessions.length,
+    attention: filterSessions(sessions, {
+      prioritizeActive: false,
+      status: 'attention',
+    }).length,
+    healthy: filterSessions(sessions, {
+      prioritizeActive: false,
+      status: 'healthy',
+    }).length,
+  };
+  const visibleSessions = filterSessions(sessions, {
     activeKey: options.activeKey,
     prioritizeActive: false,
     query,
-    status: 'active',
+    status: scope,
   });
-  const total = filterSessions(sessions, {
-    prioritizeActive: false,
-    status: 'active',
-  }).length;
   return {
-    filtered: query.length > 0,
-    sessions: activeSessions,
-    showSearch: total >= 4 || query.length > 0,
-    total,
-    visible: activeSessions.length,
+    filtered: query.length > 0 || scope !== 'all',
+    scope,
+    scopeCounts,
+    sessions: visibleSessions,
+    showScope: sessions.length >= 4 || scopeCounts.attention > 0 || scope !== 'all',
+    showSearch: sessions.length >= 4 || query.length > 0,
+    total: sessions.length,
+    visible: visibleSessions.length,
   };
 }
 
@@ -741,6 +752,8 @@ export function profileActionModel(profile = {}) {
 function matchesSessionStatus(session, status) {
   if (status === 'all') return true;
   if (status === 'active') return sessionStatusTone(session) !== 'closed';
+  if (status === 'healthy') return ['connected', 'connecting'].includes(sessionStatusLabel(session));
+  if (status === 'attention') return ['error', 'closed'].includes(sessionStatusLabel(session));
   return sessionStatusLabel(session) === status;
 }
 

@@ -24,6 +24,7 @@ const sshSecurityFieldsSource = await readFile(new URL('./components/SshSecurity
 const sshAgentSocketFieldSource = await readFile(new URL('./components/SshAgentSocketField.jsx', import.meta.url), 'utf8').catch(() => '');
 const sshNetworkFieldsSource = await readFile(new URL('./components/SshNetworkFields.jsx', import.meta.url), 'utf8').catch(() => '');
 const sessionQuickSwitcherSource = await readFile(new URL('./components/SessionQuickSwitcher.jsx', import.meta.url), 'utf8').catch(() => '');
+const sessionSidebarFilterSource = await readFile(new URL('./components/SessionSidebarFilter.jsx', import.meta.url), 'utf8').catch(() => '');
 const sessionRecoveryNoticeSource = await readFile(new URL('./components/SessionRecoveryNotice.jsx', import.meta.url), 'utf8').catch(() => '');
 const sessionRecoverySettingsSource = await readFile(new URL('./components/SessionRecoverySettings.jsx', import.meta.url), 'utf8').catch(() => '');
 const activeSessionDeclaration = source.indexOf('const activeSession =');
@@ -309,9 +310,9 @@ assert.ok(
 assert.ok(
   source.includes("const [sidebarSessionQuery, setSidebarSessionQuery] = useState('');")
     && source.includes('buildSessionSidebarState(sessions, {')
-    && source.includes('allowClear')
-    && source.includes("placeholder={t('placeholder.searchSessions')}")
-    && source.includes('activateSession(sidebarSessions[0].id);'),
+    && source.includes('onActivateFirst={() => activateSession(sidebarSessions[0]?.id)}')
+    && sessionSidebarFilterSource.includes('allowClear')
+    && sessionSidebarFilterSource.includes("placeholder={t('placeholder.searchSessions')}"),
   'the active-session sidebar must provide compact search without changing session lifetime',
 );
 assert.ok(
@@ -1242,6 +1243,20 @@ assert.ok(
     && source.includes("action === 'reconnect' || action === 'reconnectDisconnected'")
     && source.includes('recoverableCount: sessionReconnectBatchActionCount'),
   'disconnected sessions must support one explicit context-preserving batch reconnect action',
+);
+assert.ok(
+  source.includes("const [sidebarSessionScope, setSidebarSessionScope] = useState('all');")
+    && source.includes('scope: sidebarSessionScope')
+    && sessionSidebarFilterSource.includes('state.showScope')
+    && source.includes("setSidebarSessionScope('all')")
+    && source.includes('<SessionSidebarFilter')
+    && sessionSidebarFilterSource.includes("event.key !== 'Escape'")
+    && sessionSidebarFilterSource.includes('<Segmented')
+    && sessionSidebarFilterSource.includes('<Input.Search')
+    && sessionSidebarFilterSource.includes('className="sidebar-session-scope"')
+    && sessionSidebarFilterSource.includes("t('session.scope.attention')")
+    && styles.includes('.sidebar-session-scope .ant-segmented-item-label'),
+  'the sidebar must keep disconnected tabs visible and provide a compact session status scope',
 );
 
 console.log('app structure tests passed');
