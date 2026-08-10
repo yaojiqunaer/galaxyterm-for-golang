@@ -1,3 +1,5 @@
+import { normalizeConnectionAccent } from './connectionProfiles.js';
+
 export function sessionStatusTone(session = {}) {
   const status = sessionStatusLabel(session);
   if (status === 'connected') return 'success';
@@ -304,6 +306,12 @@ export function buildSessionDisplayLabels(sessions = []) {
     const displayName = totals.get(entry.normalized) > 1 ? `${entry.label} ${ordinal}` : entry.label;
     return [entry.id, displayName];
   }));
+}
+
+export function resolveSessionAccent(session = {}, profiles = []) {
+  const profileId = session.request?.profileId || session.profileId;
+  const profile = profiles.find((item) => item.id === profileId);
+  return normalizeConnectionAccent(profile?.accent || session.request?.accent || session.accent);
 }
 
 export function buildSessionIdentityDisplay(session, options = {}) {

@@ -7,6 +7,7 @@ import {
 } from 'antd';
 import {
   ApiOutlined,
+  BgColorsOutlined,
   CloseOutlined,
   DeleteOutlined,
   ExportOutlined,
@@ -16,12 +17,14 @@ import {
   TagsOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
+import { connectionAccentOptions } from '../connectionProfiles.js';
 import { t } from '../i18n.js';
 
 export default function ConnectionSelectionToolbar({
   allFavorite = false,
   allVisibleSelected = false,
   moveMenu = { items: [] },
+  onAccent,
   onClear,
   onDelete,
   onExport,
@@ -37,6 +40,14 @@ export default function ConnectionSelectionToolbar({
   testingCount = 0,
 }) {
   if (selectedCount <= 0) return null;
+  const accentMenu = {
+    items: connectionAccentOptions.map((accent) => ({
+      icon: <span className={`connection-accent-menu-swatch accent-${accent}`} />,
+      key: accent,
+      label: t(`connection.accent.${accent}`),
+      onClick: () => onAccent?.(accent),
+    })),
+  };
 
   return (
     <div
@@ -100,6 +111,15 @@ export default function ConnectionSelectionToolbar({
           size="small"
           onClick={onTags}
         />
+      </Tooltip>
+      <Tooltip title={t('action.setIdentificationColor')}>
+        <Dropdown menu={accentMenu} trigger={['click']}>
+          <Button
+            aria-label={t('action.setIdentificationColor')}
+            icon={<BgColorsOutlined />}
+            size="small"
+          />
+        </Dropdown>
       </Tooltip>
       <Tooltip title={t(allFavorite ? 'action.unfavoriteSelected' : 'action.favoriteSelected')}>
         <Button

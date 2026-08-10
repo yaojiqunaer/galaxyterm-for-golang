@@ -51,6 +51,34 @@
   --danger: #fb7185;
 }
 
+.accent-red {
+  --connection-accent: #d95c5c;
+}
+
+.accent-orange {
+  --connection-accent: #d98245;
+}
+
+.accent-yellow {
+  --connection-accent: #c7a638;
+}
+
+.accent-green {
+  --connection-accent: #4d9b68;
+}
+
+.accent-cyan {
+  --connection-accent: #3297a5;
+}
+
+.accent-blue {
+  --connection-accent: #4b7fd1;
+}
+
+.accent-purple {
+  --connection-accent: #8b6ac9;
+}
+
 html,
 body,
 #root {
@@ -1138,6 +1166,10 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   font-size: 14px;
 }
 
+.session-quick-switcher-row:not(.accent-none) .provider-icon {
+  box-shadow: inset 3px 0 0 var(--connection-accent);
+}
+
 .session-quick-switcher-main {
   display: flex;
   min-width: 0;
@@ -1470,6 +1502,89 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   max-width: 210px;
   color: #8795a1;
   font-size: 13px;
+}
+
+.session-tab-label:not(.accent-none)::before,
+.session-sidebar-label:not(.accent-none)::before {
+  width: 3px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--connection-accent);
+  content: '';
+  flex: 0 0 auto;
+}
+
+.connection-profile-provider-icon {
+  position: relative;
+}
+
+.connection-accent-marker {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--panel);
+  border-radius: 50%;
+  background: var(--connection-accent);
+}
+
+.connection-accent-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.connection-accent-picker .ant-radio-button-wrapper {
+  display: inline-grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel);
+  place-items: center;
+}
+
+.connection-accent-picker .ant-radio-button-wrapper::before {
+  display: none;
+}
+
+.connection-accent-picker .ant-radio-button-wrapper-checked {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.connection-accent-swatch {
+  display: block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--connection-accent);
+}
+
+.connection-accent-swatch.accent-none {
+  border: 1px solid var(--muted);
+  background: linear-gradient(
+    135deg,
+    transparent 44%,
+    var(--muted) 46%,
+    var(--muted) 54%,
+    transparent 56%
+  );
+}
+
+.connection-accent-menu-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--connection-accent);
+}
+
+.connection-accent-menu-swatch.accent-none {
+  border: 1px solid var(--muted);
+  background: linear-gradient(135deg, transparent 42%, var(--muted) 44%, var(--muted) 56%, transparent 58%);
 }
 
 .session-tab-context-trigger {

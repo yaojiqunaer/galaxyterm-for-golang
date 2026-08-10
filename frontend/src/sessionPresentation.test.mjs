@@ -29,6 +29,7 @@ import {
   recordSessionOutputActivity,
   reconcileSessionReconnects,
   releaseSessionReconnect,
+  resolveSessionAccent,
   resolveNextAttentionSessionId,
   reserveSessionReconnect,
   reorderSessions,
@@ -1213,6 +1214,11 @@ const mixedAttention = {
   s3: { kind: 'error', occurredAt: '2026-07-16T01:00:02.000Z', unread: true },
   s4: { kind: 'error', occurredAt: '2026-07-16T01:00:03.000Z', unread: false },
 };
+assert.equal(resolveSessionAccent({
+  request: { accent: 'orange', profileId: 'profile-1' },
+}, [{ id: 'profile-1', accent: 'blue' }]), 'blue');
+assert.equal(resolveSessionAccent({ request: { accent: 'orange' } }, []), 'orange');
+assert.equal(resolveSessionAccent({ request: { accent: 'unknown' } }, []), 'none');
 assert.equal(resolveNextAttentionSessionId(['s1', 's2', 's3', 's4'], mixedAttention, 's1'), 's3');
 assert.equal(resolveNextAttentionSessionId(['s1', 's2', 's3', 's4'], mixedAttention, 's3'), 's3');
 assert.equal(resolveNextAttentionSessionId(['s1', 's2'], {

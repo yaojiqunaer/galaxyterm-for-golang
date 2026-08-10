@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { normalizeConnectionAccent } from '../connectionProfiles.js';
 import { t } from '../i18n.js';
 
 export default function SessionQuickSwitcher({
@@ -55,7 +56,7 @@ export default function SessionQuickSwitcher({
                 else delete rowRefs.current[item.id];
               }}
               aria-selected={selected}
-              className={`session-quick-switcher-row${selected ? ' selected' : ''}`}
+              className={`session-quick-switcher-row accent-${normalizeConnectionAccent(item.accent)}${selected ? ' selected' : ''}`}
               id={`session-switcher-option-${item.id}`}
               key={item.id}
               role="option"

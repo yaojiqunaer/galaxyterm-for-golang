@@ -3,6 +3,7 @@ import {
   buildConnectionProfilesExport,
   hasStoredSshCredential,
   normalizeImportedConnectionProfile,
+  normalizeConnectionAccent,
   normalizeConnectionTags,
   normalizeStoredConnectionProfile,
   shouldClearStoredSshCredential,
@@ -14,6 +15,10 @@ assert.deepEqual(
 );
 assert.deepEqual(normalizeConnectionTags('prod, database，critical'), ['prod', 'database', 'critical']);
 assert.equal(normalizeConnectionTags(Array.from({ length: 20 }, (_, index) => `tag-${index}`)).length, 12);
+assert.equal(normalizeConnectionAccent('red'), 'red');
+assert.equal(normalizeConnectionAccent(' PURPLE '), 'purple');
+assert.equal(normalizeConnectionAccent('magenta'), 'none');
+assert.equal(normalizeConnectionAccent(''), 'none');
 
 assert.equal(hasStoredSshCredential({ id: 'profile-1' }), false);
 assert.equal(hasStoredSshCredential({ id: 'profile-1', hasJumpPassword: true }), true);
@@ -44,6 +49,7 @@ const storedFileProfile = {
   kind: 'file',
   providerType: 's3',
   displayName: 'Production assets',
+  accent: 'red',
   group: 'Production',
   tags: ['Assets', 'production', 'assets'],
   filePath: '/releases',
@@ -64,6 +70,7 @@ assert.deepEqual(normalizeStoredConnectionProfile(storedFileProfile), {
   kind: 'file',
   providerType: 's3',
   displayName: 'Production assets',
+  accent: 'red',
   group: 'Production',
   tags: ['Assets', 'production'],
   filePath: '/releases',
@@ -115,11 +122,12 @@ assert.equal(normalizedLegacySSH.auth.password, undefined);
 assert.deepEqual(normalizedLegacySSH.auth.credentialRef, { id: 'ssh-production', hasPassword: true });
 assert.deepEqual(normalizedLegacySSH.tags, []);
 const exported = buildConnectionProfilesExport([sshProfile, storedFileProfile], '2026-07-18T10:00:00.000Z');
-assert.equal(exported.version, 3);
+assert.equal(exported.version, 4);
 assert.equal(exported.secrets, 'omitted');
 assert.equal(exported.exportedAt, '2026-07-18T10:00:00.000Z');
 assert.equal(exported.profiles[0].auth.credentialRef, null);
 assert.equal(exported.profiles[1].auth.credentialRef, null);
+assert.equal(exported.profiles[1].accent, 'red');
 assert.equal(JSON.stringify(exported).includes('must-not-persist'), false);
 
 console.log('connection profile tests passed');

@@ -1,3 +1,5 @@
+export const connectionAccentOptions = ['none', 'red', 'orange', 'yellow', 'green', 'cyan', 'blue', 'purple'];
+
 export function shouldClearStoredSshCredential({
   editingProfileId = '',
   rememberCredential = false,
@@ -32,6 +34,7 @@ export function normalizeStoredConnectionProfile(profile = {}, options = {}) {
     kind,
     providerType: profile.providerType,
     displayName: profile.displayName,
+    accent: normalizeConnectionAccent(profile.accent),
     group: profile.group || '',
     tags: normalizeConnectionTags(profile.tags),
     ...(kind === 'file' ? { filePath: profile.filePath || '.' } : {}),
@@ -57,6 +60,11 @@ export function normalizeConnectionTags(value = [], { limit = 12, maxLength = 32
   return tags;
 }
 
+export function normalizeConnectionAccent(value = '') {
+  const normalized = String(value || '').trim().toLowerCase();
+  return connectionAccentOptions.includes(normalized) ? normalized : 'none';
+}
+
 export function normalizeImportedConnectionProfile(profile = {}) {
   if (!profile || !profile.providerType || !profile.displayName) return null;
   return normalizeStoredConnectionProfile(profile, { preserveCredentialRef: false });
@@ -64,7 +72,7 @@ export function normalizeImportedConnectionProfile(profile = {}) {
 
 export function buildConnectionProfilesExport(profiles = [], exportedAt = new Date().toISOString()) {
   return {
-    version: 3,
+    version: 4,
     exportedAt,
     secrets: 'omitted',
     profiles: profiles.map((profile) => normalizeStoredConnectionProfile(profile, {

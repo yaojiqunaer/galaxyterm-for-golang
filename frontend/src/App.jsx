@@ -136,6 +136,7 @@ import {
   sortSidebarProfiles,
   ungroupedKey,
   updateConnectionProfilesFavorite,
+  updateConnectionProfilesAccent,
   updateConnectionProfilesTag,
 } from './connectionManager.js';
 import {
@@ -166,6 +167,7 @@ import {
   recordSessionOutputActivity,
   releaseSessionReconnect,
   resolveNextAttentionSessionId,
+  resolveSessionAccent,
   reserveSessionReconnect,
   reorderSessions,
   sessionTabDisplay,
@@ -231,6 +233,7 @@ import {
   buildConnectionProfilesExport,
   createProfileID,
   hasStoredSshCredential,
+  normalizeConnectionAccent,
   normalizeImportedConnectionProfile,
   normalizeConnectionTags,
   normalizeStoredConnectionProfile,
@@ -427,7 +430,7 @@ const commandHistoryStorageKey = 'galaxyterm.commandHistory';
 const recentConnectionStorageKey = 'galaxyterm.recentConnections';
 const auditRecordStorageKey = 'galaxyterm.auditRecords';
 const extensionSourceStorageKey = 'galaxyterm.extensionSources';
-const profileSchemaVersion = 3;
+const profileSchemaVersion = 4;
 
 const defaultSettings = {
   appTheme: 'dark',
@@ -866,6 +869,9 @@ function App() {
   );
   const unreadSessionCount = sessionAttentionSummary.total;
   const sessionDisplayLabels = useMemo(() => buildSessionDisplayLabels(sessions), [sessions]);
+  const sessionAccents = useMemo(() => Object.fromEntries(
+    sessions.map((session) => [session.id, resolveSessionAccent(session, profiles)]),
+  ), [profiles, sessions]);
   const broadcastTargets = useMemo(() => buildBroadcastSessionTargets(sessions, {
     activeKey,
     displayLabels: sessionDisplayLabels,
@@ -1303,6 +1309,7 @@ function App() {
     const status = normalizeTerminalStatus(terminalStatuses[sessionId]?.status || session.status);
     const identityDisplay = sessionIdentityDisplays[sessionId] || {};
     return {
+      accent: sessionAccents[sessionId],
       activityKind: sessionActivity[sessionId]?.kind,
       activityLabel: sessionActivity[sessionId]?.kind === 'error'
         ? t('session.activity.error')
@@ -1677,6 +1684,7 @@ function App() {
       : savedProfile
         ? buildFileConnectionFormValues(nextProvider, savedProfile)
         : {
+          accent: 'none',
           ...buildFileProviderFormValues(nextProvider),
           displayName: '',
           group: '',
@@ -1825,6 +1833,7 @@ function App() {
     setNewType(providerType);
     setTerminalDrawerIntent(resolvedIntent);
     form.setFieldsValue({
+      accent: normalizeConnectionAccent(profile?.accent),
       displayName: profile?.displayName || '',
       group: profile?.group || initialGroup,
       tags: normalizeConnectionTags(profile?.tags),
@@ -3408,6 +3417,21 @@ function App() {
     ));
   };
 
+  const setSelectedProfilesAccent = (accent) => {
+    const normalized = normalizeConnectionAccent(accent);
+    const result = updateConnectionProfilesAccent(profiles, selectedProfileIds, normalized);
+    if (result.changedCount <= 0) {
+      messageApi.info(t('message.connectionAccentUnchanged'));
+      return;
+    }
+    persistProfiles(result.profiles);
+    setProfiles(result.profiles);
+    messageApi.success(t('message.connectionsAccentUpdated', {
+      color: t(`connection.accent.${normalized}`),
+      count: result.changedCount,
+    }));
+  };
+
   const clearConnectionProfileDrag = () => {
     draggedProfileIdRef.current = '';
     setConnectionDragState({ profileId: '', targetKey: '' });
@@ -4313,6 +4337,7 @@ function App() {
             }}
           >
             <SessionTabLabel
+              accent={sessionAccents[session.id]}
               active={session.id === activeKey}
               activityKind={sessionActivity[session.id]?.kind}
               displayName={sessionDisplayLabels[session.id]}
@@ -4421,6 +4446,7 @@ function App() {
               {sessionView === 'grid' && (
                 <div className="split-terminal-header">
                   <SessionTabLabel
+                    accent={sessionAccents[session.id]}
                     active={session.id === activeKey}
                     activityKind={sessionActivity[session.id]?.kind}
                     displayName={sessionDisplayLabels[session.id]}
@@ -4763,6 +4789,7 @@ function App() {
             allFavorite={connectionSelectionState.allFavorite}
             allVisibleSelected={visibleProfiles.length > 0 && visibleSelectedProfileCount === visibleProfiles.length}
             moveMenu={connectionSelectionMoveMenu}
+            onAccent={setSelectedProfilesAccent}
             onClear={clearConnectionProfileSelection}
             onDelete={confirmDeleteSelectedProfiles}
             onExport={exportSelectedProfiles}
@@ -4987,7 +5014,10 @@ function App() {
                               range: Boolean(event.nativeEvent?.shiftKey),
                             })}
                           />
-                          <span className="provider-icon">{providerIcons[profile.providerType] || <CodeOutlined />}</span>
+                          <span className="provider-icon connection-profile-provider-icon">
+                            {providerIcons[profile.providerType] || <CodeOutlined />}
+                            <ConnectionAccentMarker accent={profile.accent} />
+                          </span>
                         </span>
                       )}
                       title={(
@@ -5635,6 +5665,7 @@ function App() {
     if (!selectedFileProvider || selectedFileProvider.protocol === 'sftp') return;
     fileForm.setFieldValue('auth', {});
     fileForm.setFieldsValue({
+      accent: 'none',
       ...buildFileProviderFormValues(selectedFileProvider),
       displayName: '',
       group: '',
@@ -7946,10 +7977,11 @@ function App() {
                               type="button"
                               onClick={() => runConnectionProfilePrimaryAction(profile)}
                             >
-                              <span className="provider-icon">
+                              <span className="provider-icon connection-profile-provider-icon">
                                 {launching && primaryAction.action !== 'focus'
                                   ? <LoadingOutlined spin />
                                   : providerIcons[profile.providerType] || <CodeOutlined />}
+                                <ConnectionAccentMarker accent={profile.accent} />
                               </span>
                               <span className="quick-profile-main">
                                 <span>{profile.displayName}</span>
@@ -8044,6 +8076,7 @@ function App() {
                             onClick={() => activateSession(session.id)}
                           >
                             <SessionSidebarLabel
+                              accent={sessionAccents[session.id]}
                               activityKind={sessionActivity[session.id]?.kind}
                               displayName={sessionDisplayLabels[session.id]}
                               identityDisplay={sessionIdentityDisplays[session.id]}
@@ -9043,7 +9076,10 @@ function ConnectionProfilePreview({
   return (
     <div aria-busy={launching} className="connection-profile-preview">
       <div className="connection-profile-hero">
-        <span className="provider-icon large">{providerIcons[profile.providerType] || <CodeOutlined />}</span>
+        <span className="provider-icon large connection-profile-provider-icon">
+          {providerIcons[profile.providerType] || <CodeOutlined />}
+          <ConnectionAccentMarker accent={profile.accent} />
+        </span>
         <div>
           <Text type="secondary">{providerTypeLabel(profile.providerType, providers)}</Text>
           <Title level={4}>{profile.displayName}</Title>
@@ -9140,7 +9176,22 @@ function ConnectionProfilePreview({
   );
 }
 
+function ConnectionAccentMarker({ accent = 'none' }) {
+  const normalized = normalizeConnectionAccent(accent);
+  if (normalized === 'none') return null;
+  const label = t(`connection.accent.${normalized}`);
+  return (
+    <span
+      aria-label={label}
+      className={`connection-accent-marker accent-${normalized}`}
+      role="img"
+      title={label}
+    />
+  );
+}
+
 function SessionTabLabel({
+  accent = 'none',
   active = false,
   activityKind = 'output',
   displayName = '',
@@ -9154,7 +9205,7 @@ function SessionTabLabel({
     : t('session.activity.unread');
   return (
     <span
-      className={`tab-label session-tab-label tone-${display.statusTone}${display.active ? ' active' : ''}${display.unread ? ' unread' : ''}`}
+      className={`tab-label session-tab-label tone-${display.statusTone} accent-${normalizeConnectionAccent(accent)}${display.active ? ' active' : ''}${display.unread ? ' unread' : ''}`}
       title={identityDisplay?.tooltip || display.title}
     >
       <span className="session-status-dot" />
@@ -9211,6 +9262,7 @@ function remoteFileActionIcon(action) {
 }
 
 function SessionSidebarLabel({
+  accent = 'none',
   activityKind = 'output',
   displayName = '',
   identityDisplay = null,
@@ -9224,7 +9276,7 @@ function SessionSidebarLabel({
     : t('session.activity.unread');
   const detail = identityDisplay?.identity || identityDisplay?.provider || statusLabel;
   return (
-    <span className={`session-sidebar-label tone-${tone}`} title={identityDisplay?.tooltip || displayName || session.label}>
+    <span className={`session-sidebar-label tone-${tone} accent-${normalizeConnectionAccent(accent)}`} title={identityDisplay?.tooltip || displayName || session.label}>
       <span aria-label={statusLabel} className="session-status-dot" role="img" title={statusLabel} />
       <span className="session-sidebar-main">
         <span>{displayName || session.label}</span>
@@ -9692,6 +9744,7 @@ function profileFromRequest(request) {
     id: request.id || recentConnectionKey(request),
     providerType: request.providerType,
     displayName: request.displayName,
+    accent: normalizeConnectionAccent(request.accent),
     group: request.group || '',
     tags: normalizeConnectionTags(request.tags),
     config: request.config || {},
@@ -9704,6 +9757,7 @@ function profileToRequest(profile) {
     profileId: profile.id,
     providerType: profile.providerType,
     displayName: profile.displayName,
+    accent: normalizeConnectionAccent(profile.accent),
     group: profile.group || '',
     tags: normalizeConnectionTags(profile.tags),
     config: profile.config || {},
@@ -10172,6 +10226,7 @@ function saveProfile(profiles, request, editingProfileId = '', profileId = '') {
     id: editingProfileId || profileId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`),
     providerType: request.providerType,
     displayName: request.displayName,
+    accent: normalizeConnectionAccent(request.accent),
     group: request.group || '',
     tags: normalizeConnectionTags(request.tags),
     config: request.config,
@@ -10298,6 +10353,7 @@ function buildRequest(type, displayName, values, provider = null) {
     return {
       providerType: type,
       displayName,
+      accent: normalizeConnectionAccent(values.accent),
       group: values.group || '',
       tags: normalizeConnectionTags(values.tags),
       config: {
@@ -10329,6 +10385,7 @@ function buildRequest(type, displayName, values, provider = null) {
     const request = buildExtensionTerminalRequest(provider, displayName, values);
     return {
       ...request,
+      accent: normalizeConnectionAccent(values.accent),
       group: values.group || '',
       tags: normalizeConnectionTags(values.tags),
       auth: {
@@ -10341,6 +10398,7 @@ function buildRequest(type, displayName, values, provider = null) {
   return {
     providerType: type,
     displayName,
+    accent: normalizeConnectionAccent(values.accent),
     group: values.group || '',
     tags: normalizeConnectionTags(values.tags),
     config: {

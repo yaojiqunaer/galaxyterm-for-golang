@@ -12,6 +12,7 @@ const commandPaletteSource = await readFile(new URL('./components/CommandPalette
 const connectionGroupDialogSource = await readFile(new URL('./components/ConnectionGroupDialog.jsx', import.meta.url), 'utf8').catch(() => '');
 const connectionSelectionToolbarSource = await readFile(new URL('./components/ConnectionSelectionToolbar.jsx', import.meta.url), 'utf8').catch(() => '');
 const connectionMetadataFieldsSource = await readFile(new URL('./components/ConnectionMetadataFields.jsx', import.meta.url), 'utf8').catch(() => '');
+const connectionAccentFieldSource = await readFile(new URL('./components/ConnectionAccentField.jsx', import.meta.url), 'utf8').catch(() => '');
 const quickCommandLibrarySource = await readFile(new URL('./components/QuickCommandLibrary.jsx', import.meta.url), 'utf8').catch(() => '');
 const commandHistoryPanelSource = await readFile(new URL('./components/CommandHistoryPanel.jsx', import.meta.url), 'utf8').catch(() => '');
 const terminalPaneSource = await readFile(new URL('./components/TerminalPane.jsx', import.meta.url), 'utf8');
@@ -1287,6 +1288,19 @@ assert.ok(
     && source.includes("if (fact.key === 'result') return t(`terminal.result.${fact.value}`)")
     && source.includes("return fact.value ?? '-';"),
   'completed commands must expose explicit results and promote background failures without storing command text',
+);
+assert.ok(
+  source.includes('const profileSchemaVersion = 4;')
+    && source.includes('resolveSessionAccent(session, profiles)')
+    && source.includes('accent={sessionAccents[session.id]}')
+    && source.includes('<ConnectionAccentMarker accent={profile.accent} />')
+    && connectionMetadataFieldsSource.includes('<ConnectionAccentField />')
+    && connectionAccentFieldSource.includes('connectionAccentOptions.map')
+    && connectionSelectionToolbarSource.includes('connectionAccentOptions.map')
+    && source.includes('updateConnectionProfilesAccent(profiles, selectedProfileIds, normalized)')
+    && styles.includes('.connection-accent-picker')
+    && styles.includes('.session-tab-label:not(.accent-none)::before'),
+  'saved connections must carry one restrained identification color across forms, lists, and sessions',
 );
 
 console.log('app structure tests passed');

@@ -1,4 +1,4 @@
-import { normalizeConnectionTags } from './connectionProfiles.js';
+import { normalizeConnectionAccent, normalizeConnectionTags } from './connectionProfiles.js';
 
 const units = ['B', 'KB', 'MB', 'GB', 'TB'];
 const remoteFileNameCollator = new Intl.Collator(undefined, { numeric: true, sensitivity: 'base' });
@@ -134,6 +134,7 @@ export function buildFileConnectionProfile(provider = {}, values = {}, options =
     kind: 'file',
     providerType: provider.type,
     displayName: String(values.displayName || '').trim(),
+    accent: normalizeConnectionAccent(values.accent),
     group: String(values.group || '').trim(),
     tags: normalizeConnectionTags(values.tags),
     filePath: String(values.path || '.').trim() || '.',
@@ -150,6 +151,7 @@ export function buildFileConnectionFormValues(provider = {}, profile = null) {
     profile?.config?.[field.key] ?? field.default ?? (field.type === 'boolean' ? false : undefined),
   ]).filter(([, value]) => value !== undefined));
   return {
+    accent: normalizeConnectionAccent(profile?.accent),
     displayName: profile?.displayName || '',
     group: profile?.group || '',
     tags: normalizeConnectionTags(profile?.tags),

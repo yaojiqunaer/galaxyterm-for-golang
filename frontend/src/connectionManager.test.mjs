@@ -27,6 +27,7 @@ import {
   resolveConnectionProfileSelection,
   setVisibleConnectionProfileSelection,
   updateConnectionProfilesFavorite,
+  updateConnectionProfilesAccent,
   updateConnectionProfilesTag,
   resolveSelectedProfileId,
   selectBatchProfiles,
@@ -235,6 +236,12 @@ const favoritedProfiles = updateConnectionProfilesFavorite(profiles, ['prod-web'
 assert.equal(favoritedProfiles.changedCount, 1);
 assert.equal(favoritedProfiles.profiles.find((profile) => profile.id === 'prod-web')?.favorite, true);
 assert.equal(favoritedProfiles.profiles.find((profile) => profile.id === 'prod-db'), profiles[0]);
+const accentedProfiles = updateConnectionProfilesAccent(profiles, ['prod-web', 'dev-shell'], 'blue');
+assert.equal(accentedProfiles.changedCount, 2);
+assert.equal(accentedProfiles.profiles.find((profile) => profile.id === 'prod-web')?.accent, 'blue');
+assert.equal(accentedProfiles.profiles.find((profile) => profile.id === 'dev-shell')?.accent, 'blue');
+assert.equal(updateConnectionProfilesAccent(accentedProfiles.profiles, ['prod-web'], 'blue').changedCount, 0);
+assert.equal(updateConnectionProfilesAccent(accentedProfiles.profiles, ['prod-web'], 'invalid').profiles.find((profile) => profile.id === 'prod-web')?.accent, 'none');
 const taggedProfiles = updateConnectionProfilesTag(profiles, ['prod-web', 'dev-shell'], ' Critical ', 'add');
 assert.equal(taggedProfiles.changedCount, 2);
 assert.deepEqual(taggedProfiles.profiles.find((profile) => profile.id === 'prod-web')?.tags, ['production', 'web', 'Critical']);

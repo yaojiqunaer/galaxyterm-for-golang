@@ -2,6 +2,7 @@ import React from 'react';
 import { AutoComplete, Form, Select } from 'antd';
 import { t } from '../i18n.js';
 import { normalizeConnectionTags } from '../connectionProfiles.js';
+import ConnectionAccentField from './ConnectionAccentField.jsx';
 
 export default function ConnectionMetadataFields({ groups = [], tags = [] }) {
   return (
@@ -28,6 +29,7 @@ export default function ConnectionMetadataFields({ groups = [], tags = [] }) {
           tokenSeparators={[',', '，', ';']}
         />
       </Form.Item>
+      <ConnectionAccentField />
     </div>
   );
 }

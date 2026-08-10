@@ -1,4 +1,4 @@
-import { normalizeConnectionTags } from './connectionProfiles.js';
+import { normalizeConnectionAccent, normalizeConnectionTags } from './connectionProfiles.js';
 
 export const ungroupedKey = '__ungrouped__';
 const groupFilterPrefix = 'group:';
@@ -213,6 +213,18 @@ export function updateConnectionProfilesTag(
       && nextTags.every((item, index) => item === tags[index])) return profile;
     changedCount += 1;
     return { ...profile, tags: nextTags };
+  });
+  return { changedCount, profiles: changedCount > 0 ? nextProfiles : profiles };
+}
+
+export function updateConnectionProfilesAccent(profiles = [], profileIds = [], accent = 'none') {
+  const normalized = normalizeConnectionAccent(accent);
+  const ids = new Set(profileIds.filter(Boolean));
+  let changedCount = 0;
+  const nextProfiles = profiles.map((profile) => {
+    if (!ids.has(profile.id) || normalizeConnectionAccent(profile.accent) === normalized) return profile;
+    changedCount += 1;
+    return { ...profile, accent: normalized };
   });
   return { changedCount, profiles: changedCount > 0 ? nextProfiles : profiles };
 }
