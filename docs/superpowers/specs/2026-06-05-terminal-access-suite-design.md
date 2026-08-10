@@ -388,6 +388,7 @@ Current connection and command UX:
 - Saved terminal and file profiles support normalized, reusable tags. Tags survive non-secret import/export, participate in group-independent filtering, full-text search, and command-palette lookup, and can be added or removed across a multi-selection without affecting active sessions.
 - Local command history is keyed by provider, session, and command. Sensitive commands are rejected before storage, individual entries can be removed, recording can be paused, and retention is configurable from 20 to 500 entries.
 - Command-history privacy settings do not disable or bypass session audit events or terminal recordings.
+- Automatic recovery is opt-in and applies only to saved, non-local terminal profiles after unexpected errors. Retry delay and maximum attempts are bounded, repeated error events cannot create duplicate timers, ordinary exits never retry, and background recovery never changes the active workspace or tab. Each attempt closes the preceding audit and recording segment before creating the next one.
 
 ### Backend And Provider Messages
 

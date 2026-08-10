@@ -24,6 +24,8 @@ const sshSecurityFieldsSource = await readFile(new URL('./components/SshSecurity
 const sshAgentSocketFieldSource = await readFile(new URL('./components/SshAgentSocketField.jsx', import.meta.url), 'utf8').catch(() => '');
 const sshNetworkFieldsSource = await readFile(new URL('./components/SshNetworkFields.jsx', import.meta.url), 'utf8').catch(() => '');
 const sessionQuickSwitcherSource = await readFile(new URL('./components/SessionQuickSwitcher.jsx', import.meta.url), 'utf8').catch(() => '');
+const sessionRecoveryNoticeSource = await readFile(new URL('./components/SessionRecoveryNotice.jsx', import.meta.url), 'utf8').catch(() => '');
+const sessionRecoverySettingsSource = await readFile(new URL('./components/SessionRecoverySettings.jsx', import.meta.url), 'utf8').catch(() => '');
 const activeSessionDeclaration = source.indexOf('const activeSession =');
 const firstActiveSessionUsage = source.indexOf('activeSession?.providerType');
 const providersDeclaration = source.indexOf('const providers =');
@@ -1215,6 +1217,17 @@ assert.ok(
     && commandHistoryPanelSource.includes("key: 'delete'")
     && commandHistoryPanelSource.includes("'history.recordingOn'"),
   'command history must provide privacy controls, bounded retention, and precise item deletion',
+);
+assert.ok(
+  source.includes('buildSessionRecoveryPlan({')
+    && source.includes("type: automatic ? 'session.auto-reconnect' : 'session.reconnect'")
+    && source.includes('if (!automatic) clearSessionRecovery(sessionId);')
+    && source.includes('onCancelRecovery={() => cancelSessionRecovery(session.id)}')
+    && source.includes('recovery={sessionRecoveries[session.id]}')
+    && sessionRecoveryNoticeSource.includes("recovery?.status !== 'scheduled'")
+    && sessionRecoveryNoticeSource.includes('remainingSeconds')
+    && sessionRecoverySettingsSource.includes('autoReconnectMaxAttempts'),
+  'saved remote sessions must expose bounded, cancellable auto reconnect without stealing manual reconnect behavior',
 );
 
 console.log('app structure tests passed');

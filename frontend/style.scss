@@ -1796,6 +1796,49 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   flex: 0 0 auto;
 }
 
+.session-recovery-notice {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 3px 2px 7px;
+  border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--terminal-border));
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--warning) 9%, var(--terminal-chrome));
+  color: var(--warning);
+}
+
+.session-recovery-notice.exhausted {
+  border-color: color-mix(in srgb, var(--danger) 38%, var(--terminal-border));
+  background: color-mix(in srgb, var(--danger) 9%, var(--terminal-chrome));
+  color: var(--danger);
+}
+
+.session-recovery-notice > span {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.session-recovery-notice strong {
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.session-recovery-notice small {
+  margin-top: 1px;
+  color: var(--terminal-text);
+  font-size: 9px;
+  opacity: 0.72;
+  white-space: nowrap;
+}
+
+.session-recovery-notice .ant-btn {
+  color: currentColor;
+}
+
 .terminal-error-popover {
   display: flex;
   width: min(420px, calc(100vw - 48px));
@@ -1937,9 +1980,17 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   .terminal-recovery-label {
     display: none;
   }
+
+  .session-recovery-notice small {
+    display: none;
+  }
 }
 
 @media (max-width: 680px) {
+  .session-recovery-settings-grid {
+    grid-template-columns: 1fr;
+  }
+
   .session-audit-indicator,
   .session-recording-indicator,
   .provider-runtime-indicator,
@@ -5015,6 +5066,28 @@ code {
 
 .command-history-setting-row .ant-input-number {
   width: 96px;
+}
+
+.session-recovery-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-block: 4px 8px;
+}
+
+.session-recovery-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.session-recovery-settings-grid .ant-form-item {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.session-recovery-settings-grid .ant-input-number {
+  width: 100%;
 }
 
 .terminal-settings-preview {

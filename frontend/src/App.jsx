@@ -335,6 +335,12 @@ import {
   shouldCancelSessionSwitch,
   startSessionSwitch,
 } from './sessionSwitcher.js';
+import {
+  buildSessionRecoveryPlan,
+  markSessionRecoveryStarted,
+  normalizeSessionRecoveryPolicy,
+  pruneSessionRecoveries,
+} from './sessionRecovery.js';
 import * as ExtensionsAPI from '../wailsjs/go/extensions/API.js';
 import * as FilesAPI from '../wailsjs/go/files/API.js';
 import * as DesktopAPI from '../wailsjs/go/desktop/API.js';
@@ -359,6 +365,8 @@ import ConnectionMetadataFields from './components/ConnectionMetadataFields.jsx'
 import QuickCommandLibrary from './components/QuickCommandLibrary.jsx';
 import CommandHistoryPanel from './components/CommandHistoryPanel.jsx';
 import SessionQuickSwitcher from './components/SessionQuickSwitcher.jsx';
+import SessionRecoveryNotice from './components/SessionRecoveryNotice.jsx';
+import SessionRecoverySettings from './components/SessionRecoverySettings.jsx';
 import SavedSSHProfileSelect from './components/SavedSSHProfileSelect.jsx';
 import SshAgentSocketField from './components/SshAgentSocketField.jsx';
 import SshNetworkFields from './components/SshNetworkFields.jsx';
@@ -420,6 +428,9 @@ const defaultSettings = {
   confirmDangerousActions: true,
   recordCommandHistory: true,
   commandHistoryLimit: 80,
+  autoReconnect: false,
+  autoReconnectDelaySeconds: 3,
+  autoReconnectMaxAttempts: 3,
   defaultProviderType: 'local',
   defaultWorkingDirectory: '',
   disabledExtensionIds: [],
@@ -485,6 +496,7 @@ function App() {
   const [allProviders, setAllProviders] = useState(fallbackProviders);
   const [sessions, setSessions] = useState([]);
   const [sessionReconnects, setSessionReconnects] = useState({});
+  const [sessionRecoveries, setSessionRecoveries] = useState({});
   const [closedSessions, setClosedSessions] = useState([]);
   const [profiles, setProfiles] = useState(() => loadProfiles());
   const [settings, setSettings] = useState(() => loadSettings());
@@ -686,6 +698,8 @@ function App() {
   const connectionLaunchKeysRef = useRef(connectionLaunchKeys);
   const connectionHealthRef = useRef(connectionHealth);
   const sessionReconnectsRef = useRef(sessionReconnects);
+  const sessionRecoveriesRef = useRef(sessionRecoveries);
+  const sessionRecoveryTimersRef = useRef({});
   const sessionSwitchStateRef = useRef(sessionSwitchState);
   const sessionSwitchOriginViewRef = useRef(selectedNav);
   const sessionsRef = useRef(sessions);
@@ -717,6 +731,12 @@ function App() {
     const next = typeof updater === 'function' ? updater(sessionReconnectsRef.current) : updater;
     sessionReconnectsRef.current = next;
     setSessionReconnects(next);
+    return next;
+  };
+  const updateSessionRecoveries = (updater) => {
+    const next = typeof updater === 'function' ? updater(sessionRecoveriesRef.current) : updater;
+    sessionRecoveriesRef.current = next;
+    setSessionRecoveries(next);
     return next;
   };
   const isSessionReconnecting = (sessionId) => Boolean(
@@ -1221,6 +1241,20 @@ function App() {
 
   useEffect(() => {
     setSessionActivity((current) => pruneSessionActivity(current, sessions.map((session) => session.id)));
+  }, [sessions]);
+
+  useEffect(() => {
+    const sessionIds = sessions.map((session) => session.id);
+    const idSet = new Set(sessionIds);
+    Object.keys(sessionRecoveryTimersRef.current).forEach((sessionId) => {
+      if (idSet.has(sessionId)) return;
+      window.clearTimeout(sessionRecoveryTimersRef.current[sessionId]);
+      delete sessionRecoveryTimersRef.current[sessionId];
+    });
+    const next = pruneSessionRecoveries(sessionRecoveriesRef.current, sessionIds);
+    if (Object.keys(next).length !== Object.keys(sessionRecoveriesRef.current).length) {
+      updateSessionRecoveries(next);
+    }
   }, [sessions]);
 
   const providers = useMemo(() => filterProvidersByDisabledExtensions(
@@ -2019,6 +2053,86 @@ function App() {
     }
   };
 
+  const clearSessionRecovery = (sessionId) => {
+    if (!sessionId) return;
+    const timer = sessionRecoveryTimersRef.current[sessionId];
+    if (timer) window.clearTimeout(timer);
+    delete sessionRecoveryTimersRef.current[sessionId];
+    if (!Object.prototype.hasOwnProperty.call(sessionRecoveriesRef.current, sessionId)) return;
+    updateSessionRecoveries((current) => {
+      const next = { ...current };
+      delete next[sessionId];
+      return next;
+    });
+  };
+
+  const clearAllSessionRecoveries = () => {
+    Object.values(sessionRecoveryTimersRef.current).forEach((timer) => window.clearTimeout(timer));
+    sessionRecoveryTimersRef.current = {};
+    if (Object.keys(sessionRecoveriesRef.current).length > 0) updateSessionRecoveries({});
+  };
+
+  const scheduleSessionRecovery = (sessionId, status, revision = 0) => {
+    const session = sessionsRef.current.find((item) => item.id === sessionId);
+    const plan = buildSessionRecoveryPlan({
+      recovery: sessionRecoveriesRef.current[sessionId],
+      revision,
+      session,
+      settings,
+      status,
+    });
+    if (plan.kind === 'none') return plan;
+    const currentTimer = sessionRecoveryTimersRef.current[sessionId];
+    if (currentTimer) window.clearTimeout(currentTimer);
+    delete sessionRecoveryTimersRef.current[sessionId];
+    updateSessionRecoveries((current) => ({ ...current, [sessionId]: plan.recovery }));
+    if (plan.kind === 'exhausted') return plan;
+    sessionRecoveryTimersRef.current[sessionId] = window.setTimeout(() => {
+      delete sessionRecoveryTimersRef.current[sessionId];
+      const recovery = sessionRecoveriesRef.current[sessionId];
+      if (recovery?.status !== 'scheduled' || recovery.retryAt !== plan.recovery.retryAt) return;
+      const result = reconnectSession(sessionId, {
+        attempt: recovery.attempt,
+        automatic: true,
+      });
+      if (!result?.started) clearSessionRecovery(sessionId);
+    }, plan.recovery.delaySeconds * 1000);
+    return plan;
+  };
+
+  const cancelSessionRecovery = (sessionId, { silent = false } = {}) => {
+    const recovery = sessionRecoveriesRef.current[sessionId];
+    if (!recovery) return;
+    clearSessionRecovery(sessionId);
+    if (recovery.status === 'scheduled') {
+      appendAuditEvent(sessionId, 'session.auto-reconnect.cancel');
+      if (!silent) messageApi.info(t('message.autoReconnectCancelled'));
+    }
+  };
+
+  useEffect(() => {
+    clearAllSessionRecoveries();
+    const policy = normalizeSessionRecoveryPolicy(settings);
+    if (!policy.enabled) return;
+    sessionsRef.current.forEach((session) => {
+      const status = terminalStatuses[session.id];
+      if (status?.status === 'error') scheduleSessionRecovery(
+        session.id,
+        status,
+        session.revision || 0,
+      );
+    });
+  }, [
+    settings.autoReconnect,
+    settings.autoReconnectDelaySeconds,
+    settings.autoReconnectMaxAttempts,
+  ]);
+
+  useEffect(() => () => {
+    Object.values(sessionRecoveryTimersRef.current).forEach((timer) => window.clearTimeout(timer));
+    sessionRecoveryTimersRef.current = {};
+  }, []);
+
   const rememberClosedSessions = (closingSessions) => {
     if (!closingSessions?.length) return;
     setClosedSessions((current) => appendClosedSessions(current, closingSessions, 10));
@@ -2171,6 +2285,7 @@ function App() {
   const closeSessionSet = (closingSessions = []) => {
     if (closingSessions.length === 0) return;
     const closingSessionIds = new Set(closingSessions.map((session) => session.id));
+    closingSessions.forEach((session) => clearSessionRecovery(session.id));
     closingSessions.forEach((session) => saveAuditRecord(session.id, { finalize: true }));
     rememberClosedSessions(closingSessions);
     const remainingSessions = sessions.filter((session) => !closingSessionIds.has(session.id));
@@ -2354,23 +2469,32 @@ function App() {
     messageApi.success(t(session.protected ? 'message.sessionUnprotected' : 'message.sessionProtected'));
   };
 
-  const reconnectSession = (sessionId = activeKey) => {
+  const reconnectSession = (sessionId = activeKey, options = {}) => {
+    const automatic = options.automatic === true;
+    if (automatic && settings.autoReconnect !== true) return { started: false };
+    if (!automatic) clearSessionRecovery(sessionId);
     if (!sessionId) {
-      messageApi.warning(t('message.noActiveSession'));
-      return;
+      if (!automatic) messageApi.warning(t('message.noActiveSession'));
+      return { started: false };
     }
     const session = sessionsRef.current.find((item) => item.id === sessionId);
     if (!session) {
-      messageApi.warning(t('message.noActiveSession'));
-      return;
+      if (!automatic) messageApi.warning(t('message.noActiveSession'));
+      return { started: false };
     }
     const revision = (session.revision || 0) + 1;
     const reservation = reserveSessionReconnect(sessionReconnectsRef.current, sessionId, revision);
     if (!reservation.reserved) {
-      messageApi.info(t('message.sessionReconnectInProgress'));
-      return;
+      if (!automatic) messageApi.info(t('message.sessionReconnectInProgress'));
+      return { started: false };
     }
     updateSessionReconnects(reservation.reconnects);
+    if (automatic) {
+      updateSessionRecoveries((current) => ({
+        ...current,
+        [sessionId]: markSessionRecoveryStarted(current[sessionId], revision),
+      }));
+    }
     saveAuditRecord(sessionId, { finalize: true });
     setTerminalStatuses((current) => ({
       ...current,
@@ -2381,9 +2505,10 @@ function App() {
         ? {
           ...item,
           auditEvents: [createAuditEvent({
+            detail: automatic ? `attempt ${Number(options.attempt) || 1}` : '',
             sessionId: item.id,
             sessionLabel: item.label,
-            type: 'session.reconnect',
+            type: automatic ? 'session.auto-reconnect' : 'session.reconnect',
           })],
           auditRecordSaved: false,
           backendSessionId: '',
@@ -2392,9 +2517,12 @@ function App() {
         }
         : item
     )));
-    setActiveKey(sessionId);
-    setSelectedNav('sessions');
-    messageApi.success(t('terminal.status.connecting'));
+    if (!automatic) {
+      setActiveKey(sessionId);
+      setSelectedNav('sessions');
+      messageApi.success(t('terminal.status.connecting'));
+    }
+    return { revision, started: true };
   };
 
   const findInTerminal = (direction = 'next') => {
@@ -3866,6 +3994,8 @@ function App() {
       revision,
     ));
     setSessions((current) => synchronizeSessionTerminalStatus(current, sessionId, status, revision));
+    if (status?.status === 'error') scheduleSessionRecovery(sessionId, status, revision);
+    if (status?.status === 'connected' || status?.status === 'idle') clearSessionRecovery(sessionId);
   };
 
   const recordSessionActivity = (sessionId, outputAt) => {
@@ -3921,12 +4051,14 @@ function App() {
           providerName: providerTypeLabel(session.providerType, allProviders),
           recordingActive,
         })}
+        onCancelRecovery={() => cancelSessionRecovery(session.id)}
         onCopyError={() => copyTerminalError(session.id)}
         onInterrupt={() => interruptSession(session.id)}
         onOpenAudit={() => openSessionAudit(session.id)}
         onManageProvider={() => openProviderExtension(providerRuntime)}
         onReconnect={() => reconnectSession(session.id)}
         providerRuntime={providerRuntime}
+        recovery={sessionRecoveries[session.id]}
         reconnecting={isSessionReconnecting(session.id)}
         status={terminalStatuses[session.id]}
       >
@@ -3944,6 +4076,7 @@ function App() {
             onOutputActivity={(outputAt) => recordSessionActivity(session.id, outputAt)}
             onSearchResultsChange={(result) => updateTerminalSearchResult(session.id, result)}
             onSessionCreated={(backendSessionId) => {
+              clearSessionRecovery(session.id);
               updateSessionReconnects((current) => releaseSessionReconnect(
                 current,
                 session.id,
@@ -6468,6 +6601,10 @@ function App() {
                 }))}
               />
             </Form.Item>
+            <SessionRecoverySettings
+              settings={settings}
+              onChange={(patch) => setSettings((current) => ({ ...current, ...patch }))}
+            />
             <Text type="secondary">{t('settings.terminalDefaultsHint')}</Text>
             <Form.Item label={t('field.fontFamily')}>
               <Input
@@ -9055,12 +9192,14 @@ function TerminalFrame({
   auditSummary,
   children,
   contextFacts = [],
+  onCancelRecovery,
   onCopyError,
   onInterrupt,
   onManageProvider,
   onOpenAudit,
   onReconnect,
   providerRuntime,
+  recovery = null,
   reconnecting = false,
   status,
 }) {
@@ -9091,8 +9230,14 @@ function TerminalFrame({
             </span>
           ))}
         </div>
-        {(providerRuntime || recordingFact || auditSummary || controlActions.length > 0 || errorDetail || recoveryActions.length > 0) && (
+        {(providerRuntime || recordingFact || auditSummary || recovery || controlActions.length > 0 || errorDetail || recoveryActions.length > 0) && (
           <div className="terminal-recovery-actions">
+            {recovery && (
+              <SessionRecoveryNotice
+                onCancel={onCancelRecovery}
+                recovery={recovery}
+              />
+            )}
             {providerRuntime && (
               <Tooltip title={providerRuntimeDescription(providerRuntime)}>
                 {providerRuntime.manageable ? (
@@ -9899,6 +10044,7 @@ function normalizeSettings(settings) {
   const interfaceDensity = ['comfortable', 'compact'].includes(settings.interfaceDensity)
     ? settings.interfaceDensity
     : defaultSettings.interfaceDensity;
+  const recoveryPolicy = normalizeSessionRecoveryPolicy(settings);
   return {
     ...defaultSettings,
     ...settings,
@@ -9910,6 +10056,9 @@ function normalizeSettings(settings) {
       500,
       defaultSettings.commandHistoryLimit,
     ),
+    autoReconnect: recoveryPolicy.enabled,
+    autoReconnectDelaySeconds: recoveryPolicy.baseDelaySeconds,
+    autoReconnectMaxAttempts: recoveryPolicy.maxAttempts,
     interfaceDensity,
     sidebarMode: normalizeSidebarMode(settings.sidebarMode),
     defaultProviderType: String(settings.defaultProviderType || defaultSettings.defaultProviderType).trim() || defaultSettings.defaultProviderType,
