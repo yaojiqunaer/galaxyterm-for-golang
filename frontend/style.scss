@@ -5652,6 +5652,121 @@ code {
   resize: vertical;
 }
 
+.connection-import-source {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.connection-import-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 16px;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+
+.connection-import-metric {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  color: var(--muted);
+}
+
+.connection-import-metric + .connection-import-metric {
+  border-left: 1px solid var(--border);
+}
+
+.connection-import-metric strong {
+  color: var(--text);
+  font-size: 18px;
+}
+
+.connection-import-metric.tone-success strong {
+  color: var(--success);
+}
+
+.connection-import-metric.tone-warning strong {
+  color: var(--warning);
+}
+
+.connection-import-strategy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.connection-import-strategy small {
+  min-height: 18px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.connection-import-conflicts {
+  display: flex;
+  max-height: min(300px, 36vh);
+  flex-direction: column;
+  gap: 0;
+  margin-top: 14px;
+  overflow-y: auto;
+  border-top: 1px solid var(--border);
+}
+
+.connection-import-conflicts > strong {
+  padding: 10px 0 6px;
+}
+
+.connection-import-conflict-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.7fr) minmax(180px, 1.5fr) auto;
+  min-height: 48px;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.connection-import-conflict-row > div:first-child {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.connection-import-target-change {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+
+.connection-import-conflict-row small,
+.connection-import-target-change {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.connection-import-target-change span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .connection-import-conflict-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .connection-import-target-change {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}
+
 @keyframes page-enter {
   from {
     opacity: 0;

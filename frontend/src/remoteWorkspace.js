@@ -134,6 +134,7 @@ export function buildFileConnectionProfile(provider = {}, values = {}, options =
     kind: 'file',
     providerType: provider.type,
     displayName: String(values.displayName || '').trim(),
+    ...(existing.importSource ? { importSource: existing.importSource } : {}),
     accent: normalizeConnectionAccent(values.accent),
     group: String(values.group || '').trim(),
     tags: normalizeConnectionTags(values.tags),

@@ -13,6 +13,7 @@ const connectionGroupDialogSource = await readFile(new URL('./components/Connect
 const connectionSelectionToolbarSource = await readFile(new URL('./components/ConnectionSelectionToolbar.jsx', import.meta.url), 'utf8').catch(() => '');
 const connectionMetadataFieldsSource = await readFile(new URL('./components/ConnectionMetadataFields.jsx', import.meta.url), 'utf8').catch(() => '');
 const connectionAccentFieldSource = await readFile(new URL('./components/ConnectionAccentField.jsx', import.meta.url), 'utf8').catch(() => '');
+const connectionImportReviewSource = await readFile(new URL('./components/ConnectionImportReviewModal.jsx', import.meta.url), 'utf8').catch(() => '');
 const quickCommandLibrarySource = await readFile(new URL('./components/QuickCommandLibrary.jsx', import.meta.url), 'utf8').catch(() => '');
 const commandHistoryPanelSource = await readFile(new URL('./components/CommandHistoryPanel.jsx', import.meta.url), 'utf8').catch(() => '');
 const terminalPaneSource = await readFile(new URL('./components/TerminalPane.jsx', import.meta.url), 'utf8');
@@ -1290,7 +1291,7 @@ assert.ok(
   'completed commands must expose explicit results and promote background failures without storing command text',
 );
 assert.ok(
-  source.includes('const profileSchemaVersion = 4;')
+  source.includes('const profileSchemaVersion = 5;')
     && source.includes('resolveSessionAccent(session, profiles)')
     && source.includes('accent={sessionAccents[session.id]}')
     && source.includes('<ConnectionAccentMarker accent={profile.accent} />')
@@ -1301,6 +1302,25 @@ assert.ok(
     && styles.includes('.connection-accent-picker')
     && styles.includes('.session-tab-label:not(.accent-none)::before'),
   'saved connections must carry one restrained identification color across forms, lists, and sessions',
+);
+assert.ok(
+  source.includes('const profileSchemaVersion = 5;')
+    && source.includes('buildConnectionImportPlan(profiles, importedProfiles)')
+    && source.includes('applyConnectionImportPlan(profiles, connectionImportReview.plan, connectionImportStrategy)')
+    && source.includes('<ConnectionImportReviewModal')
+    && source.includes('result.clearedCredentialProfiles.map(deleteProfileCredential)')
+    && /function saveProfile\([\s\S]*?importSource: existingProfile\?\.importSource/.test(source)
+    && !/function profileFromRequest\([^)]*\)\s*\{[^}]*existingProfile/.test(source)
+    && source.includes('clearConnectionHealth(current, result.updatedProfileIds)')
+    && source.includes("messageApi.warning(t('message.connectionImportCredentialCleanupFailed'")
+    && /const duplicateProfile = \(profile\) => \{[\s\S]*?importSource: undefined,/.test(source)
+    && !source.includes('function mergeProfiles(')
+    && connectionImportReviewSource.includes("value: 'skip'")
+    && connectionImportReviewSource.includes("value: 'replace'")
+    && connectionImportReviewSource.includes("value: 'copy'")
+    && connectionImportReviewSource.includes("t('connection.import.credentialsCleared'")
+    && styles.includes('.connection-import-summary'),
+  'JSON and SSH Config imports must share a previewed conflict-safe merge flow',
 );
 
 console.log('app structure tests passed');

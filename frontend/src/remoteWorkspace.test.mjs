@@ -87,6 +87,13 @@ assert.deepEqual(buildFileConnectionFormValues(s3Provider, s3Profile), {
   auth: {},
   rememberCredential: true,
 });
+assert.deepEqual(buildFileConnectionProfile(s3Provider, {
+  ...buildFileConnectionFormValues(s3Provider, s3Profile),
+  path: s3Profile.filePath,
+}, {
+  id: s3Profile.id,
+  profile: { ...s3Profile, importSource: { type: 'galaxyterm', key: 's3-production' } },
+}).importSource, { type: 'galaxyterm', key: 's3-production' });
 assert.deepEqual(buildFileConnectionRequest(s3Profile, {
   accessKey: 'AKIAEXAMPLE',
   secretKey: 'secret',

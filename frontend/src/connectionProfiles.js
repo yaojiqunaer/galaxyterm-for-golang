@@ -29,11 +29,13 @@ export function normalizeStoredConnectionProfile(profile = {}, options = {}) {
       jumpUsername: profile.auth?.jumpUsername || '',
       credentialRef,
     };
+  const importSource = normalizeConnectionImportSource(profile.importSource);
   return {
     id: profile.id || createProfileID(),
     kind,
     providerType: profile.providerType,
     displayName: profile.displayName,
+    ...(importSource ? { importSource } : {}),
     accent: normalizeConnectionAccent(profile.accent),
     group: profile.group || '',
     tags: normalizeConnectionTags(profile.tags),
@@ -43,6 +45,12 @@ export function normalizeStoredConnectionProfile(profile = {}, options = {}) {
     lastUsedAt: profile.lastUsedAt || '',
     auth,
   };
+}
+
+export function normalizeConnectionImportSource(value = null) {
+  const type = String(value?.type || '').trim().toLowerCase().slice(0, 40);
+  const key = String(value?.key || '').trim().slice(0, 160);
+  return type && key ? { type, key } : null;
 }
 
 export function normalizeConnectionTags(value = [], { limit = 12, maxLength = 32 } = {}) {
@@ -72,7 +80,7 @@ export function normalizeImportedConnectionProfile(profile = {}) {
 
 export function buildConnectionProfilesExport(profiles = [], exportedAt = new Date().toISOString()) {
   return {
-    version: 4,
+    version: 5,
     exportedAt,
     secrets: 'omitted',
     profiles: profiles.map((profile) => normalizeStoredConnectionProfile(profile, {

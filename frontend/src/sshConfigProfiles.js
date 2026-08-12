@@ -3,6 +3,8 @@ const sshConfigGroup = 'SSH Config';
 export function parseSshConfigProfiles(content, options = {}) {
   const idFactory = options.idFactory || defaultIdFactory;
   const profiles = [];
+  const profilesByAlias = new Map();
+  const assignedFields = new WeakMap();
   let activeProfiles = [];
 
   content.split(/\r?\n/).forEach((line) => {
@@ -15,59 +17,74 @@ export function parseSshConfigProfiles(content, options = {}) {
     if (!value) return;
 
     if (key === 'host') {
+      const activeKeys = new Set();
       activeProfiles = value
         .split(/\s+/)
         .filter((alias) => alias && !alias.includes('*') && !alias.includes('?') && alias !== '!')
-        .map((alias) => ({
-          id: idFactory(alias),
-          providerType: 'ssh',
-          displayName: alias,
-          group: sshConfigGroup,
-          config: {
-            agentSocketPath: '',
-            connectTimeoutSeconds: 10,
-            host: alias,
-            keepAliveIntervalSeconds: 0,
-            keepAliveMaxFailures: 3,
-            port: 22,
-            identityFile: '',
-          },
-          auth: {
-            username: '',
-            authType: 'password',
-          },
-        }));
-      profiles.push(...activeProfiles);
+        .map((alias) => {
+          const aliasKey = alias.toLocaleLowerCase();
+          if (activeKeys.has(aliasKey)) return null;
+          activeKeys.add(aliasKey);
+          if (profilesByAlias.has(aliasKey)) return profilesByAlias.get(aliasKey);
+          const profile = createSshConfigProfile(alias, idFactory);
+          profilesByAlias.set(aliasKey, profile);
+          assignedFields.set(profile, new Set());
+          profiles.push(profile);
+          return profile;
+        })
+        .filter(Boolean);
       return;
     }
 
     if (activeProfiles.length === 0) return;
 
     activeProfiles.forEach((profile) => {
+      const assigned = assignedFields.get(profile);
+      if (!assigned || assigned.has(key)) return;
       if (key === 'hostname') profile.config.host = value;
-      if (key === 'user') profile.auth.username = value;
-      if (key === 'port') profile.config.port = normalizePort(value);
-      if (key === 'identityfile') {
+      else if (key === 'user') profile.auth.username = value;
+      else if (key === 'port') profile.config.port = normalizePort(value);
+      else if (key === 'identityfile') {
         profile.config.identityFile = value;
         profile.auth.authType = 'privateKey';
-      }
-      if (key === 'identityagent' && !profile.config.identityFile) {
+      } else if (key === 'identityagent' && !profile.config.identityFile) {
         profile.config.agentSocketPath = value;
         profile.auth.authType = 'agent';
-      }
-      if (key === 'connecttimeout') {
+      } else if (key === 'connecttimeout') {
         profile.config.connectTimeoutSeconds = normalizeInteger(value, 1, 120, 10);
-      }
-      if (key === 'serveraliveinterval') {
+      } else if (key === 'serveraliveinterval') {
         profile.config.keepAliveIntervalSeconds = normalizeKeepAliveInterval(value);
-      }
-      if (key === 'serveralivecountmax') {
+      } else if (key === 'serveralivecountmax') {
         profile.config.keepAliveMaxFailures = normalizeInteger(value, 1, 10, 3);
-      }
+      } else return;
+      assigned.add(key);
     });
   });
 
   return profiles.filter((profile) => profile.config.host);
+}
+
+function createSshConfigProfile(alias, idFactory) {
+  return {
+    id: idFactory(alias),
+    providerType: 'ssh',
+    displayName: alias,
+    group: sshConfigGroup,
+    importSource: { type: 'ssh-config', key: alias },
+    config: {
+      agentSocketPath: '',
+      connectTimeoutSeconds: 10,
+      host: alias,
+      keepAliveIntervalSeconds: 0,
+      keepAliveMaxFailures: 3,
+      port: 22,
+      identityFile: '',
+    },
+    auth: {
+      username: '',
+      authType: 'password',
+    },
+  };
 }
 
 function normalizePort(value) {

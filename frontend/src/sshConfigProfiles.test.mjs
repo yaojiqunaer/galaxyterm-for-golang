@@ -44,6 +44,7 @@ assert.deepEqual(
     keepAliveMaxFailures: profile.config.keepAliveMaxFailures,
     identityFile: profile.config.identityFile,
     group: profile.group,
+    importSource: profile.importSource,
   })),
   [
     {
@@ -59,6 +60,7 @@ assert.deepEqual(
       keepAliveMaxFailures: 3,
       identityFile: '~/.ssh/prod_ed25519',
       group: 'SSH Config',
+      importSource: { type: 'ssh-config', key: 'prod-api' },
     },
     {
       id: 'id-prod-db',
@@ -73,6 +75,7 @@ assert.deepEqual(
       keepAliveMaxFailures: 3,
       identityFile: '~/.ssh/prod_ed25519',
       group: 'SSH Config',
+      importSource: { type: 'ssh-config', key: 'prod-db' },
     },
     {
       id: 'id-bastion',
@@ -87,6 +90,7 @@ assert.deepEqual(
       keepAliveMaxFailures: 3,
       identityFile: '',
       group: 'SSH Config',
+      importSource: { type: 'ssh-config', key: 'bastion' },
     },
     {
       id: 'id-agent-host',
@@ -101,6 +105,7 @@ assert.deepEqual(
       keepAliveMaxFailures: 4,
       identityFile: '',
       group: 'SSH Config',
+      importSource: { type: 'ssh-config', key: 'agent-host' },
     },
   ],
 );
@@ -108,3 +113,14 @@ assert.deepEqual(
 const invalidKeepAlive = parseSshConfigProfiles(`Host short-keepalive
   ServerAliveInterval 3`, { idFactory: (alias) => alias });
 assert.equal(invalidKeepAlive[0].config.keepAliveIntervalSeconds, 0);
+
+const repeatedHost = parseSshConfigProfiles(`Host repeated
+  HostName first.example.com
+  Port 2222
+Host repeated
+  HostName ignored.example.com
+  User deploy`, { idFactory: (alias) => `repeat-${alias}` });
+assert.equal(repeatedHost.length, 1);
+assert.equal(repeatedHost[0].config.host, 'first.example.com');
+assert.equal(repeatedHost[0].config.port, 2222);
+assert.equal(repeatedHost[0].auth.username, 'deploy');

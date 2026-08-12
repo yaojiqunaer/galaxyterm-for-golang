@@ -240,6 +240,11 @@ import {
   shouldClearStoredSshCredential,
 } from './connectionProfiles.js';
 import {
+  applyConnectionImportPlan,
+  buildConnectionImportPlan,
+  countConnectionImportCredentialCleanupFailures,
+} from './connectionImport.js';
+import {
   beginConnectionProbes,
   buildConnectionHealthPresentation,
   buildConnectionProbePlan,
@@ -369,6 +374,7 @@ import {
 } from './i18n.js';
 import CommandPalette from './components/CommandPalette.jsx';
 import ConnectionGroupDialog from './components/ConnectionGroupDialog.jsx';
+import ConnectionImportReviewModal from './components/ConnectionImportReviewModal.jsx';
 import ConnectionSelectionToolbar from './components/ConnectionSelectionToolbar.jsx';
 import ConnectionHealthStatus from './components/ConnectionHealthStatus.jsx';
 import ConnectionMetadataFields from './components/ConnectionMetadataFields.jsx';
@@ -430,7 +436,7 @@ const commandHistoryStorageKey = 'galaxyterm.commandHistory';
 const recentConnectionStorageKey = 'galaxyterm.recentConnections';
 const auditRecordStorageKey = 'galaxyterm.auditRecords';
 const extensionSourceStorageKey = 'galaxyterm.extensionSources';
-const profileSchemaVersion = 4;
+const profileSchemaVersion = 5;
 
 const defaultSettings = {
   appTheme: 'dark',
@@ -543,6 +549,9 @@ function App() {
   const [sshConfigOpen, setSshConfigOpen] = useState(false);
   const [sshConfigContent, setSshConfigContent] = useState('');
   const [sshConfigLoading, setSshConfigLoading] = useState(false);
+  const [connectionImportReview, setConnectionImportReview] = useState(null);
+  const [connectionImportStrategy, setConnectionImportStrategy] = useState('skip');
+  const [connectionImportApplying, setConnectionImportApplying] = useState(false);
   const [renameOpen, setRenameOpen] = useState(false);
   const [renamingSessionId, setRenamingSessionId] = useState('');
   const [renamingSessionName, setRenamingSessionName] = useState('');
@@ -2292,6 +2301,7 @@ function App() {
   const duplicateProfile = (profile) => {
     const copy = {
       ...profile,
+      importSource: undefined,
       auth: {
         ...(profile.auth || {}),
         credentialRef: null,
@@ -3102,7 +3112,7 @@ function App() {
   };
 
   const deleteProfileCredential = async (profile) => {
-    if (!profile) return;
+    if (!profile) return true;
     try {
       if (profile.auth?.credentialRef && profile.providerType !== 'ssh') {
         await CredentialsAPI.DeleteProviderCredential(profile.auth.credentialRef);
@@ -3111,7 +3121,9 @@ function App() {
       }
     } catch {
       // Profiles remain removable even if the OS credential store is unavailable.
+      return false;
     }
+    return true;
   };
 
   const deleteProfile = async (profileId) => {
@@ -3833,6 +3845,51 @@ function App() {
     messageApi.success(t('message.connectionsExported', { count: selectedConnectionProfiles.length }));
   };
 
+  const openConnectionImportReview = (importedProfiles, source) => {
+    if (!Array.isArray(importedProfiles) || importedProfiles.length === 0) {
+      messageApi.warning(t('message.noImportableConnections'));
+      return;
+    }
+    setConnectionImportReview({
+      importedProfiles,
+      plan: buildConnectionImportPlan(profiles, importedProfiles),
+      source,
+    });
+    setConnectionImportStrategy('skip');
+  };
+
+  const closeConnectionImportReview = () => {
+    if (connectionImportApplying) return;
+    setConnectionImportReview(null);
+  };
+
+  const confirmConnectionImport = async () => {
+    if (!connectionImportReview || connectionImportApplying) return;
+    setConnectionImportApplying(true);
+    try {
+      const result = applyConnectionImportPlan(profiles, connectionImportReview.plan, connectionImportStrategy);
+      persistProfiles(result.profiles);
+      setProfiles(result.profiles);
+      updateConnectionHealth((current) => clearConnectionHealth(current, result.updatedProfileIds));
+      const credentialCleanup = await Promise.allSettled(
+        result.clearedCredentialProfiles.map(deleteProfileCredential),
+      );
+      const credentialCleanupFailed = countConnectionImportCredentialCleanupFailures(credentialCleanup);
+      if (connectionImportReview.source === 'sshConfig') setSshConfigContent('');
+      setConnectionImportReview(null);
+      messageApi.success(t('message.connectionImportSummary', result.summary));
+      if (credentialCleanupFailed > 0) {
+        messageApi.warning(t('message.connectionImportCredentialCleanupFailed', {
+          count: credentialCleanupFailed,
+        }));
+      }
+    } catch (error) {
+      showOperationError('message.profileImportFailed', error);
+    } finally {
+      setConnectionImportApplying(false);
+    }
+  };
+
   const importProfiles = async (event) => {
     const file = event.target.files?.[0];
     event.target.value = '';
@@ -3842,10 +3899,7 @@ function App() {
       const incoming = Array.isArray(payload) ? payload : payload.profiles;
       if (!Array.isArray(incoming)) throw new Error('invalid profiles');
       const normalized = incoming.map(normalizeImportedConnectionProfile).filter(Boolean);
-      const nextProfiles = mergeProfiles(profiles, normalized);
-      persistProfiles(nextProfiles);
-      setProfiles(nextProfiles);
-      messageApi.success(t('message.profileImported'));
+      openConnectionImportReview(normalized, 'json');
     } catch (error) {
       showOperationError('message.profileImportFailed', error);
     }
@@ -3863,12 +3917,8 @@ function App() {
       messageApi.warning(t('message.sshConfigEmpty'));
       return;
     }
-    const nextProfiles = mergeProfiles(profiles, importedProfiles);
-    persistProfiles(nextProfiles);
-    setProfiles(nextProfiles);
     setSshConfigOpen(false);
-    setSshConfigContent('');
-    messageApi.success(t('message.sshConfigImported'));
+    openConnectionImportReview(importedProfiles, 'sshConfig');
   };
 
   const selectSshConfigFile = async () => {
@@ -8758,6 +8808,19 @@ function App() {
           spellCheck={false}
         />
       </Drawer>
+      <ConnectionImportReviewModal
+        applying={connectionImportApplying}
+        formatProfileTarget={localizedConnectionProfileSubtitle}
+        onCancel={closeConnectionImportReview}
+        onConfirm={confirmConnectionImport}
+        onStrategyChange={setConnectionImportStrategy}
+        open={Boolean(connectionImportReview)}
+        plan={connectionImportReview?.plan}
+        sourceLabel={connectionImportReview
+          ? t(`connection.import.source.${connectionImportReview.source}`)
+          : ''}
+        strategy={connectionImportStrategy}
+      />
     </Layout>
     </ConfigProvider>
   );
@@ -9610,19 +9673,6 @@ function persistProfiles(profiles) {
   }));
 }
 
-function mergeProfiles(currentProfiles, importedProfiles) {
-  const existingIds = new Set(currentProfiles.map((profile) => profile.id));
-  const nextProfiles = [...currentProfiles];
-  importedProfiles.forEach((profile) => {
-    const nextProfile = existingIds.has(profile.id)
-      ? { ...profile, id: createProfileID() }
-      : profile;
-    existingIds.add(nextProfile.id);
-    nextProfiles.push(nextProfile);
-  });
-  return nextProfiles;
-}
-
 function loadQuickCommands() {
   try {
     const raw = localStorage.getItem(commandStorageKey);
@@ -10226,6 +10276,7 @@ function saveProfile(profiles, request, editingProfileId = '', profileId = '') {
     id: editingProfileId || profileId || (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}`),
     providerType: request.providerType,
     displayName: request.displayName,
+    importSource: existingProfile?.importSource,
     accent: normalizeConnectionAccent(request.accent),
     group: request.group || '',
     tags: normalizeConnectionTags(request.tags),

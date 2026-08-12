@@ -14,6 +14,7 @@
     "test:connections": "node src/connectionManager.test.mjs",
     "test:connection-workspace": "node src/connectionWorkspace.test.mjs",
     "test:connection-health": "node src/connectionHealth.test.mjs",
+    "test:connection-import": "node src/connectionImport.test.mjs",
     "test:connection-profiles": "node src/connectionProfiles.test.mjs",
     "test:desktop-bridge": "node src/desktopBridge.test.mjs",
     "test:extensions": "node src/extensionPresentation.test.mjs",
