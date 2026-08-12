@@ -1323,4 +1323,14 @@ assert.ok(
   'JSON and SSH Config imports must share a previewed conflict-safe merge flow',
 );
 
+assert.ok(
+  source.includes('const [terminalContexts, setTerminalContexts] = useState({});')
+    && source.includes('onContextChange={(context) => setTerminalContexts')
+    && source.includes('terminalContext: terminalContexts[activeKey]')
+    && terminalPaneSource.includes('term.current.onTitleChange')
+    && terminalPaneSource.includes('registerOscHandler(7')
+    && terminalPaneSource.includes('parseOscWorkingDirectory(value)'),
+  'terminal OSC title and working-directory context must reach the persistent session chrome',
+);
+
 console.log('app structure tests passed');

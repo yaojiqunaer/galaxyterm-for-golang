@@ -1,4 +1,5 @@
 import { normalizeConnectionAccent } from './connectionProfiles.js';
+import { normalizeTerminalTitle, terminalRuntimeLabel } from './terminalContext.js';
 
 export function sessionStatusTone(session = {}) {
   const status = sessionStatusLabel(session);
@@ -280,11 +281,15 @@ export function buildSessionToolbarContext(session, options = {}) {
   const providerType = session.providerType || session.request?.providerType || '';
   const target = resolveSessionTarget(config, providerType);
   const user = config.username || auth.username || '';
+  const runtime = terminalRuntimeLabel(options.terminalContext);
+  const terminalTitle = normalizeTerminalTitle(options.terminalContext?.title);
   return {
     iconType: session.providerType || session.request?.providerType || 'terminal',
     identity: user && target ? `${user}@${target}` : target || user,
     provider,
+    ...(runtime ? { runtime } : {}),
     target,
+    ...(terminalTitle ? { terminalTitle } : {}),
     user,
   };
 }
@@ -333,7 +338,7 @@ export function buildSessionIdentityDisplay(session, options = {}) {
     displayName,
     identity,
     provider,
-    tooltip: [displayName, detail, statusName].filter(Boolean).join(' · '),
+    tooltip: [displayName, detail, context.runtime, statusName].filter(Boolean).join(' · '),
   };
 }
 

@@ -1269,7 +1269,7 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
 
 .session-toolbar-context {
   gap: 5px;
-  max-width: min(28vw, 280px);
+  max-width: min(38vw, 420px);
   height: 28px;
   padding: 0 7px;
   overflow: hidden;
@@ -1294,6 +1294,22 @@ html[data-platform='darwin'] .app-shell.focus-mode .topbar {
   font-weight: 600;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.session-toolbar-context-runtime {
+  min-width: 0;
+  overflow: hidden;
+  padding-left: 6px;
+  border-left: 1px solid var(--terminal-border);
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1440px) {
+  .session-toolbar-context-runtime {
+    display: none;
+  }
 }
 
 .session-toolbar-context-copy.ant-btn {

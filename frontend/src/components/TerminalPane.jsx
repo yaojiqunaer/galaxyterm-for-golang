@@ -25,6 +25,11 @@ import {
   normalizeTerminalExternalLink,
   shouldActivateTerminalLink,
 } from '../terminalInteraction.js';
+import {
+  mergeTerminalContext,
+  normalizeTerminalTitle,
+  parseOscWorkingDirectory,
+} from '../terminalContext.js';
 
 function TerminalPane({
   request,
@@ -32,6 +37,7 @@ function TerminalPane({
   onAuditEvent,
   onCommandSubmitted,
   onConfirmPaste,
+  onContextChange,
   onOutputActivity,
   onSearchResultsChange,
   onSessionCreated,
@@ -53,11 +59,13 @@ function TerminalPane({
   const durationTimer = useRef(null);
   const lastActivityNotificationAt = useRef(null);
   const pasteConfirmationPending = useRef(false);
+  const runtimeContext = useRef({ title: '', workingDirectory: null });
   const [showScrollToBottom, setShowScrollToBottom] = useState(false);
   const callbacksRef = useRef({
     onAuditEvent,
     onCommandSubmitted,
     onConfirmPaste,
+    onContextChange,
     onOutputActivity,
     onSearchResultsChange,
     onSessionClosed,
@@ -68,6 +76,7 @@ function TerminalPane({
     onAuditEvent,
     onCommandSubmitted,
     onConfirmPaste,
+    onContextChange,
     onOutputActivity,
     onSearchResultsChange,
     onSessionClosed,
@@ -85,6 +94,13 @@ function TerminalPane({
 
   const emitStatus = (patch) => {
     emitTerminalStatus(callbacksRef.current.onStatusChange, terminalStatus, patch);
+  };
+
+  const emitContext = (patch) => {
+    const next = mergeTerminalContext(runtimeContext.current, patch);
+    if (next === runtimeContext.current) return;
+    runtimeContext.current = next;
+    callbacksRef.current.onContextChange?.(next);
   };
 
   const stopDurationTicker = () => {
@@ -273,6 +289,8 @@ function TerminalPane({
     let cleanupExit = null;
     let searchResultsDisposable = null;
     let scrollDisposable = null;
+    let titleDisposable = null;
+    let workingDirectoryDisposable = null;
 
     async function initTerminal() {
       const terminalTheme = await resolveTerminalTheme(settings);
@@ -310,6 +328,14 @@ function TerminalPane({
       });
       scrollDisposable = term.current.onScroll((viewportY) => {
         syncTerminalViewportState(viewportY);
+      });
+      titleDisposable = term.current.onTitleChange((title) => {
+        emitContext({ title: normalizeTerminalTitle(title) });
+      });
+      workingDirectoryDisposable = term.current.parser.registerOscHandler(7, (value) => {
+        const workingDirectory = parseOscWorkingDirectory(value);
+        if (workingDirectory) emitContext({ workingDirectory });
+        return true;
       });
       term.current.open(containerRef.current);
       emitStatus({ status: 'connecting' });
@@ -454,6 +480,8 @@ function TerminalPane({
       cleanupExit?.();
       searchResultsDisposable?.dispose();
       scrollDisposable?.dispose();
+      titleDisposable?.dispose();
+      workingDirectoryDisposable?.dispose();
       cleanupWindow?.();
       observer?.disconnect();
       if (sessionId.current) {

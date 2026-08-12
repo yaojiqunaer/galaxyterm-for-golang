@@ -31,7 +31,7 @@ func newMacOptions() *mac.Options {
 		Appearance: mac.DefaultAppearance,
 		About: &mac.AboutInfo{
 			Title:   "GalaxyTerm 0.0.1",
-			Message: "Galaxy Term for handsome users.\nCopyright © 2024",
+			Message: "Open-source extensible terminal workspace.\nCopyright © 2024-2026",
 			Icon:    icon,
 		},
 	}
@@ -58,23 +58,16 @@ func main() {
 
 	// Create application with options
 	var err = wails.Run(&options.App{
-		Title:  "GalaxyTerm",
-		Width:  1280,
-		Height: 800,
-		//DisableResize:    false,
-		//WindowStartState: options.Normal,
-		// 无边框
-		Frameless: false,
-		MinWidth:  720,
-		MinHeight: 480,
-		//StartHidden: false,
-		//HideWindowOnClose: false,
+		Title:            "GalaxyTerm",
+		Width:            1280,
+		Height:           800,
+		Frameless:        false,
+		MinWidth:         720,
+		MinHeight:        480,
 		BackgroundColour: &options.RGBA{R: 0, G: 0, B: 0, A: 1},
-		//AlwaysOnTop:      false,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},
-		//Menu:   newMenu,
 		OnStartup: func(ctx context.Context) {
 			appCtx = ctx
 		},
@@ -87,8 +80,6 @@ func main() {
 			}
 			_ = tunnelAPI.StopAll()
 		},
-		//OnBeforeClose:   beforeClose,
-		//CSSDragProperty: "--wails-draggable",
 		Bind: []interface{}{
 			sessionAPI,
 			desktop.NewDesktopAPI(func() context.Context { return appCtx }),

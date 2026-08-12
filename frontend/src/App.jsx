@@ -561,6 +561,7 @@ function App() {
   const [sidebarSessionQuery, setSidebarSessionQuery] = useState('');
   const [sidebarSessionScope, setSidebarSessionScope] = useState('all');
   const [terminalStatuses, setTerminalStatuses] = useState({});
+  const [terminalContexts, setTerminalContexts] = useState({});
   const [sessionActivity, setSessionActivity] = useState({});
   const [focusMode, setFocusMode] = useState(false);
   const sidebarCompact = resolveSidebarCompact(settings.sidebarMode, screens.lg === false);
@@ -1287,6 +1288,14 @@ function App() {
   }, [sessions]);
 
   useEffect(() => {
+    const activeIds = new Set(sessions.map((session) => session.id));
+    setTerminalContexts((current) => {
+      const entries = Object.entries(current).filter(([sessionId]) => activeIds.has(sessionId));
+      return entries.length === Object.keys(current).length ? current : Object.fromEntries(entries);
+    });
+  }, [sessions]);
+
+  useEffect(() => {
     const sessionIds = sessions.map((session) => session.id);
     const idSet = new Set(sessionIds);
     Object.keys(sessionRecoveryTimersRef.current).forEach((sessionId) => {
@@ -1310,8 +1319,9 @@ function App() {
       displayName: sessionDisplayLabels[session.id],
       providerName: providerTypeLabel(session.providerType, allProviders),
       statusName: t(`session.status.${sessionStatusLabel(session)}`),
+      terminalContext: terminalContexts[session.id],
     })]),
-  ), [allProviders, locale, sessionDisplayLabels, sessions, translationRevision]);
+  ), [allProviders, locale, sessionDisplayLabels, sessions, terminalContexts, translationRevision]);
   const sessionSwitcherItems = sessionSwitchState.orderedIds.map((sessionId) => {
     const session = sessions.find((item) => item.id === sessionId);
     if (!session) return null;
@@ -2551,6 +2561,12 @@ function App() {
       return { started: false };
     }
     updateSessionReconnects(reservation.reconnects);
+    setTerminalContexts((current) => {
+      if (!Object.prototype.hasOwnProperty.call(current, sessionId)) return current;
+      const next = { ...current };
+      delete next[sessionId];
+      return next;
+    });
     if (automatic) {
       updateSessionRecoveries((current) => ({
         ...current,
@@ -4249,6 +4265,9 @@ function App() {
             onAuditEvent={(event) => appendAuditEvent(session.id, event.type, event.detail)}
             onCommandSubmitted={(command) => recordCommandHistory(command, session)}
             onConfirmPaste={confirmTerminalPaste}
+            onContextChange={(context) => setTerminalContexts((current) => (
+              current[session.id] === context ? current : { ...current, [session.id]: context }
+            ))}
             onOutputActivity={(outputAt) => recordSessionActivity(session.id, outputAt)}
             onSearchResultsChange={(result) => updateTerminalSearchResult(session.id, result)}
             onSessionCreated={(backendSessionId) => {
@@ -4439,6 +4458,7 @@ function App() {
       providerName: activeSession
         ? providerTypeLabel(activeSession.providerType, allProviders)
         : '',
+      terminalContext: terminalContexts[activeKey],
     });
     const runSessionToolbarAction = (action) => {
       if (action === 'grid') setSessionView('grid');
@@ -9426,17 +9446,22 @@ function SessionToolbarActions({ model, onAction }) {
 }
 
 function SessionToolbarContext({ model, onCopyTarget }) {
+  const tooltip = [model.provider, model.identity, model.runtime, model.terminalTitle]
+    .filter(Boolean)
+    .filter((value, index, values) => values.indexOf(value) === index)
+    .join(' · ');
   return (
     <div
-      aria-label={t('session.context.summary', model)}
+      aria-label={tooltip}
       className="session-toolbar-context"
-      title={t('session.context.summary', model)}
+      title={tooltip}
     >
       <span className="session-toolbar-context-icon">
         {providerIcons[model.iconType] || <CodeOutlined />}
       </span>
       <span className="session-toolbar-context-provider">{model.provider}</span>
       {model.identity && <strong>{model.identity}</strong>}
+      {model.runtime && <span className="session-toolbar-context-runtime">{model.runtime}</span>}
       {model.identity && onCopyTarget && (
         <Tooltip title={t('action.copySessionTarget')}>
           <Button

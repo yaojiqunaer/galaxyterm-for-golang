@@ -34,6 +34,7 @@
     "test:terminal-status": "node src/terminalStatus.test.mjs",
     "test:terminal-search": "node src/terminalSearch.test.mjs",
     "test:terminal-interaction": "node src/terminalInteraction.test.mjs",
+    "test:terminal-context": "node src/terminalContext.test.mjs",
     "test:terminal-providers": "node src/terminalProviders.test.mjs",
     "test:terminal-execution": "node src/terminalExecution.test.mjs",
     "test:tunnel-presets": "node src/tunnelPresets.test.mjs",

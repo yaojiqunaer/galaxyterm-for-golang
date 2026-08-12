@@ -322,6 +322,24 @@ assert.deepEqual(buildSessionToolbarContext({
   user: '',
 });
 assert.equal(buildSessionToolbarContext(null), null);
+assert.deepEqual(buildSessionToolbarContext({
+  providerType: 'ssh',
+  request: { config: { host: 'prod.example.com' } },
+}, {
+  providerName: 'SSH',
+  terminalContext: {
+    title: 'root@prod: app',
+    workingDirectory: { host: 'prod.example.com', path: '/srv/app' },
+  },
+}), {
+  iconType: 'ssh',
+  identity: 'prod.example.com',
+  provider: 'SSH',
+  runtime: 'prod.example.com:/srv/app',
+  target: 'prod.example.com',
+  terminalTitle: 'root@prod: app',
+  user: '',
+});
 
 const broadcastToolbar = buildSessionToolbarModel({
   activeKey: 's1',
